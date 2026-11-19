@@ -1,0 +1,254 @@
+/*************************************************************************
+*   CSphere                                                              *
+*                                                                        *
+*       This class defines the behavior of the basic sphere. It handles  *
+* all of the sphere intersection and shading information.                *
+*                                                                        *
+* Copyright (c) 1996, Jeffrey R. Naujok                                  *
+*************************************************************************/
+
+#ifdef RAY_GUI
+    #include "StdAfx.h"
+    #include "resource.h"
+    #include "SpherePropertiesDlg.h"
+#else
+    #include "Globals.h"
+#endif
+
+#include "Sphere.h"
+#include "Light.h"
+
+#ifdef RAY_GUI
+#if defined(RAY_GUI) && defined(_DEBUG)
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+#endif
+
+#define SPHERE_VERSION  ((DWORD)3)
+#define VERSION_2       ((DWORD)2)
+#define VERSION_1       ((DWORD)1)
+                  
+CSphere::CSphere( void )
+{
+    CMaterial   *pMaterial;
+
+    m_nRadius = 0.0;
+
+    pMaterial = new CDiffuseMaterial;
+    m_oMaterials.Add( pMaterial, 1.0 );
+    m_oColor.Set( 0.5, 0.5, 0.5 );
+}
+
+CSphere::CSphere( FLT nX, FLT nY, FLT nZ, FLT nRadius ) :
+m_oCenter( nX, nY, nZ )
+{
+    m_nRadius = nRadius;
+    m_oColor.Set( 0.5, 0.5, 0.5 );
+}
+
+CSphere::CSphere( CVector oCenter, FLT nRadius ) :
+m_oCenter( oCenter )
+{
+    m_nRadius = nRadius;
+    m_oColor.Set( 0.5, 0.5, 0.5 );
+}
+
+CSphere::~CSphere( void )
+{
+}
+
+
+#ifdef RAY_GUI
+void CSphere::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
+{
+    HTREEITEM   hSphere;
+
+    hSphere = pTree->AddObject( this, 8, "Sphere", hUnder );
+    CObjects::MatToTree( pTree, hSphere );
+}
+
+void CSphere::SetProperties( void )
+{
+    CSpherePropertiesDlg    oProp( &m_oCenter, &m_nRadius );
+    int                     nCount;
+    CMaterial              *pMaterial;
+
+    oProp.m_oColor = m_oColor;
+    if ( ( oProp.DoModal() == IDOK ) && ( oProp.m_bColorChanged ) )
+    {
+        m_oColor = oProp.m_oColor;
+        nCount = 0;
+        while ( nCount < m_oMaterials.GetSize() )
+        {
+            pMaterial = m_oMaterials[ nCount ];
+            pMaterial->SetColor( m_oColor );
+            nCount++;
+        }
+    }
+}
+#endif
+
+DYNAMIC_IMPLEMENTS( CSphere );
+
+CRayStream &operator >>( CRayStream &oStream, CSphere &oSphere )
+{
+    DWORD       dwVersion;
+    CColor      oColor;
+    CMaterial  *pMaterial;
+
+    oStream >> dwVersion;
+
+    switch( dwVersion )
+    {
+        case SPHERE_VERSION:
+            oStream >> oSphere.m_oCenter;
+            oStream >> oSphere.m_nRadius;
+            oStream >> oSphere.m_oColor;
+            oStream >> oSphere.m_oMaterials;
+            break;
+
+        case VERSION_2:
+            oStream >> oSphere.m_oCenter;
+            oStream >> oSphere.m_nRadius;
+            oStream >> oSphere.m_oMaterials;
+            oSphere.m_oColor.Set( 0.5, 0.5, 0.5 );
+            break;
+
+        case VERSION_1:
+            oStream >> oSphere.m_oCenter;
+            oStream >> oSphere.m_nRadius;
+            oStream >> oSphere.m_oColor;
+            pMaterial = new CDiffuseMaterial( oSphere.m_oColor );
+            oSphere.m_oMaterials.Add( pMaterial, 1.0 );
+            break;
+
+        default:
+            break;
+    }
+
+    return oStream;
+}
+
+CRayStream &operator <<( CRayStream &oStream, CSphere &oSphere )
+{
+    oStream << SPHERE_VERSION;
+    oStream << oSphere.m_oCenter;
+    oStream << oSphere.m_nRadius;
+    oStream << oSphere.m_oColor;
+    oStream << oSphere.m_oMaterials;
+
+    return oStream;
+}
+
+
+BOOL CSphere::Intersect( CRay &oRay, CVector &oIntersect )
+{
+    BOOL    bFound = FALSE;
+    FLT     nA;
+    FLT     nB;
+    FLT     nC;
+    FLT     nT;
+    FLT     nT1;
+    FLT     nT2;
+    FLT     nBSquared;
+    FLT     n4AC;
+    FLT     nSqrt;
+    FLT     n2A;
+    FLT     nDet;
+
+    // TO DO: Speed-ups -- For instance, since the rays are normalized, nA is _always_ 1.
+
+        // A = i^2 + j^2 + k^2
+    nA = ( oRay.GetI() * oRay.GetI() ) + (oRay.GetJ() * oRay.GetJ() ) + (oRay.GetK() * oRay.GetK() );
+        // B = 2i(x-l) + 2j(y-m) + 2k(z-n)
+    nB = (( 2.0 * oRay.GetI() ) * (oRay.GetX() - m_oCenter.GetX() )) +
+         (( 2.0 * oRay.GetJ() ) * (oRay.GetY() - m_oCenter.GetY() )) +
+         (( 2.0 * oRay.GetK() ) * (oRay.GetZ() - m_oCenter.GetZ() ));
+        // C = l^2 + m^2 + n^2 + x^2 + y^2 + z^2 + 2(-lx - my -nz) - r^2
+    nC = ( m_oCenter.GetX() * m_oCenter.GetX() ) +
+         ( m_oCenter.GetY() * m_oCenter.GetY() ) +
+         ( m_oCenter.GetZ() * m_oCenter.GetZ() ) +
+         ( oRay.GetX() * oRay.GetX() ) +
+         ( oRay.GetY() * oRay.GetY() ) +
+         ( oRay.GetZ() * oRay.GetZ() ) +
+         ( 2.0 * ( ( -m_oCenter.GetX() * oRay.GetX() ) +
+                   ( -m_oCenter.GetY() * oRay.GetY() ) +
+                   ( -m_oCenter.GetZ() * oRay.GetZ() ) ) ) -
+         ( m_nRadius * m_nRadius );
+    nBSquared = nB * nB;
+    n4AC = 4.0 * nA * nC;
+    n2A = 2.0 * nA;
+    nDet = nBSquared - n4AC;
+
+        // A negative determinant means all intersections are imaginary (i.e. The line never intersects)
+    if ( nDet < 0.0 )
+        return FALSE;
+
+        // A zero determinant means the intersection is tangential, so we just say it hits.
+        // The truth is, this code will probably never be hit, since the solution is unlikely to
+        // _EVER_ be exactly zero.
+    if ( nDet == 0.0 )
+    {
+        nT = -nB / n2A;
+        if ( ( nT > 0.0 ) && ( nT < oRay.GetT() ) )
+        {
+            oRay.SetT( nT );
+            oIntersect.Set( (oRay.GetI() * nT) + oRay.GetX(), 
+                            (oRay.GetJ() * nT) + oRay.GetY(),
+                            (oRay.GetK() * nT) + oRay.GetZ() );
+            return TRUE;
+        }
+    }
+
+        // Determinant is positive, we have to find the nearer intersection
+    nSqrt = SQRT( nBSquared - n4AC );
+
+    nT1 = ( -nB - nSqrt ) / n2A;
+    nT2 = ( -nB + nSqrt ) / n2A;
+
+    if ( ( nT1 > 0.0 ) && ( nT1 < nT2 ) )
+        nT = nT1;
+    else if ( nT2 > 0.0 )
+        nT = nT2;
+    else if ( nT1 > 0.0 )
+        nT = nT1;
+    else
+        return FALSE;
+
+        // If the intersection is the closest, return TRUE;
+    if ( ( nT > 0.0 ) && ( nT < oRay.GetT() ) )
+    {
+        if ( ( ( nT1 > 0.0 ) && ( nT2 < 0.0 ) ) || ( (nT2 > 0.0 ) && (nT1 < 0.0 ) ) )
+            oIntersect.Inside( TRUE );
+        else
+            oIntersect.Inside( FALSE );
+        oRay.SetT( nT );
+        oIntersect.Set( (oRay.GetI() * nT) + oRay.GetX(), 
+                        (oRay.GetJ() * nT) + oRay.GetY(),
+                        (oRay.GetK() * nT) + oRay.GetZ() );
+        return TRUE;
+    }
+
+        // No intersection
+    return FALSE;
+}
+
+CColor CSphere::Shade( CLight *pLight, CVector &oIntersect ) // CArray <CLight *, CLight *> *pLight, CVector &oIntersect )
+{
+    CColor  oColor;
+    return oColor;
+}
+
+CColor CSphere::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
+{
+    CVector     oVector;
+
+    oVector = oIntersect - m_oCenter;
+
+    oVector.Normalize();
+
+    return BaseShade( oScene, oRay, oIntersect, oVector );
+}
+

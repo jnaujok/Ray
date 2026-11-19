@@ -7,6 +7,76 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-19
+
+The code builds again, on Windows, Linux, and macOS, on top of
+[IASLib v3.0](https://github.com/jnaujok/IASLib). The ray tracing logic is unchanged.
+
+### Added
+
+- `core/`: one ray tracing library shared by every program. It replaces the separate, drifted
+  copies in the MFC application and in `rayengine/`.
+- A TCP transport built on IASLib sockets (`CSocketTaskMaster`, `CSocketTaskSlave`, and a framed
+  wire protocol in `WireProtocol.h`). It takes the place of PVM.
+- `raythrower` options: `--listen [port]` to trace with networked engines, `--spawn` to start
+  local `rayengine` processes, `-o` to choose the image file, `--ppm` to also write a viewable
+  PPM image, `--batch`, `--timeout`, and `--tasks` (the original `-Nxxx` still works).
+  Without `--listen` it traces with threads.
+- `CScene::Load` and `CScene::Save`. `Load` reads version-1 and transitional scene files with the
+  pre-April-1997 number format, which the 1997 code itself could no longer read.
+- Regression tests (`ctest`): every readable sample scene is rendered and compared with a reference
+  render, networked engines must produce exactly what threads produce, scene files must survive a
+  load and save, and the serialization format is checked byte for byte.
+- GitHub Actions CI: Linux (GCC and Clang), macOS, and Windows builds with tests, a Linux
+  AddressSanitizer/UBSan job, and a Windows build of the MFC scene editor.
+- `scenes/README.md`, describing the sample scenes and the file format history.
+
+### Changed
+
+- Uses IASLib's `CString`, streams, threads, mutexes, semaphores, sockets, and `TArray` instead of
+  the project's own early versions of them. `CStream` is now `CRayStream`, a reader and writer of the
+  original binary format on top of any IASLib stream.
+- `CRayArray`, `CColorArray`, `CObjectsArray`, `CLightArray`, and `CMaterialList` are built on
+  IASLib's `TArray`, with the same interfaces and ownership rules.
+- `CThreadTaskMaster` uses IASLib threads and in-memory queues instead of named pipes and Win32
+  semaphores. It is portable and part of the core.
+- `raythrower` reuses `CTaskMaster::TraceScene` instead of its own copy of the ray loop.
+- Built with CMake as C++17. IASLib is fetched by CMake at `v3.0.0`.
+- The core's GUI code is keyed on `RAY_GUI` instead of `_WINDOWS`, which CMake defines for every
+  MSVC build.
+- The Visual C++ 6 project files moved to `legacy/msvc6/`; they cannot build the new code.
+
+### Removed
+
+- PVM: the bundled PVM 3 headers and libraries, `CPVMStream`, `CPVMTaskMaster`, `CPVMTaskSlave`.
+- `CFileStream`, `CPipeStream`, `CSem`, and the engine's own `CString`, all replaced by IASLib.
+- The Unix Makefiles, replaced by CMake.
+- Stubs that were never compiled: `TraceEngine.h`, `TraceThread`, `ImageStream.h`, `DynMaterial.h`.
+
+### Fixed
+
+- `CRay` never initialized or copied its reflection depth, so every ray started with a garbage depth.
+  Traces were not repeatable, and the reflection scenes overflowed the stack.
+- The object class registry existed only in the GUI; every other program crashed on its first object.
+- Loading a scene leaked the camera object. An unknown object class now fails the load instead of
+  reading the rest of the file as garbage.
+- `CObjectsArray::Delete` and `CLightArray::Delete` never reduced the count, leaving a duplicate
+  pointer that was later deleted twice. `SetX`, `SetY`, and `SetInfluence` tested their index with
+  `||`, so they wrote out of bounds. The arrays freed `new[]` memory with `delete`.
+- `CMaterial` had no virtual destructor, though materials are deleted through it.
+- `CColorArray( int )` and the other array constructors were implicit, so
+  `oStream << COLOR_ARRAY_VERSION` called the array serializer.
+- `CImageFile` called `setvbuf` on a file that failed to open, and wrote pixels at any coordinates
+  it was given; out-of-range pixels are now refused.
+- The ray thrower never sent the last partial batch of rays (so it waited forever), never told the
+  engines to stop, dropped pixels after the first reply from each engine, and could divide by zero.
+- `CTaskMaster::TraceScene` overflowed its progress value on images over about 200,000 pixels and
+  left `IsTracing()` true after a trace.
+- Scene files saved over a larger file kept the old file's tail. The GUI ignored load failures, and
+  its display thread opened the image for writing while the tracer was writing it.
+- Long values are written as 4 bytes on every platform, so scene files from 64-bit Linux and macOS
+  match those from Windows.
+
 ## [0.1.0] - 2026-11-19
 
 The first public import of the 1997 code base, reorganized into a modern project layout.
@@ -53,5 +123,6 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jnaujok/Ray/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jnaujok/Ray/releases/tag/v0.1.0

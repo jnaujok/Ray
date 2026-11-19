@@ -1,39 +1,38 @@
 # rayengine
 
-[![Platform: Unix](https://img.shields.io/badge/platform-Unix-lightgrey.svg)](#)
-[![PVM 3](https://img.shields.io/badge/PVM-3-orange.svg)](https://www.netlib.org/pvm3/)
+[![Build and test](https://github.com/jnaujok/Ray/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jnaujok/Ray/actions/workflows/build.yml)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../LICENSE)
 
-The PVM worker process of the [Ray](../README.md) distributed ray tracer.
+The tracing task of the [Ray](../README.md) distributed ray tracer.
+
+## Usage
+
+```sh
+rayengine <master-host> [port] [--retry <seconds>]
+```
+
+| Argument | Meaning |
+|----------|---------|
+| `master-host` | Host name or address of a `raythrower` started with `--listen` |
+| `port` | The master's port (default 7997) |
+| `--retry <seconds>` | Keep trying to connect for this long if the master isn't listening yet |
 
 ## What it does
 
-`rayengine` is started by a master (the Windows scene editor or [`raythrower`](../raythrower))
-through `pvm_spawn`. It:
+1. Connects to the master and sends a hello with the protocol version.
+2. Receives the scene.
+3. Receives batches of primary rays, traces each one, and sends the colors back.
+4. Exits when it is sent an empty batch, or when the master goes away.
 
-1. receives the serialized scene (`MESSAGE_SCENE`),
-2. receives a batch of primary rays (`MESSAGE_RAYS`),
-3. traces each ray and sends the resulting colors back to its parent, and
-4. repeats until it receives an empty batch, then exits.
-
-It refuses to run outside a PVM virtual machine.
-
-## Layout
-
-| Path | Contents |
-|------|----------|
-| `src/` | Engine sources: geometry, materials, scene, streams, `main.cpp` |
-| `include/` | Engine headers (Unix copies of the shared ray tracing core) |
-| `Makefile` | Make build |
+The engine is a `CSocketTaskSlave` (`core/src/SocketTaskSlave.cpp`) running the shared
+`CTaskSlave::RunEngine` loop; the code is in [`main.cpp`](main.cpp). It replaces the 1997 PVM
+worker, which `pvm_spawn` started; `raythrower --spawn` now starts local engines instead.
 
 ## Building
 
+Built with the rest of the project from the repository root:
+
 ```sh
-make PVM_INCLUDE=/path/to/pvm3/include PVM_LIB=/path/to/pvm3/lib/ARCH
+cmake -S . -B build && cmake --build build --target rayengine
 ```
-
-Or from the repository root: `cmake -S . -B build -DRAY_BUILD_PVM_TOOLS=ON`.
-
-> [!NOTE]
-> `src/PVMStream.cpp` was never in the original Makefile's source list, so it isn't in the
-> current one either. If the link fails on `CPVMStream`, add it to `SRCS`.

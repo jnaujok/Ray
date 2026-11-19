@@ -1,106 +1,117 @@
-cmake_minimum_required(VERSION 3.16)
-project(Ray LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.18)
+project(Ray VERSION 0.2.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+option(RAY_BUILD_GUI   "Build the Windows MFC scene editor (MSVC only)" OFF)
+option(RAY_BUILD_TESTS "Build the regression tests" ON)
 
 # ---------------------------------------------------------------------------
-# Ray - Windows MFC scene editor / front end (mirrors Ray.dsp)
+# IASLib: strings, streams, files, threads and sockets.
+# Only the pieces the ray tracer needs are switched on, so no database,
+# JSON or TLS libraries are required.
 # ---------------------------------------------------------------------------
+set(USE_THREADS          ON  CACHE BOOL "" FORCE)
+set(USE_NETWORK          ON  CACHE BOOL "" FORCE)
+set(USE_DATABASE         OFF CACHE BOOL "" FORCE)
+set(USE_SQLITE           OFF CACHE BOOL "" FORCE)
+set(USE_JSON             OFF CACHE BOOL "" FORCE)
+set(USE_MEMORY_DEBUGGING OFF CACHE BOOL "" FORCE)
+set(IASLIB_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
+set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL ON CACHE BOOL "" FORCE)
+
+include(FetchContent)
+FetchContent_Declare(IASLib
+    GIT_REPOSITORY https://github.com/jnaujok/IASLib.git
+    GIT_TAG        v3.0.0
+    GIT_SHALLOW    TRUE)
+FetchContent_MakeAvailable(IASLib)
+
+# ---------------------------------------------------------------------------
+# Ray tracing core, shared by every program.
+#
+# It is an OBJECT library on purpose: scene object and material classes
+# register themselves with static constructors (DYNAMIC_IMPLEMENTS), and a
+# static library would let the linker drop them.
+# ---------------------------------------------------------------------------
+set(RAY_CORE_SOURCES
+    core/src/AmbientMaterial.cpp
+    core/src/Camera.cpp
+    core/src/Color.cpp
+    core/src/ColorArray.cpp
+    core/src/DiffuseMaterial.cpp
+    core/src/ImageFile.cpp
+    core/src/Light.cpp
+    core/src/LightArray.cpp
+    core/src/Material.cpp
+    core/src/MaterialList.cpp
+    core/src/Matrix.cpp
+    core/src/Objects.cpp
+    core/src/ObjectsArray.cpp
+    core/src/Plane.cpp
+    core/src/PtLight.cpp
+    core/src/RayArray.cpp
+    core/src/Rays.cpp
+    core/src/RaySettings.cpp
+    core/src/RayStream.cpp
+    core/src/ReflectiveMaterial.cpp
+    core/src/Scene.cpp
+    core/src/SocketTaskMaster.cpp
+    core/src/SocketTaskSlave.cpp
+    core/src/SpecularMaterial.cpp
+    core/src/Sphere.cpp
+    core/src/TaskMaster.cpp
+    core/src/TaskSlave.cpp
+    core/src/ThreadTaskMaster.cpp
+    core/src/Transform.cpp
+    core/src/TransparentMaterial.cpp
+    core/src/Triangle.cpp
+    core/src/Vector.cpp
+    core/src/WireProtocol.cpp
+)
+
+add_library(ray_core OBJECT ${RAY_CORE_SOURCES})
+target_include_directories(ray_core PUBLIC core/include)
+target_link_libraries(ray_core PUBLIC IASLib::IASLib)
 if(MSVC)
-    set(CMAKE_MFC_FLAG 2)   # MFC as a shared DLL (_AFXDLL)
-
-    set(RAY_APP_SOURCES
-        src/AddMaterialsDlg.cpp
-        src/AddPlaneDlg.cpp
-        src/AddPtLightDlg.cpp
-        src/AddSphereDlg.cpp
-        src/AmbientMaterial.cpp
-        src/Camera.cpp
-        src/CameraPropertiesDlg.cpp
-        src/ChildFrm.cpp
-        src/Color.cpp
-        src/ColorArray.cpp
-        src/DiffuseMaterial.cpp
-        src/DiffuseMaterialPropDlg.cpp
-        src/FileStream.cpp
-        src/ImageFile.cpp
-        src/InfluenceDlg.cpp
-        src/Light.cpp
-        src/LightArray.cpp
-        src/MainFrm.cpp
-        src/Material.cpp
-        src/MaterialList.cpp
-        src/MaterialsDlg.cpp
-        src/Matrix.cpp
-        src/Objects.cpp
-        src/ObjectsArray.cpp
-        src/PipeStream.cpp
-        src/Plane.cpp
-        src/PlanePropertiesDlg.cpp
-        src/PointLightPropertiesDlg.cpp
-        src/PtLight.cpp
-        src/Ray.cpp
-        src/RayArray.cpp
-        src/RayDoc.cpp
-        src/Rays.cpp
-        src/RaySettings.cpp
-        src/RayView.cpp
-        src/ReflectiveMatDlg.cpp
-        src/ReflectiveMaterial.cpp
-        src/Scene.cpp
-        src/SceneTreeView.cpp
-        src/Semaphore.cpp
-        src/SetColorDlg.cpp
-        src/SettingsDialog.cpp
-        src/SpecMatDlg.cpp
-        src/SpecularMaterial.cpp
-        src/Sphere.cpp
-        src/SpherePropertiesDlg.cpp
-        src/StdAfx.cpp
-        src/TaskMaster.cpp
-        src/TaskSlave.cpp
-        src/ThreadTaskMaster.cpp
-        src/ThreadTaskSlave.cpp
-        src/Transform.cpp
-        src/TransparentMatDlg.cpp
-        src/TransparentMaterial.cpp
-        src/Triangle.cpp
-        src/Vector.cpp
-        res/Ray.rc
-    )
-    # Not part of the original Ray.dsp build (PVM-distributed and unused code):
-    #   src/PVMStream.cpp src/PVMTaskMaster.cpp src/PVMTaskSlave.cpp
-    #   src/SceneTreeDlg.cpp src/TraceThread.cpp
-
-    add_executable(Ray WIN32 ${RAY_APP_SOURCES})
-    target_include_directories(Ray PRIVATE include third_party/pvm3/include res)
-    target_compile_definitions(Ray PRIVATE WIN32 _WINDOWS _MBCS _AFXDLL $<$<CONFIG:Debug>:_DEBUG>)
+    # CMake adds /D_WINDOWS to every MSVC build; the core keys its GUI code on RAY_GUI instead.
+    target_compile_definitions(ray_core PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX)
+    target_compile_options(ray_core PRIVATE /W3)
+else()
+    target_compile_options(ray_core PRIVATE -Wall)
 endif()
 
 # ---------------------------------------------------------------------------
-# RayEngine / RayThrower - Unix PVM programs (also buildable via their Makefiles)
+# Command-line programs (Windows, Linux, macOS)
 # ---------------------------------------------------------------------------
-option(RAY_BUILD_PVM_TOOLS "Build the Unix PVM ray engine and ray thrower" OFF)
+add_executable(raythrower raythrower/main.cpp)
+target_link_libraries(raythrower PRIVATE ray_core)
 
-if(RAY_BUILD_PVM_TOOLS)
-    find_library(PVM3_LIBRARY NAMES pvm3 REQUIRED)
-    set(PVM3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/pvm3/include"
-        CACHE PATH "Directory containing pvm3.h")
+add_executable(rayengine rayengine/main.cpp)
+target_link_libraries(rayengine PRIVATE ray_core)
 
-    set(RAY_ENGINE_SOURCES
-        AmbientMaterial Camera Color ColorArray CString DiffuseMaterial FileStream ImageFile
-        Light LightArray Material MaterialList Matrix Objects ObjectsArray Plane PtLight
-        RayArray Rays RaySettings ReflectiveMaterial Scene SpecularMaterial Sphere Transform
-        TransparentMaterial Triangle Vector)
-    list(TRANSFORM RAY_ENGINE_SOURCES PREPEND rayengine/src/)
-    list(TRANSFORM RAY_ENGINE_SOURCES APPEND .cpp)
+install(TARGETS raythrower rayengine RUNTIME DESTINATION bin)
 
-    add_executable(rayengine ${RAY_ENGINE_SOURCES} rayengine/src/main.cpp)
-    target_include_directories(rayengine PRIVATE rayengine/include ${PVM3_INCLUDE_DIR})
-    target_compile_definitions(rayengine PRIVATE UNIX)
-    target_link_libraries(rayengine PRIVATE ${PVM3_LIBRARY} m)
+# ---------------------------------------------------------------------------
+# Windows MFC scene editor
+# ---------------------------------------------------------------------------
+if(RAY_BUILD_GUI)
+    if(NOT MSVC)
+        message(FATAL_ERROR "RAY_BUILD_GUI needs MSVC with MFC")
+    endif()
+    include(cmake/RayGui.cmake)
+endif()
 
-    list(FILTER RAY_ENGINE_SOURCES EXCLUDE REGEX "/CString\\.cpp$")
-    add_executable(raythrower ${RAY_ENGINE_SOURCES} raythrower/src/CString.cpp raythrower/src/main_unix.cpp)
-    target_include_directories(raythrower PRIVATE raythrower/include include ${PVM3_INCLUDE_DIR})
-    target_compile_definitions(raythrower PRIVATE UNIX)
-    target_link_libraries(raythrower PRIVATE ${PVM3_LIBRARY} m)
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+if(RAY_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()

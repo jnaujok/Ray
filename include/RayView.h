@@ -44,7 +44,7 @@ protected:
 // Generated message map functions
 protected:
 	//{{AFX_MSG(CRayView)
-	afx_msg void OnTimer(UINT nIDEvent);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnRenderRayTrace();
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()

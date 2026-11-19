@@ -8,18 +8,22 @@
 
 class CTaskMaster;
 
+#include <atomic>
+
+    // Shared by the document and its tracing threads; the flags are atomic
+    // because several threads read and write them.
 typedef struct
 {
-    CScene         *pScene;
-    CBitmap        *pBitmap;
-    CRect          *pRect;
-    BOOL            bStop;
-    int             nTracing;
-    BOOL            bTracing;
-    int             nQuarter;
-    CDC            *pDC;
-    BOOL            bChoosing;
-    CTaskMaster    *poTaskMaster;
+    CScene             *pScene;
+    CBitmap            *pBitmap;
+    CRect              *pRect;
+    std::atomic<int>    bStop;
+    std::atomic<int>    nTracing;
+    std::atomic<int>    bTracing;
+    int                 nQuarter;
+    CDC * volatile      pDC;
+    std::atomic<int>    bChoosing;
+    CTaskMaster        *poTaskMaster;
 } TRACE_THREAD_DATA;
 
 class CRayDoc : public CDocument

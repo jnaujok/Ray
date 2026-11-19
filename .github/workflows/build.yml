@@ -1,0 +1,106 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux (GCC)
+            os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - name: Linux (Clang)
+            os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+          - name: macOS (Apple Clang)
+            os: macos-latest
+          - name: Windows (MSVC)
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.cxx }}" ]; then
+            export CC=${{ matrix.cc }} CXX=${{ matrix.cxx }}
+          fi
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure --parallel 4
+
+      - name: Package
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p dist
+          find build -maxdepth 3 -type f \( -name 'raythrower' -o -name 'rayengine' -o -name 'raythrower.exe' -o -name 'rayengine.exe' \) -exec cp {} dist/ \;
+          ls -la dist
+
+      - name: Upload programs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ray-${{ runner.os }}-${{ matrix.cc || 'default' }}
+          path: dist/
+          if-no-files-found: warn
+
+  sanitizers:
+    name: Linux (ASan + UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: ctest --test-dir build --output-on-failure --parallel 4
+
+  gui:
+    name: Windows scene editor (MFC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DRAY_BUILD_GUI=ON -DRAY_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --target Ray --parallel
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ray-scene-editor-windows
+          path: build/Release/Ray.exe
+          if-no-files-found: error
