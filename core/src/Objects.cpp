@@ -16,6 +16,8 @@
 #include "Scene.h"
 #include "Light.h"
 
+#include <string.h>
+
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -165,6 +167,19 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
 CDynObject::CDynObject( CObjects *(CFUNC *lpFunction)(CRayStream &oStream), LPCSTR strKey )
 {
     m_lpFunction = lpFunction;
+    m_lpCreateEmpty = NULL;
+    m_strJsonType = NULL;
+    m_strObjectID = strKey;
+    m_pNext = m_pFirst;
+    m_pFirst = this;
+}
+
+CDynObject::CDynObject( CObjects *(CFUNC *lpFunction)(CRayStream &oStream), CObjects *(CFUNC *lpCreateEmpty)(void),
+                        LPCSTR strKey, LPCSTR strJsonType )
+{
+    m_lpFunction = lpFunction;
+    m_lpCreateEmpty = lpCreateEmpty;
+    m_strJsonType = strJsonType;
     m_strObjectID = strKey;
     m_pNext = m_pFirst;
     m_pFirst = this;
@@ -216,6 +231,11 @@ CObjects *CDynObject::MakeMe( CRayStream &oStream )
     return (CObjects *)(*m_lpFunction)( oStream );
 }
 
+CObjects *CDynObject::MakeEmpty( void )
+{
+    return m_lpCreateEmpty ? (*m_lpCreateEmpty)() : NULL;
+}
+
 CDynObject *CDynObject::GetFirst( void )
 {
     return m_pFirst;
@@ -253,6 +273,26 @@ CObjects *CDynList::Instantiate( LPCSTR lpszName, CRayStream &oStream  )
     }
 
     return pReturn;
+}
+
+CObjects *CDynList::Create( LPCSTR strJsonType )
+{
+    for ( CDynObject *pObject = g_oBaseObject.GetFirst(); pObject; pObject = pObject->GetNext() )
+    {
+        if ( pObject->GetJsonType() && strJsonType && strcmp( pObject->GetJsonType(), strJsonType ) == 0 )
+            return pObject->MakeEmpty();
+    }
+    return NULL;
+}
+
+LPCSTR CDynList::JsonTypeOf( LPCSTR strClassType )
+{
+    for ( CDynObject *pObject = g_oBaseObject.GetFirst(); pObject; pObject = pObject->GetNext() )
+    {
+        if ( pObject->Match( strClassType ) )
+            return pObject->GetJsonType();
+    }
+    return NULL;
 }
 
 #ifdef __ENGINE__

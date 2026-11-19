@@ -13,15 +13,15 @@ option(RAY_BUILD_GUI   "Build the Windows MFC scene editor (MSVC only)" OFF)
 option(RAY_BUILD_TESTS "Build the regression tests" ON)
 
 # ---------------------------------------------------------------------------
-# IASLib: strings, streams, files, threads and sockets.
-# Only the pieces the ray tracer needs are switched on, so no database,
-# JSON or TLS libraries are required.
+# IASLib: strings, streams, files, threads, sockets, and JSON (scene files).
+# Only the pieces the ray tracer needs are switched on, so no database or TLS
+# libraries are required. IASLib's JSON support has no outside dependencies.
 # ---------------------------------------------------------------------------
 set(USE_THREADS          ON  CACHE BOOL "" FORCE)
 set(USE_NETWORK          ON  CACHE BOOL "" FORCE)
 set(USE_DATABASE         OFF CACHE BOOL "" FORCE)
 set(USE_SQLITE           OFF CACHE BOOL "" FORCE)
-set(USE_JSON             OFF CACHE BOOL "" FORCE)
+set(USE_JSON             ON  CACHE BOOL "" FORCE)
 set(USE_MEMORY_DEBUGGING OFF CACHE BOOL "" FORCE)
 set(IASLIB_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
 set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL ON CACHE BOOL "" FORCE)
@@ -43,9 +43,14 @@ FetchContent_MakeAvailable(IASLib)
 set(RAY_CORE_SOURCES
     core/src/AmbientMaterial.cpp
     core/src/Camera.cpp
+    core/src/CenterSampler.cpp
+    core/src/ClipColorModel.cpp
     core/src/Color.cpp
     core/src/ColorArray.cpp
+    core/src/ColorModel.cpp
+    core/src/CornerSampler.cpp
     core/src/DiffuseMaterial.cpp
+    core/src/GammaColorModel.cpp
     core/src/ImageFile.cpp
     core/src/Light.cpp
     core/src/LightArray.cpp
@@ -54,6 +59,8 @@ set(RAY_CORE_SOURCES
     core/src/Matrix.cpp
     core/src/Objects.cpp
     core/src/ObjectsArray.cpp
+    core/src/PixelSampler.cpp
+    core/src/PixelWriter.cpp
     core/src/Plane.cpp
     core/src/PtLight.cpp
     core/src/RayArray.cpp
@@ -61,11 +68,14 @@ set(RAY_CORE_SOURCES
     core/src/RaySettings.cpp
     core/src/RayStream.cpp
     core/src/ReflectiveMaterial.cpp
+    core/src/ReinhardColorModel.cpp
     core/src/Scene.cpp
+    core/src/SceneJson.cpp
     core/src/SocketTaskMaster.cpp
     core/src/SocketTaskSlave.cpp
     core/src/SpecularMaterial.cpp
     core/src/Sphere.cpp
+    core/src/SrgbColorModel.cpp
     core/src/TaskMaster.cpp
     core/src/TaskSlave.cpp
     core/src/ThreadTaskMaster.cpp

@@ -24,16 +24,36 @@ raythrower <FileToTrace> [options]
 | `--engine <path>` | The `rayengine` to start (default: next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for each engine to connect (default 60) |
 | `--batch <rays>` | Rays per batch (default 127) |
+| `--aa <mode>` | Pixel sampler, instead of the scene's: `none`, or `corners` for five rays per pixel at its corners and center |
+| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard` |
+| `--convert <file>` | Save the scene as a JSON `.ray` file, with any `--aa` or `--color` applied, and exit without tracing |
 | `-q`, `--quiet` | Print only errors |
 
 Without `--listen` it traces with one thread per task. When the trace finishes it prints the pixel
-count, the elapsed time, and the pixels per second.
+count, the rays traced, the elapsed time, and the pixels per second.
+
+With `--aa corners` each pixel is the average of five rays: one at each corner and one at the
+center. A corner is traced once and shared with the neighboring pixels, so this costs about two rays
+per pixel. The engines don't need to know: the camera's sampler (`CCornerSampler`) labels the rays with
+their position on a doubled sample grid and does the averaging in the master.
+
+`--color` picks how pixel colors become bytes. `clip`, the default, is the 1997 look. `gamma` and
+`srgb` encode for today's displays, which makes the 1997 scenes, lit for a screen without gamma
+encoding, look washed out. `reinhard` tone maps, bringing back highlights that `clip` turns white.
+Settings such as a Reinhard exposure are given in the scene file (see
+[`scenes/README.md`](../scenes/README.md)). `--help` lists every sampler and color model.
 
 ## Examples
 
 ```sh
 # Threads on this machine
 raythrower scenes/scan_test.ray -o scan.raw --ppm scan.ppm
+
+# The same, anti-aliased and tone mapped
+raythrower scenes/scan_test.ray --aa corners --color reinhard -o scan.raw --ppm scan.ppm
+
+# Turn a 1997 binary scene into JSON
+raythrower scenes/1997/scan_test.ray --convert scan_test.ray
 
 # Four local engines over TCP
 raythrower scenes/scan_test.ray --listen --spawn -N4
@@ -44,7 +64,8 @@ raythrower scenes/scan_test.ray --listen 7997 -N3
 
 ## How it works
 
-`raythrower` loads the scene with `CScene::Load`, which reads every scene format from 1997, and
+`raythrower` loads the scene with `CScene::Load`, which reads JSON scenes and every binary format
+from 1997, and
 traces it with the shared `CTaskMaster::TraceScene` loop through a `CThreadTaskMaster` or a
 `CSocketTaskMaster`. The code is in [`main.cpp`](main.cpp).
 

@@ -1,0 +1,452 @@
+#ifdef RAY_GUI
+#include "StdAfx.h"
+#else
+#include "Globals.h"
+#endif
+
+#include "SceneJson.h"
+#include "Vector.h"
+#include "Color.h"
+
+#include "JSON/JsonParser.h"
+
+#include <math.h>
+#include <stdio.h>
+
+#include <vector>
+
+namespace
+{
+        // Errors are per thread: engines decode scenes on their own threads.
+    thread_local std::vector<std::string>   t_astrWhere;
+    thread_local std::string                t_strError;
+
+    std::string Where( void )
+    {
+        std::string strWhere;
+
+        for ( size_t nIndex = 0; nIndex < t_astrWhere.size(); nIndex++ )
+        {
+            const std::string &strPart = t_astrWhere[ nIndex ];
+
+            if ( ! strWhere.empty() && strPart[ 0 ] != '[' )
+                strWhere += '.';
+            strWhere += strPart;
+        }
+        return strWhere;
+    }
+
+    const char *TypeName( const IASLib::CJsonNode &oNode )
+    {
+        switch ( oNode.getNodeType() )
+        {
+            case IASLib::JSON_OBJECT:   return "an object";
+            case IASLib::JSON_ARRAY:    return "an array";
+            case IASLib::JSON_STRING:   return "a string";
+            case IASLib::JSON_NUMBER:   return "a number";
+            case IASLib::JSON_BOOLEAN:  return "true or false";
+            case IASLib::JSON_NULL:     return "null";
+            default:                    return "something else";
+        }
+    }
+
+    BOOL WrongType( const char *strKey, const char *strWanted, const IASLib::CJsonNode &oNode )
+    {
+        return RayJson::Fail( std::string( strKey ) + " must be " + strWanted + ", not " + TypeName( oNode ) );
+    }
+
+    BOOL Finite( const char *strKey, double dValue )
+    {
+        if ( ! isfinite( dValue ) )
+            return RayJson::Fail( std::string( strKey ) + " is not a finite number" );
+        return TRUE;
+    }
+
+        // A number as JSON text that reads back as the same double.
+    std::string NumberText( const IASLib::CJsonNode &oNode )
+    {
+        return oNode.toJson( -1 );
+    }
+
+    void EscapeKey( std::string &strOut, const std::string &strKey )
+    {
+        strOut += '"';
+        for ( size_t nIndex = 0; nIndex < strKey.size(); nIndex++ )
+        {
+            unsigned char c = (unsigned char)strKey[ nIndex ];
+
+            if ( c == '"' || c == '\\' )
+            {
+                strOut += '\\';
+                strOut += (char)c;
+            }
+            else if ( c < 0x20 )
+            {
+                char achBuffer[ 8 ];
+                snprintf( achBuffer, sizeof( achBuffer ), "\\u%04x", c );
+                strOut += achBuffer;
+            }
+            else
+                strOut += (char)c;
+        }
+        strOut += '"';
+    }
+
+    bool IsScalarArray( const IASLib::CJsonNode &oNode )
+    {
+        if ( ! oNode.isArray() )
+            return false;
+        for ( int nIndex = 0; nIndex < oNode.size(); nIndex++ )
+        {
+            const IASLib::CJsonNode *pChild = oNode.get( nIndex );
+            if ( pChild == NULL || pChild->isContainerNode() )
+                return false;
+        }
+        return true;
+    }
+
+    void WriteNode( std::string &strOut, const IASLib::CJsonNode &oNode, int nLevel )
+    {
+        const std::string strIndent( (size_t)( nLevel + 1 ) * 4, ' ' );
+        const std::string strClose( (size_t)nLevel * 4, ' ' );
+
+        if ( oNode.isObject() )
+        {
+            const IASLib::CObjectNode &oObject = static_cast<const IASLib::CObjectNode &>( oNode );
+
+            if ( oObject.size() == 0 )
+            {
+                strOut += "{}";
+                return;
+            }
+            strOut += "{\n";
+            for ( int nIndex = 0; nIndex < oObject.size(); nIndex++ )
+            {
+                const std::string &strKey = oObject.fieldNameString( nIndex );
+
+                strOut += strIndent;
+                EscapeKey( strOut, strKey );
+                strOut += ": ";
+                WriteNode( strOut, *oObject.get( strKey ), nLevel + 1 );
+                if ( nIndex + 1 < oObject.size() )
+                    strOut += ',';
+                strOut += '\n';
+            }
+            strOut += strClose + "}";
+        }
+        else if ( oNode.isArray() )
+        {
+            if ( oNode.size() == 0 )
+                strOut += "[]";
+            else if ( IsScalarArray( oNode ) )
+            {
+                    // Short and flat, like a vector: keep it on one line.
+                strOut += '[';
+                for ( int nIndex = 0; nIndex < oNode.size(); nIndex++ )
+                {
+                    if ( nIndex )
+                        strOut += ", ";
+                    strOut += NumberText( *oNode.get( nIndex ) );
+                }
+                strOut += ']';
+            }
+            else
+            {
+                strOut += "[\n";
+                for ( int nIndex = 0; nIndex < oNode.size(); nIndex++ )
+                {
+                    strOut += strIndent;
+                    WriteNode( strOut, *oNode.get( nIndex ), nLevel + 1 );
+                    if ( nIndex + 1 < oNode.size() )
+                        strOut += ',';
+                    strOut += '\n';
+                }
+                strOut += strClose + "]";
+            }
+        }
+        else
+            strOut += oNode.toJson( -1 );
+    }
+}
+
+namespace RayJson
+{
+    CWhere::CWhere( const char *strName )
+    {
+        t_astrWhere.push_back( strName );
+    }
+
+    CWhere::CWhere( const char *strName, int nIndex )
+    {
+        t_astrWhere.push_back( std::string( strName ) + "[" + std::to_string( nIndex ) + "]" );
+    }
+
+    CWhere::~CWhere( void )
+    {
+        t_astrWhere.pop_back();
+    }
+
+    BOOL Fail( const std::string &strMessage )
+    {
+            // Keep the first error: later ones are usually caused by it.
+        if ( t_strError.empty() )
+        {
+            std::string strWhere = Where();
+            t_strError = strWhere.empty() ? strMessage : strWhere + ": " + strMessage;
+        }
+        return FALSE;
+    }
+
+    const std::string &GetError( void )
+    {
+        return t_strError;
+    }
+
+    void ClearError( void )
+    {
+        t_strError.clear();
+    }
+
+    const IASLib::CJsonNode *Field( const IASLib::CJsonNode &oNode, const char *strKey, BOOL bRequired )
+    {
+        if ( ! oNode.isObject() )
+        {
+            Fail( std::string( "must be an object, not " ) + TypeName( oNode ) );
+            return NULL;
+        }
+
+        const IASLib::CJsonNode *pField = oNode.get( strKey );
+
+        if ( pField == NULL && bRequired )
+            Fail( std::string( "needs \"" ) + strKey + "\"" );
+        return pField;
+    }
+
+    BOOL OnlyFields( const IASLib::CJsonNode &oNode, const char *const *astrFields )
+    {
+        if ( ! oNode.isObject() )
+            return Fail( std::string( "must be an object, not " ) + TypeName( oNode ) );
+
+        const IASLib::CObjectNode &oObject = static_cast<const IASLib::CObjectNode &>( oNode );
+
+        for ( int nIndex = 0; nIndex < oObject.size(); nIndex++ )
+        {
+            const std::string  &strKey = oObject.fieldNameString( nIndex );
+            bool                bKnown = ( strKey == "type" );
+
+            for ( int nField = 0; ! bKnown && astrFields[ nField ]; nField++ )
+                bKnown = ( strKey == astrFields[ nField ] );
+            if ( ! bKnown )
+                return Fail( "unknown field \"" + strKey + "\"" );
+        }
+        return TRUE;
+    }
+
+    BOOL GetType( const IASLib::CJsonNode &oNode, std::string &strType )
+    {
+        if ( oNode.isTextual() )
+        {
+            strType = oNode.textString();
+            return TRUE;
+        }
+        return GetString( oNode, "type", strType, TRUE );
+    }
+
+    BOOL GetNumber( const IASLib::CJsonNode &oNode, const char *strKey, FLT &nValue, BOOL bRequired )
+    {
+        const IASLib::CJsonNode *pField = Field( oNode, strKey, bRequired );
+
+        if ( pField == NULL )
+            return ( oNode.isObject() && ! bRequired ) ? TRUE : FALSE;
+        if ( ! pField->isNumber() )
+            return WrongType( strKey, "a number", *pField );
+        if ( ! Finite( strKey, pField->doubleValue() ) )
+            return FALSE;
+        nValue = (FLT)pField->doubleValue();
+        return TRUE;
+    }
+
+    BOOL GetInt( const IASLib::CJsonNode &oNode, const char *strKey, int &nValue, int nMin, int nMax, BOOL bRequired )
+    {
+        const IASLib::CJsonNode *pField = Field( oNode, strKey, bRequired );
+
+        if ( pField == NULL )
+            return ( oNode.isObject() && ! bRequired ) ? TRUE : FALSE;
+        if ( ! pField->isNumber() )
+            return WrongType( strKey, "a number", *pField );
+
+        double dValue = pField->doubleValue();
+
+        if ( dValue != floor( dValue ) || dValue < nMin || dValue > nMax )
+            return Fail( std::string( strKey ) + " must be a whole number from " + std::to_string( nMin ) +
+                         " to " + std::to_string( nMax ) );
+        nValue = (int)dValue;
+        return TRUE;
+    }
+
+    BOOL GetBool( const IASLib::CJsonNode &oNode, const char *strKey, BOOL &bValue, BOOL bRequired )
+    {
+        const IASLib::CJsonNode *pField = Field( oNode, strKey, bRequired );
+
+        if ( pField == NULL )
+            return ( oNode.isObject() && ! bRequired ) ? TRUE : FALSE;
+        if ( ! pField->isBoolean() )
+            return WrongType( strKey, "true or false", *pField );
+        bValue = pField->booleanValue() ? TRUE : FALSE;
+        return TRUE;
+    }
+
+    BOOL GetString( const IASLib::CJsonNode &oNode, const char *strKey, std::string &strValue, BOOL bRequired )
+    {
+        const IASLib::CJsonNode *pField = Field( oNode, strKey, bRequired );
+
+        if ( pField == NULL )
+            return ( oNode.isObject() && ! bRequired ) ? TRUE : FALSE;
+        if ( ! pField->isTextual() )
+            return WrongType( strKey, "a string", *pField );
+        strValue = pField->textString();
+        return TRUE;
+    }
+
+    BOOL ToVector( const IASLib::CJsonNode &oNode, CVector &oValue )
+    {
+        FLT anValue[ 3 ];
+
+        if ( ! oNode.isArray() || oNode.size() != 3 )
+            return Fail( std::string( "must be an array of three numbers, not " ) +
+                         ( oNode.isArray() ? "an array of " + std::to_string( oNode.size() ) : std::string( TypeName( oNode ) ) ) );
+
+        for ( int nIndex = 0; nIndex < 3; nIndex++ )
+        {
+            const IASLib::CJsonNode *pValue = oNode.get( nIndex );
+
+            if ( pValue == NULL || ! pValue->isNumber() )
+                return Fail( "must be an array of three numbers" );
+            if ( ! Finite( "every element", pValue->doubleValue() ) )
+                return FALSE;
+            anValue[ nIndex ] = (FLT)pValue->doubleValue();
+        }
+        oValue.Set( anValue[ 0 ], anValue[ 1 ], anValue[ 2 ] );
+        return TRUE;
+    }
+
+    BOOL GetVector( const IASLib::CJsonNode &oNode, const char *strKey, CVector &oValue, BOOL bRequired )
+    {
+        const IASLib::CJsonNode *pField = Field( oNode, strKey, bRequired );
+
+        if ( pField == NULL )
+            return ( oNode.isObject() && ! bRequired ) ? TRUE : FALSE;
+
+        CWhere oWhere( strKey );
+        return ToVector( *pField, oValue );
+    }
+
+    BOOL GetColor( const IASLib::CJsonNode &oNode, const char *strKey, CColor &oValue, BOOL bRequired )
+    {
+        CVector oVector;
+        BOOL    bPresent = ( oNode.isObject() && oNode.get( strKey ) != NULL );
+
+        if ( ! GetVector( oNode, strKey, oVector, bRequired ) )
+            return FALSE;
+        if ( bPresent )
+            oValue.Set( oVector.GetX(), oVector.GetY(), oVector.GetZ() );
+        return TRUE;
+    }
+
+    BOOL GetAngle( const IASLib::CJsonNode &oNode, const char *strKey, FLT &nRadians, BOOL bRequired )
+    {
+        std::string strRadians = std::string( strKey ) + "Radians";
+        FLT         nValue;
+
+        if ( ! oNode.isObject() )
+            return Fail( std::string( "must be an object, not " ) + TypeName( oNode ) );
+
+        if ( oNode.get( strRadians ) != NULL )
+            return GetNumber( oNode, strRadians.c_str(), nRadians, TRUE );
+
+        if ( oNode.get( strKey ) == NULL )
+            return bRequired ? Fail( std::string( "needs \"" ) + strKey + "\"" ) : TRUE;
+
+        if ( ! GetNumber( oNode, strKey, nValue, TRUE ) )
+            return FALSE;
+        nRadians = nValue * RADIANS;
+        return TRUE;
+    }
+
+    void PutNumber( IASLib::CObjectNode &oNode, const char *strKey, FLT nValue )
+    {
+        oNode.put( strKey, (double)nValue );
+    }
+
+    void PutBool( IASLib::CObjectNode &oNode, const char *strKey, BOOL bValue )
+    {
+        oNode.put( strKey, bValue ? true : false );
+    }
+
+    void AddVector( IASLib::CArrayNode &oArray, const CVector &oValue )
+    {
+        CVector oCopy( oValue );
+
+        oArray.addArray()->add( (double)oCopy.GetX() )->add( (double)oCopy.GetY() )->add( (double)oCopy.GetZ() );
+    }
+
+    void PutVector( IASLib::CObjectNode &oNode, const char *strKey, const CVector &oValue )
+    {
+        CVector oCopy( oValue );
+
+        oNode.putArray( strKey )->add( (double)oCopy.GetX() )->add( (double)oCopy.GetY() )->add( (double)oCopy.GetZ() );
+    }
+
+    void PutColor( IASLib::CObjectNode &oNode, const char *strKey, const CColor &oValue )
+    {
+        CColor oCopy( oValue );
+
+        oNode.putArray( strKey )->add( (double)oCopy.GetR() )->add( (double)oCopy.GetG() )->add( (double)oCopy.GetB() );
+    }
+
+    void PutAngle( IASLib::CObjectNode &oNode, const char *strKey, FLT nRadians )
+    {
+        double dDegrees = (double)( nRadians / RADIANS );
+
+            // The shortest decimal number of degrees that reads back exactly.
+        for ( int nPlaces = 0; nPlaces <= 15; nPlaces++ )
+        {
+            double dScale = pow( 10.0, nPlaces );
+            double dRounded = round( dDegrees * dScale ) / dScale;
+
+            if ( (FLT)( (FLT)dRounded * RADIANS ) == nRadians )
+            {
+                oNode.put( strKey, dRounded );
+                return;
+            }
+        }
+            // Not every double is some number of degrees times RADIANS.
+        if ( (FLT)( (FLT)dDegrees * RADIANS ) == nRadians )
+            oNode.put( strKey, dDegrees );
+        else
+            oNode.put( std::string( strKey ) + "Radians", (double)nRadians );
+    }
+
+    std::string Write( const IASLib::CJsonNode &oNode )
+    {
+        std::string strOut;
+
+        WriteNode( strOut, oNode, 0 );
+        strOut += '\n';
+        return strOut;
+    }
+
+    IASLib::CJsonNode *Parse( const std::string &strText )
+    {
+        IASLib::CJsonParser     oParser;
+        IASLib::CJsonNode      *pRoot = oParser.readTree( strText );
+
+        if ( pRoot == NULL || oParser.hasError() )
+        {
+            delete pRoot;
+            Fail( std::string( "not valid JSON: " ) + (const char *)oParser.getError() );
+            return NULL;
+        }
+        return pRoot;
+    }
+}

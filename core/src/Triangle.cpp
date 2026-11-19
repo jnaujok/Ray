@@ -17,6 +17,7 @@
 
 #include "Triangle.h"
 #include "Light.h"
+#include "SceneJson.h"
 
 #ifdef RAY_GUI
 #if defined(RAY_GUI) && defined(_DEBUG)
@@ -106,7 +107,7 @@ void CTriangle::SetProperties( void )
 }
 #endif
 
-DYNAMIC_IMPLEMENTS( CTriangle );
+DYNAMIC_IMPLEMENTS( CTriangle, "triangle" );
 
 CRayStream &operator >>( CRayStream &oStream, CTriangle &oTriangle )
 {
@@ -252,3 +253,55 @@ CColor CTriangle::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
     return BaseShade( oScene, oRay, oIntersect, oVector );
 }
 
+    // Reads an array of three [x, y, z] vectors.
+static BOOL ReadThree( const IASLib::CJsonNode &oNode, const char *strKey, CVector &oFirst, CVector &oSecond, CVector &oThird )
+{
+    const IASLib::CJsonNode *pArray = RayJson::Field( oNode, strKey, TRUE );
+    RayJson::CWhere          oWhere( strKey );
+
+    if ( pArray == NULL )
+        return FALSE;
+    if ( ! pArray->isArray() || pArray->size() != 3 )
+        return RayJson::Fail( "must be an array of three [x, y, z] arrays" );
+
+    CVector *apoVectors[ 3 ] = { &oFirst, &oSecond, &oThird };
+
+    for ( int nIndex = 0; nIndex < 3; nIndex++ )
+    {
+        RayJson::CWhere oElement( "", nIndex );
+
+        if ( ! RayJson::ToVector( *pArray->get( nIndex ), *apoVectors[ nIndex ] ) )
+            return FALSE;
+    }
+    return TRUE;
+}
+
+void CTriangle::ToJson( IASLib::CObjectNode &oNode )
+{
+    IASLib::CArrayNode *pCorners = oNode.putArray( "corners" );
+    RayJson::AddVector( *pCorners, m_oCorner1 );
+    RayJson::AddVector( *pCorners, m_oCorner2 );
+    RayJson::AddVector( *pCorners, m_oCorner3 );
+    RayJson::PutVector( oNode, "surfaceNormal", m_oSurfaceNormal );
+
+    IASLib::CArrayNode *pNormals = oNode.putArray( "normals" );
+    RayJson::AddVector( *pNormals, m_oNormal1 );
+    RayJson::AddVector( *pNormals, m_oNormal2 );
+    RayJson::AddVector( *pNormals, m_oNormal3 );
+    RayJson::PutColor( oNode, "color", m_oColor );
+    m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+}
+
+BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "corners", "surfaceNormal", "normals", "color", "materials", NULL };
+
+    if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+         ! ReadThree( oNode, "corners", m_oCorner1, m_oCorner2, m_oCorner3 ) ||
+         ! RayJson::GetVector( oNode, "surfaceNormal", m_oSurfaceNormal, TRUE ) ||
+         ! ReadThree( oNode, "normals", m_oNormal1, m_oNormal2, m_oNormal3 ) )
+        return FALSE;
+
+    return RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
+           m_oMaterials.FromJson( oNode, "materials" );
+}

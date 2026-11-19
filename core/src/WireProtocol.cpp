@@ -84,17 +84,15 @@ namespace RayWire
         return oStream.ReadUInt32() == RAY_WIRE_VERSION;
     }
 
+        // The scene travels as the same JSON as a scene file, on one line.
     std::string EncodeScene( CScene &oScene )
     {
-        return Encode( [&oScene]( CRayStream &oStream ) { oScene.Serialize( oStream, FALSE ); } );
+        return oScene.ToJson( TRUE );
     }
 
     bool DecodeScene( const std::string &strPayload, CScene &oScene )
     {
-        IASLib::CStringStream   oBuffer( strPayload.data(), strPayload.size() );
-        CRayStream              oStream( oBuffer );
-
-        return oScene.Serialize( oStream, TRUE ) == 0;
+        return oScene.FromJson( strPayload ) == 0;
     }
 
     std::string EncodeRays( CRayArray &oRays )

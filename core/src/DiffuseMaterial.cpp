@@ -7,6 +7,7 @@
 #include "Vector.h"
 
 #include "DiffuseMaterial.h"
+#include "SceneJson.h"
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -16,7 +17,7 @@ static char THIS_FILE[] = __FILE__;
 
 #define DIFFUSE_MATERIAL_VERSION    ((DWORD)1)
 
-IMPLEMENT_MATERIAL( CDiffuseMaterial, Diffuse Material );
+IMPLEMENT_MATERIAL( CDiffuseMaterial, Diffuse Material, "diffuse" );
 
 CDiffuseMaterial::CDiffuseMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 )
@@ -144,3 +145,18 @@ void CDiffuseMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
     oList.SetItem( &oItem );
 }
 #endif
+
+void CDiffuseMaterial::ToJson( IASLib::CObjectNode &oNode )
+{
+    RayJson::PutColor( oNode, "color", m_oColor );
+    RayJson::PutBool( oNode, "diffuseCast", m_bDiffuseCast );
+}
+
+BOOL CDiffuseMaterial::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "influence", "color", "diffuseCast", NULL };
+
+    return RayJson::OnlyFields( oNode, astrFields ) &&
+           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
+           RayJson::GetBool( oNode, "diffuseCast", m_bDiffuseCast, FALSE );
+}

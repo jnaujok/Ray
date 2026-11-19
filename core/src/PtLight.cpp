@@ -18,6 +18,7 @@
 #endif
 
 #include "PtLight.h"
+#include "SceneJson.h"
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -71,7 +72,7 @@ void CPointLight::SetProperties( void )
 }
 #endif
 
-DYNAMIC_IMPLEMENTS( CPointLight );
+DYNAMIC_IMPLEMENTS( CPointLight, "point" );
 
 CRayStream &operator >>( CRayStream &oStream, CPointLight &oLight )
 {
@@ -100,3 +101,17 @@ CRayStream &operator <<( CRayStream &oStream, CPointLight &oLight )
     return oStream;
 }
 
+void CPointLight::ToJson( IASLib::CObjectNode &oNode )
+{
+    RayJson::PutVector( oNode, "position", m_oPosition );
+    RayJson::PutColor( oNode, "color", m_oColor );
+}
+
+BOOL CPointLight::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "position", "color", NULL };
+
+    return RayJson::OnlyFields( oNode, astrFields ) &&
+           RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) &&
+           RayJson::GetColor( oNode, "color", m_oColor, TRUE );
+}

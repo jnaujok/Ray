@@ -104,6 +104,15 @@ void CRay::CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX
     // where (0, 0) is the top left corner of the image.
 void CRay::CreateRay( CScene &oScene, int nX, int nY, FLT nInfluence )
 {
+    CreateRayAt( oScene, nX + 0.5, nY + 0.5, nX, nY, nInfluence );
+}
+
+    // The primary ray from the camera through the point (nImageX, nImageY) on
+    // the image, measured in pixels from its top left corner: (0, 0) is that
+    // corner and (width, height) the bottom right one. The ray is labeled
+    // with (nTagX, nTagY), which comes back with its color.
+void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int nTagY, FLT nInfluence )
+{
     CCamera        &oCamera = oScene.GetCamera();
     CSettings      &oSettings = oScene.GetSettings();
     FLT             nWidth = (FLT)oSettings.GetImageWidth();
@@ -114,8 +123,8 @@ void CRay::CreateRay( CScene &oScene, int nX, int nY, FLT nInfluence )
     if ( ( nWidth <= 0.0 ) || ( nHeight <= 0.0 ) )
         nWidth = nHeight = 1.0;
 
-    oDirection = oCamera.RayDirection( ( ( ( nX + 0.5 ) * 2.0 ) / nWidth ) - 1.0,
-                                       1.0 - ( ( ( nY + 0.5 ) * 2.0 ) / nHeight ),
+    oDirection = oCamera.RayDirection( ( ( nImageX * 2.0 ) / nWidth ) - 1.0,
+                                       1.0 - ( ( nImageY * 2.0 ) / nHeight ),
                                        nWidth / nHeight );
 
     m_nX = oStartPos.GetX();
@@ -128,8 +137,8 @@ void CRay::CreateRay( CScene &oScene, int nX, int nY, FLT nInfluence )
     m_nT = 1e100;
 
     m_nInfluence = nInfluence;
-    m_nPixelX = nX;
-    m_nPixelY = nY;
+    m_nPixelX = nTagX;
+    m_nPixelY = nTagY;
     m_nDepth = 0;
 }
 

@@ -13,11 +13,24 @@
 
 #include "RayStream.h"
 
+namespace IASLib
+{
+    class CJsonNode;
+    class CObjectNode;
+}
+
 class CSettings
 {
     public:
                         CSettings( int nWidth = 640, int nHeight = 480, int nColorDepth = 8, LPCSTR strOutputFile = "ray.out" );
         virtual        ~CSettings( void ) {}
+
+            // The settings as JSON for a scene file. The ones the tracer uses
+            // are fields of oNode; the 1997 placeholders it never implemented
+            // go in "reserved1997", and only where they differ from their
+            // defaults. Every field is optional when reading.
+        void            ToJson( IASLib::CObjectNode &oNode );
+        BOOL            FromJson( const IASLib::CJsonNode &oNode );
 
     protected:
             // Image information

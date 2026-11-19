@@ -17,7 +17,9 @@ class CImageFile
         virtual    ~CImageFile( void );
 
         CColor      GetPoint( int nX, int nY );
+            // Writes a color the way the 1997 code did (the clip color model).
         BOOL        PutPoint( int nX, int nY, const CColor &oColor );
+        BOOL        PutRGB( int nX, int nY, BYTE nRed, BYTE nGreen, BYTE nBlue );
         BOOL        IsOpen( void ) const { return ( m_pFile != NULL ) ? TRUE : FALSE; }
 
         DWORD       GetWidth( void ) { return m_nWidth; }

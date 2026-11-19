@@ -6,6 +6,7 @@
 
 #include "Color.h"
 #include "ImageFile.h"
+#include "ClipColorModel.h"
 
 CImageFile::CImageFile( LPCSTR strFilename, int nWidth, int nHeight, BOOL bRead )
 {
@@ -120,12 +121,17 @@ CColor CImageFile::GetPoint( int nX, int nY )
 
 BOOL CImageFile::PutPoint( int nX, int nY, const CColor &oColor )
 {
+    CClipColorModel oModel;
+    BYTE            nRed, nGreen, nBlue;
+
+    oModel.ToRGB( oColor, nRed, nGreen, nBlue );
+    return PutRGB( nX, nY, nRed, nGreen, nBlue );
+}
+
+BOOL CImageFile::PutRGB( int nX, int nY, BYTE nRed, BYTE nGreen, BYTE nBlue )
+{
     long    dwOffset;
     BOOL    bRetVal = FALSE;
-    BYTE    nRed, nGreen, nBlue;
-    CColor  oColor2 = oColor;
-
-    oColor2.Clip();
 
     if ( ( nX < 0 ) || ( nY < 0 ) || ( (DWORD)nX >= m_nWidth ) || ( (DWORD)nY >= m_nHeight ) )
         return FALSE;
@@ -135,10 +141,6 @@ BOOL CImageFile::PutPoint( int nX, int nY, const CColor &oColor )
         dwOffset = 4 + ( ( ( m_nWidth * nY ) + nX ) * 3 );
 
         fseek( m_pFile, dwOffset, SEEK_SET );
-
-        nRed = (BYTE)(oColor2.GetR() * 255);
-        nGreen = (BYTE)(oColor2.GetG() * 255);
-        nBlue = (BYTE)(oColor2.GetB() * 255);
 
         if ( ( fwrite( &nRed, sizeof( BYTE ), 1, m_pFile ) == 1 ) &&
              ( fwrite( &nGreen, sizeof( BYTE ), 1, m_pFile ) == 1 ) &&

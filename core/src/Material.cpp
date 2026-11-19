@@ -16,6 +16,8 @@
 
 #include "Material.h"
 
+#include <string.h>
+
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -28,10 +30,12 @@ CDynMaterial *CDynMaterial::m_pFirst = NULL;
 
 static CDynMaterial   g_oBaseMaterial( NULL, NULL, "Base Material", "Base Material" );
 
-CDynMaterial::CDynMaterial( CMaterial *(CFUNC *lpFunction)(CRayStream &oStream), LPADDFUNC lpAddFunc, LPCSTR strKey, LPCSTR strName )
+CDynMaterial::CDynMaterial( CMaterial *(CFUNC *lpFunction)(CRayStream &oStream), LPADDFUNC lpAddFunc, LPCSTR strKey, LPCSTR strName,
+                            LPCSTR strJsonType )
 {
     m_lpFunction = lpFunction;
     m_lpAddFunc = lpAddFunc;
+    m_strJsonType = strJsonType;
     m_strObjectID = strKey;
     m_strAddName = strName;
     m_pNext = m_pFirst;
@@ -93,6 +97,26 @@ CDynMaterialList::CDynMaterialList( void )
 
 CDynMaterialList::~CDynMaterialList( void )
 {
+}
+
+CMaterial *CDynMaterialList::Create( LPCSTR strJsonType )
+{
+    for ( CDynMaterial *pObject = m_pFirst; pObject; pObject = pObject->GetNext() )
+    {
+        if ( pObject->GetJsonType() && strJsonType && strcmp( pObject->GetJsonType(), strJsonType ) == 0 )
+            return pObject->GetAddFunc() ? (*pObject->GetAddFunc())() : NULL;
+    }
+    return NULL;
+}
+
+LPCSTR CDynMaterialList::JsonTypeOf( LPCSTR strClassType )
+{
+    for ( CDynMaterial *pObject = m_pFirst; pObject; pObject = pObject->GetNext() )
+    {
+        if ( pObject->Match( strClassType ) )
+            return pObject->GetJsonType();
+    }
+    return NULL;
 }
 
 CMaterial *CDynMaterialList::Instantiate( LPCSTR lpszName, CRayStream &oStream  )

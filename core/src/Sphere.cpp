@@ -17,6 +17,7 @@
 
 #include "Sphere.h"
 #include "Light.h"
+#include "SceneJson.h"
 
 #ifdef RAY_GUI
 #if defined(RAY_GUI) && defined(_DEBUG)
@@ -90,7 +91,7 @@ void CSphere::SetProperties( void )
 }
 #endif
 
-DYNAMIC_IMPLEMENTS( CSphere );
+DYNAMIC_IMPLEMENTS( CSphere, "sphere" );
 
 CRayStream &operator >>( CRayStream &oStream, CSphere &oSphere )
 {
@@ -252,3 +253,21 @@ CColor CSphere::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
     return BaseShade( oScene, oRay, oIntersect, oVector );
 }
 
+void CSphere::ToJson( IASLib::CObjectNode &oNode )
+{
+    RayJson::PutVector( oNode, "center", m_oCenter );
+    RayJson::PutNumber( oNode, "radius", m_nRadius );
+    RayJson::PutColor( oNode, "color", m_oColor );
+    m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+}
+
+BOOL CSphere::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "center", "radius", "color", "materials", NULL };
+
+    return RayJson::OnlyFields( oNode, astrFields ) &&
+           RayJson::GetVector( oNode, "center", m_oCenter, TRUE ) &&
+           RayJson::GetNumber( oNode, "radius", m_nRadius, TRUE ) &&
+           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
+           m_oMaterials.FromJson( oNode, "materials" );
+}

@@ -1,11 +1,13 @@
 // Checks that CRayStream writes exactly the bytes the 1997 CFileStream did,
-// and that scene files survive a load and save unchanged.
+// that JSON scenes are read and checked properly, and that scene files
+// survive a load and save unchanged.
 //
-//   format_test                   the byte-level format checks
+//   format_test                   the byte-level format and JSON checks
 //   format_test <scene.ray> <dir> load, save, load, save; the two saves must match
 #include "Globals.h"
 #include "RayStream.h"
 #include "Scene.h"
+#include "ReinhardColorModel.h"
 
 #include "Streams/StringStream.h"
 
@@ -125,6 +127,88 @@ static std::string ReadFile( const std::string &strFile )
     return strData;
 }
 
+    // A scene with only what has no default: a camera.
+static const char *s_strMinimal =
+    "{\n"
+    "  \"format\": \"Ray scene\", \"version\": 3,\n"
+    "  \"camera\": { \"position\": [0, 0, -10], \"lookAt\": [0, 0, 0] },\n"
+    "  \"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 } ],\n"
+    "  \"lights\": [ { \"type\": \"point\", \"position\": [5, 5, -5], \"color\": [1, 1, 1] } ]\n"
+    "}\n";
+
+    // s_strMinimal with strFrom replaced by strTo.
+static std::string Minimal( const char *strFrom, const char *strTo )
+{
+    std::string strText = s_strMinimal;
+    size_t      nAt = strText.find( strFrom );
+
+    if ( nAt != std::string::npos )
+        strText.replace( nAt, strlen( strFrom ), strTo );
+    return strText;
+}
+
+    // Loading strText must fail with a message containing strExpected, and
+    // leave the scene as it was.
+static void ExpectError( const std::string &strText, DWORD nExpected, const char *strExpected )
+{
+    CScene  oScene;
+
+    Check( oScene.FromJson( s_strMinimal ) == 0, "the minimal scene loads" );
+
+    std::string strBefore = oScene.ToJson();
+    DWORD       nResult = oScene.FromJson( strText );
+
+    if ( nResult != nExpected || strstr( oScene.GetLoadError(), strExpected ) == NULL )
+    {
+        fprintf( stderr, "FAILED: expected error \"%s\", got %u \"%s\"\n", strExpected, (unsigned)nResult, oScene.GetLoadError() );
+        g_nFailures++;
+    }
+    Check( oScene.ToJson() == strBefore, "a failed load leaves the scene as it was" );
+}
+
+static void JsonChecks( void )
+{
+    CScene  oScene;
+
+    Check( oScene.FromJson( s_strMinimal ) == 0, "a minimal JSON scene loads" );
+    Check( oScene.GetSettings().GetImageWidth() == 640, "settings that are left out keep their defaults" );
+    Check( strcmp( oScene.GetCamera().GetSampler().GetName(), "none" ) == 0, "the default sampler" );
+    Check( strcmp( oScene.GetCamera().GetColorModel().GetName(), "clip" ) == 0, "the default color model" );
+
+        // The sampler and color model, with settings, are saved and read back.
+    std::string strModels = Minimal( "\"lookAt\": [0, 0, 0]",
+                                     "\"lookAt\": [0, 0, 0], \"sampler\": \"corners\", "
+                                     "\"colorModel\": { \"type\": \"reinhard\", \"exposure\": 2, \"white\": 4 }" );
+    Check( oScene.FromJson( strModels ) == 0, "a scene with a sampler and color model loads" );
+    Check( strcmp( oScene.GetCamera().GetSampler().GetName(), "corners" ) == 0, "the sampler is read" );
+
+    CReinhardColorModel *pModel = dynamic_cast<CReinhardColorModel *>( &oScene.GetCamera().GetColorModel() );
+    Check( pModel && pModel->GetExposure() == 2.0 && pModel->GetWhite() == 4.0, "the color model's settings are read" );
+
+    std::string strSaved = oScene.ToJson();
+    CScene      oReread;
+    Check( oReread.FromJson( strSaved ) == 0 && oReread.ToJson() == strSaved, "a saved JSON scene reads back the same" );
+    Check( strSaved.find( "\"sampler\": \"corners\"" ) != std::string::npos, "a sampler without settings is saved by name" );
+    Check( strSaved.find( "\"exposure\": 2.0" ) != std::string::npos, "a color model's settings are saved" );
+
+        // Mistakes are reported where they are.
+    ExpectError( "{ \"format\": ", BAD_FILE, "not valid JSON" );
+    ExpectError( Minimal( "\"Ray scene\"", "\"Something else\"" ), BAD_FILE, "\"format\" must be \"Ray scene\"" );
+    ExpectError( Minimal( "\"version\": 3", "\"version\": 4" ), WRONG_VERSION, "newer version" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radus\": 1" ), BAD_FILE, "objects[0]: unknown field \"radus\"" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": \"big\"" ), BAD_FILE, "objects[0]: radius must be a number" );
+    ExpectError( Minimal( "\"center\": [0, 0, 0]", "\"center\": [0, 0]" ), BAD_FILE, "objects[0].center: must be an array of three numbers" );
+    ExpectError( Minimal( "\"type\": \"sphere\"", "\"type\": \"cube\"" ), BAD_FILE, "objects[0]: unknown object type \"cube\"" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"sphere\"" ), BAD_FILE, "lights[0]: unknown light type \"sphere\"" );
+    ExpectError( Minimal( "\"position\": [0, 0, -10], ", "" ), BAD_FILE, "camera: needs \"position\"" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"sampler\": \"jittered\"" ), BAD_FILE,
+                 "camera.sampler: unknown sampler \"jittered\"" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"colorModel\": { \"type\": \"gamma\", \"gamma\": -1 }" ),
+                 BAD_FILE, "camera.colorModel: gamma must be a positive number" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"chrome\" } ]" ), BAD_FILE,
+                 "objects[0].materials[0]: unknown material type \"chrome\"" );
+}
+
 static void RoundTrip( const char *strScene, const char *strDir )
 {
     std::string strBase = std::string( strDir ) + "/roundtrip_";
@@ -154,7 +238,10 @@ int main( int argc, char **argv )
     if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
     else
+    {
         FormatChecks();
+        JsonChecks();
+    }
 
     if ( g_nFailures == 0 )
         printf( "All checks passed\n" );

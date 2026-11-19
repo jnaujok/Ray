@@ -253,7 +253,7 @@ BOOL CSocketTaskMaster::RaysToTask( CRayArray &oRays, int nTask )
     return TRUE;
 }
 
-int CSocketTaskMaster::ColorsFromTasks( CImageFile &oImageFile, BOOL bWait )
+int CSocketTaskMaster::ColorsFromTasks( BOOL bWait )
 {
     CColorArray    *pColors;
     int             nPixels = 0;
@@ -276,7 +276,7 @@ int CSocketTaskMaster::ColorsFromTasks( CImageFile &oImageFile, BOOL bWait )
         }
 
         for ( int nCount = 0; nCount < pColors->GetSize(); nCount++ )
-            oImageFile.PutPoint( pColors->GetX( nCount ), pColors->GetY( nCount ), (*pColors)[ nCount ] );
+            PutSample( pColors->GetX( nCount ), pColors->GetY( nCount ), (*pColors)[ nCount ] );
 
         nPixels += pColors->GetSize();
         delete pColors;

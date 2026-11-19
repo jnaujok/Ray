@@ -7,6 +7,65 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **JSON scene files.** Scenes are saved as human-readable JSON (version 3 of the `.ray` format,
+  same extension) that can be written and edited by hand. Only the camera is required; anything
+  left out takes its default. Unknown fields are errors, so misspellings are caught, and every error
+  says where it is (`objects[0].materials[1]: unknown field "colour"`). The format is documented in
+  `scenes/README.md`. It adds the background color and the camera's sampler and color model to what
+  the binary format held, and keeps every 1997 setting, the never-implemented ones under
+  `settings.reserved1997`. Built on IASLib's JSON support, which the build now turns on.
+  - Each scene class reads and writes its own fields (`ToJson`/`FromJson`); the object and material
+    registries give each class a JSON `type` name and can create one empty.
+  - `CScene::Load` tells JSON from the 1997 binary format by the first byte and reads both;
+    `CScene::Save` always writes JSON. `CScene::GetLoadError` says why a load failed.
+  - Angles are written in degrees when a decimal number of degrees reads back to exactly the same
+    radians, and otherwise in radians (`verticalAngleRadians`), so nothing changes in conversion.
+- **Pixel samplers.** A camera owns a `CPixelSampler` that makes its primary rays and turns their
+  colors into pixels, so new anti-aliasing or ray generation schemes are new subclasses attached
+  with `CCamera::SetSampler` or named in the scene. `CTaskMaster::TraceScene` just runs the camera's
+  sampler. Samplers are listed by name in `PixelSampler.cpp`.
+  - `none` (`CCenterSampler`, the default): one ray through each pixel's center, as before.
+  - `corners` (`CCornerSampler`): the first anti-aliasing mode. It traces five rays for each pixel,
+    one at each corner and one at the center, and averages them. Each corner is traced once and
+    shared by the four pixels around it, so it costs about two rays per pixel instead of five.
+    Rays are tagged with their position on a doubled sample grid, so `rayengine` needs no change,
+    and samples are summed in fixed point, so threads and networked engines produce identical
+    images.
+- **Color models.** A camera owns a `CColorModel` that turns each pixel's linear color, of any
+  brightness, into the image's bytes; samplers now hand over unclipped colors through a
+  `CPixelWriter`. Color models are listed by name in `ColorModel.cpp`:
+  - `clip` (the default): clip at 1 and truncate, exactly as the 1997 image writer did;
+  - `gamma`: gamma encoding, with a `gamma` setting (default 2.2);
+  - `srgb`: the sRGB curve;
+  - `reinhard`: Reinhard tone mapping on luminance, with `exposure` and `white` settings, then sRGB.
+- `raythrower` options: `--aa <sampler>` and `--color <model>` override the scene's choices;
+  `--convert <file>` saves the scene as JSON and exits; `--help` lists the samplers and color
+  models. It prints the rays traced and the rays per pixel, and says why a scene couldn't be read.
+  The scene editor does not offer a sampler or color model yet.
+- `CRay::CreateRayAt`, which casts a primary ray through any point on the image, and
+  `CImageFile::PutRGB`.
+- Tests: four scenes rendered with corner anti-aliasing and one with each color model (new
+  references in `tests/reference/renders.tar.gz`); networked engines must match threads with
+  anti-aliasing on; each 1997 scene must render exactly what its JSON version renders and convert
+  to exactly the committed JSON file; JSON scenes with mistakes must fail with the right message
+  and leave the scene untouched.
+
+### Changed
+
+- The sample scenes in `scenes/` are now JSON, converted from the 1997 originals, which moved to
+  `scenes/1997/`. Every one renders exactly as before.
+- The scene is sent to `rayengine` as JSON. Ray and color batches stay binary. The wire protocol
+  version is now 2, so engines and masters must be from the same release.
+- The 1997 binary format is now read-only: it is still read exactly, but nothing writes it.
+- `CTaskMaster::ColorsFromTasks` no longer takes the image; colors go to the camera's sampler.
+- `CImageFile::PutPoint` writes through the `clip` color model, which also treats negative
+  channels as 0 (the 1997 code converted them to a byte without a check, which is undefined).
+- `CRay::CreateRay( CScene &, ... )` takes pixel coordinates instead of angles, and the camera
+  works out the direction (`CCamera::RayDirection`). `CTaskMaster::TraceScene` and the GUI preview
+  loop no longer do their own angle stepping.
+
 ### Fixed
 
 - Camera rays were distorted. The camera was aimed by adding the difference between its view
@@ -20,12 +79,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a flat image plane. The vertical angle sets the field of view and the horizontal one follows from
   the image's width and height, so pixels are square.
   The reference renders in `tests/reference/renders.tar.gz` and the README images were regenerated.
-
-### Changed
-
-- `CRay::CreateRay( CScene &, ... )` takes pixel coordinates instead of angles, and the camera
-  works out the direction (`CCamera::RayDirection`). `CTaskMaster::TraceScene` and the GUI preview
-  loop no longer do their own angle stepping.
 
 ## [0.2.0] - 2026-11-19
 

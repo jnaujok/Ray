@@ -7,6 +7,9 @@
 #endif
 
 #include "Camera.h"
+#include "CenterSampler.h"
+#include "ClipColorModel.h"
+#include "SceneJson.h"
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -53,6 +56,8 @@ CCamera::CCamera( const CCamera &oSource )
     m_nVerticalAngle = oSource.m_nVerticalAngle;
     m_nHorizontalAngle = oSource.m_nHorizontalAngle;
     m_nAspectRatio = oSource.m_nAspectRatio;
+    m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
+    m_pColorModel.reset( oSource.m_pColorModel ? oSource.m_pColorModel->Clone() : NULL );
     CalcRotate();
 }
 
@@ -64,6 +69,11 @@ CCamera &CCamera::operator =( const CCamera &oSource )
     m_nVerticalAngle = oSource.m_nVerticalAngle;
     m_nHorizontalAngle = oSource.m_nHorizontalAngle;
     m_nAspectRatio = oSource.m_nAspectRatio;
+    if ( this != &oSource )
+    {
+        m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
+        m_pColorModel.reset( oSource.m_pColorModel ? oSource.m_pColorModel->Clone() : NULL );
+    }
     CalcRotate();
     return *this;
 }
@@ -73,7 +83,31 @@ CCamera::~CCamera( void )
 {
 }
 
-DYNAMIC_IMPLEMENTS( CCamera );
+CPixelSampler &CCamera::GetSampler( void )
+{
+    if ( ! m_pSampler )
+        m_pSampler.reset( new CCenterSampler );
+    return *m_pSampler;
+}
+
+void CCamera::SetSampler( CPixelSampler *pSampler )
+{
+    m_pSampler.reset( pSampler );
+}
+
+CColorModel &CCamera::GetColorModel( void )
+{
+    if ( ! m_pColorModel )
+        m_pColorModel.reset( new CClipColorModel );
+    return *m_pColorModel;
+}
+
+void CCamera::SetColorModel( CColorModel *pColorModel )
+{
+    m_pColorModel.reset( pColorModel );
+}
+
+DYNAMIC_IMPLEMENTS( CCamera, "camera" );
 
 CRayStream &operator >>( CRayStream &oStream, CCamera &oCamera )
 {
@@ -193,4 +227,94 @@ CVector CCamera::RayDirection( FLT nScreenX, FLT nScreenY, FLT nAspect )
     oDirection.Normalize();
 
     return oDirection;
+}
+
+    // A sampler or color model: just its name when it has no settings, else
+    // an object with its "type" and settings.
+template <class T> static void PutModel( IASLib::CObjectNode &oNode, const char *strKey, const T &oModel )
+{
+    IASLib::CObjectNode *pModel = new IASLib::CObjectNode;
+
+    pModel->put( "type", oModel.GetName() );
+    oModel.ToJson( *pModel );
+    if ( pModel->size() == 1 )
+    {
+        delete pModel;
+        oNode.put( strKey, oModel.GetName() );
+    }
+    else
+        oNode.set( strKey, pModel );
+}
+
+    // Reads oNode[ strKey ], if it is there, as a T made by T::Create.
+template <class T> static BOOL GetModel( const IASLib::CJsonNode &oNode, const char *strKey, T *&pModel, const char *strWhat )
+{
+    const IASLib::CJsonNode *pField = oNode.get( strKey );
+    std::string              strType;
+
+    pModel = NULL;
+    if ( pField == NULL )
+        return TRUE;
+
+    RayJson::CWhere oWhere( strKey );
+
+    if ( ! RayJson::GetType( *pField, strType ) )
+        return FALSE;
+
+    pModel = T::Create( strType.c_str() );
+    if ( pModel == NULL )
+        return RayJson::Fail( std::string( "unknown " ) + strWhat + " \"" + strType + "\"" );
+    if ( ! pModel->FromJson( *pField ) )
+    {
+        delete pModel;
+        pModel = NULL;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+void CCamera::ToJson( IASLib::CObjectNode &oNode )
+{
+    RayJson::PutVector( oNode, "position", m_oPosition );
+    RayJson::PutVector( oNode, "lookAt", m_oPointAt );
+    RayJson::PutVector( oNode, "up", m_oUp );
+    RayJson::PutAngle( oNode, "verticalAngle", m_nVerticalAngle );
+    RayJson::PutAngle( oNode, "horizontalAngle", m_nHorizontalAngle );
+    RayJson::PutNumber( oNode, "aspectRatio", m_nAspectRatio );
+    PutModel( oNode, "sampler", GetSampler() );
+    PutModel( oNode, "colorModel", GetColorModel() );
+}
+
+BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "position", "lookAt", "up", "verticalAngle", "verticalAngleRadians",
+                                              "horizontalAngle", "horizontalAngleRadians", "aspectRatio",
+                                              "sampler", "colorModel", NULL };
+    CPixelSampler  *pSampler;
+    CColorModel    *pColorModel;
+
+    if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+         ! RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) ||
+         ! RayJson::GetVector( oNode, "lookAt", m_oPointAt, TRUE ) ||
+         ! RayJson::GetVector( oNode, "up", m_oUp, FALSE ) ||
+         ! RayJson::GetAngle( oNode, "verticalAngle", m_nVerticalAngle, FALSE ) ||
+         ! RayJson::GetAngle( oNode, "horizontalAngle", m_nHorizontalAngle, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "aspectRatio", m_nAspectRatio, FALSE ) )
+        return FALSE;
+
+    if ( ! ( m_nVerticalAngle > 0.0 ) || ! ( m_nVerticalAngle < PI ) )
+        return RayJson::Fail( "verticalAngle must be between 0 and 180 degrees" );
+
+    if ( ! GetModel( oNode, "sampler", pSampler, "sampler" ) )
+        return FALSE;
+    if ( pSampler )
+        SetSampler( pSampler );
+
+    if ( ! GetModel( oNode, "colorModel", pColorModel, "color model" ) )
+        return FALSE;
+    if ( pColorModel )
+        SetColorModel( pColorModel );
+
+    CalcRotate();
+    return TRUE;
 }

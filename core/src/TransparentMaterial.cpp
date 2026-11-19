@@ -6,6 +6,7 @@
 
 #include "TransparentMaterial.h"
 #include "Scene.h"
+#include "SceneJson.h"
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -15,7 +16,7 @@ static char THIS_FILE[] = __FILE__;
 
 #define TRANSPARENT_MATERIAL_VERSION    ((DWORD)1)
 
-IMPLEMENT_MATERIAL( CTransparentMaterial, Transparent Material );
+IMPLEMENT_MATERIAL( CTransparentMaterial, Transparent Material, "transparent" );
 
 CTransparentMaterial::CTransparentMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 )
@@ -164,3 +165,18 @@ void CTransparentMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence 
 }
 
 #endif
+
+void CTransparentMaterial::ToJson( IASLib::CObjectNode &oNode )
+{
+    RayJson::PutColor( oNode, "color", m_oColor );
+    RayJson::PutNumber( oNode, "indexOfRefraction", m_nIndexOfRefraction );
+}
+
+BOOL CTransparentMaterial::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "influence", "color", "indexOfRefraction", NULL };
+
+    return RayJson::OnlyFields( oNode, astrFields ) &&
+           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
+           RayJson::GetNumber( oNode, "indexOfRefraction", m_nIndexOfRefraction, FALSE );
+}

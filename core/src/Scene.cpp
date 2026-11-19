@@ -19,6 +19,7 @@
 #include "RaySettings.h"
 #include "Scene.h"
 #include "RayStream.h"
+#include "SceneJson.h"
 
 #include "Exceptions/Exception.h"
 #include "Files/File.h"
@@ -26,7 +27,9 @@
 #include "Streams/StringStream.h"
 
 #include <stdio.h>
+#include <memory>
 #include <string>
+#include <vector>
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -38,6 +41,11 @@ static char THIS_FILE[] = __FILE__;
 #define MAGIC_NUMBER    (DWORD)0x122771F3
 #define CURRENT_VERSION ((DWORD)0x02)
 #define VERSION_ONE     ((DWORD)0x01)
+
+    // JSON scene files say what they are, and their version follows on from
+    // the two binary versions.
+#define JSON_FORMAT     "Ray scene"
+#define JSON_VERSION    3
 
 CScene::CScene( void )
 {
@@ -490,10 +498,25 @@ DWORD CScene::Load( const char *strFileName )
         int                 nRead;
 
         if ( ! oFile.IsOpen() )
+        {
+            m_strLoadError = "the file can't be opened";
             return BAD_FILE;
+        }
         while ( ( nRead = oFile.GetBuffer( achBuffer, (int)sizeof( achBuffer ) ) ) > 0 )
             strData.append( achBuffer, (size_t)nRead );
     }
+
+        // A JSON scene starts with "{", perhaps after white space or a UTF-8
+        // byte order mark. A binary one starts with its magic number.
+    size_t nStart = ( strData.compare( 0, 3, "\xEF\xBB\xBF" ) == 0 ) ? 3 : 0;
+
+    while ( nStart < strData.size() && ( strData[ nStart ] == ' ' || strData[ nStart ] == '\t' ||
+                                         strData[ nStart ] == '\r' || strData[ nStart ] == '\n' ) )
+        nStart++;
+    if ( nStart < strData.size() && strData[ nStart ] == '{' )
+        return FromJson( strData.substr( nStart ) );
+
+    m_strLoadError.clear();
 
         // Files saved in the weeks when doubles were still binary but the
         // header already said version two can only be told apart by trying.
@@ -516,29 +539,177 @@ DWORD CScene::Load( const char *strFileName )
         if ( nResult == 0 )
             return 0;
         if ( nResult == WRONG_VERSION )
+        {
+            m_strLoadError = "it was saved by a newer version of the ray tracer";
             return nResult;
+        }
     }
 
     m_oObjects.RemoveAll();
     m_oLights.RemoveAll();
+    m_strLoadError = "it is not a scene file this program can read";
     return BAD_FILE;
 }
 
 DWORD CScene::Save( const char *strFileName )
 {
-    IASLib::CStringStream   oBuffer;
-    CRayStream              oStream( oBuffer );
-
-    Serialize( oStream, FALSE );
+    std::string strData = ToJson( FALSE );
 
     FILE *pFile = fopen( strFileName, "wb" );
     if ( pFile == NULL )
         return BAD_FILE;
 
-    const std::string &strData = oBuffer.GetOutput();
     bool bWritten = fwrite( strData.data(), 1, strData.size(), pFile ) == strData.size();
 
     if ( fclose( pFile ) != 0 || ! bWritten )
         return BAD_FILE;
+    return 0;
+}
+
+std::string CScene::ToJson( BOOL bCompact )
+{
+    IASLib::CObjectNode     oRoot;
+
+    oRoot.put( "format", JSON_FORMAT );
+    oRoot.put( "version", JSON_VERSION );
+    m_oSettings.ToJson( *oRoot.putObject( "settings" ) );
+    RayJson::PutColor( oRoot, "background", m_oBackgroundColor );
+    m_oCamera.ToJson( *oRoot.putObject( "camera" ) );
+
+    IASLib::CArrayNode *apArrays[ 2 ] = { oRoot.putArray( "objects" ), oRoot.putArray( "lights" ) };
+
+    for ( int nList = 0; nList < 2; nList++ )
+    {
+        int nCount = ( nList == 0 ) ? m_oObjects.GetSize() : m_oLights.GetSize();
+
+        for ( int nIndex = 0; nIndex < nCount; nIndex++ )
+        {
+            CObjects               *pObject = ( nList == 0 ) ? m_oObjects[ nIndex ] : (CObjects *)m_oLights[ nIndex ];
+            IASLib::CObjectNode    *pNode = apArrays[ nList ]->addObject();
+            LPCSTR                  strType = g_pDynamicList->JsonTypeOf( pObject->ClassType() );
+
+            pNode->put( "type", strType ? strType : pObject->ClassType() );
+            pObject->ToJson( *pNode );
+        }
+    }
+
+    return bCompact ? oRoot.toJson( -1 ) : RayJson::Write( oRoot );
+}
+
+    // Reads the array oRoot[ strKey ] of objects (bLights FALSE) or lights.
+static BOOL ReadObjects( const IASLib::CJsonNode &oRoot, const char *strKey, BOOL bLights, std::vector<CObjects *> &apRead )
+{
+    const IASLib::CJsonNode *pArray = RayJson::Field( oRoot, strKey, FALSE );
+
+    if ( pArray == NULL )
+        return TRUE;
+
+    RayJson::CWhere oWhere( strKey );
+
+    if ( ! pArray->isArray() )
+        return RayJson::Fail( bLights ? "must be an array of lights" : "must be an array of objects" );
+
+    for ( int nIndex = 0; nIndex < pArray->size(); nIndex++ )
+    {
+        RayJson::CWhere             oElement( "", nIndex );
+        const IASLib::CJsonNode    &oNode = *pArray->get( nIndex );
+        std::string                 strType;
+
+        if ( ! RayJson::GetString( oNode, "type", strType, TRUE ) )
+            return FALSE;
+
+        CObjects *pObject = g_pDynamicList->Create( strType.c_str() );
+
+        if ( pObject == NULL || pObject->IsCamera() || ( pObject->IsALight() ? TRUE : FALSE ) != bLights )
+        {
+            delete pObject;
+            return RayJson::Fail( std::string( bLights ? "unknown light type \"" : "unknown object type \"" ) + strType + "\"" );
+        }
+
+        apRead.push_back( pObject );
+        if ( ! pObject->FromJson( oNode ) )
+            return FALSE;
+    }
+    return TRUE;
+}
+
+DWORD CScene::FromJson( const std::string &strText )
+{
+    static const char *const astrFields[] = { "format", "version", "settings", "background", "camera", "objects", "lights", NULL };
+    std::unique_ptr<IASLib::CJsonNode>  pRoot;
+    std::vector<CObjects *>             apObjects;
+    std::vector<CObjects *>             apLights;
+    CSettings                           oSettings;
+    CCamera                             oCamera;
+    CColor                              oBackground( 1, 1, 1 );
+    std::string                         strFormat;
+    int                                 nVersion = 0;
+    BOOL                                bRead = FALSE;
+
+    RayJson::ClearError();
+    pRoot.reset( RayJson::Parse( strText ) );
+
+    if ( pRoot )
+    {
+        if ( ! RayJson::GetString( *pRoot, "format", strFormat, TRUE ) )
+            ;
+        else if ( strFormat != JSON_FORMAT )
+            RayJson::Fail( "\"format\" must be \"" JSON_FORMAT "\"" );
+        else if ( ! RayJson::GetInt( *pRoot, "version", nVersion, 1, 1000000, TRUE ) )
+            ;
+        else if ( nVersion > JSON_VERSION )
+        {
+            m_strLoadError = "it was saved by a newer version of the ray tracer (scene version " +
+                             std::to_string( nVersion ) + ")";
+            return WRONG_VERSION;
+        }
+        else if ( nVersion < JSON_VERSION )
+            RayJson::Fail( "JSON scenes start at version " + std::to_string( JSON_VERSION ) );
+        else if ( RayJson::OnlyFields( *pRoot, astrFields ) )
+        {
+            const IASLib::CJsonNode *pSettings = pRoot->get( "settings" );
+            const IASLib::CJsonNode *pCamera = RayJson::Field( *pRoot, "camera", TRUE );
+            BOOL                     bSettings = TRUE;
+            BOOL                     bCamera = FALSE;
+
+            if ( pSettings )
+            {
+                RayJson::CWhere oWhere( "settings" );
+                bSettings = oSettings.FromJson( *pSettings );
+            }
+            if ( bSettings && pCamera )
+            {
+                RayJson::CWhere oWhere( "camera" );
+                bCamera = oCamera.FromJson( *pCamera );
+            }
+
+            bRead = bSettings && bCamera &&
+                    RayJson::GetColor( *pRoot, "background", oBackground, FALSE ) &&
+                    ReadObjects( *pRoot, "objects", FALSE, apObjects ) &&
+                    ReadObjects( *pRoot, "lights", TRUE, apLights );
+        }
+    }
+
+    if ( ! bRead )
+    {
+        for ( size_t nIndex = 0; nIndex < apObjects.size(); nIndex++ )
+            delete apObjects[ nIndex ];
+        for ( size_t nIndex = 0; nIndex < apLights.size(); nIndex++ )
+            delete apLights[ nIndex ];
+        m_strLoadError = RayJson::GetError();
+        RayJson::ClearError();
+        return BAD_FILE;
+    }
+
+    m_oObjects.RemoveAll();
+    m_oLights.RemoveAll();
+    m_oSettings = oSettings;
+    m_oCamera = oCamera;
+    m_oBackgroundColor = oBackground;
+    for ( size_t nIndex = 0; nIndex < apObjects.size(); nIndex++ )
+        AddObject( apObjects[ nIndex ] );
+    for ( size_t nIndex = 0; nIndex < apLights.size(); nIndex++ )
+        AddLight( (CLight *)apLights[ nIndex ] );
+    m_strLoadError.clear();
     return 0;
 }

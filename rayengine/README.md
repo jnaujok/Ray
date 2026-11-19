@@ -20,8 +20,10 @@ rayengine <master-host> [port] [--retry <seconds>]
 
 ## What it does
 
-1. Connects to the master and sends a hello with the protocol version.
-2. Receives the scene.
+1. Connects to the master and sends a hello with the protocol version. The master turns away an
+   engine of a different version, so engines and masters must come from the same release
+   (version 2 began when scenes started being sent as JSON).
+2. Receives the scene, as JSON.
 3. Receives batches of primary rays, traces each one, and sends the colors back.
 4. Exits when it is sent an empty batch, or when the master goes away.
 

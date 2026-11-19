@@ -5,11 +5,13 @@
 *                                                                        *
 *       tag      1 byte (MsgTag.h)                                       *
 *       length   4 bytes, big-endian                                     *
-*       payload  length bytes, in the CRayStream format                  *
+*       payload  length bytes                                            *
 *                                                                        *
-*   The payload is framed because a scene is read until its data runs    *
-*   out. A connection opens with MESSAGE_HELLO from the engine, carrying *
-*   RAY_WIRE_MAGIC and RAY_WIRE_VERSION.                                 *
+*   The scene is sent as JSON text, the same as a scene file but on one  *
+*   line; batches of rays and colors, which are sent constantly, stay in *
+*   the compact CRayStream binary format. A connection opens with        *
+*   MESSAGE_HELLO from the engine, carrying RAY_WIRE_MAGIC and           *
+*   RAY_WIRE_VERSION, so an engine of another version is turned away.    *
 *                                                                        *
 *************************************************************************/
 #ifndef __WIREPROTOCOL_H__
@@ -25,7 +27,7 @@
 #include <string>
 
 #define RAY_WIRE_MAGIC          ((uint32_t)0x52415931)     // "RAY1"
-#define RAY_WIRE_VERSION        ((uint32_t)1)
+#define RAY_WIRE_VERSION        ((uint32_t)2)     // 2: the scene is sent as JSON
 #define RAY_WIRE_DEFAULT_PORT   7997
 #define RAY_WIRE_MAX_PAYLOAD    ((uint32_t)( 256u * 1024u * 1024u ))
 

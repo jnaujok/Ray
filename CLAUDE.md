@@ -22,7 +22,7 @@ v3.0. It is made of three programs and a shared core:
 
 | Part | Location | Platform |
 |------|----------|----------|
-| Ray tracing core: scene, objects, materials, `CRayStream`, task masters | `core/` | all |
+| Ray tracing core: scene, objects, materials, samplers, color models, JSON and binary scene I/O, task masters | `core/` | all |
 | `raythrower`: command-line master (threads, or engines over TCP) | `raythrower/` | Windows, Linux, macOS |
 | `rayengine`: networked tracing task | `rayengine/` | Windows, Linux, macOS |
 | `Ray.exe`: MFC scene editor | `src/`, `include/`, `res/` | Windows only (MFC, MBCS) |
@@ -51,12 +51,23 @@ ctest --test-dir build --output-on-failure
 ## Rules for the code
 
 - **Don't change the ray tracing logic** (intersection, shading, primary ray generation in
-  `CRay::CreateRay` and `CCamera::RayDirection`) without being asked to. Fixing crashes and undefined behavior is fine.
-- **The `.ray` format is fixed.** `CRayStream` writes exactly what the 1997 `CFileStream` did:
-  plain `int` is a one-byte BOOL, `long`/`DWORD` are 4 bytes on every platform, floating point is
-  `%.18e` text. Don't add `CRayStream` overloads that change which encoding a type gets.
-- Use IASLib for strings, streams, files, threads, and sockets rather than adding new hand-written
-  versions. In core headers write `IASLib::CString` in full: the GUI also sees MFC's `CString`.
+  `CRay::CreateRay`, `CCamera::RayDirection`, and the pixel samplers) without being asked to. Fixing crashes and undefined behavior is fine.
+- **Scene files are JSON** (`.ray`, version 3; documented in `scenes/README.md`). Each scene class
+  reads and writes its own fields in `ToJson`/`FromJson`, through the `RayJson` helpers in
+  `SceneJson.h`; readers reject unknown fields and report errors with `RayJson::Fail`. Keep the
+  format backward compatible: add optional fields with defaults, and bump `JSON_VERSION` in
+  `Scene.cpp` only for a change old readers would get wrong. Update `scenes/README.md` with it.
+- **The 1997 binary format is read-only and frozen.** `CScene::Load` must keep reading versions 1
+  and 2 exactly, and nothing saves them. `CRayStream` still encodes the ray and color batches on
+  the wire exactly as the 1997 `CFileStream` did: plain `int` is a one-byte BOOL, `long`/`DWORD`
+  are 4 bytes on every platform, floating point is `%.18e` text. Don't add `CRayStream` overloads
+  that change which encoding a type gets.
+- **If JSON output changes**, regenerate the sample scenes with
+  `raythrower scenes/1997/<scene>.ray --convert scenes/<scene>.ray`; the `convert_*` tests check
+  that they match.
+- Use IASLib for strings, streams, files, threads, sockets, and JSON rather than adding new
+  hand-written versions. In core headers write `IASLib::CString` in full: the GUI also sees MFC's
+  `CString`.
 - Avoid names that are Win32 macros (`SendMessage`, `GetMessage`, `CreateWindow`, ...).
 
 ## Conventions
@@ -70,6 +81,15 @@ ctest --test-dir build --output-on-failure
   case-sensitive. Use include paths rather than `..\` or `../` relative includes.
 - **Line endings:** LF everywhere except `*.dsp`, `*.dsw`, `*.clw`, and `*.bat`, which must stay
   CRLF because Visual C++ 6 and `cmd.exe` need it. `.gitattributes` enforces this.
+- **New ways of sampling pixels** (anti-aliasing and the like) are `CPixelSampler` subclasses
+  attached to the camera, listed in the table in `core/src/PixelSampler.cpp`. Keep sampling out of
+  `CTaskMaster` and the engines.
+- **New ways of turning pixel colors into bytes** (gamma, tone mapping, and the like) are
+  `CColorModel` subclasses attached to the camera, listed in the table in
+  `core/src/ColorModel.cpp`. Samplers hand linear, unclipped colors to the `CPixelWriter`.
+- **New object, light, or material classes** register a JSON `type` name in
+  `DYNAMIC_IMPLEMENTS( CClass, "name" )` or `IMPLEMENT_MATERIAL( CClass, Name, "name" )`, and the
+  macros make them implement `ToJson` and `FromJson`.
 - **Adding a source file:** add it to `RAY_CORE_SOURCES` in `CMakeLists.txt` (core) or to
   `cmake/RayGui.cmake` (GUI).
 - **Don't modify** `legacy/` (historical project files).
@@ -82,6 +102,6 @@ ctest --test-dir build --output-on-failure
 
 ## Known issues
 
-- `scenes/yyy.ray` and `scenes/stream_test1.ray` cannot be read (see `scenes/README.md`).
+- `scenes/1997/yyy.ray` and `scenes/1997/stream_test1.ray` cannot be read (see `scenes/README.md`).
 - The MFC application can only be built on Windows; on Linux and macOS only the core and the
   command-line programs build.

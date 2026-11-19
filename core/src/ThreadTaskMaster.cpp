@@ -173,7 +173,7 @@ BOOL CThreadTaskMaster::RaysToTask( CRayArray &oRays, int nTask )
     return TRUE;
 }
 
-int CThreadTaskMaster::ColorsFromTasks( CImageFile &oImageFile, BOOL bWait )
+int CThreadTaskMaster::ColorsFromTasks( BOOL bWait )
 {
     CColorArray    *pColors;
     int             nPixels = 0;
@@ -193,7 +193,7 @@ int CThreadTaskMaster::ColorsFromTasks( CImageFile &oImageFile, BOOL bWait )
             return -1;      // A worker stopped in the middle of the trace.
 
         for ( int nCount = 0; nCount < pColors->GetSize(); nCount++ )
-            oImageFile.PutPoint( pColors->GetX( nCount ), pColors->GetY( nCount ), (*pColors)[ nCount ] );
+            PutSample( pColors->GetX( nCount ), pColors->GetY( nCount ), (*pColors)[ nCount ] );
 
         nPixels += pColors->GetSize();
         delete pColors;

@@ -6,6 +6,7 @@
 
 #include "RayStream.h"
 #include "MaterialList.h"
+#include "SceneJson.h"
 
 #define MATERIAL_LIST_VERSION       ((DWORD)1)
 
@@ -117,4 +118,75 @@ CRayStream &operator <<( CRayStream &oStream, CMaterialList &oList )
         nCount++;
     }
     return oStream;
+}
+
+void CMaterialList::ToJson( IASLib::CArrayNode &oArray )
+{
+    CDynMaterialList    oMats;
+
+    for ( int nIndex = 0; nIndex < GetSize(); nIndex++ )
+    {
+        CMaterial           *pMaterial = GetAt( nIndex );
+        IASLib::CObjectNode *pNode = oArray.addObject();
+        LPCSTR               strType = oMats.JsonTypeOf( pMaterial->ClassType() );
+
+        pNode->put( "type", strType ? strType : pMaterial->ClassType() );
+        RayJson::PutNumber( *pNode, "influence", GetInfluence( nIndex ) );
+        pMaterial->ToJson( *pNode );
+    }
+}
+
+BOOL CMaterialList::FromJson( const IASLib::CJsonNode &oNode, const char *strKey )
+{
+    const IASLib::CJsonNode    *pArray = RayJson::Field( oNode, strKey, FALSE );
+    CDynMaterialList            oMats;
+    CMaterialList               oRead;
+    BOOL                        bRetVal = TRUE;
+
+    if ( pArray == NULL )
+        return oNode.isObject();
+
+    RayJson::CWhere oWhere( strKey );
+
+    if ( ! pArray->isArray() )
+        return RayJson::Fail( "must be an array of materials" );
+
+    for ( int nIndex = 0; bRetVal && nIndex < pArray->size(); nIndex++ )
+    {
+        RayJson::CWhere             oElement( "", nIndex );
+        const IASLib::CJsonNode    &oMaterial = *pArray->get( nIndex );
+        std::string                 strType;
+        FLT                         nInfluence = 1.0;
+
+        if ( ! RayJson::GetString( oMaterial, "type", strType, TRUE ) ||
+             ! RayJson::GetNumber( oMaterial, "influence", nInfluence, FALSE ) )
+        {
+            bRetVal = FALSE;
+            break;
+        }
+
+        CMaterial *pMaterial = oMats.Create( strType.c_str() );
+
+        if ( pMaterial == NULL )
+            bRetVal = RayJson::Fail( "unknown material type \"" + strType + "\"" );
+        else
+        {
+            oRead.Add( pMaterial, nInfluence );
+            bRetVal = pMaterial->FromJson( oMaterial );
+        }
+    }
+
+        // Whichever list is being dropped, its materials are deleted.
+    CMaterialList &oDrop = bRetVal ? *this : oRead;
+
+    for ( int nIndex = 0; nIndex < oDrop.GetSize(); nIndex++ )
+        delete oDrop.GetAt( nIndex );
+    oDrop.RemoveAll();
+
+    if ( bRetVal )
+    {
+        for ( int nIndex = 0; nIndex < oRead.GetSize(); nIndex++ )
+            Add( oRead.GetAt( nIndex ), oRead.GetInfluence( nIndex ) );
+    }
+    return bRetVal;
 }

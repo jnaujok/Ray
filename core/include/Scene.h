@@ -18,6 +18,8 @@
 #include "ObjectsArray.h"
 #include "LightArray.h"
 
+#include <string>
+
 #define NO_SER_ERROR    (DWORD)0
 #define BAD_FILE        (DWORD)1
 #define WRONG_VERSION   (DWORD)2
@@ -30,6 +32,7 @@ class CScene
         CSettings           m_oSettings;
         CCamera             m_oCamera;
         CColor              m_oBackgroundColor;
+        std::string         m_strLoadError;
 #ifdef RAY_GUI
         HTREEITEM           m_hCamera;
         HTREEITEM           m_hObjects;
@@ -55,10 +58,22 @@ class CScene
         virtual BOOL        TraceRay( CRay &oRay, CColor &oColor, CObjects *pDeny = NULL );
         virtual BOOL        Intersect( CRay &oRay, CObjects *pIgnore = NULL );
 
+            /// Reads or writes the binary format of 1996-1999 (versions 1 and
+            /// 2). Scenes are now saved as JSON; this is kept to read old files.
         virtual DWORD       Serialize( CRayStream &oStream, BOOL bLoading );
-            /// Reads a .ray file, of any version. Returns 0, BAD_FILE or WRONG_VERSION.
+            /// The scene as JSON text (version 3 of the .ray format): indented
+            /// for a file, or on one line for the network.
+        std::string         ToJson( BOOL bCompact = FALSE );
+            /// Replaces the scene with one read from JSON text. Returns 0,
+            /// BAD_FILE (see GetLoadError) or WRONG_VERSION. On failure the
+            /// scene is left as it was.
+        DWORD               FromJson( const std::string &strText );
+            /// Reads a .ray file of any version: JSON, or the old binary
+            /// format. Returns 0, BAD_FILE or WRONG_VERSION.
         DWORD               Load( const char *strFileName );
-            /// Writes a .ray file in the current format. Returns 0 or BAD_FILE.
+            /// Why the last Load or FromJson failed.
+        const char         *GetLoadError( void ) const { return m_strLoadError.c_str(); }
+            /// Writes a .ray file as JSON. Returns 0 or BAD_FILE.
         DWORD               Save( const char *strFileName );
         virtual CLight     *GetLight( int nIndex );
         CColor             &GetBackground( void ) { return m_oBackgroundColor; }

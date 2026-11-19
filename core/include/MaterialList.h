@@ -5,6 +5,11 @@
 #include "DiffuseMaterial.h"
 #include "Templates/TArray.h"
 
+namespace IASLib
+{
+    class CArrayNode;
+}
+
     // The materials an object is made of, each with its influence. The list
     // does not own the materials: copies share them.
 class CMaterialList
@@ -26,6 +31,13 @@ class CMaterialList
         int             GetSize( void ) const { return (int)m_apoItems.Length(); }
         FLT             GetInfluence( int nIndex );
         void            SetInfluence( int nIndex, FLT nInfluence );
+
+            // The materials as a JSON array of objects, each with its "type"
+            // and "influence".
+        void            ToJson( IASLib::CArrayNode &oArray );
+            // Reads the array oNode[ strKey ], if it is there. The materials it
+            // replaces are deleted (the object owning the list owns them).
+        BOOL            FromJson( const IASLib::CJsonNode &oNode, const char *strKey );
 
         friend CRayStream &operator >>( CRayStream &oStream, CMaterialList &oList );
         friend CRayStream &operator <<( CRayStream &oStream, CMaterialList &oList );

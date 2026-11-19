@@ -13,6 +13,10 @@
 #include "Objects.h"
 #include "Vector.h"
 #include "Matrix.h"
+#include "PixelSampler.h"
+#include "ColorModel.h"
+
+#include <memory>
 
 class CCamera : public CObjects
 {
@@ -32,6 +36,15 @@ class CCamera : public CObjects
         CVector     m_oForward;
         CVector     m_oRight;
         CVector     m_oTop;
+
+            // How the camera samples each pixel; NULL means the default,
+            // which GetSampler makes when it is first needed (cameras read
+            // from a stream don't go through the other constructors). Not
+            // saved in scene files.
+        std::unique_ptr<CPixelSampler>  m_pSampler;
+            // How the camera turns pixel colors into bytes; NULL means the
+            // default, as for the sampler.
+        std::unique_ptr<CColorModel>    m_pColorModel;
     public:
                     CCamera( void );
                     CCamera( CVector oPosition, CVector oPointAt, FLT nVerticalAngle, FLT nHorizontalAngle, FLT nAspectRatio = 0.0, CVector *poUp = NULL );
@@ -60,6 +73,21 @@ class CCamera : public CObjects
             // over its height. The vertical angle sets the field of view; the
             // horizontal one follows from the image's shape, so pixels are square.
         CVector     RayDirection( FLT nScreenX, FLT nScreenY, FLT nAspect );
+
+            // The sampler that makes the camera's primary rays and turns their
+            // colors into pixels. A camera starts with a CCenterSampler.
+            // SetSampler takes ownership; NULL puts the default back. Copying
+            // a camera copies its sampler.
+        CPixelSampler  &GetSampler( void );
+        void        SetSampler( CPixelSampler *pSampler );
+
+            // The color model that turns the sampler's pixel colors into the
+            // image's bytes. A camera starts with a CClipColorModel, which
+            // writes colors as the 1997 code did. SetColorModel takes
+            // ownership; NULL puts the default back. Copying a camera copies
+            // its color model.
+        CColorModel    &GetColorModel( void );
+        void        SetColorModel( CColorModel *pColorModel );
         FLT         GetXRotate( void ) { return m_nXRotate; }
         FLT         GetYRotate( void ) { return m_nYRotate; }
 

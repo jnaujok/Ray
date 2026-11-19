@@ -8,6 +8,7 @@
 
 #include "Vector.h"
 #include "SpecularMaterial.h"
+#include "SceneJson.h"
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -18,7 +19,7 @@ static char THIS_FILE[] = __FILE__;
 
 #define SPECULAR_MATERIAL_VERSION    ((DWORD)1)
 
-IMPLEMENT_MATERIAL( CSpecularMaterial, Specular Material );
+IMPLEMENT_MATERIAL( CSpecularMaterial, Specular Material, "specular" );
 
 CSpecularMaterial::CSpecularMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 )
@@ -229,3 +230,22 @@ void CSpecularMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
 }
 
 #endif
+
+void CSpecularMaterial::ToJson( IASLib::CObjectNode &oNode )
+{
+    RayJson::PutColor( oNode, "color", m_oColor );
+    RayJson::PutNumber( oNode, "power", m_nPower );
+    RayJson::PutNumber( oNode, "indexOfRefraction", m_nIOR );
+    RayJson::PutBool( oNode, "materialHighlight", m_bMaterialHighlight );
+}
+
+BOOL CSpecularMaterial::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "influence", "color", "power", "indexOfRefraction", "materialHighlight", NULL };
+
+    return RayJson::OnlyFields( oNode, astrFields ) &&
+           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
+           RayJson::GetNumber( oNode, "power", m_nPower, FALSE ) &&
+           RayJson::GetNumber( oNode, "indexOfRefraction", m_nIOR, FALSE ) &&
+           RayJson::GetBool( oNode, "materialHighlight", m_bMaterialHighlight, FALSE );
+}

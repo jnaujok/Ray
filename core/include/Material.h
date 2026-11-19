@@ -12,6 +12,12 @@ class CScene;
 class CLight;
 class CObjects;
 
+namespace IASLib
+{
+    class CJsonNode;
+    class CObjectNode;
+}
+
 class CMaterial
 {
    public:
@@ -21,6 +27,11 @@ class CMaterial
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect ) = 0;
         virtual LPCSTR      ClassType( void ) { return "CMaterial"; };
         virtual void        Out( CRayStream &oStream ) = 0;
+            // The material as JSON for a scene file: its fields go into oNode,
+            // which already holds its "type". FromJson reads them back and
+            // returns FALSE, with RayJson::Fail, if one is missing or bad.
+        virtual void        ToJson( IASLib::CObjectNode &oNode ) = 0;
+        virtual BOOL        FromJson( const IASLib::CJsonNode &oNode ) = 0;
         virtual void        SetColor( CColor &oColor ) = 0;
 #ifdef RAY_GUI
         virtual void        Properties( void ) = 0;
@@ -47,9 +58,11 @@ class CMaterial
                                 { \
                                     oStream << (*this); \
                                 } \
+                                virtual void ToJson( IASLib::CObjectNode &oNode ); \
+                                virtual BOOL FromJson( const IASLib::CJsonNode &oNode ); \
                                 virtual LPCSTR ClassType( void ) { return #x; }
 
-#define IMPLEMENT_MATERIAL(x,y) static CDynMaterial  oDynMaterial( x::CreateMe, x::AddMe, #x, #y );
+#define IMPLEMENT_MATERIAL(x,y,json) static CDynMaterial  oDynMaterial( x::CreateMe, x::AddMe, #x, #y, json );
 
 typedef CMaterial *(CFUNC *LPADDFUNC)( void );
 
@@ -62,8 +75,10 @@ class CDynMaterial
         CDynMaterial           *m_pNext;
         LPCSTR                  m_strAddName;
         LPADDFUNC               m_lpAddFunc;
+        LPCSTR                  m_strJsonType;      // Its "type" in JSON scene files.
     public:
-                            CDynMaterial( CMaterial *(CFUNC *lpFunction)(CRayStream &oStream), LPADDFUNC lpAddFunc, LPCSTR nKey, LPCSTR strName );
+                            CDynMaterial( CMaterial *(CFUNC *lpFunction)(CRayStream &oStream), LPADDFUNC lpAddFunc, LPCSTR nKey, LPCSTR strName,
+                                          LPCSTR strJsonType = NULL );
         virtual            ~CDynMaterial( void );
         int                 Compare( CDynMaterial *oCompare );
         BOOL                Match( LPCSTR lpszCompare );
@@ -72,6 +87,7 @@ class CDynMaterial
         CDynMaterial       *GetNext( void );
         LPCSTR              GetAddName( void ) { return m_strAddName; }
         LPADDFUNC           GetAddFunc( void ) { return m_lpAddFunc; }
+        LPCSTR              GetJsonType( void ) { return m_strJsonType; }
 };
 
 class CDynMaterialList
@@ -82,6 +98,10 @@ class CDynMaterialList
                             CDynMaterialList( void );
         virtual            ~CDynMaterialList( void );
         CMaterial          *Instantiate( LPCSTR lpszName, CRayStream &oStream );
+            // A new, default material of a JSON scene file's "type", or NULL.
+        CMaterial          *Create( LPCSTR strJsonType );
+            // The JSON "type" of a material class (its ClassType()), or NULL.
+        LPCSTR              JsonTypeOf( LPCSTR strClassType );
 #ifdef RAY_GUI
         void                LoadAddList( CListCtrl &oList );
 #endif

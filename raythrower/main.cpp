@@ -15,6 +15,8 @@
 #include "ThreadTaskMaster.h"
 #include "SocketTaskMaster.h"
 #include "WireProtocol.h"
+#include "PixelSampler.h"
+#include "ColorModel.h"
 
 #include "Exceptions/Exception.h"
 
@@ -43,6 +45,9 @@ namespace
         std::string strOutput;
         std::string strPpm;
         std::string strEngine;
+        std::string strSampler;         // Empty: what the scene says.
+        std::string strColorModel;      // Empty: what the scene says.
+        std::string strConvert;
         int         nTasks = 0;
         int         nPort = RAY_WIRE_DEFAULT_PORT;
         int         nTimeout = 60;
@@ -66,6 +71,24 @@ namespace
         printf( "  --engine <path>             The rayengine to start (default: next to raythrower)\n" );
         printf( "  --timeout <seconds>         How long to wait for engines to connect (default 60)\n" );
         printf( "  --batch <rays>              Rays per batch sent to a task (default 127)\n" );
+        printf( "  --aa <mode>                 How each pixel is sampled (anti-aliasing), instead\n" );
+        printf( "                              of what the scene says:\n" );
+
+        int                             nTypes;
+        const CPixelSampler::SType     *aoTypes = CPixelSampler::GetTypes( nTypes );
+        for ( int nIndex = 0; nIndex < nTypes; nIndex++ )
+            printf( "                                %-9s %s%s\n", aoTypes[ nIndex ].strName, aoTypes[ nIndex ].strDescription,
+                    ( nIndex == 0 ) ? " (default)" : "" );
+
+        printf( "  --color <model>             How pixel colors become bytes, instead of what the\n" );
+        printf( "                              scene says (settings can be given in the scene):\n" );
+
+        const CColorModel::SType       *aoModels = CColorModel::GetTypes( nTypes );
+        for ( int nIndex = 0; nIndex < nTypes; nIndex++ )
+            printf( "                                %-9s %s%s\n", aoModels[ nIndex ].strName, aoModels[ nIndex ].strDescription,
+                    ( nIndex == 0 ) ? " (default)" : "" );
+        printf( "  --convert <file>            Save the scene as a JSON .ray file, with any --aa or\n" );
+        printf( "                              --color applied, and exit without tracing\n" );
         printf( "  -q, --quiet                 Print only errors\n" );
         printf( "  -h, --help                  Show this help\n" );
     }
@@ -97,6 +120,30 @@ namespace
                 oOptions.bQuiet = true;
             else if ( strArg == "--spawn" )
                 oOptions.bSpawn = true;
+            else if ( strArg == "--aa" || strArg == "--antialias" )
+            {
+                std::unique_ptr<CPixelSampler> pSampler( CPixelSampler::Create( strNext ) );
+
+                if ( ! pSampler )
+                {
+                    fprintf( stderr, "%s needs a sampling mode; see --help\n", strArg.c_str() );
+                    return false;
+                }
+                oOptions.strSampler = strNext;
+                nCount++;
+            }
+            else if ( strArg == "--color" )
+            {
+                std::unique_ptr<CColorModel> pModel( CColorModel::Create( strNext ) );
+
+                if ( ! pModel )
+                {
+                    fprintf( stderr, "%s needs a color model; see --help\n", strArg.c_str() );
+                    return false;
+                }
+                oOptions.strColorModel = strNext;
+                nCount++;
+            }
             else if ( strArg == "--listen" )
             {
                 oOptions.bListen = true;
@@ -114,7 +161,7 @@ namespace
                 }
                 nCount++;
             }
-            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--engine" )
+            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--engine" || strArg == "--convert" )
             {
                 if ( strNext == NULL )
                 {
@@ -122,6 +169,7 @@ namespace
                     return false;
                 }
                 std::string &strTarget = ( strArg == "--ppm" ) ? oOptions.strPpm :
+                                         ( strArg == "--convert" ) ? oOptions.strConvert :
                                          ( strArg == "--engine" ) ? oOptions.strEngine : oOptions.strOutput;
                 strTarget = strNext;
                 nCount++;
@@ -307,14 +355,29 @@ int main( int argc, char **argv )
     DWORD nLoaded = oScene.Load( oOptions.strScene.c_str() );
     if ( nLoaded != 0 )
     {
-        fprintf( stderr, "%s %s\n", oOptions.strScene.c_str(),
-                 ( nLoaded == WRONG_VERSION ) ? "was saved by a newer version of the ray tracer"
-                                              : "is not a scene file this program can read" );
+        fprintf( stderr, "Can't read %s: %s\n", oOptions.strScene.c_str(), oScene.GetLoadError() );
         return 1;
     }
 
     if ( ! oOptions.bQuiet )
         printf( "Scene loaded from %s\n", oOptions.strScene.c_str() );
+
+    if ( ! oOptions.strSampler.empty() )
+        oScene.GetCamera().SetSampler( CPixelSampler::Create( oOptions.strSampler.c_str() ) );
+    if ( ! oOptions.strColorModel.empty() )
+        oScene.GetCamera().SetColorModel( CColorModel::Create( oOptions.strColorModel.c_str() ) );
+
+    if ( ! oOptions.strConvert.empty() )
+    {
+        if ( oScene.Save( oOptions.strConvert.c_str() ) != 0 )
+        {
+            fprintf( stderr, "Couldn't write %s\n", oOptions.strConvert.c_str() );
+            return 1;
+        }
+        if ( ! oOptions.bQuiet )
+            printf( "Scene saved as JSON to %s\n", oOptions.strConvert.c_str() );
+        return 0;
+    }
 
     CSettings      &oSettings = oScene.GetSettings();
     std::string     strImage = oOptions.strOutput.empty() ? std::string( oSettings.GetImageFileName() ) : oOptions.strOutput;
@@ -378,13 +441,16 @@ int main( int argc, char **argv )
         }
 
         if ( ! oOptions.bQuiet )
-            printf( "Tracing %dx%d with %d task(s) into %s\n", oSettings.GetImageWidth(), oSettings.GetImageHeight(),
-                    pMaster->GetTaskCount(), strImage.c_str() );
+            printf( "Tracing %dx%d with %d task(s), sampling %s, color model %s, into %s\n",
+                    oSettings.GetImageWidth(), oSettings.GetImageHeight(), pMaster->GetTaskCount(),
+                    oScene.GetCamera().GetSampler().GetName(), oScene.GetCamera().GetColorModel().GetName(),
+                    strImage.c_str() );
 
         bTraced = pMaster->TraceScene( oScene, oImage );
     }
     auto tEnd = std::chrono::steady_clock::now();
 
+    long long nRays = pMaster->GetRaysTraced();
     IASLib::CString strError;
     if ( oOptions.bListen )
         strError = static_cast<CSocketTaskMaster *>( pMaster.get() )->GetLastError();
@@ -411,6 +477,7 @@ int main( int argc, char **argv )
         long    nPixels = (long)oSettings.GetImageHeight() * (long)oSettings.GetImageWidth();
 
         printf( "Total Pixels Traced: %ld\n", nPixels );
+        printf( "Rays Traced: %lld (%.2f per pixel)\n", nRays, nPixels ? (double)nRays / (double)nPixels : 0.0 );
         printf( "Time to trace: %.2f seconds\n", dSeconds );
         if ( dSeconds > 0.0 )
             printf( "Pixels per Second: %.0f\n", (double)nPixels / dSeconds );

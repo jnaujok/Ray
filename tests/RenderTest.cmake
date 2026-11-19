@@ -2,16 +2,23 @@
 #
 #   cmake -DRAYTHROWER=... -DCOMPARE=... -DSCENE=... -DOUTPUT=...
 #         [-DREFERENCE=...] [-DMODE=threads|network] [-DEXACT_WITH=...]
-#         -P RenderTest.cmake
+#         [-DAA=<sampler>] [-DCOLOR=<color model>] -P RenderTest.cmake
 #
 # MODE network renders with rayengine processes over TCP. EXACT_WITH names
-# another render the output must match byte for byte.
+# another render the output must match byte for byte. AA and COLOR pick the
+# sampler and color model instead of the scene's.
 
 if(NOT MODE)
     set(MODE threads)
 endif()
 
 set(ARGS "${SCENE}" -q -o "${OUTPUT}")
+if(AA)
+    list(APPEND ARGS --aa ${AA})
+endif()
+if(COLOR)
+    list(APPEND ARGS --color ${COLOR})
+endif()
 if(MODE STREQUAL "network")
     if(NOT PORT)
         set(PORT 0)     # let the system pick a free one

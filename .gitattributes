@@ -10,8 +10,11 @@
 /legacy/** -text
 /help/** -text
 
+# Scene files: the 1997 ones are binary, the current ones JSON text.
+*.ray text eol=lf
+/scenes/1997/*.ray binary
+
 # Binary assets
-*.ray binary
 *.raw binary
 *.out binary
 *.lib binary

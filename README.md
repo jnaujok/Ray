@@ -18,7 +18,7 @@
 [![Contributions: closed](https://img.shields.io/badge/contributions-closed-red.svg)](CONTRIBUTING.md)
 [![Last commit](https://img.shields.io/github/last-commit/jnaujok/Ray.svg)](https://github.com/jnaujok/Ray/commits/main)
 
-<img src="docs/images/scan_test.png" alt="scan_test.ray: reflective and transparent spheres over a plane" width="480">
+<img src="docs/images/scan_test.png" alt="scan_test.ray: reflective and transparent spheres over a plane, anti-aliased" width="480">
 
 </div>
 
@@ -53,7 +53,7 @@ replaced by plain TCP, and the command-line programs build on Windows, Linux, an
 The ray tracing itself is the 1997 code.
 
 <div align="center">
-<img src="docs/images/gallery.png" alt="Renders of six of the sample scenes" width="720">
+<img src="docs/images/gallery.png" alt="Anti-aliased renders of six of the sample scenes" width="720">
 </div>
 
 ## Features
@@ -61,15 +61,22 @@ The ray tracing itself is the 1997 code.
 - **Primitives:** spheres, planes, and triangles, each with its own transform.
 - **Lights:** point lights.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by influence.
+- **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler. The first
+  anti-aliasing sampler takes five rays per pixel (four shared corners and the center) at a cost
+  of about two.
 - **Camera:** pinhole camera with position, look-at point, up vector, and vertical field of view;
   square pixels at any image size.
+- **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
+  look, and the default), `gamma`, `srgb`, and `reinhard` tone mapping.
+- **Readable scene files:** scenes are JSON that you can write and edit by hand, with clear errors
+  that say where a mistake is.
 - **Scene editor:** MFC MDI application with a scene tree, property dialogs for every object type,
   and a material editor.
 - **Distributed rendering:** a master hands out batches of rays to `rayengine` processes over TCP and
   collects the traced colors. Engines can run anywhere that can reach the master.
 - **Local rendering:** the same master can trace with one thread per CPU instead.
-- **Old scenes load:** every readable scene file from 1997 loads, including ones from before the
-  file format's number encoding changed.
+- **Old scenes load:** every readable binary scene file from 1997 loads, including ones from before
+  the file format's number encoding changed, and renders exactly as its JSON conversion does.
 
 ## How it works
 
@@ -95,14 +102,23 @@ flowchart LR
     TM -- pixels --> IMG[(Image file)]
 ```
 
-1. The master sends each task its own copy of the serialized scene.
+1. The master sends each task its own copy of the scene, as JSON.
 2. It walks the image, builds batches of primary rays (`CRayArray`), and deals them out in turn.
-3. Each task traces its batch and sends back the colors, which the master writes into the image.
+3. Each task traces its batch and sends back the colors. The camera's pixel sampler turns them
+   into pixels, and its color model turns the pixels into the image's bytes.
 4. An empty batch tells a task to stop.
 
-Over TCP every message is framed as a tag, a length, and a payload in the scene file's own binary
-format; see [`core/include/WireProtocol.h`](core/include/WireProtocol.h). An engine opens the
-connection with a hello carrying the protocol version.
+Which primary rays are made for each pixel, and how their colors become the pixel, is up to the
+camera's pixel sampler ([`core/include/PixelSampler.h`](core/include/PixelSampler.h)). The default
+casts one ray through each pixel's center; `--aa corners` attaches the anti-aliasing sampler.
+The color model ([`core/include/ColorModel.h`](core/include/ColorModel.h)) then turns each pixel's
+linear color into bytes. Both are set in the scene's camera, or with `--aa` and `--color`, and the
+engines never need to know which are in use.
+
+Over TCP every message is framed as a tag, a length, and a payload. The scene is sent as JSON, the
+same as a scene file; the batches of rays and colors, which are sent constantly, stay in the compact
+binary encoding. See [`core/include/WireProtocol.h`](core/include/WireProtocol.h). An engine opens
+the connection with a hello carrying the protocol version (2 since scenes became JSON).
 
 ## Platforms
 
@@ -145,6 +161,24 @@ cmake --build build --config Release --target Ray
 raythrower scenes/scan_test.ray -o scan_test.raw --ppm scan_test.ppm
 ```
 
+**Smooth the edges** with five rays per pixel:
+
+```sh
+raythrower scenes/scan_test.ray --aa corners --ppm scan_test.ppm
+```
+
+**Tone map** instead of clipping highlights:
+
+```sh
+raythrower scenes/scan_test.ray --color reinhard --ppm scan_test.ppm
+```
+
+**Convert a 1997 binary scene** to JSON:
+
+```sh
+raythrower old_scene.ray --convert new_scene.ray
+```
+
 **Trace with engines on this machine**, started for you:
 
 ```sh
@@ -168,6 +202,9 @@ rayengine master.example.com 7997                       # on each of three machi
 | `--engine <path>` | The `rayengine` to start (default: the one next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for engines to connect (default 60) |
 | `--batch <rays>` | Rays per batch (default 127) |
+| `--aa <mode>` | Pixel sampler, instead of the scene's: `none` or `corners` |
+| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard` |
+| `--convert <file>` | Save the scene as JSON (with any `--aa`/`--color`) and exit |
 
 Images are written in the original raw format: a 2-byte width, a 2-byte height (both big-endian),
 then RGB bytes. `--ppm` gives a copy any image viewer can open.
@@ -181,10 +218,13 @@ menu, and choose *Render*.
 ctest --test-dir build --output-on-failure
 ```
 
-The tests render every readable sample scene and compare it with a reference render, check that
-networked engines produce exactly the same bytes as threads, check that scene files survive a load
-and save, and check the serialization format byte for byte against the 1997 encoding. CI runs them
-on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
+The tests render every sample scene and compare it with a reference render (four of them again
+with anti-aliasing, and one with each color model), check that each 1997 binary scene renders
+exactly what its JSON conversion does and converts to exactly the JSON file in `scenes/`, check
+that networked engines produce exactly the same bytes as threads, check that scene files survive a
+load and save, check that mistakes in JSON scenes are reported where they are, and check the binary
+encoding byte for byte against 1997. CI runs them on every platform, and again on Linux under
+AddressSanitizer and UndefinedBehaviorSanitizer.
 
 ## Repository layout
 
@@ -196,7 +236,7 @@ on every platform, and again on Linux under AddressSanitizer and UndefinedBehavi
 | [`src/`](src), [`include/`](include) | MFC scene editor |
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
-| [`scenes/`](scenes) | Sample `.ray` scenes from 1997 |
+| [`scenes/`](scenes) | Sample `.ray` scenes from 1997, as JSON; the binary originals are in `scenes/1997/` |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |
 | [`docs/`](docs) | MFC AppWizard notes and README images |
@@ -204,9 +244,38 @@ on every platform, and again on Linux under AddressSanitizer and UndefinedBehavi
 
 ## Scene files
 
-`.ray` files are binary scenes: camera, render settings, objects with their materials, and lights.
-The format is unchanged since 1997, so files from then and now are interchangeable.
-[`scenes/README.md`](scenes/README.md) lists the sample scenes and the format's history.
+`.ray` files are JSON: render settings, the camera with its sampler and color model, objects with
+their materials, and lights. Only the camera is required; anything else left out takes its default.
+
+```json
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": { "imageWidth": 640, "imageHeight": 480, "imageFile": "ball.out" },
+    "camera": {
+        "position": [0, 1, -10],
+        "lookAt": [0, 0, 0],
+        "verticalAngle": 30,
+        "sampler": "corners",
+        "colorModel": { "type": "reinhard", "exposure": 1.5 }
+    },
+    "objects": [
+        { "type": "plane", "position": [0, -1, 0], "normal": [0, 1, 0] },
+        {
+            "type": "sphere", "center": [0, 0, 0], "radius": 1,
+            "materials": [
+                { "type": "diffuse", "influence": 0.6, "color": [0.8, 0.2, 0.2] },
+                { "type": "reflective", "influence": 0.4, "color": [1, 1, 1] }
+            ]
+        }
+    ],
+    "lights": [ { "type": "point", "position": [5, 8, -6], "color": [1, 1, 1] } ]
+}
+```
+
+Files saved from 1996 to 1999 are binary (versions 1 and 2). They still load, and
+`raythrower --convert` turns them into JSON. [`scenes/README.md`](scenes/README.md) describes every
+field, lists the sample scenes, and gives the format's history.
 
 ## Project status
 

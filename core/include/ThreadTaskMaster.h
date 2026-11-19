@@ -38,7 +38,7 @@ class CThreadTaskMaster : public CTaskMaster
 
         virtual BOOL    SceneToTasks( CScene &oScene );
         virtual BOOL    RaysToTask( CRayArray &oRays, int nTask );
-        virtual int     ColorsFromTasks( CImageFile &oImageFile, BOOL bWait );
+        virtual int     ColorsFromTasks( BOOL bWait );
 
     private:
                         CThreadTaskMaster( const CThreadTaskMaster & );

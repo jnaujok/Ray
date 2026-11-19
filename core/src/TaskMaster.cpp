@@ -8,6 +8,10 @@
 #include "ImageFile.h"
 #include "RayArray.h"
 #include "TaskMaster.h"
+#include "Rays.h"
+#include "Color.h"
+#include "PixelSampler.h"
+#include "PixelWriter.h"
 
 #include "Threading/Thread.h"
 
@@ -18,7 +22,11 @@ CTaskMaster::CTaskMaster( void ) :
     m_nRaysPerPacket( RAYS_PER_PACKET ),
     m_bTracing( false ),
     m_bStop( false ),
-    m_nStatus( 0 )
+    m_nStatus( 0 ),
+    m_nRaysTraced( 0 ),
+    m_nRaysToTrace( 0 ),
+    m_pSampler( NULL ),
+    m_pWriter( NULL )
 {
 }
 
@@ -40,109 +48,94 @@ BOOL CTaskMaster::EndTrace( void )
     return ( nCount < 100 );
 }
 
+void CTaskMaster::PutSample( int nX, int nY, const CColor &oColor )
+{
+    if ( m_pSampler && m_pWriter )
+        m_pSampler->PutSample( *m_pWriter, nX, nY, oColor );
+}
+
+    // Collects whatever colors the tasks have finished. Returns FALSE if a
+    // task failed.
+BOOL CTaskMaster::CollectColors( BOOL bWait )
+{
+    int nColors = ColorsFromTasks( bWait );
+
+    if ( nColors < 0 )
+        return FALSE;
+
+    m_nRaysTraced += nColors;
+    if ( m_nRaysToTrace > 0 )
+        m_nStatus = (int)( ( m_nRaysTraced * 10000 ) / m_nRaysToTrace );
+    return TRUE;
+}
+
+    // Adds a ray to the batch being built, and sends the batch off when it is
+    // full. Returns FALSE if the trace was stopped or a task failed.
+BOOL CTaskMaster::QueueRay( CRay &oRay, CRayArray &oRays, int &nCurrentTask )
+{
+    if ( m_bStop )
+        return FALSE;
+
+    oRays.Add( oRay );
+
+    if ( oRays.GetSize() > m_nRaysPerPacket )
+    {
+        if ( RaysToTask( oRays, nCurrentTask ) == FALSE )
+            return FALSE;
+
+        if ( ! CollectColors( FALSE ) )
+            return FALSE;
+
+        nCurrentTask++;
+        nCurrentTask = nCurrentTask % m_nTasks;
+        oRays.RemoveAll();
+    }
+    return TRUE;
+}
+
 BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
 {
     CSettings      &oSettings = oScene.GetSettings();
+    CPixelSampler  &oSampler = oScene.GetCamera().GetSampler();
+    CPixelWriter    oWriter( oImageFile, oScene.GetCamera().GetColorModel() );
     CRayArray       oRays;
+    CRay            oRay;
+    int             nCurrentTask = 0;
+    BOOL            bRetVal = TRUE;
 
-        // Pixel Iterators
-    int     nX;
-    int     nY;
+    m_nRaysTraced = 0;
 
-        // The Ray we're casting
-    CRay    oRay;
-
-    int         nYStop = oSettings.GetImageHeight();
-    int         nXStart = 0;
-    int         nXStop = oSettings.GetImageWidth();
-    int         nYStart = 0;
-    int         nPixels = 0;
-    long long   nTotalPixels = (long long)oSettings.GetImageHeight() * (long long)oSettings.GetImageWidth();
-    long long   nPixelCount = 0;
-    int         nCurrentTask = 0;
-
-    if ( ( m_nTasks <= 0 ) || ( nTotalPixels <= 0 ) )
+    if ( ( m_nTasks <= 0 ) || ( oSettings.GetImageWidth() <= 0 ) || ( oSettings.GetImageHeight() <= 0 ) )
         return FALSE;
+
+    m_pSampler = &oSampler;
+    m_pWriter = &oWriter;
+    m_nRaysToTrace = oSampler.Begin( oSettings.GetImageWidth(), oSettings.GetImageHeight() );
 
     m_bTracing = true;
     m_bStop = false;
     m_nStatus = 0;
 
     if ( ! SceneToTasks( oScene ) )
-    {
-        m_bTracing = false;
-        return FALSE;
-    }
+        bRetVal = FALSE;
 
-    nY = nYStart;
-    while ( nY < nYStop )
-    {
-        nX = nXStart;
-        while ( nX < nXStop )
-        {
-            if ( m_bStop )
-            {
-                m_bTracing = false;
-                return FALSE;
-            }
+    while ( bRetVal && oSampler.NextRay( oScene, oRay ) )
+        bRetVal = QueueRay( oRay, oRays, nCurrentTask );
 
-            oRay.CreateRay( oScene, nX, nY );
-            oRays.Add( oRay );
+    if ( bRetVal && oRays.GetSize() )
+        bRetVal = RaysToTask( oRays, nCurrentTask );
 
-            if ( oRays.GetSize() > m_nRaysPerPacket )
-            {
-                if ( RaysToTask( oRays, nCurrentTask ) == FALSE )
-                {
-                    m_bTracing = false;
-                    return FALSE;
-                }
-
-                nPixels = ColorsFromTasks( oImageFile, FALSE );
-                if ( nPixels < 0 )
-                {
-                    m_bTracing = false;
-                    return FALSE;
-                }
-                nPixelCount += nPixels;
-
-                nCurrentTask++;
-                nCurrentTask = nCurrentTask % m_nTasks;
-                oRays.RemoveAll();
-            }
-
-            nX++;
-        }
-        nY++;
-        m_nStatus = (int)( ( nPixelCount * 10000 ) / nTotalPixels );
-    }
-
-    if ( oRays.GetSize() )
-    {
-        if ( RaysToTask( oRays, nCurrentTask ) == FALSE )
-        {
-            m_bTracing = false;
-            return FALSE;
-        }
-    }
-
-    while ( nPixelCount < nTotalPixels )
+    while ( bRetVal && ( m_nRaysTraced < m_nRaysToTrace ) )
     {
         if ( m_bStop )
-        {
-            m_bTracing = false;
-            return FALSE;
-        }
-
-        nPixels = ColorsFromTasks( oImageFile, TRUE );
-        if ( nPixels < 0 )
-        {
-            m_bTracing = false;
-            return FALSE;
-        }
-        nPixelCount += nPixels;
-        m_nStatus = (int)( ( nPixelCount * 10000 ) / nTotalPixels );
+            bRetVal = FALSE;
+        else
+            bRetVal = CollectColors( TRUE );
     }
 
+    oSampler.End();
+    m_pSampler = NULL;
+    m_pWriter = NULL;
     m_bTracing = false;
-    return TRUE;
+    return bRetVal;
 }

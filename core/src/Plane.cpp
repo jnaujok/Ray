@@ -16,6 +16,7 @@
 
 #include "Plane.h"
 #include "Light.h"
+#include "SceneJson.h"
 
 #ifdef RAY_GUI
 #if defined(RAY_GUI) && defined(_DEBUG)
@@ -98,7 +99,7 @@ void CPlane::SetProperties( void )
 
 #endif
 
-DYNAMIC_IMPLEMENTS( CPlane );
+DYNAMIC_IMPLEMENTS( CPlane, "plane" );
 
 CRayStream &operator >>( CRayStream &oStream, CPlane &oPlane )
 {
@@ -224,4 +225,23 @@ CColor CPlane::Shade( CLight *pLight, CVector &oIntersect )
         oGourand = oGourand * nIncidentCos;
     }
     return oColor;
+}
+
+void CPlane::ToJson( IASLib::CObjectNode &oNode )
+{
+    RayJson::PutVector( oNode, "position", m_oPosition );
+    RayJson::PutVector( oNode, "normal", m_oNormal );
+    RayJson::PutColor( oNode, "color", m_oColor );
+    m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+}
+
+BOOL CPlane::FromJson( const IASLib::CJsonNode &oNode )
+{
+    static const char *const astrFields[] = { "position", "normal", "color", "materials", NULL };
+
+    return RayJson::OnlyFields( oNode, astrFields ) &&
+           RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) &&
+           RayJson::GetVector( oNode, "normal", m_oNormal, TRUE ) &&
+           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
+           m_oMaterials.FromJson( oNode, "materials" );
 }
