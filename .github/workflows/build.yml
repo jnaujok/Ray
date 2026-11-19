@@ -50,6 +50,26 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure --parallel 4
 
+      - name: Diagnose networking (temporary)
+        if: failure() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          B=build
+          ./$B/raythrower scenes/triangle.ray -o /tmp/diag.raw --listen 28500 -N3 --timeout 20 > /tmp/master.log 2>&1 &
+          sleep 2
+          echo "--- listening before any engine"; netstat -an | grep 28500 || true; lsof -nP -iTCP:28500 || true
+          ./$B/rayengine 127.0.0.1 28500 > /tmp/e1.log 2>&1 &
+          sleep 2
+          echo "--- after engine 1"; netstat -an | grep 28500 || true; lsof -nP -iTCP:28500 || true
+          ./$B/rayengine 127.0.0.1 28500 --retry 3 > /tmp/e2.log 2>&1 &
+          sleep 4
+          echo "--- after engine 2"; netstat -an | grep 28500 || true
+          ./$B/rayengine localhost 28500 --retry 3 > /tmp/e3.log 2>&1 &
+          sleep 4
+          echo "--- after engine 3 (localhost)"; netstat -an | grep 28500 || true
+          wait || true
+          for f in /tmp/master.log /tmp/e1.log /tmp/e2.log /tmp/e3.log; do echo "== $f"; cat $f; done
+
       - name: Package
         if: always()
         shell: bash
