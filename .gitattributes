@@ -17,3 +17,6 @@
 *.lib binary
 *.bmp binary
 *.ico binary
+
+# Reference renders and other archives
+*.gz binary

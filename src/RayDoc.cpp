@@ -10,11 +10,9 @@
 #include "AddSphereDlg.h"
 #include "AddPlaneDlg.h"
 #include "MainFrm.h"
-#include "FileStream.h"
 #include "ImageFile.h"
 #include "RayArray.h"
 #include "ColorArray.h"
-#include "PVMTaskMaster.h"
 #include "ThreadTaskMaster.h"
 #include "Triangle.h"
 
@@ -177,7 +175,6 @@ UINT TraceThread( LPVOID pParam )
     CDC                 oDC;
     CBitmap            *pOldBitmap;
     CSettings          &oSettings = pData->pScene->GetSettings();
-    CImageFile          oImageFile( oSettings.GetImageFileName(), oSettings.GetImageWidth(), oSettings.GetImageHeight(), FALSE );
     int                 nX, nY;
     CColor              oColor;
     int                 nLastY;
@@ -199,6 +196,11 @@ UINT TraceThread( LPVOID pParam )
 
     while ( pData->bChoosing )
         Sleep( 10 );
+
+        // The tracer has created the image file by now; this thread only
+        // reads it back to draw the progress. (It used to open the file for
+        // writing too, which truncated it under the tracer.)
+    CImageFile          oImageFile( oSettings.GetImageFileName(), oSettings.GetImageWidth(), oSettings.GetImageHeight(), TRUE );
 
         // Wait for all the tracer threads to finish
     while ( pData->nTracing )
@@ -335,16 +337,11 @@ void CRayDoc::OnUpdateRenderKillTrace(CCmdUI* pCmdUI)
 
 BOOL CRayDoc::OnOpenDocument(LPCTSTR lpszPathName) 
 {
-	CStream    *pStream;
-
-//	if (!CDocument::OnOpenDocument(lpszPathName))
-//		return FALSE;
-	
-    pStream = new CFileStream( lpszPathName );
-
-    m_oScene.Serialize( *pStream, TRUE );
-
-    delete pStream;
+    if ( m_oScene.Load( lpszPathName ) != 0 )
+    {
+        AfxMessageBox( "This file is not a scene this program can read.", MB_ICONSTOP | MB_OK );
+        return FALSE;
+    }
 
     SetModifiedFlag( FALSE );
 
@@ -353,13 +350,11 @@ BOOL CRayDoc::OnOpenDocument(LPCTSTR lpszPathName)
 
 BOOL CRayDoc::OnSaveDocument(LPCTSTR lpszPathName) 
 {
-	CStream    *pStream;
-
-    pStream = new CFileStream( lpszPathName );
-
-    m_oScene.Serialize( *pStream, FALSE );
-	
-    delete pStream;
+    if ( m_oScene.Save( lpszPathName ) != 0 )
+    {
+        AfxMessageBox( "The scene could not be saved.", MB_ICONSTOP | MB_OK );
+        return FALSE;
+    }
 
     SetModifiedFlag( FALSE );
 

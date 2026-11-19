@@ -2,6 +2,7 @@
 //
 
 #include "StdAfx.h"
+#include "Sockets/Socket.h"
 #include "Ray.h"
 
 #include "SceneTreeView.h"
@@ -44,7 +45,6 @@ CRayApp::CRayApp()
 
 CRayApp::~CRayApp( void )
 {
-    delete g_pDynamicList;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -57,13 +57,7 @@ CRayApp theApp;
 
 BOOL CRayApp::InitInstance()
 {
-    g_pDynamicList = new CDynList;
-
-	if (!AfxSocketInit())
-	{
-		AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
-		return FALSE;
-	}
+	IASLib::CSocket::InitializeNetworking();
 
 	// Standard initialization
 	// If you are not using these features and wish to reduce the size
