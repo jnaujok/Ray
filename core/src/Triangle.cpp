@@ -39,6 +39,7 @@ CTriangle::CTriangle( void )
     m_oCorner3.Set( -1.0, 0.0, 0.0 );
     m_bDoubleSided = FALSE;
     m_bSmooth = FALSE;
+    m_bGivenNormals = FALSE;
     CalcNormal();
 }
 
@@ -48,7 +49,8 @@ CTriangle::CTriangle( const CVector &oCorner1, const CVector &oCorner2, const CV
     m_oCorner2( oCorner2 ),
     m_oCorner3( oCorner3 ),
     m_bDoubleSided( bDoubleSided ),
-    m_bSmooth( bSmooth )
+    m_bSmooth( bSmooth ),
+    m_bGivenNormals( FALSE )
 {
     m_oColor.Set( 0.5, 0.5, 0.5 );
     if ( pMaterials )
@@ -247,8 +249,10 @@ CColor CTriangle::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
     return BaseShade( oScene, oRay, oIntersect, oNormal );
 }
 
-    // Reads an array of three [x, y, z] vectors.
-static BOOL ReadThree( const IASLib::CJsonNode &oNode, const char *strKey, CVector &oFirst, CVector &oSecond, CVector &oThird )
+    // Reads an array of three [x, y, z] vectors (with bNormals, each made a
+    // unit vector, and none may be zero).
+static BOOL ReadThree( const IASLib::CJsonNode &oNode, const char *strKey, CVector &oFirst, CVector &oSecond, CVector &oThird,
+                       BOOL bNormals = FALSE )
 {
     const IASLib::CJsonNode *pArray = RayJson::Field( oNode, strKey, TRUE );
     RayJson::CWhere          oWhere( strKey );
@@ -266,6 +270,12 @@ static BOOL ReadThree( const IASLib::CJsonNode &oNode, const char *strKey, CVect
 
         if ( ! RayJson::ToVector( *pArray->get( nIndex ), *apoVectors[ nIndex ] ) )
             return FALSE;
+        if ( bNormals )
+        {
+            if ( apoVectors[ nIndex ]->Magnitude() == 0.0 )
+                return RayJson::Fail( "a normal can't be [0, 0, 0]" );
+            apoVectors[ nIndex ]->Normalize();
+        }
     }
     return TRUE;
 }
@@ -278,23 +288,40 @@ void CTriangle::ToJson( IASLib::CObjectNode &oNode )
     RayJson::AddVector( *pCorners, m_oCorner3 );
     RayJson::PutBool( oNode, "doubleSided", m_bDoubleSided );
     RayJson::PutBool( oNode, "smooth", m_bSmooth );
+    if ( m_bGivenNormals )
+    {
+        IASLib::CArrayNode *pNormals = oNode.putArray( "normals" );
+        RayJson::AddVector( *pNormals, m_oNormal1 );
+        RayJson::AddVector( *pNormals, m_oNormal2 );
+        RayJson::AddVector( *pNormals, m_oNormal3 );
+    }
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
 }
 
 BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "corners", "doubleSided", "smooth", "color", "materials", NULL };
+    static const char *const astrFields[] = { "corners", "doubleSided", "smooth", "normals", "color", "materials", NULL };
+    BOOL    bNormals = oNode.isObject() && ( oNode.get( "normals" ) != NULL );
 
+        // Given corner normals are what smooth shading blends, so they make
+        // the triangle smooth; saying "smooth": false with them is an error.
+    m_bSmooth = bNormals;
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
          ! ReadThree( oNode, "corners", m_oCorner1, m_oCorner2, m_oCorner3 ) ||
          ! RayJson::GetBool( oNode, "doubleSided", m_bDoubleSided, FALSE ) ||
          ! RayJson::GetBool( oNode, "smooth", m_bSmooth, FALSE ) )
         return FALSE;
+    if ( bNormals && ! m_bSmooth )
+        return RayJson::Fail( "normals are only used by smooth shading, so \"smooth\" can't be false with them" );
 
     CalcNormal();
     if ( m_oSurfaceNormal.Magnitude() == 0.0 )
         return RayJson::Fail( "the corners are in a line, so the triangle has no surface" );
+
+    m_bGivenNormals = bNormals;
+    if ( bNormals && ! ReadThree( oNode, "normals", m_oNormal1, m_oNormal2, m_oNormal3, TRUE ) )
+        return FALSE;
 
     return RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            m_oMaterials.FromJson( oNode, "materials" );

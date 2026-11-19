@@ -24,8 +24,8 @@ raythrower <FileToTrace> [options]
 | `--engine <path>` | The `rayengine` to start (default: next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for each engine to connect (default 60) |
 | `--batch <rays>` | Rays per batch (default 127) |
-| `--aa <mode>` | Pixel sampler, instead of the scene's: `none`, or `corners` for five rays per pixel at its corners and center |
-| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard` |
+| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, or `random`, with any settings after a colon (`random:samples=9,seed=2`) |
+| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`, with settings as for `--aa` (`reinhard:exposure=1.5`) |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene, with any `--aa`, `--color` or `--size` applied, and exit without tracing |
 | `-q`, `--quiet` | Print only errors |
@@ -37,6 +37,14 @@ With `--aa corners` each pixel is the average of five rays: one at each corner a
 center. A corner is traced once and shared with the neighboring pixels, so this costs about two rays
 per pixel. The engines don't need to know: the camera's sampler (`CCornerSampler`) labels the rays with
 their position on a doubled sample grid and does the averaging in the master.
+
+`--aa box` traces four rays per pixel, each halfway from the pixel's center to one of its corners,
+and averages them equally.
+
+`--aa random:samples=N` traces one ray through the center, which counts for half the pixel, and N
+rays at random points in the pixel, which share the other half: N + 1 rays a pixel (N from 1 to
+1024, default 4). The points come from a hash of the pixel, the ray's number and `seed` (default 0),
+so the same scene always gives the same image, however the work is split between tasks.
 
 `--color` picks how pixel colors become bytes. `clip`, the default, is the 1997 look. `gamma` and
 `srgb` encode for today's displays, which makes the 1997 scenes, lit for a screen without gamma

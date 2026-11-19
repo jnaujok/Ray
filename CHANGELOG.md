@@ -32,16 +32,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     Rays are tagged with their position on a doubled sample grid, so `rayengine` needs no change,
     and samples are summed in fixed point, so threads and networked engines produce identical
     images.
+  - `box` (`CBoxSampler`): four rays per pixel, each halfway from the center to one of its corners,
+    averaged equally.
+  - `random` (`CRandomSampler`): a ray through the center worth half the pixel, and N rays at random
+    points in the pixel sharing the other half (`samples`, N, from 1 to 1024, default 4). The points
+    come from a hash of the pixel, ray number and `seed`, so images are reproducible and threads and
+    engines agree.
+  - `CPixelAccumulator`: the weighted, fixed-point, order-independent averaging the samplers share.
 - **Triangles work out their own normals** from their corners, instead of storing them, by the
   edge traversal in the 1997 code (which had been commented out) with its order reversed:
   (V2 − V1) × (V3 − V2). The 1997 order made faces of standard models such as OBJ files face
   inward. The corner order decides the front; the two 1997 triangle scenes had their corners
-  reordered to keep facing the camera, and are double-sided. New `doubleSided` (a single-sided triangle can't be hit from behind; a double-sided one is
-  shaded from the side it is seen from) and `smooth` flags.
+  reordered to keep facing the camera, and are double-sided. New `doubleSided` (a single-sided
+  triangle can't be hit from behind; a double-sided one is shaded from the side it is seen from)
+  and `smooth` flags. Optional `normals` override the corner normals smooth shading blends (and
+  make the triangle smooth); `triangle2.ray` keeps its 1997 tilted normals this way, which are what
+  light it.
 - **Meshes** (`"type": "mesh"`, `CMesh`): a vertex list and faces given as vertex indices. The
   faces are `CTriangle`s that share the mesh's materials. In a smooth mesh each vertex's normal is
   the sum of the normals of the faces around it, and faces blend their corner normals by barycentric
-  weights, so shared edges show no seam. Rays that miss the mesh's bounding box skip all its faces,
+  weights, so shared edges show no seam; optional `normals`, one per vertex, replace the summed
+  ones. Rays that miss the mesh's bounding box skip all its faces,
   and rays leaving a face skip only that face (`CObjects::Intersect` now takes the object to
   ignore), so a mesh shadows and reflects itself.
 - **The Utah teapot** (`scenes/teapot.ray`, 6,320 triangles), and `tools/obj_to_ray.py`, which turns
@@ -55,12 +66,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `srgb`: the sRGB curve;
   - `reinhard`: Reinhard tone mapping on luminance, with `exposure` and `white` settings, then sRGB.
 - `raythrower` options: `--aa <sampler>`, `--color <model>` and `--size <w>x<h>` override the
-  scene's choices; `--save <file>` saves the scene and exits; `--help` lists the samplers and color
+  scene's choices, and `--aa`/`--color` take settings after a colon (`--aa random:samples=9`); `--save <file>` saves the scene and exits; `--help` lists the samplers and color
   models. It prints the rays traced and the rays per pixel, and says why a scene couldn't be read.
   The scene editor does not offer a sampler or color model yet.
+- An "Expected output" section in the README showing every reference render the tests compare
+  against, labelled with its test, and `tools/render_previews.py`, which makes those previews
+  (`docs/images/tests/`) from `tests/reference/renders.tar.gz`.
 - `CRay::CreateRayAt`, which casts a primary ray through any point on the image,
   `CImageFile::PutRGB`, `CVector::Cross`, and `CScene::GetObjectAt`.
-- Tests: four scenes rendered with corner anti-aliasing, one with each color model, and the teapot
+- Tests: four scenes rendered with corner anti-aliasing, one with `box` and with `random` at 2, 4
+  and 9 rays (and networked `random`, which must match threads exactly), one with each color
+  model, and the teapot
   (new references in `tests/reference/renders.tar.gz`); networked engines must match threads with
   anti-aliasing on; rays and colors must cross the wire exactly; JSON scenes with mistakes must
   fail with the right message and leave the scene untouched; triangles must cull back faces only
@@ -68,9 +84,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The default trace depth is 16 levels (`settings.maximumDepth`; the camera ray is level 1, so 15
+  reflections or refractions), up from the 1997 default of 15, and every sample scene uses it.
+  The deepest bounces in `reflection_test`, `reflect_me` and `reflect_test2` change their renders;
+  their references and the README gallery were regenerated.
 - The sample scenes in `scenes/` are now JSON, converted from the 1997 originals and rounded to six
-  decimal places. Rounding moves a few pixels by one level, and `triangle2`, whose corners had
-  tilted normals to fake a curve, now renders flat; the reference renders were regenerated.
+  decimal places. Rounding moves a few pixels by one level, and `triangle2` now blends its corner
+  normals by barycentric weights instead of the 1997 inverse-distance weighting; the reference
+  renders were regenerated.
 - The wire protocol (version 3): the scene is sent as SJSON, IASLib's compact binary JSON; ray
   and color batches are fixed-layout big-endian IEEE-754 doubles (72 bytes a ray, 32 a color),
   which `RayWire::ToReadable` can show as JSON. SJSON was tried for the batches too, in stream,

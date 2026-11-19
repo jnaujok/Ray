@@ -16,6 +16,7 @@
 #include "WireProtocol.h"
 #include "PixelSampler.h"
 #include "ColorModel.h"
+#include "SceneJson.h"
 
 #include "Exceptions/Exception.h"
 
@@ -73,8 +74,9 @@ namespace
         printf( "  --timeout <seconds>         How long to wait for engines to connect (default 60)\n" );
         printf( "  --batch <rays>              Rays per batch sent to a task (default 127)\n" );
         printf( "  --size <width>x<height>     Image size, instead of the scene's\n" );
-        printf( "  --aa <mode>                 How each pixel is sampled (anti-aliasing), instead\n" );
-        printf( "                              of what the scene says:\n" );
+        printf( "  --aa <sampler>              How each pixel is sampled (anti-aliasing), instead\n" );
+        printf( "                              of what the scene says. Settings follow a colon:\n" );
+        printf( "                              --aa random:samples=9,seed=2\n" );
 
         int                             nTypes;
         const CPixelSampler::SType     *aoTypes = CPixelSampler::GetTypes( nTypes );
@@ -83,7 +85,7 @@ namespace
                     ( nIndex == 0 ) ? " (default)" : "" );
 
         printf( "  --color <model>             How pixel colors become bytes, instead of what the\n" );
-        printf( "                              scene says (settings can be given in the scene):\n" );
+        printf( "                              scene says, with settings as for --aa:\n" );
 
         const CColorModel::SType       *aoModels = CColorModel::GetTypes( nTypes );
         for ( int nIndex = 0; nIndex < nTypes; nIndex++ )
@@ -93,6 +95,68 @@ namespace
         printf( "                              exit without tracing\n" );
         printf( "  -q, --quiet                 Print only errors\n" );
         printf( "  -h, --help                  Show this help\n" );
+    }
+
+        // A sampler or color model from "name" or "name:key=value,...", the
+        // settings as the scene file would give them. NULL, with a message in
+        // strError, if the name or a setting is not right.
+    template <class T> T *MakeModel( const std::string &strSpec, std::string &strError )
+    {
+        size_t              nColon = strSpec.find( ':' );
+        std::string         strName = strSpec.substr( 0, nColon );
+        std::unique_ptr<T>  pModel( T::Create( strName.c_str() ) );
+
+        if ( ! pModel )
+        {
+            strError = "there is none called \"" + strName + "\"";
+            return NULL;
+        }
+        if ( nColon == std::string::npos )
+            return pModel.release();
+
+        IASLib::CObjectNode oSettings;
+        std::string         strRest = strSpec.substr( nColon + 1 );
+
+        oSettings.put( "type", strName.c_str() );
+        while ( ! strRest.empty() )
+        {
+            size_t      nComma = strRest.find( ',' );
+            std::string strPair = strRest.substr( 0, nComma );
+            size_t      nEquals = strPair.find( '=' );
+
+            strRest = ( nComma == std::string::npos ) ? "" : strRest.substr( nComma + 1 );
+            if ( nEquals == std::string::npos || nEquals == 0 )
+            {
+                strError = "settings are given as key=value, not \"" + strPair + "\"";
+                return NULL;
+            }
+
+            std::string strKey = strPair.substr( 0, nEquals );
+            std::string strValue = strPair.substr( nEquals + 1 );
+            char       *pEnd = NULL;
+            double      dValue = strtod( strValue.c_str(), &pEnd );
+
+            if ( strValue == "true" || strValue == "false" )
+                oSettings.put( strKey, strValue == "true" );
+            else if ( ! strValue.empty() && *pEnd == '\0' )
+            {
+                if ( dValue == (double)(long long)dValue && strValue.find_first_of( ".eE" ) == std::string::npos )
+                    oSettings.put( strKey, (long long)dValue );
+                else
+                    oSettings.put( strKey, dValue );
+            }
+            else
+                oSettings.put( strKey, strValue.c_str() );
+        }
+
+        RayJson::ClearError();
+        if ( ! pModel->FromJson( oSettings ) )
+        {
+            strError = RayJson::GetError();
+            RayJson::ClearError();
+            return NULL;
+        }
+        return pModel.release();
     }
 
     bool ParseInt( const char *strValue, int &nValue )
@@ -124,11 +188,13 @@ namespace
                 oOptions.bSpawn = true;
             else if ( strArg == "--aa" || strArg == "--antialias" )
             {
-                std::unique_ptr<CPixelSampler> pSampler( CPixelSampler::Create( strNext ) );
+                std::string                     strError;
+                std::unique_ptr<CPixelSampler>  pSampler( strNext ? MakeModel<CPixelSampler>( strNext, strError ) : NULL );
 
                 if ( ! pSampler )
                 {
-                    fprintf( stderr, "%s needs a sampling mode; see --help\n", strArg.c_str() );
+                    fprintf( stderr, "%s needs a sampler%s%s; see --help\n", strArg.c_str(),
+                             strError.empty() ? "" : ": ", strError.c_str() );
                     return false;
                 }
                 oOptions.strSampler = strNext;
@@ -136,11 +202,13 @@ namespace
             }
             else if ( strArg == "--color" )
             {
-                std::unique_ptr<CColorModel> pModel( CColorModel::Create( strNext ) );
+                std::string                     strError;
+                std::unique_ptr<CColorModel>    pModel( strNext ? MakeModel<CColorModel>( strNext, strError ) : NULL );
 
                 if ( ! pModel )
                 {
-                    fprintf( stderr, "%s needs a color model; see --help\n", strArg.c_str() );
+                    fprintf( stderr, "%s needs a color model%s%s; see --help\n", strArg.c_str(),
+                             strError.empty() ? "" : ": ", strError.c_str() );
                     return false;
                 }
                 oOptions.strColorModel = strNext;
@@ -380,9 +448,15 @@ int main( int argc, char **argv )
         printf( "Scene loaded from %s\n", oOptions.strScene.c_str() );
 
     if ( ! oOptions.strSampler.empty() )
-        oScene.GetCamera().SetSampler( CPixelSampler::Create( oOptions.strSampler.c_str() ) );
+    {
+        std::string strError;
+        oScene.GetCamera().SetSampler( MakeModel<CPixelSampler>( oOptions.strSampler, strError ) );
+    }
     if ( ! oOptions.strColorModel.empty() )
-        oScene.GetCamera().SetColorModel( CColorModel::Create( oOptions.strColorModel.c_str() ) );
+    {
+        std::string strError;
+        oScene.GetCamera().SetColorModel( MakeModel<CColorModel>( oOptions.strColorModel, strError ) );
+    }
 
     if ( oOptions.nWidth > 0 )
     {

@@ -7,12 +7,15 @@
 *       The surface normal comes from the corners, by the edge traversal *
 * (V2 - V1) x (V3 - V2), so the order of the corners decides which side  *
 * is the front. It is the rule OBJ and most other model formats are made *
-* for, so their faces come out facing outward. A single-sided triangle can only be hit from the front;  *
-* a double-sided one from either side, and it is shaded with the normal  *
-* turned toward the viewer. A flat triangle is shaded with its surface   *
-* normal everywhere; a smooth one blends normals given for its corners   *
-* (by a mesh, from the faces around each vertex) by barycentric weights, *
-* so neighboring faces meet without a seam.                              *
+* for, so their faces come out facing outward. A single-sided triangle   *
+* can only be hit from the front; a double-sided one from either side,   *
+* and it is shaded with the normal turned toward the viewer.             *
+*                                                                        *
+*       A flat triangle is shaded with its surface normal everywhere. A  *
+* smooth one blends normals for its corners by barycentric weights, so   *
+* neighboring faces meet without a seam. The corner normals come from a  *
+* mesh (the sum of the normals of the faces around each vertex) or from  *
+* the scene file; otherwise they are the surface normal.                 *
 *                                                                        *
 * Copyright (c) 1997, Jeffrey R. Naujok                                  *
 *************************************************************************/
@@ -38,6 +41,7 @@ class CTriangle : public CObjects
 
         BOOL                m_bDoubleSided;
         BOOL                m_bSmooth;
+        BOOL                m_bGivenNormals;    // the corner normals came from the scene file
 
         CColor              m_oColor;
 

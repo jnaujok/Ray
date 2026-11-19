@@ -50,6 +50,7 @@ FetchContent_MakeAvailable(IASLib)
 # ---------------------------------------------------------------------------
 set(RAY_CORE_SOURCES
     core/src/AmbientMaterial.cpp
+    core/src/BoxSampler.cpp
     core/src/Camera.cpp
     core/src/CenterSampler.cpp
     core/src/ClipColorModel.cpp
@@ -68,12 +69,14 @@ set(RAY_CORE_SOURCES
     core/src/Mesh.cpp
     core/src/Objects.cpp
     core/src/ObjectsArray.cpp
+    core/src/PixelAccumulator.cpp
     core/src/PixelSampler.cpp
     core/src/PixelWriter.cpp
     core/src/Plane.cpp
     core/src/PtLight.cpp
     core/src/RayArray.cpp
     core/src/Rays.cpp
+    core/src/RandomSampler.cpp
     core/src/RaySettings.cpp
     core/src/ReflectiveMaterial.cpp
     core/src/ReinhardColorModel.cpp

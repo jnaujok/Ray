@@ -6,7 +6,7 @@
         "imageHeight": 240,
         "imageFile": "teapot.out",
         "colorDepth": 8,
-        "maximumDepth": 15,
+        "maximumDepth": 16,
         "depthThreshold": 0.01
     },
     "background": [0.55, 0.7, 0.9],

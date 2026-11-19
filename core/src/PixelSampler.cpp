@@ -7,6 +7,8 @@
 #include "PixelSampler.h"
 #include "CenterSampler.h"
 #include "CornerSampler.h"
+#include "BoxSampler.h"
+#include "RandomSampler.h"
 
 #include "SceneJson.h"
 
@@ -16,12 +18,17 @@ namespace
 {
     CPixelSampler *CreateCenter( void ) { return new CCenterSampler; }
     CPixelSampler *CreateCorner( void ) { return new CCornerSampler; }
+    CPixelSampler *CreateBox( void )    { return new CBoxSampler; }
+    CPixelSampler *CreateRandom( void ) { return new CRandomSampler; }
 
         // Every sampler that can be chosen by name. The first is the default.
     const CPixelSampler::SType s_aoTypes[] =
     {
         { "none",    "one ray through the center of each pixel",                           CreateCenter },
         { "corners", "five rays per pixel, at its corners and center (about two per pixel)", CreateCorner },
+        { "box",     "four rays per pixel, halfway from its center to each corner",            CreateBox },
+        { "random",  "a center ray worth half the pixel, and N random rays sharing the other "
+                     "half (settings: samples, N, default 4; seed, default 0)",                  CreateRandom },
     };
 }
 

@@ -33,6 +33,7 @@
 - [Building](#building)
 - [Usage](#usage)
 - [Testing](#testing)
+  - [Expected output](#expected-output)
 - [Repository layout](#repository-layout)
 - [Scene files](#scene-files)
 - [Project status](#project-status)
@@ -59,14 +60,16 @@ The ray tracing itself is the 1997 code.
 ## Features
 
 - **Primitives:** spheres, planes, triangles, and triangle meshes. A triangle's normal comes from
-  its corner order; it can be single- or double-sided, and flat or smooth. A mesh shares vertices
+  its corner order; it can be single- or double-sided, and flat or smooth, with corner normals that
+  can be given to override the computed ones. A mesh shares vertices
   between faces, gives each vertex the sum of its faces' normals, and skips all its faces for rays
   that miss its bounding box.
 - **Lights:** point lights.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by influence.
-- **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler. The first
-  anti-aliasing sampler takes five rays per pixel (four shared corners and the center) at a cost
-  of about two.
+- **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler: `corners`
+  (five rays per pixel, four of them corners shared with the neighbors, about two rays a pixel),
+  `box` (four rays halfway from the center to each corner), or `random` (a center ray worth half
+  the pixel plus N random rays; reproducible, so every run gives the same image).
 - **Camera:** pinhole camera with position, look-at point, up vector, and vertical field of view;
   square pixels at any image size.
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
@@ -217,8 +220,8 @@ rayengine master.example.com 7997                       # on each of three machi
 | `--engine <path>` | The `rayengine` to start (default: the one next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for engines to connect (default 60) |
 | `--batch <rays>` | Rays per batch (default 127) |
-| `--aa <mode>` | Pixel sampler, instead of the scene's: `none` or `corners` |
-| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard` |
+| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, or `random`; settings after a colon, as in `random:samples=9` |
+| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`; settings as for `--aa`, as in `reinhard:exposure=1.5` |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene (with any `--aa`/`--color`/`--size`) and exit |
 
@@ -235,11 +238,49 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests render every sample scene and compare it with a reference render (four of them again
-with anti-aliasing, one with each color model, and the teapot), check that networked engines
+with corner anti-aliasing, one with each other sampler and color model, and the teapot), check that networked engines
 produce exactly the same bytes as threads and that rays and colors cross the wire exactly, check
 that scene files survive a load and save, check that mistakes in JSON scenes are reported where
 they are, and check triangle sidedness and that smooth mesh faces agree along shared edges. CI runs them on every platform, and again on Linux under
 AddressSanitizer and UndefinedBehaviorSanitizer.
+
+### Expected output
+
+These are the reference renders the tests compare against, from
+[`tests/reference/renders.tar.gz`](tests/reference/renders.tar.gz), each labelled with its test.
+They are shown at up to 320 pixels wide; `tools/render_previews.py` makes these previews from the
+archive, so run it whenever the references are regenerated. The networked tests (`network_*`) must
+produce exactly the same images as the threaded ones, so they have no images of their own.
+
+**Sample scenes**, with each scene's own sampler and color model (one ray a pixel, `clip`).
+`huh` and `ser_test2` have nothing in view. `triangle2`'s corners are given tilted normals that fake
+a curve; they are what light it, since its lights lie in the triangle's own plane.
+
+<table>
+<tr><td align="center"><img src="docs/images/tests/axis_test.png" alt="render_axis_test" width="260"><br><code>render_axis_test</code></td><td align="center"><img src="docs/images/tests/huh.png" alt="render_huh (blank by design)" width="260"><br><code>render_huh (blank by design)</code></td><td align="center"><img src="docs/images/tests/inside_sphere.png" alt="render_inside_sphere" width="260"><br><code>render_inside_sphere</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/mat_test.png" alt="render_mat_test" width="260"><br><code>render_mat_test</code></td><td align="center"><img src="docs/images/tests/reflect_me.png" alt="render_reflect_me" width="260"><br><code>render_reflect_me</code></td><td align="center"><img src="docs/images/tests/reflect_test2.png" alt="render_reflect_test2" width="260"><br><code>render_reflect_test2</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/reflect_test3.png" alt="render_reflect_test3" width="260"><br><code>render_reflect_test3</code></td><td align="center"><img src="docs/images/tests/reflection_test.png" alt="render_reflection_test" width="260"><br><code>render_reflection_test</code></td><td align="center"><img src="docs/images/tests/scan_test.png" alt="render_scan_test" width="260"><br><code>render_scan_test</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/ser_test.png" alt="render_ser_test" width="260"><br><code>render_ser_test</code></td><td align="center"><img src="docs/images/tests/ser_test2.png" alt="render_ser_test2 (blank by design)" width="260"><br><code>render_ser_test2 (blank by design)</code></td><td align="center"><img src="docs/images/tests/spec_test.png" alt="render_spec_test" width="260"><br><code>render_spec_test</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"></td></tr>
+</table>
+
+**Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box` and `random` samplers on
+`scan_test` (compare with `render_scan_test` above).
+
+<table>
+<tr><td align="center"><img src="docs/images/tests/scan_test_aa.png" alt="render_aa_scan_test (corners)" width="260"><br><code>render_aa_scan_test (corners)</code></td><td align="center"><img src="docs/images/tests/axis_test_aa.png" alt="render_aa_axis_test (corners)" width="260"><br><code>render_aa_axis_test (corners)</code></td><td align="center"><img src="docs/images/tests/triangle_aa.png" alt="render_aa_triangle (corners)" width="260"><br><code>render_aa_triangle (corners)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/xxx_aa.png" alt="render_aa_xxx (corners)" width="260"><br><code>render_aa_xxx (corners)</code></td><td align="center"><img src="docs/images/tests/scan_test_box.png" alt="render_sampler_box" width="260"><br><code>render_sampler_box</code></td><td align="center"><img src="docs/images/tests/scan_test_random2.png" alt="render_sampler_random2" width="260"><br><code>render_sampler_random2</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/scan_test_random4.png" alt="render_sampler_random4" width="260"><br><code>render_sampler_random4</code></td><td align="center"><img src="docs/images/tests/scan_test_random9.png" alt="render_sampler_random9" width="260"><br><code>render_sampler_random9</code></td><td align="center"></td></tr>
+</table>
+
+**Color models** (`--color`) on `scan_test`. The 1997 scenes were lit for screens without gamma
+encoding, so `gamma` and `srgb` look washed out; `reinhard` brings back clipped highlights.
+
+<table>
+<tr><td align="center"><img src="docs/images/tests/scan_test.png" alt="clip (the default)" width="260"><br><code>clip (the default)</code></td><td align="center"><img src="docs/images/tests/scan_test_gamma.png" alt="render_color_gamma" width="260"><br><code>render_color_gamma</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/scan_test_srgb.png" alt="render_color_srgb" width="260"><br><code>render_color_srgb</code></td><td align="center"><img src="docs/images/tests/scan_test_reinhard.png" alt="render_color_reinhard" width="260"><br><code>render_color_reinhard</code></td></tr>
+</table>
 
 ## Repository layout
 
@@ -252,7 +293,7 @@ AddressSanitizer and UndefinedBehaviorSanitizer.
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
 | [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and the Utah teapot |
-| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |
 | [`docs/`](docs) | MFC AppWizard notes and README images |

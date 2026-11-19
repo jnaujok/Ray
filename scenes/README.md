@@ -15,7 +15,7 @@ when the binary format was dropped; they are in the repository's history.
 | `ser_test.ray`, `ser_test2.ray` | version 2 | Serialization tests (`ser_test2` renders blank: nothing is in view) |
 | `spec_test.ray` | version 2 | Specular highlights |
 | `test.ray` | version 2 | |
-| `triangle.ray`, `triangle2.ray` | version 2 | Triangle primitives. `triangle2` gave its corners tilted normals to fake a curve; triangles now work out their own, so it renders flat |
+| `triangle.ray`, `triangle2.ray` | version 2 | Triangle primitives. `triangle2` gives its corners tilted normals, which fake a curve (and are what light it: its lights lie in the triangle's plane) |
 | `xxx.ray` | version 1 | Read with the legacy number format |
 | `huh.ray` | transitional | Version-2 header with legacy numbers; renders blank |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -50,8 +50,8 @@ places.
 | `imageWidth`, `imageHeight` | `640`, `480` | Image size in pixels |
 | `imageFile` | `"ray.out"` | Where `raythrower` writes the image, unless given `-o` |
 | `colorDepth` | `8` | Bits per channel (kept from 1997; images are always 8-bit) |
-| `maximumDepth` | `15` | How many times a ray may be reflected or refracted |
-| `depthThreshold` | `0.01` | A ray whose influence on its pixel falls below this is not traced further |
+| `maximumDepth` | `16` | How many levels deep a ray may be traced: the ray from the camera is level 1, and each reflection or refraction one more, so 16 allows 15 bounces |
+| `depthThreshold` | `0.01` | A ray whose influence on its pixel falls below this is not traced further. (Reflected and refracted rays keep their parent's influence, so in practice `maximumDepth` is what stops them.) |
 | `reserved1997` | | Settings the 1997 code defined but never implemented (anti-aliasing, caustics, focal blur, haze, and so on), kept so nothing is lost. Only the ones that differ from their defaults are written. The tracer ignores them. |
 
 **`camera`**
@@ -63,11 +63,13 @@ places.
 | `up` | `[0, 1, 0]` | Which way is up; the image's top edge faces this way |
 | `verticalAngle` | `30` | Vertical field of view in degrees. The horizontal one follows from the image's shape, so pixels are square. |
 | `horizontalAngle`, `aspectRatio` | `40`, `1.333…` | Kept from 1997; not used for rendering |
-| `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center) or `"corners"` (five rays, at its corners and center, about two per pixel) |
+| `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half) |
 | `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, or `"reinhard"` |
 
 A sampler or color model is a name, or an object with a `type` and its settings:
-`{ "type": "gamma", "gamma": 2.2 }`, or `{ "type": "reinhard", "exposure": 1, "white": 4 }`
+`{ "type": "random", "samples": 9, "seed": 0 }` (N from 1 to 1024, default 4; the same seed always
+gives the same image), `{ "type": "gamma", "gamma": 2.2 }`, or
+`{ "type": "reinhard", "exposure": 1, "white": 4 }`
 (`exposure` scales the colors first; with a `white` luminance, that and anything brighter maps to
 white).
 
@@ -78,8 +80,8 @@ color, not used in shading), and `materials` (default: one diffuse material).
 |--------|--------|
 | `sphere` | `center` (required), `radius` (required) |
 | `plane` | `position` (required): a point on the plane; `normal` (required) |
-| `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`) |
-| `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`) |
+| `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each corner |
+| `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex |
 
 A triangle's normal is worked out from its corners by the edge traversal (V2 − V1) × (V3 − V2), so
 the order of the corners decides which side is the front. It is the rule OBJ and most other model
@@ -89,6 +91,11 @@ seen from. A flat triangle is shaded with that normal everywhere. In a smooth me
 normal is the sum of the normals of the faces around it, and each face blends its corners' normals
 by barycentric weights, so neighboring faces meet without a seam. (A lone smooth triangle has no
 neighbors, so it shades flat.) A mesh's faces whose corners are in a line are left out.
+
+`normals` overrides the corner (or vertex) normals that smooth shading blends, for a surface that
+should curve differently than its faces suggest. They are made unit vectors and can't be
+`[0, 0, 0]`. They don't change which side is the front or where rays hit, only shading, and they
+make the shape smooth (`"smooth": false` with them is an error).
 
 **Materials.** An object's look is the sum of its materials, each scaled by its `influence`
 (default `1`). Each has a `type` and a `color`.

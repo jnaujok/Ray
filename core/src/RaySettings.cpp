@@ -24,7 +24,7 @@ CSettings::CSettings( int nWidth, int nHeight, int nColorDepth, LPCSTR strOutput
     m_nGammaCorrection = 1.0;
     m_bAdaptiveDepth = FALSE;
     m_nAdaptiveDepthThreshold = 0.01;
-    m_nMaximumTraceDepth = 15;
+    m_nMaximumTraceDepth = 16;
     m_bAntialias = FALSE;
     m_bAdaptiveAntialiasing = FALSE;
     m_nAntialiasThreshold = 0.03;

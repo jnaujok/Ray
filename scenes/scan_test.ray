@@ -6,7 +6,7 @@
         "imageHeight": 240,
         "imageFile": "scantest.out",
         "colorDepth": 8,
-        "maximumDepth": 15,
+        "maximumDepth": 16,
         "depthThreshold": 0.01
     },
     "background": [1.0, 1.0, 1.0],

@@ -1,5 +1,15 @@
 # Tools
 
+## `render_previews.py`
+
+Writes a PNG preview of every reference render in `tests/reference/renders.tar.gz` to
+`docs/images/tests/`, shrunk to at most 320 pixels wide, for the README's "Expected output"
+section. It needs only Python 3. Run it from the repository root whenever the references change:
+
+```sh
+tools/render_previews.py
+```
+
 ## `obj_to_ray.py`
 
 Turns a Wavefront OBJ model into a Ray mesh object (JSON), ready to put in a scene's `objects`

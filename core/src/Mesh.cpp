@@ -40,8 +40,12 @@ void CMesh::DeleteFaces( void )
     m_pHitFace = NULL;
 }
 
-BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vector<int> &anFaces, BOOL bSmooth, BOOL bDoubleSided )
+BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vector<int> &anFaces, BOOL bSmooth, BOOL bDoubleSided,
+                         const std::vector<CVector> &aoNormals )
 {
+    if ( ! aoNormals.empty() && aoNormals.size() != aoVertices.size() )
+        return FALSE;
+
     for ( size_t nIndex = 0; nIndex < anFaces.size(); nIndex++ )
     {
         if ( anFaces[ nIndex ] < 0 || anFaces[ nIndex ] >= (int)aoVertices.size() )
@@ -53,10 +57,11 @@ BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vect
     m_anFaces = anFaces;
     m_bSmooth = bSmooth;
     m_bDoubleSided = bDoubleSided;
+    m_aoGivenNormals = aoNormals;
 
         // Each vertex's normal is the sum of the normals of the faces around
         // it, then made a unit vector.
-    std::vector<CVector> aoNormals( m_aoVertices.size(), CVector( 0.0, 0.0, 0.0 ) );
+    std::vector<CVector> aoSums( m_aoVertices.size(), CVector( 0.0, 0.0, 0.0 ) );
     std::vector<size_t>  anKeptFrom;        // where each kept face's indices start
 
     for ( size_t nFace = 0; nFace + 2 < m_anFaces.size(); nFace += 3 )
@@ -73,13 +78,15 @@ BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vect
         anKeptFrom.push_back( nFace );
         for ( int nCorner = 0; nCorner < 3; nCorner++ )
         {
-            CVector &oSum = aoNormals[ m_anFaces[ nFace + nCorner ] ];
+            CVector &oSum = aoSums[ m_anFaces[ nFace + nCorner ] ];
             oSum = oSum + pFace->GetSurfaceNormal();
         }
     }
 
-    for ( size_t nIndex = 0; nIndex < aoNormals.size(); nIndex++ )
-        aoNormals[ nIndex ].Normalize();
+    for ( size_t nIndex = 0; nIndex < aoSums.size(); nIndex++ )
+        aoSums[ nIndex ].Normalize();
+
+    const std::vector<CVector> &aoVertexNormals = m_aoGivenNormals.empty() ? aoSums : m_aoGivenNormals;
 
     if ( m_bSmooth )
     {
@@ -87,8 +94,8 @@ BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vect
         {
             size_t nFace = anKeptFrom[ nKept ];
 
-            m_apFaces[ nKept ]->SetCornerNormals( aoNormals[ m_anFaces[ nFace ] ], aoNormals[ m_anFaces[ nFace + 1 ] ],
-                                                  aoNormals[ m_anFaces[ nFace + 2 ] ] );
+            m_apFaces[ nKept ]->SetCornerNormals( aoVertexNormals[ m_anFaces[ nFace ] ], aoVertexNormals[ m_anFaces[ nFace + 1 ] ],
+                                                  aoVertexNormals[ m_anFaces[ nFace + 2 ] ] );
         }
     }
 
@@ -216,6 +223,13 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
 
     RayJson::PutBool( oNode, "smooth", m_bSmooth );
     RayJson::PutBool( oNode, "doubleSided", m_bDoubleSided );
+    if ( ! m_aoGivenNormals.empty() )
+    {
+        IASLib::CArrayNode *pNormals = oNode.putArray( "normals" );
+
+        for ( size_t nIndex = 0; nIndex < m_aoGivenNormals.size(); nIndex++ )
+            RayJson::AddVector( *pNormals, m_aoGivenNormals[ nIndex ] );
+    }
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
 
@@ -227,10 +241,14 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
 
 BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "vertices", "faces", "smooth", "doubleSided", "color", "materials", NULL };
+    static const char *const astrFields[] = { "vertices", "faces", "normals", "smooth", "doubleSided", "color", "materials", NULL };
     std::vector<CVector>    aoVertices;
     std::vector<int>        anFaces;
-    BOOL                    bSmooth = m_bSmooth;
+    std::vector<CVector>    aoNormals;
+    BOOL                    bGivenNormals = oNode.isObject() && ( oNode.get( "normals" ) != NULL );
+        // Given normals are what smooth shading blends, so they make the
+        // mesh smooth; saying "smooth": false with them is an error.
+    BOOL                    bSmooth = bGivenNormals ? TRUE : m_bSmooth;
     BOOL                    bDoubleSided = m_bDoubleSided;
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
@@ -239,6 +257,8 @@ BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
          ! RayJson::GetColor( oNode, "color", m_oColor, FALSE ) ||
          ! m_oMaterials.FromJson( oNode, "materials" ) )
         return FALSE;
+    if ( bGivenNormals && ! bSmooth )
+        return RayJson::Fail( "normals are only used by smooth shading, so \"smooth\" can't be false with them" );
 
     const IASLib::CJsonNode *pVertices = RayJson::Field( oNode, "vertices", TRUE );
     const IASLib::CJsonNode *pFaces = RayJson::Field( oNode, "faces", TRUE );
@@ -287,5 +307,26 @@ BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
         }
     }
 
-    return SetGeometry( aoVertices, anFaces, bSmooth, bDoubleSided );
+    if ( bGivenNormals )
+    {
+        const IASLib::CJsonNode *pNormals = oNode.get( "normals" );
+        RayJson::CWhere          oWhere( "normals" );
+
+        if ( ! pNormals->isArray() || pNormals->size() != (int)aoVertices.size() )
+            return RayJson::Fail( "must be an array of [x, y, z] normals, one for each of the " +
+                                  std::to_string( (long)aoVertices.size() ) + " vertices" );
+        aoNormals.resize( aoVertices.size() );
+        for ( int nIndex = 0; nIndex < pNormals->size(); nIndex++ )
+        {
+            RayJson::CWhere oElement( "", nIndex );
+
+            if ( ! RayJson::ToVector( *pNormals->get( nIndex ), aoNormals[ (size_t)nIndex ] ) )
+                return FALSE;
+            if ( aoNormals[ (size_t)nIndex ].Magnitude() == 0.0 )
+                return RayJson::Fail( "a normal can't be [0, 0, 0]" );
+            aoNormals[ (size_t)nIndex ].Normalize();
+        }
+    }
+
+    return SetGeometry( aoVertices, anFaces, bSmooth, bDoubleSided, aoNormals );
 }

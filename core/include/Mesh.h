@@ -6,7 +6,7 @@
 *   are ordinary CTriangles, owned by the mesh and sharing its           *
 *   materials. Each vertex gets a normal, the sum of the normals of      *
 *   every face it belongs to, so a smooth mesh shades as one curved      *
-*   surface. The corner order of each face decides its front, as for     *
+*   surface; the scene file can give the vertex normals instead. The corner order of each face decides its front, as for     *
 *   CTriangle.                                                           *
 *                                                                        *
 *   A ray that misses the mesh's bounding box skips all its faces. Rays  *
@@ -28,6 +28,7 @@ class CMesh : public CObjects
     protected:
         std::vector<CVector>    m_aoVertices;
         std::vector<int>        m_anFaces;          // three vertex indices a face
+        std::vector<CVector>    m_aoGivenNormals;   // one a vertex, or empty to sum the faces' normals
         BOOL                    m_bDoubleSided;
         BOOL                    m_bSmooth;
         CColor                  m_oColor;
@@ -47,10 +48,13 @@ class CMesh : public CObjects
         virtual                ~CMesh( void );
 
             /// Replaces the geometry and rebuilds the faces and normals.
-            /// Faces whose corners are in a line are left out. Returns FALSE
-            /// if an index is out of range.
+            /// Faces whose corners are in a line are left out. aoNormals, if
+            /// not empty, gives each vertex's normal (unit vectors) instead
+            /// of the sum of its faces' normals. Returns FALSE if an index is
+            /// out of range or aoNormals is the wrong length.
         BOOL                    SetGeometry( const std::vector<CVector> &aoVertices, const std::vector<int> &anFaces,
-                                             BOOL bSmooth, BOOL bDoubleSided );
+                                             BOOL bSmooth, BOOL bDoubleSided,
+                                             const std::vector<CVector> &aoNormals = std::vector<CVector>() );
         int                     GetFaceCount( void ) const { return (int)m_apFaces.size(); }
             /// The normal face nFace shades with at a point on it.
         CVector                 FaceNormalAt( int nFace, CVector oPoint ) { return m_apFaces[ (size_t)nFace ]->NormalAt( oPoint ); }

@@ -169,6 +169,16 @@ static void JsonChecks( void )
     Check( strSaved.find( "\"sampler\": \"corners\"" ) != std::string::npos, "a sampler without settings is saved by name" );
     Check( strSaved.find( "\"exposure\": 2.0" ) != std::string::npos, "a color model's settings are saved" );
 
+        // A sampler with settings.
+    CScene oRandom;
+    Check( oRandom.FromJson( Minimal( "\"lookAt\": [0, 0, 0]",
+                                      "\"lookAt\": [0, 0, 0], \"sampler\": { \"type\": \"random\", \"samples\": 9, \"seed\": 3 }" ) ) == 0,
+           "a random sampler with settings loads" );
+    Check( oRandom.ToJson().find( "\"samples\": 9" ) != std::string::npos && oRandom.ToJson().find( "\"seed\": 3" ) != std::string::npos,
+           "the random sampler's settings are saved" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"sampler\": { \"type\": \"random\", \"samples\": 0 }" ),
+                 BAD_FILE, "camera.sampler: samples must be a whole number from 1 to 1024" );
+
         // Mistakes are reported where they are.
     ExpectError( "{ \"format\": ", BAD_FILE, "not valid JSON" );
     ExpectError( Minimal( "\"Ray scene\"", "\"Something else\"" ), BAD_FILE, "\"format\" must be \"Ray scene\"" );
@@ -232,6 +242,51 @@ static void TriangleChecks( void )
     ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
                           "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 1, 3]]" ),
                  BAD_FILE, "objects[0].faces[0]: vertex indices must be whole numbers from 0 to 2" );
+
+        // Normals given in the scene: a triangle shades with them, smoothly,
+        // and saves them; a mesh uses them instead of summing its faces'.
+    {
+        CScene      oGiven;
+        CTriangle  *pTriangle = dynamic_cast<CTriangle *>( FirstObject( oGiven,
+            "{ \"type\": \"triangle\", \"corners\": [[0, 1, 0], [1, 0, 0], [-1, 0, 0]], "
+            "\"normals\": [[0, 2, -2], [1, 0, -1], [-1, 0, -1]] }" ) );
+        CVector     oCorner( 0.0, 1.0, 0.0 );
+        CVector     oExpected( 0.0, 1.0, -1.0 );
+
+        oExpected.Normalize();
+        Check( pTriangle != NULL, "a triangle with normals loads" );
+        if ( pTriangle )
+        {
+            CVector oDifference = pTriangle->NormalAt( oCorner ) - oExpected;
+            Check( oDifference.Magnitude() < 1e-12, "a triangle shades with its given normals, made unit vectors" );
+        }
+        Check( oGiven.ToJson().find( "\"normals\"" ) != std::string::npos && oGiven.ToJson().find( "\"smooth\": true" ) != std::string::npos,
+               "given normals make a triangle smooth and are saved" );
+
+        CScene  oMeshGiven;
+        CMesh  *pMesh = dynamic_cast<CMesh *>( FirstObject( oMeshGiven,
+            "{ \"type\": \"mesh\", \"vertices\": [[-1, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 2, 1]], "
+            "\"normals\": [[0, 0, -1], [0, 0, -1], [0, 1, 0]] }" ) );
+        Check( pMesh && pMesh->GetFaceCount() == 1, "a mesh with normals loads" );
+        if ( pMesh )
+        {
+            CVector oUp( 0.0, 1.0, 0.0 );
+            CVector oDifference = pMesh->FaceNormalAt( 0, oUp ) - oUp;
+            Check( oDifference.Magnitude() < 1e-12, "a mesh shades with its given vertex normals" );
+        }
+    }
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"triangle\", \"corners\": [[0, 1, 0], [1, 0, 0], [-1, 0, 0]], \"smooth\": false, "
+                          "\"normals\": [[0, 0, -1], [0, 0, -1], [0, 0, -1]]" ),
+                 BAD_FILE, "objects[0]: normals are only used by smooth shading" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"triangle\", \"corners\": [[0, 1, 0], [1, 0, 0], [-1, 0, 0]], "
+                          "\"normals\": [[0, 0, -1], [0, 0, 0], [0, 0, -1]]" ),
+                 BAD_FILE, "objects[0].normals[1]: a normal can't be [0, 0, 0]" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 1, 2]], "
+                          "\"normals\": [[0, 0, -1]]" ),
+                 BAD_FILE, "objects[0].normals: must be an array of [x, y, z] normals, one for each of the 3 vertices" );
 
         // A mesh of two faces folded along a shared edge: smooth shading must
         // give the same normal from either face at a point on that edge, and

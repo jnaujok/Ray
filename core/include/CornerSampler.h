@@ -11,9 +11,7 @@
 *   a time, a row of corners and then a row of centers, so the samples   *
 *   of a pixel go out close together.                                    *
 *                                                                        *
-*   Samples are averaged unclipped, so the color model sees the true     *
-*   brightness of each pixel, and summed in fixed point, so the image    *
-*   doesn't depend on the order they come back in.                       *
+*   The five are averaged equally by a CPixelAccumulator.                *
 *                                                                        *
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
@@ -21,29 +19,16 @@
 #define __CORNERSAMPLER_H__
 
 #include "PixelSampler.h"
-
-#include <cstdint>
-#include <vector>
+#include "PixelAccumulator.h"
 
 class CCornerSampler : public CPixelSampler
 {
     protected:
-            // The samples a pixel has received so far.
-        struct SPixelSum
-        {
-            uint64_t            nRed;
-            uint64_t            nGreen;
-            uint64_t            nBlue;
-            uint32_t            nSamples;
-        };
-
         int                     m_nWidth;
         int                     m_nHeight;
         int                     m_nGridX;           // Position of the next ray on the doubled grid.
         int                     m_nGridY;
-        std::vector<SPixelSum>  m_aoSums;
-
-        void                    AddToPixel( CPixelWriter &oWriter, int nX, int nY, const uint64_t anColor[ 3 ] );
+        CPixelAccumulator       m_oSums;
 
     public:
                                 CCornerSampler( void );
