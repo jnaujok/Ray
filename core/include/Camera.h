@@ -25,6 +25,13 @@ class CCamera : public CObjects
         FLT         m_nAspectRatio;
         FLT         m_nXRotate;
         FLT         m_nYRotate;
+
+            // The camera's viewing basis, worked out by CalcRotate(): the
+            // direction it looks, and the directions of the image's right
+            // and top edges, all unit vectors.
+        CVector     m_oForward;
+        CVector     m_oRight;
+        CVector     m_oTop;
     public:
                     CCamera( void );
                     CCamera( CVector oPosition, CVector oPointAt, FLT nVerticalAngle, FLT nHorizontalAngle, FLT nAspectRatio = 0.0, CVector *poUp = NULL );
@@ -46,6 +53,13 @@ class CCamera : public CObjects
         friend CRayStream  &operator <<( CRayStream &oStream, CCamera &oCamera );
 
         void        CalcRotate( void );
+
+            // The direction of the ray through a point on the image. nScreenX
+            // runs from -1 at the left edge to 1 at the right, nScreenY from -1
+            // at the bottom to 1 at the top, and nAspect is the image's width
+            // over its height. The vertical angle sets the field of view; the
+            // horizontal one follows from the image's shape, so pixels are square.
+        CVector     RayDirection( FLT nScreenX, FLT nScreenY, FLT nAspect );
         FLT         GetXRotate( void ) { return m_nXRotate; }
         FLT         GetYRotate( void ) { return m_nYRotate; }
 

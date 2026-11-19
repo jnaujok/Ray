@@ -100,45 +100,30 @@ void CRay::CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX
     m_nDepth = 0;
 }
 
-void CRay::CreateRay( CScene &oScene, FLT nXAngularOffset, FLT nYAngularOffset, FLT nInfluence, int nX, int nY )
+    // The primary ray from the camera through the center of pixel (nX, nY),
+    // where (0, 0) is the top left corner of the image.
+void CRay::CreateRay( CScene &oScene, int nX, int nY, FLT nInfluence )
 {
-    CVector         oTemp;
-    CCamera        &oCamera =  oScene.GetCamera();
+    CCamera        &oCamera = oScene.GetCamera();
+    CSettings      &oSettings = oScene.GetSettings();
+    FLT             nWidth = (FLT)oSettings.GetImageWidth();
+    FLT             nHeight = (FLT)oSettings.GetImageHeight();
     CVector         oStartPos = oCamera.GetPosition();
-    CVector         oPointAt( oCamera.PointAt() );
-    CVector         oDifference;
+    CVector         oDirection;
+
+    if ( ( nWidth <= 0.0 ) || ( nHeight <= 0.0 ) )
+        nWidth = nHeight = 1.0;
+
+    oDirection = oCamera.RayDirection( ( ( ( nX + 0.5 ) * 2.0 ) / nWidth ) - 1.0,
+                                       1.0 - ( ( ( nY + 0.5 ) * 2.0 ) / nHeight ),
+                                       nWidth / nHeight );
 
     m_nX = oStartPos.GetX();
     m_nY = oStartPos.GetY();
     m_nZ = oStartPos.GetZ();
-
-    oPointAt = oPointAt - oStartPos;
-
-    oPointAt.Normalize();
-
-    oTemp.Set( 0.0, 0.0, 1.0 );
-
-    oDifference = oPointAt - oTemp;
-
-    oTemp.Set( TAN( nXAngularOffset ), TAN( nYAngularOffset ), 1.0 );
-
-    oTemp.Normalize();
-
-    oTemp = oTemp + oDifference;
-
-//        // Rotate the Z unit vector to the offset for the current pixel
-//    oTemp.Rotate( -nYAngularOffset, -nXAngularOffset, 0.0 );
-
-        // Normalize that unit vector to the direction the camera is pointing
-//    oTemp.Rotate( oCamera.GetXRotate(), oCamera.GetYRotate(), 0 );
-
-        // Normalize the vector
-    oTemp.Normalize();
-
-        // And make it the ray.
-    m_nI = oTemp.GetX();
-    m_nJ = oTemp.GetY();
-    m_nK = oTemp.GetZ();
+    m_nI = oDirection.GetX();
+    m_nJ = oDirection.GetY();
+    m_nK = oDirection.GetZ();
 
     m_nT = 1e100;
 

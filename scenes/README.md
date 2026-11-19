@@ -6,7 +6,7 @@ reference renders in [`tests/reference/`](../tests/reference).
 
 | Scene | Format | Notes |
 |-------|--------|-------|
-| `axis_test.ray` | current | Six colored spheroids along the axes |
+| `axis_test.ray` | current | Six colored spheres along the axes |
 | `inside_sphere.ray` | current | Camera inside a sphere |
 | `mat_test.ray` | current | Material test |
 | `reflect_me.ray`, `reflect_test2.ray`, `reflect_test3.ray`, `reflection_test.ray` | current | Reflection tests |

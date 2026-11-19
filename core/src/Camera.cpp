@@ -139,6 +139,13 @@ void CCamera::SetProperties( void )
 
 #endif    
 
+static CVector Cross( CVector &oA, CVector &oB )
+{
+    return CVector( ( oA.GetY() * oB.GetZ() ) - ( oA.GetZ() * oB.GetY() ),
+                    ( oA.GetZ() * oB.GetX() ) - ( oA.GetX() * oB.GetZ() ),
+                    ( oA.GetX() * oB.GetY() ) - ( oA.GetY() * oB.GetX() ) );
+}
+
 void CCamera::CalcRotate( void )
 {
     CVector oCenterRay( m_oPointAt - m_oPosition );
@@ -152,4 +159,38 @@ void CCamera::CalcRotate( void )
 
     if ( oAxisZ.Dot( oCenterRay ) < 0 )
         m_nYRotate += PI;
+
+        // The viewing basis. The scenes use left-handed coordinates: looking
+        // down +Z with +Y up, +X is to the right.
+    m_oForward = oCenterRay;
+    if ( m_oForward.Magnitude() == 0.0 )
+        m_oForward = oAxisZ;            // the camera looks at its own position
+
+    CVector oUp( m_oUp );
+    m_oRight = Cross( oUp, m_oForward );
+    if ( m_oRight.Magnitude() < 1e-9 )
+    {
+            // Looking straight along the up vector: let the top of the image
+            // face +Z when looking down and -Z when looking up, so +X stays
+            // to the right.
+        oUp.Set( 0.0, 0.0, ( m_oForward.GetY() < 0.0 ) ? 1.0 : -1.0 );
+        m_oRight = Cross( oUp, m_oForward );
+    }
+    m_oRight.Normalize();
+    m_oTop = Cross( m_oForward, m_oRight );
+    m_oTop.Normalize();
+}
+
+CVector CCamera::RayDirection( FLT nScreenX, FLT nScreenY, FLT nAspect )
+{
+    FLT     nHalfHeight = TAN( m_nVerticalAngle / 2.0 );
+    FLT     nHalfWidth = nHalfHeight * nAspect;
+    CVector oRight( m_oRight * ( nScreenX * nHalfWidth ) );
+    CVector oTop( m_oTop * ( nScreenY * nHalfHeight ) );
+    CVector oDirection( m_oForward + oRight );
+
+    oDirection = oDirection + oTop;
+    oDirection.Normalize();
+
+    return oDirection;
 }

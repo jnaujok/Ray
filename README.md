@@ -61,7 +61,8 @@ The ray tracing itself is the 1997 code.
 - **Primitives:** spheres, planes, and triangles, each with its own transform.
 - **Lights:** point lights.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by influence.
-- **Camera:** position, orientation, and field of view.
+- **Camera:** pinhole camera with position, look-at point, up vector, and vertical field of view;
+  square pixels at any image size.
 - **Scene editor:** MFC MDI application with a scene tree, property dialogs for every object type,
   and a material editor.
 - **Distributed rendering:** a master hands out batches of rays to `rayengine` processes over TCP and

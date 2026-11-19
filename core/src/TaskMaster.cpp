@@ -43,26 +43,7 @@ BOOL CTaskMaster::EndTrace( void )
 BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
 {
     CSettings      &oSettings = oScene.GetSettings();
-    CCamera        &oCamera = oScene.GetCamera();
     CRayArray       oRays;
-
-    FLT nWidth = (FLT)oSettings.GetImageWidth();
-    FLT nHeight = (FLT)oSettings.GetImageHeight();
-    FLT nXCenter = nWidth / 2;
-    FLT nYCenter = nHeight / 2;
-
-        // Current Trace Point;
-    FLT nCurrentX = -nXCenter;
-    FLT nCurrentY = nYCenter;
-    FLT nXRestart;
-
-        // Angular step per pixel/line
-    FLT nXStep = oCamera.GetHorizontalAngle() / nWidth;
-    FLT nYStep = oCamera.GetVerticalAngle() / nHeight;
-
-        // Current Angular Position for 0, 0 position
-    FLT nXAngle;
-    FLT nYAngle;
 
         // Pixel Iterators
     int     nX;
@@ -93,8 +74,6 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
         return FALSE;
     }
 
-    nXRestart = nCurrentX;
-
     nY = nYStart;
     while ( nY < nYStop )
     {
@@ -107,10 +86,7 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
                 return FALSE;
             }
 
-            nXAngle = nCurrentX * nXStep;
-            nYAngle = nCurrentY * nYStep;
-
-            oRay.CreateRay( oScene, nXAngle, nYAngle, 1.0, nX, nY );
+            oRay.CreateRay( oScene, nX, nY );
             oRays.Add( oRay );
 
             if ( oRays.GetSize() > m_nRaysPerPacket )
@@ -134,11 +110,8 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
                 oRays.RemoveAll();
             }
 
-            nCurrentX += 1.0;
             nX++;
         }
-        nCurrentX = nXRestart;
-        nCurrentY -= 1.0;
         nY++;
         m_nStatus = (int)( ( nPixelCount * 10000 ) / nTotalPixels );
     }

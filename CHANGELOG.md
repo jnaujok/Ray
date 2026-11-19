@@ -7,6 +7,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Camera rays were distorted. The camera was aimed by adding the difference between its view
+  direction and +Z to every ray instead of rotating the rays, which sheared the image: spheres came
+  out as tilted ellipses, horizons curved, a camera looking straight down saw a smear, and a camera
+  turned to face -Z rendered a mirror image. Pixels were also spaced by equal angles rather than
+  evenly across a flat image plane, and were not square unless the scene's two angles happened to
+  match the image's shape.
+  Primary rays now come from a proper camera basis (view direction, right, and up, from the stored
+  up vector, with a fallback when looking straight up or down) through the center of each pixel on
+  a flat image plane. The vertical angle sets the field of view and the horizontal one follows from
+  the image's width and height, so pixels are square.
+  The reference renders in `tests/reference/renders.tar.gz` and the README images were regenerated.
+
+### Changed
+
+- `CRay::CreateRay( CScene &, ... )` takes pixel coordinates instead of angles, and the camera
+  works out the direction (`CCamera::RayDirection`). `CTaskMaster::TraceScene` and the GUI preview
+  loop no longer do their own angle stepping.
+
 ## [0.2.0] - 2026-11-19
 
 The code builds again, on Windows, Linux, and macOS, on top of

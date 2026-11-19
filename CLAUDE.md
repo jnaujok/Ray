@@ -50,8 +50,8 @@ ctest --test-dir build --output-on-failure
 
 ## Rules for the code
 
-- **Don't change the ray tracing logic** (intersection, shading, ray generation in
-  `CTaskMaster::TraceScene`) without being asked to. Fixing crashes and undefined behavior is fine.
+- **Don't change the ray tracing logic** (intersection, shading, primary ray generation in
+  `CRay::CreateRay` and `CCamera::RayDirection`) without being asked to. Fixing crashes and undefined behavior is fine.
 - **The `.ray` format is fixed.** `CRayStream` writes exactly what the 1997 `CFileStream` did:
   plain `int` is a one-byte BOOL, `long`/`DWORD` are 4 bytes on every platform, floating point is
   `%.18e` text. Don't add `CRayStream` overloads that change which encoding a type gets.

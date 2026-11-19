@@ -125,24 +125,6 @@ void CScene::AddObject( CObjects *pObject )
 #ifdef RAY_GUI
 BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
 {
-    FLT nWidth = (FLT)m_oSettings.GetImageWidth();
-    FLT nHeight = (FLT)m_oSettings.GetImageHeight();
-    FLT nXCenter = nWidth / 2;
-    FLT nYCenter = nHeight / 2;
-
-        // Current Trace Point;
-    FLT nCurrentX = -nXCenter;
-    FLT nCurrentY = nYCenter;
-    FLT nXRestart;
-
-        // Angular step per pixel/line
-    FLT nXStep = m_oCamera.GetHorizontalAngle() / nWidth;
-    FLT nYStep = m_oCamera.GetVerticalAngle() / nHeight;
-
-        // Current Angular Position for 0, 0 position
-    FLT nXAngle;
-    FLT nYAngle;
-
         // Current Pixel Color
     CColor  oPixel;
 
@@ -205,8 +187,6 @@ BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
             return TRUE;
     }
 
-    nXRestart = nCurrentX;
-
     nY = nYStart;
     while ( nY < nYStop )
     {
@@ -217,10 +197,7 @@ BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
             if ( *pbStop )
                 return FALSE;
 
-            nXAngle = nCurrentX * nXStep;
-            nYAngle = nCurrentY * nYStep;
-
-            oRay.CreateRay( *this, nXAngle, nYAngle, 1.0, nX, nY );
+            oRay.CreateRay( *this, nX, nY );
 
             nCount = 0;
             oPixel = RGB( 0, 0, 0 );
@@ -250,11 +227,8 @@ BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
             oPixel.Clip();
             pDC->SetPixel( nX, nY, (COLORREF)oPixel );
 
-            nCurrentX += 1.0;
             nX++;
         }
-        nCurrentX = nXRestart;
-        nCurrentY -= 1.0;
         nY++;
     }
     return TRUE;

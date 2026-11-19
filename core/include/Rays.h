@@ -35,7 +35,7 @@ class CRay
                         CRay( void );
                         CRay( const CRay &oSource );
         virtual        ~CRay( void );
-        virtual void    CreateRay( CScene &oScene, FLT nXAngularOffset, FLT nYAngularOffset, FLT nInfluence, int nX, int nY );
+        virtual void    CreateRay( CScene &oScene, int nX, int nY, FLT nInfluence = 1.0 );
         virtual void    CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX, int nY );
 
 
