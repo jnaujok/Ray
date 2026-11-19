@@ -123,5 +123,6 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jnaujok/Ray/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jnaujok/Ray/releases/tag/v0.1.0
