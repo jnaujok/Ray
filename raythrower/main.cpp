@@ -28,6 +28,13 @@
 #include <thread>
 #include <vector>
 
+#if ! defined( _WIN32 )
+#include <errno.h>
+#include <spawn.h>
+#include <sys/wait.h>
+extern char **environ;
+#endif
+
 namespace
 {
     struct SOptions
@@ -160,23 +167,91 @@ namespace
 #endif
     }
 
-        // Starts nCount local rayengines. Each runs on a thread of its own
-        // until it exits; the caller joins them.
-    void SpawnEngines( std::vector<std::thread> &aEngines, const std::string &strEngine, int nPort, int nCount )
+        // Local rayengine processes started by --spawn. They are started
+        // directly (posix_spawn or CreateProcess), not through system():
+        // macOS runs system() calls one at a time, so only one engine ran.
+    class CEngineProcesses
     {
-        char        achPort[ 16 ];
-        std::string strCommand;
-
-        snprintf( achPort, sizeof( achPort ), "%d", nPort );
-        strCommand = "\"" + strEngine + "\" 127.0.0.1 " + achPort + " --retry 30";
+        protected:
 #if defined( _WIN32 )
-            // cmd.exe drops the outer quotes when the command starts with one.
-        strCommand = "\"" + strCommand + "\"";
+            std::vector<HANDLE> m_aProcesses;
+#else
+            std::vector<pid_t>  m_aProcesses;
 #endif
 
-        for ( int nEngine = 0; nEngine < nCount; nEngine++ )
-            aEngines.emplace_back( [strCommand]() { int nResult = system( strCommand.c_str() ); (void)nResult; } );
-    }
+        public:
+            ~CEngineProcesses( void ) { WaitAll(); }
+
+            bool Start( const std::string &strEngine, int nPort, int nCount )
+            {
+                char achPort[ 16 ];
+
+                snprintf( achPort, sizeof( achPort ), "%d", nPort );
+
+                for ( int nEngine = 0; nEngine < nCount; nEngine++ )
+                {
+#if defined( _WIN32 )
+                    std::string         strCommand = "\"" + strEngine + "\" 127.0.0.1 " + achPort + " --retry 30";
+                    STARTUPINFOA        stStartup;
+                    PROCESS_INFORMATION stProcess;
+
+                    memset( &stStartup, 0, sizeof( stStartup ) );
+                    stStartup.cb = sizeof( stStartup );
+                    memset( &stProcess, 0, sizeof( stProcess ) );
+
+                    std::vector<char> achCommand( strCommand.begin(), strCommand.end() );
+                    achCommand.push_back( '\0' );
+
+                    if ( ! CreateProcessA( NULL, achCommand.data(), NULL, NULL, FALSE, 0, NULL, NULL,
+                                           &stStartup, &stProcess ) )
+                    {
+                        fprintf( stderr, "Couldn't start %s (error %lu)\n", strEngine.c_str(), (unsigned long)GetLastError() );
+                        return false;
+                    }
+                    CloseHandle( stProcess.hThread );
+                    m_aProcesses.push_back( stProcess.hProcess );
+#else
+                    std::string strHost = "127.0.0.1";
+                    std::string strRetry = "--retry";
+                    std::string strSeconds = "30";
+                    char       *astrArgs[] = { const_cast<char *>( strEngine.c_str() ), &strHost[ 0 ], achPort,
+                                               &strRetry[ 0 ], &strSeconds[ 0 ], NULL };
+                    pid_t       nPid;
+                    int         nError;
+
+                        // posix_spawnp searches PATH when the name has no '/'.
+                    nError = posix_spawnp( &nPid, strEngine.c_str(), NULL, NULL, astrArgs, environ );
+                    if ( nError != 0 )
+                    {
+                        fprintf( stderr, "Couldn't start %s: %s\n", strEngine.c_str(), strerror( nError ) );
+                        return false;
+                    }
+                    m_aProcesses.push_back( nPid );
+#endif
+                }
+                return true;
+            }
+
+                /// Waits for every engine to exit.
+            void WaitAll( void )
+            {
+#if defined( _WIN32 )
+                for ( HANDLE hProcess : m_aProcesses )
+                {
+                    WaitForSingleObject( hProcess, INFINITE );
+                    CloseHandle( hProcess );
+                }
+#else
+                for ( pid_t nPid : m_aProcesses )
+                {
+                    int nStatus;
+                    while ( waitpid( nPid, &nStatus, 0 ) < 0 && errno == EINTR )
+                        ;
+                }
+#endif
+                m_aProcesses.clear();
+            }
+    };
 
     bool WritePpm( const std::string &strRaw, const std::string &strPpm )
     {
@@ -249,7 +324,7 @@ int main( int argc, char **argv )
 
         // Set up the tasks.
     std::unique_ptr<CTaskMaster>    pMaster;
-    std::vector<std::thread>        aEngines;
+    CEngineProcesses                oEngines;
 
     if ( oOptions.bListen )
     {
@@ -262,8 +337,12 @@ int main( int argc, char **argv )
             return 1;
         }
 
-        if ( oOptions.bSpawn )
-            SpawnEngines( aEngines, EnginePath( oOptions, argv[ 0 ] ), pSockets->GetPort(), oOptions.nTasks );
+        if ( oOptions.bSpawn && ! oEngines.Start( EnginePath( oOptions, argv[ 0 ] ), pSockets->GetPort(), oOptions.nTasks ) )
+        {
+            pMaster.reset();
+            oEngines.WaitAll();
+            return 1;
+        }
         else if ( ! oOptions.bQuiet )
             printf( "Waiting for %d rayengine(s) on port %d\n", oOptions.nTasks, pSockets->GetPort() );
 
@@ -271,8 +350,7 @@ int main( int argc, char **argv )
         {
             fprintf( stderr, "Couldn't start the tasks: %s\n", pSockets->GetLastError() );
             pMaster.reset();
-            for ( auto &oEngine : aEngines )
-                oEngine.join();
+            oEngines.WaitAll();
             return 1;
         }
     }
@@ -295,8 +373,7 @@ int main( int argc, char **argv )
         {
             fprintf( stderr, "Couldn't create the image file %s\n", strImage.c_str() );
             pMaster.reset();
-            for ( auto &oEngine : aEngines )
-                oEngine.join();
+            oEngines.WaitAll();
             return 1;
         }
 
@@ -314,8 +391,7 @@ int main( int argc, char **argv )
 
     pMaster->EndTasks();
     pMaster.reset();
-    for ( auto &oEngine : aEngines )
-        oEngine.join();
+    oEngines.WaitAll();
 
     if ( ! bTraced )
     {
