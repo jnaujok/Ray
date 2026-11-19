@@ -41,6 +41,6 @@ protected:
 	virtual BOOL OnInitDialog();
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	//}}AFX_MSG
-	afx_msg LONG OnInitPaint( UINT, LONG );
+	afx_msg LRESULT OnInitPaint( WPARAM, LPARAM );
     DECLARE_MESSAGE_MAP()
 };

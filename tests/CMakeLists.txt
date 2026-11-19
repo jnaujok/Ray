@@ -40,7 +40,11 @@ foreach(scene IN LISTS RAY_TEST_SCENES)
     add_test(NAME roundtrip_${scene} COMMAND format_test ${scene_file} ${RENDER_DIR})
 endforeach()
 
+# Each networked test listens on its own port, outside the range the system
+# hands out for outgoing connections, and they run one at a time.
+set(port 27997)
 foreach(scene IN LISTS RAY_NETWORK_SCENES)
+    math(EXPR port "${port} + 1")
     add_test(NAME network_${scene}
              COMMAND ${CMAKE_COMMAND}
                      -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -48,9 +52,11 @@ foreach(scene IN LISTS RAY_NETWORK_SCENES)
                      -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${scene}.ray
                      -DOUTPUT=${RENDER_DIR}/${scene}_network.raw
                      -DMODE=network
+                     -DPORT=${port}
                      -DEXACT_WITH=${RENDER_DIR}/${scene}.raw
                      -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-    set_tests_properties(network_${scene} PROPERTIES FIXTURES_REQUIRED render_${scene} TIMEOUT 300)
+    set_tests_properties(network_${scene} PROPERTIES FIXTURES_REQUIRED render_${scene}
+                                                     RESOURCE_LOCK ray_network TIMEOUT 300)
 endforeach()
 
 # raythrower --spawn starts the rayengine next to it.

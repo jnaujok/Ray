@@ -17,41 +17,71 @@ Guidance for Claude Code when working in this repository.
 
 ## Project overview
 
-Ray is a distributed ray tracer from 1997, made of three programs:
+Ray is a distributed ray tracer from 1997, rebuilt on [IASLib](https://github.com/jnaujok/IASLib)
+v3.0. It is made of three programs and a shared core:
 
-| Program | Location | Platform | Build |
-|---------|----------|----------|-------|
-| `Ray.exe`: MFC scene editor / master | `src/`, `include/`, `res/` | Windows (MFC, MBCS) | `Ray.dsw` (VC++ 6) or CMake with MSVC |
-| `rayengine`: PVM worker | `rayengine/` | Unix + PVM 3 | `rayengine/Makefile` or CMake `-DRAY_BUILD_PVM_TOOLS=ON` |
-| `raythrower`: command-line PVM master | `raythrower/` | Unix + PVM 3 | `raythrower/Makefile` or CMake |
+| Part | Location | Platform |
+|------|----------|----------|
+| Ray tracing core: scene, objects, materials, `CRayStream`, task masters | `core/` | all |
+| `raythrower`: command-line master (threads, or engines over TCP) | `raythrower/` | Windows, Linux, macOS |
+| `rayengine`: networked tracing task | `rayengine/` | Windows, Linux, macOS |
+| `Ray.exe`: MFC scene editor | `src/`, `include/`, `res/` | Windows only (MFC, MBCS) |
 
-`rayengine/` has its own fork of the core ray tracing classes (`Scene`, `Sphere`, materials, and
-so on), and they have drifted from the copies in the root `src/` and `include/`. Changing one copy
-doesn't change the other. Check both and decide deliberately.
+The core is compiled twice: once as the `ray_core` OBJECT library for the command-line programs,
+and again inside the GUI target with `RAY_GUI` defined, which turns on the tree-view and dialog
+code in the scene classes. Keep `ray_core` an OBJECT library: object and material classes register
+themselves from static constructors, which a static library would let the linker drop.
+
+## Building and testing
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+- IASLib is fetched by CMake (`FetchContent`, tag `v3.0.0`). To use a local checkout, pass
+  `-DFETCHCONTENT_SOURCE_DIR_IASLIB=/path/to/IASLib`.
+- The GUI needs MSVC with MFC: `-DRAY_BUILD_GUI=ON`, then build the `Ray` target.
+- Run the tests under AddressSanitizer before changing anything in `core/`
+  (`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"`); CI does.
+- If a change is meant to alter rendered output, regenerate `tests/reference/renders.tar.gz`
+  and say so in the changelog. Otherwise a reference mismatch is a bug.
+
+## Rules for the code
+
+- **Don't change the ray tracing logic** (intersection, shading, ray generation in
+  `CTaskMaster::TraceScene`) without being asked to. Fixing crashes and undefined behavior is fine.
+- **The `.ray` format is fixed.** `CRayStream` writes exactly what the 1997 `CFileStream` did:
+  plain `int` is a one-byte BOOL, `long`/`DWORD` are 4 bytes on every platform, floating point is
+  `%.18e` text. Don't add `CRayStream` overloads that change which encoding a type gets.
+- Use IASLib for strings, streams, files, threads, and sockets rather than adding new hand-written
+  versions. In core headers write `IASLib::CString` in full: the GUI also sees MFC's `CString`.
+- Avoid names that are Win32 macros (`SendMessage`, `GetMessage`, `CreateWindow`, ...).
 
 ## Conventions
 
 - **File names:** source and header files are PascalCase after the class they define, without
   the MFC `C` prefix (`CSpherePropertiesDlg` → `SpherePropertiesDlg.h`). Exceptions follow
   Windows convention: `StdAfx.cpp`/`StdAfx.h`, `resource.h`, `MainFrm`, `ChildFrm`, and `main.cpp`.
-  Data and scene files are snake_case. PVM headers keep their upstream lowercase names.
+  Data and scene files are snake_case.
 - **Extensions:** `.cpp` and `.h`.
 - **Includes:** `#include` names must match the file name's case exactly, because Linux is
   case-sensitive. Use include paths rather than `..\` or `../` relative includes.
 - **Line endings:** LF everywhere except `*.dsp`, `*.dsw`, `*.clw`, and `*.bat`, which must stay
   CRLF because Visual C++ 6 and `cmd.exe` need it. `.gitattributes` enforces this.
-- **Adding a source file:** add it to `CMakeLists.txt`, and to `Ray.dsp` or the right `Makefile`.
-- **Don't modify** `legacy/` (historical project files) or `third_party/` (bundled PVM 3).
+- **Adding a source file:** add it to `RAY_CORE_SOURCES` in `CMakeLists.txt` (core) or to
+  `cmake/RayGui.cmake` (GUI).
+- **Don't modify** `legacy/` (historical project files).
 
 ## Repository policy
 
-- Licensed under Apache 2.0. Keep `LICENSE` and `NOTICE` intact.
+- Licensed under Apache 2.0. Keep `LICENSE` and `NOTICE` intact. IASLib is LGPL-3.0.
 - Outside contributions are closed (see `CONTRIBUTING.md`). Don't open or accept pull requests
   from people outside the project.
 
 ## Known issues
 
-- The Unix sources don't compile cleanly with a modern GCC or Clang (`TRUE`/`FALSE` and other
-  1997-era assumptions).
-- The MFC application can only be built on Windows. On Linux, at most you can check includes
-  and syntax.
+- `scenes/yyy.ray` and `scenes/stream_test1.ray` cannot be read (see `scenes/README.md`).
+- The MFC application can only be built on Windows; on Linux and macOS only the core and the
+  command-line programs build.

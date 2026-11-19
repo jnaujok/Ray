@@ -15,6 +15,8 @@
 #include "Streams/SocketStream.h"
 #include "Threading/Thread.h"
 
+#include <errno.h>
+#include <string.h>
 #include <time.h>
 
 CSocketTaskSlave::CSocketTaskSlave( void ) :
@@ -55,10 +57,12 @@ BOOL CSocketTaskSlave::Connect( const char *strHost, int nPort, int nRetrySecond
             break;
         }
 
+        int nError = errno;
+
         delete pSocket;
         if ( time( NULL ) >= nGiveUp )
         {
-            m_strLastError.Format( "Could not connect to %s:%d", strHost, nPort );
+            m_strLastError.Format( "Could not connect to %s:%d (%s)", strHost, nPort, strerror( nError ) );
             return FALSE;
         }
         IASLib::CThread::Millisleep( 250 );

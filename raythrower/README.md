@@ -1,42 +1,57 @@
 # raythrower
 
-[![Platform: Unix](https://img.shields.io/badge/platform-Unix-lightgrey.svg)](#)
-[![PVM 3](https://img.shields.io/badge/PVM-3-orange.svg)](https://www.netlib.org/pvm3/)
+[![Build and test](https://github.com/jnaujok/Ray/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jnaujok/Ray/actions/workflows/build.yml)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../LICENSE)
 
-A command-line PVM master for the [Ray](../README.md) distributed ray tracer. It traces a
-`.ray` scene on a PVM cluster without the Windows scene editor.
+The command-line master of the [Ray](../README.md) distributed ray tracer. It traces a `.ray`
+scene without the Windows scene editor, with threads or with networked
+[`rayengine`](../rayengine) processes.
 
 ## Usage
 
 ```sh
-raythrower <FileToTrace> [-N<tasks>]
+raythrower <FileToTrace> [options]
 ```
 
-| Argument | Meaning |
-|----------|---------|
-| `FileToTrace` | Full path of the `.ray` scene to trace |
-| `-N<tasks>` | Number of [`rayengine`](../rayengine) tasks to spawn under PVM |
+| Option | Meaning |
+|--------|---------|
+| `-N<count>`, `--tasks <count>` | Number of tracing tasks (default: one per CPU) |
+| `-o`, `--output <file>` | Image file to write (default: the one named in the scene) |
+| `--ppm <file>` | Also write the image as a PPM file |
+| `--listen [port]` | Trace with engines that connect on this port (default 7997; 0 picks a free port) |
+| `--spawn` | With `--listen`, start the engines on this machine |
+| `--engine <path>` | The `rayengine` to start (default: next to `raythrower`) |
+| `--timeout <seconds>` | How long to wait for each engine to connect (default 60) |
+| `--batch <rays>` | Rays per batch (default 127) |
+| `-q`, `--quiet` | Print only errors |
 
-The thrower loads the scene, spawns the engines, multicasts the scene to them, deals out
-batches of rays, and writes the returned pixels to the image file named in the scene's settings.
-When it finishes, it prints the pixel count, elapsed time, and pixels per second.
+Without `--listen` it traces with one thread per task. When the trace finishes it prints the pixel
+count, the elapsed time, and the pixels per second.
 
-It must be run as a PVM master, not as a spawned task.
+## Examples
 
-## Layout
+```sh
+# Threads on this machine
+raythrower scenes/scan_test.ray -o scan.raw --ppm scan.ppm
 
-| Path | Contents |
-|------|----------|
-| `src/main_unix.cpp` | Unix entry point (used by the Makefile and CMake) |
-| `src/main.cpp` | Win32 variant of the same entry point |
-| `src/CString.cpp`, `include/CString.h` | Standalone `CString` replacement for non-MFC builds |
-| `Makefile` | Make build. It shares the engine sources in `../rayengine/src` and the application headers in `../include` |
+# Four local engines over TCP
+raythrower scenes/scan_test.ray --listen --spawn -N4
+
+# Engines on other machines: start this, then `rayengine <this-host>` on each
+raythrower scenes/scan_test.ray --listen 7997 -N3
+```
+
+## How it works
+
+`raythrower` loads the scene with `CScene::Load`, which reads every scene format from 1997, and
+traces it with the shared `CTaskMaster::TraceScene` loop through a `CThreadTaskMaster` or a
+`CSocketTaskMaster`. The code is in [`main.cpp`](main.cpp).
 
 ## Building
 
-```sh
-make PVM_INCLUDE=/path/to/pvm3/include PVM_LIB=/path/to/pvm3/lib/ARCH
-```
+Built with the rest of the project from the repository root:
 
-Or from the repository root: `cmake -S . -B build -DRAY_BUILD_PVM_TOOLS=ON`.
+```sh
+cmake -S . -B build && cmake --build build --target raythrower
+```

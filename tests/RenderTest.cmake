@@ -13,8 +13,10 @@ endif()
 
 set(ARGS "${SCENE}" -q -o "${OUTPUT}")
 if(MODE STREQUAL "network")
-    # Port 0: let the system pick a free one.
-    list(APPEND ARGS -N3 --spawn --listen 0 --timeout 60)
+    if(NOT PORT)
+        set(PORT 0)     # let the system pick a free one
+    endif()
+    list(APPEND ARGS -N3 --spawn --listen ${PORT} --timeout 60)
 else()
     list(APPEND ARGS -N4)
 endif()

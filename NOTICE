@@ -3,6 +3,8 @@ Copyright 1997-2026 Jeffrey Naujok
 
 This product includes software developed by Jeffrey Naujok.
 
-This distribution bundles headers and libraries from PVM 3 (Parallel Virtual Machine),
-located in third_party/pvm3/. They are not covered by the Apache License and remain
-subject to their original copyright and license terms.
+The build downloads and links IASLib (https://github.com/jnaujok/IASLib),
+which is licensed under the GNU Lesser General Public License, version 3.
+IASLib is not covered by the Apache License; its source, and the means to
+relink this program against a modified copy of it, are available from that
+repository and from this project's CMake build.

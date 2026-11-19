@@ -150,7 +150,7 @@ void CSetColorDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
     CDialog::OnHScroll(nSBCode, nPos, pScrollBar);
 }
 
-LONG CSetColorDlg::OnInitPaint( UINT wParam, LONG lParam )
+LRESULT CSetColorDlg::OnInitPaint( WPARAM wParam, LPARAM lParam )
 {
     CWnd       *pSample;
     CRect       oRect;

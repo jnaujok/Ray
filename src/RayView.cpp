@@ -164,7 +164,7 @@ void CRayView::OnActivateView(BOOL bActivate, CView* pActivateView, CView* pDeac
     CScrollView::OnActivateView(bActivate, pActivateView, pDeactiveView);
 }
 
-void CRayView::OnTimer(UINT nIDEvent) 
+void CRayView::OnTimer(UINT_PTR nIDEvent) 
 {
     Invalidate( FALSE );
     

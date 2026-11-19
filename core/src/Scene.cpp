@@ -21,6 +21,7 @@
 #include "RayStream.h"
 
 #include "Exceptions/Exception.h"
+#include "Files/File.h"
 #include "Streams/FileStream.h"
 #include "Streams/StringStream.h"
 
@@ -508,7 +509,9 @@ DWORD CScene::Load( const char *strFileName )
     std::string strData;
 
     {
-        IASLib::CFileStream oFile( strFileName, true, false );
+            // Binary: in text mode Windows would translate line breaks and
+            // stop at the first 0x1A byte.
+        IASLib::CFileStream oFile( new IASLib::CFile( strFileName, IASLib::CFile::READ | IASLib::CFile::BINARY ) );
         char                achBuffer[ 8192 ];
         int                 nRead;
 
