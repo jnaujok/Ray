@@ -28,7 +28,6 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-#define RAY_VERSION     ((DWORD)1)
 
 CRay::CRay( void )
 {
@@ -142,52 +141,24 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
     m_nDepth = 0;
 }
 
+void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInfluence, int nPixelX, int nPixelY )
+{
+    m_nX = nX;
+    m_nY = nY;
+    m_nZ = nZ;
+    m_nI = nI;
+    m_nJ = nJ;
+    m_nK = nK;
+    m_nT = nT;
+    m_nInfluence = nInfluence;
+    m_nPixelX = nPixelX;
+    m_nPixelY = nPixelY;
+    m_nDepth = 0;
+}
+
 void CRay::SetT( FLT nNewT )
 {
     m_nT = nNewT;
 }
 
-CRayStream  &operator >>( CRayStream &oStream, CRay &oRay )
-{
-    DWORD       dwVersion;
-
-    oStream >> dwVersion;
-
-    switch ( dwVersion )
-    {
-        case RAY_VERSION:
-            oStream >> oRay.m_nI;
-            oStream >> oRay.m_nJ;
-            oStream >> oRay.m_nK;
-            oStream >> oRay.m_nX;
-            oStream >> oRay.m_nY;
-            oStream >> oRay.m_nZ;
-            oStream >> oRay.m_nT;
-            oStream >> oRay.m_nInfluence;
-            oStream >> oRay.m_nPixelX;
-            oStream >> oRay.m_nPixelY;
-            break;
-
-        default:
-            break;
-    }
-    return oStream;
-}
-
-
-CRayStream  &operator <<( CRayStream &oStream, CRay &oRay )
-{
-    oStream << RAY_VERSION;
-    oStream << oRay.m_nI;
-    oStream << oRay.m_nJ;
-    oStream << oRay.m_nK;
-    oStream << oRay.m_nX;
-    oStream << oRay.m_nY;
-    oStream << oRay.m_nZ;
-    oStream << oRay.m_nT;
-    oStream << oRay.m_nInfluence;
-    oStream << oRay.m_nPixelX;
-    oStream << oRay.m_nPixelY;
-    return oStream;
-}
 

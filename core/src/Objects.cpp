@@ -27,7 +27,7 @@ static char THIS_FILE[] = __FILE__;
 
 CDynObject *CDynObject::m_pFirst = NULL;
 
-static CDynObject   g_oBaseObject( NULL, "Base Object" );
+static CDynObject   g_oBaseObject( NULL, "Base Object", NULL );
 
     // The registry of object classes. It is a static object, so it exists
     // in every program (it used to be created only by the GUI), and it reads
@@ -38,6 +38,7 @@ CDynList    *g_pDynamicList = &g_oDynamicList;
 
 CObjects::CObjects( void )
 {
+    m_bOwnsMaterials = TRUE;
 #ifdef RAY_GUI
     m_bExpanded = FALSE;
     m_bSelected = FALSE;
@@ -52,7 +53,7 @@ CObjects::~CObjects( void )
     int         nIndex;
 
     nIndex = 0;
-    while ( nIndex < m_oMaterials.GetSize() )
+    while ( m_bOwnsMaterials && ( nIndex < m_oMaterials.GetSize() ) )
     {
         pMaterial = m_oMaterials[ nIndex ];
         delete pMaterial;
@@ -164,20 +165,8 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
     return oReturn;
 }
 
-CDynObject::CDynObject( CObjects *(CFUNC *lpFunction)(CRayStream &oStream), LPCSTR strKey )
+CDynObject::CDynObject( CObjects *(CFUNC *lpCreateEmpty)(void), LPCSTR strKey, LPCSTR strJsonType )
 {
-    m_lpFunction = lpFunction;
-    m_lpCreateEmpty = NULL;
-    m_strJsonType = NULL;
-    m_strObjectID = strKey;
-    m_pNext = m_pFirst;
-    m_pFirst = this;
-}
-
-CDynObject::CDynObject( CObjects *(CFUNC *lpFunction)(CRayStream &oStream), CObjects *(CFUNC *lpCreateEmpty)(void),
-                        LPCSTR strKey, LPCSTR strJsonType )
-{
-    m_lpFunction = lpFunction;
     m_lpCreateEmpty = lpCreateEmpty;
     m_strJsonType = strJsonType;
     m_strObjectID = strKey;
@@ -226,11 +215,6 @@ BOOL CDynObject::Match( LPCSTR lpszCompare )
     return FALSE;
 }
 
-CObjects *CDynObject::MakeMe( CRayStream &oStream )
-{
-    return (CObjects *)(*m_lpFunction)( oStream );
-}
-
 CObjects *CDynObject::MakeEmpty( void )
 {
     return m_lpCreateEmpty ? (*m_lpCreateEmpty)() : NULL;
@@ -254,25 +238,6 @@ CDynList::CDynList( void )
 
 CDynList::~CDynList( void )
 {
-}
-
-CObjects *CDynList::Instantiate( LPCSTR lpszName, CRayStream &oStream  )
-{
-    CDynObject     *pObject;
-    CObjects       *pReturn = NULL;
-
-    pObject = g_oBaseObject.GetFirst();
-    while ( ( pObject ) && ( ! pObject->Match( lpszName ) ) )
-    {
-        pObject = pObject->GetNext();
-    }
-
-    if ( pObject )
-    {
-        pReturn = pObject->MakeMe( oStream );
-    }
-
-    return pReturn;
 }
 
 CObjects *CDynList::Create( LPCSTR strJsonType )

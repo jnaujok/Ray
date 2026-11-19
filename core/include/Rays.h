@@ -15,7 +15,6 @@
 
 class CScene;
 class CVector;
-class CRayStream;
 
 class CRay
 {
@@ -50,14 +49,15 @@ class CRay
         virtual FLT     GetT(void) {return m_nT;}
         virtual FLT     GetInfluence( void ) { return m_nInfluence; }
         virtual void    SetT( FLT nNewT );
+            // Sets every field (as the wire protocol carries them), with a
+            // depth of 0.
+        void            Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInfluence, int nPixelX, int nPixelY );
         virtual int     GetPixelX( void ) { return m_nPixelX; }
         virtual int     GetPixelY( void ) { return m_nPixelY; }
         void            Increment( void ) { m_nDepth++; }
         virtual int     GetDepth( void ) { return m_nDepth; }
         virtual void    SetDepth( int nDepth ) { m_nDepth = nDepth; }
 
-        friend CRayStream  &operator >>( CRayStream &oStream, CRay &oRay );
-        friend CRayStream  &operator <<( CRayStream &oStream, CRay &oRay );
 };
 
 #endif // __RAYS_H__

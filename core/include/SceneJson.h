@@ -3,9 +3,9 @@
 *                                                                        *
 *   Helpers for reading and writing scenes as JSON with IASLib's JSON    *
 *   trees: typed field access with clear error messages, vectors and     *
-*   colors as [x, y, z] arrays, angles in degrees that read back to      *
-*   exactly the same radians, and a writer that keeps short arrays on    *
-*   one line.                                                            *
+*   colors as [x, y, z] arrays, angles in degrees, and a file writer     *
+*   that keeps short arrays on one line and rounds numbers to six        *
+*   decimal places.                                                      *
 *                                                                        *
 *   Reading functions return FALSE on a bad value and record why; use    *
 *   CWhere to say where in the file the reader is, so the message can    *
@@ -67,10 +67,13 @@ namespace RayJson
     BOOL            GetString( const IASLib::CJsonNode &oNode, const char *strKey, std::string &strValue, BOOL bRequired );
     BOOL            GetVector( const IASLib::CJsonNode &oNode, const char *strKey, CVector &oValue, BOOL bRequired );
     BOOL            GetColor( const IASLib::CJsonNode &oNode, const char *strKey, CColor &oValue, BOOL bRequired );
-        /// An angle in degrees (strKey), or in radians (strKey + "Radians").
+        /// An angle, given in degrees.
     BOOL            GetAngle( const IASLib::CJsonNode &oNode, const char *strKey, FLT &nRadians, BOOL bRequired );
         /// A vector given as a JSON [x, y, z] array.
     BOOL            ToVector( const IASLib::CJsonNode &oNode, CVector &oValue );
+
+        /// A number rounded as scene files write it: to six decimal places.
+    double          Rounded( double dValue );
 
     void            PutNumber( IASLib::CObjectNode &oNode, const char *strKey, FLT nValue );
     void            PutBool( IASLib::CObjectNode &oNode, const char *strKey, BOOL bValue );
@@ -78,12 +81,12 @@ namespace RayJson
     void            PutColor( IASLib::CObjectNode &oNode, const char *strKey, const CColor &oValue );
         /// Adds an [x, y, z] array to an array.
     void            AddVector( IASLib::CArrayNode &oArray, const CVector &oValue );
-        /// Writes the angle in degrees if some decimal number of degrees reads
-        /// back to exactly these radians, else in radians as strKey + "Radians".
+        /// Writes an angle in degrees.
     void            PutAngle( IASLib::CObjectNode &oNode, const char *strKey, FLT nRadians );
 
-        /// JSON text indented by four spaces, with arrays of numbers kept on
-        /// one line.
+        /// JSON text for a scene file: indented by four spaces, arrays of
+        /// numbers kept on one line, and floating-point numbers rounded to
+        /// six decimal places. (Compact text for the network is not rounded.)
     std::string     Write( const IASLib::CJsonNode &oNode );
         /// Parses JSON text. Returns NULL (and records why) if it is not
         /// valid JSON. The caller owns the tree.

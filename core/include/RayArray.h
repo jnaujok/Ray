@@ -4,7 +4,6 @@
 #include "Rays.h"
 #include "Templates/TArray.h"
 
-class CRayStream;
 
 class CRayArray
 {
@@ -24,8 +23,6 @@ class CRayArray
         void            RemoveAll( void ) { m_aoItems.Clear(); }
         int             GetSize( void ) const { return (int)m_aoItems.Length(); }
 
-        friend CRayStream  &operator >>( CRayStream &oStream, CRayArray &oRay );
-        friend CRayStream  &operator <<( CRayStream &oStream, CRayArray &oRay );
 };
 
 #endif // __RAYARRAY_H__

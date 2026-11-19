@@ -32,36 +32,6 @@ m_oColor( oColor )
     m_bFilterReflection = FALSE;
 }
 
-CRayStream &operator <<( CRayStream &oAr, CReflectiveMaterial &oMaterial )
-{
-    oAr << REFLECTIVE_MATERIAL_VERSION;
-    oAr << oMaterial.m_oColor;
-    oAr << oMaterial.m_nDiffuseReflectivity;
-    oAr << oMaterial.m_bFilterReflection;
-
-    return oAr;
-}
-
-CRayStream &operator >>( CRayStream &oAr, CReflectiveMaterial &oMaterial )
-{
-    DWORD   dwVersion;
-
-    oAr >> dwVersion;
-
-    switch ( dwVersion )
-    {
-        case REFLECTIVE_MATERIAL_VERSION:
-            oAr >> oMaterial.m_oColor;
-            oAr >> oMaterial.m_nDiffuseReflectivity;
-            oAr >> oMaterial.m_bFilterReflection;
-            break;
-
-        default:
-            break;
-    }
-    return oAr;
-}
-
 CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
     CColor      oReturn(0,0,0);

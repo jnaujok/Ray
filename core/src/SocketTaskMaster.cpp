@@ -18,7 +18,9 @@
 #include "Threading/Thread.h"
 
     // One connected rayengine. The master thread writes to it; a reader
-    // thread takes the colors it sends back and queues them.
+    // thread takes the colors it sends back and queues them. Each direction
+    // is its own SJSON stream, so each has its own encoder or decoder, used
+    // by one thread only.
 class CSocketTaskMaster::CConnection : public IASLib::CThread
 {
     protected:
@@ -27,6 +29,8 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
         IASLib::CSocketStream       m_oIn;      // shares it
         TWorkQueue<CColorArray *>  &m_oResults;
         std::atomic<bool>          &m_bClosing;
+        RayWire::CEncoder           m_oEncoder;     // the master thread's
+        RayWire::CDecoder           m_oDecoder;     // the reader thread's
 
     public:
         CConnection( IASLib::CSocket *pSocket, TWorkQueue<CColorArray *> &oResults, std::atomic<bool> &bClosing ) :
@@ -35,7 +39,9 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
             m_oOut( pSocket ),
             m_oIn( pSocket ),
             m_oResults( oResults ),
-            m_bClosing( bClosing )
+            m_bClosing( bClosing ),
+            m_oEncoder( RAY_WIRE_MASTER_ID ),
+            m_oDecoder( RAY_WIRE_MASTER_ID, RAY_WIRE_ENGINE_ID )
         {
             m_oIn.SetNoDelete();
             SetNoDelete( true );
@@ -54,9 +60,15 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
             return ( nTag == MESSAGE_HELLO ) && RayWire::DecodeHello( strPayload );
         }
 
-        void Send( uint8_t nTag, const std::string &strPayload )
+        void SendScene( CScene &oScene )
         {
-            RayWire::SendFrame( m_oOut, nTag, strPayload );
+            RayWire::SendFrame( m_oOut, MESSAGE_SCENE, m_oEncoder.Scene( oScene ) );
+        }
+
+            /// An empty batch tells the engine to stop.
+        void SendRays( CRayArray &oRays )
+        {
+            RayWire::SendFrame( m_oOut, MESSAGE_RAYS, m_oEncoder.Rays( oRays ) );
         }
 
             /// Stops the reader by closing the connection under it.
@@ -79,7 +91,11 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
                     {
                         CColorArray *pColors = new CColorArray;
 
-                        RayWire::DecodeColors( strPayload, *pColors );
+                        if ( ! m_oDecoder.Colors( strPayload, *pColors ) )
+                        {
+                            delete pColors;
+                            break;      // A damaged stream can't be followed.
+                        }
                         m_oResults.Push( pColors );
                     }
                 }
@@ -188,7 +204,6 @@ BOOL CSocketTaskMaster::SpawnTasks( int nTasksToSpawn )
 BOOL CSocketTaskMaster::EndTasks( void )
 {
     CRayArray       oStop;
-    std::string     strStop = RayWire::EncodeRays( oStop );
     CColorArray    *pColors;
 
     m_bClosing = true;
@@ -197,7 +212,7 @@ BOOL CSocketTaskMaster::EndTasks( void )
     {
         try
         {
-            m_apConnections[ nCount ]->Send( MESSAGE_RAYS, strStop );
+            m_apConnections[ nCount ]->SendRays( oStop );
         }
         catch ( IASLib::CException & )
         {
@@ -221,12 +236,12 @@ BOOL CSocketTaskMaster::EndTasks( void )
 
 BOOL CSocketTaskMaster::SceneToTasks( CScene &oScene )
 {
-    std::string strScene = RayWire::EncodeScene( oScene );
-
     try
     {
+            // Each connection has its own SJSON stream, so the scene is
+            // encoded for each.
         for ( size_t nCount = 0; nCount < m_apConnections.size(); nCount++ )
-            m_apConnections[ nCount ]->Send( MESSAGE_SCENE, strScene );
+            m_apConnections[ nCount ]->SendScene( oScene );
     }
     catch ( IASLib::CException &oException )
     {
@@ -243,7 +258,7 @@ BOOL CSocketTaskMaster::RaysToTask( CRayArray &oRays, int nTask )
 
     try
     {
-        m_apConnections[ (size_t)nTask ]->Send( MESSAGE_RAYS, RayWire::EncodeRays( oRays ) );
+        m_apConnections[ (size_t)nTask ]->SendRays( oRays );
     }
     catch ( IASLib::CException &oException )
     {

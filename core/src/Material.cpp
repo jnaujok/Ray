@@ -28,12 +28,10 @@ CDynMaterialList    *g_pMaterialList = NULL;
 
 CDynMaterial *CDynMaterial::m_pFirst = NULL;
 
-static CDynMaterial   g_oBaseMaterial( NULL, NULL, "Base Material", "Base Material" );
+static CDynMaterial   g_oBaseMaterial( NULL, "Base Material", "Base Material", NULL );
 
-CDynMaterial::CDynMaterial( CMaterial *(CFUNC *lpFunction)(CRayStream &oStream), LPADDFUNC lpAddFunc, LPCSTR strKey, LPCSTR strName,
-                            LPCSTR strJsonType )
+CDynMaterial::CDynMaterial( LPADDFUNC lpAddFunc, LPCSTR strKey, LPCSTR strName, LPCSTR strJsonType )
 {
-    m_lpFunction = lpFunction;
     m_lpAddFunc = lpAddFunc;
     m_strJsonType = strJsonType;
     m_strObjectID = strKey;
@@ -74,11 +72,6 @@ BOOL CDynMaterial::Match( LPCSTR lpszCompare )
     return FALSE;
 }
 
-CMaterial *CDynMaterial::MakeMe( CRayStream &oStream )
-{
-    return (CMaterial *)(*m_lpFunction)( oStream );
-}
-
 CDynMaterial *CDynMaterial::GetFirst( void )
 {
     return m_pFirst;
@@ -117,25 +110,6 @@ LPCSTR CDynMaterialList::JsonTypeOf( LPCSTR strClassType )
             return pObject->GetJsonType();
     }
     return NULL;
-}
-
-CMaterial *CDynMaterialList::Instantiate( LPCSTR lpszName, CRayStream &oStream  )
-{
-    CDynMaterial   *pObject;
-    CMaterial      *pReturn = NULL;
-
-    pObject = m_pFirst;
-    while ( ( pObject ) && ( ! pObject->Match( lpszName ) ) )
-    {
-        pObject = pObject->GetNext();
-    }
-
-    if ( pObject )
-    {
-        pReturn = pObject->MakeMe( oStream );
-    }
-
-    return pReturn;
 }
 
 #ifdef RAY_GUI

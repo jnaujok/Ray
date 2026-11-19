@@ -1,15 +1,17 @@
-// Checks that CRayStream writes exactly the bytes the 1997 CFileStream did,
-// that JSON scenes are read and checked properly, and that scene files
-// survive a load and save unchanged.
+// Checks that rays, colors and scenes cross the wire exactly, that JSON
+// scenes are read and checked properly, and that scene files survive a load
+// and save unchanged.
 //
-//   format_test                   the byte-level format and JSON checks
+//   format_test                   the wire and JSON checks
 //   format_test <scene.ray> <dir> load, save, load, save; the two saves must match
 #include "Globals.h"
-#include "RayStream.h"
+#include "RayArray.h"
+#include "ColorArray.h"
+#include "WireProtocol.h"
+#include "Mesh.h"
 #include "Scene.h"
 #include "ReinhardColorModel.h"
 
-#include "Streams/StringStream.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -27,89 +29,65 @@ static void Check( bool bCondition, const char *strWhat )
     }
 }
 
-static std::string Bytes( const char *pData, size_t nLength )
+    // Rays, colors and a scene must cross the wire exactly.
+static void WireChecks( void )
 {
-    return std::string( pData, nLength );
-}
+    RayWire::CEncoder   oEncoder( RAY_WIRE_MASTER_ID );
+    RayWire::CDecoder   oDecoder( RAY_WIRE_ENGINE_ID, RAY_WIRE_MASTER_ID );
+    const double        adValues[] = { 0.0, 0.1, -3.141592653589793, 1e-300, 6.02214076e23, 2.0 / 3.0, 1e100, -7.25 };
+    const int           nValues = (int)( sizeof( adValues ) / sizeof( adValues[ 0 ] ) );
+    CRayArray           oRays;
+    CRay                oRay;
 
-static void FormatChecks( void )
-{
-    IASLib::CStringStream   oBuffer;
-    CRayStream              oOut( oBuffer );
+    Check( RayWire::DecodeHello( RayWire::EncodeHello() ), "the hello reads back" );
 
-    oOut << (int)TRUE;                      // BOOL: one byte
-    oOut << (char)'A';
-    oOut << (short)-2;                      // two bytes, big-endian
-    oOut << (unsigned short)0x1234;
-    oOut << (long)-1;                       // four bytes whatever sizeof(long) is
-    oOut << (DWORD)0x01020304;
-    oOut << 1.0;                            // double as "%.18e" text
-    oOut << "ray.out";
-
-    std::string strExpected;
-    strExpected += Bytes( "\x01", 1 );
-    strExpected += Bytes( "A", 1 );
-    strExpected += Bytes( "\xFF\xFE", 2 );
-    strExpected += Bytes( "\x12\x34", 2 );
-    strExpected += Bytes( "\xFF\xFF\xFF\xFF", 4 );
-    strExpected += Bytes( "\x01\x02\x03\x04", 4 );
-    strExpected += Bytes( "\x00\x18", 2 ) + "1.000000000000000000e+00";
-    strExpected += Bytes( "\x00\x07", 2 ) + "ray.out";
-
-    Check( oBuffer.GetOutput() == strExpected, "values are written in the 1997 file format" );
-
-    IASLib::CStringStream   oInBuffer( oBuffer.GetOutput().data(), oBuffer.GetOutput().size() );
-    CRayStream              oIn( oInBuffer );
-    int                     bValue;
-    char                    chValue;
-    short                   nShort;
-    unsigned short          nUShort;
-    long                    nLong;
-    DWORD                   nDword;
-    double                  dValue;
-    IASLib::CString         strValue;
-
-    oIn >> bValue >> chValue >> nShort >> nUShort >> nLong >> nDword >> dValue >> strValue;
-
-    Check( bValue == TRUE, "BOOL reads back" );
-    Check( chValue == 'A', "char reads back" );
-    Check( nShort == -2, "short reads back" );
-    Check( nUShort == 0x1234, "unsigned short reads back" );
-    Check( nLong == -1, "long reads back, sign included" );
-    Check( nDword == 0x01020304, "DWORD reads back" );
-    Check( dValue == 1.0, "double reads back" );
-    Check( strcmp( (const char *)strValue, "ray.out" ) == 0, "string reads back" );
-    Check( ! oIn.DataAvailable(), "nothing is left over" );
-
-        // Doubles must survive the text form exactly.
-    const double adValues[] = { 0.1, -3.141592653589793, 1e-300, 6.02214076e23, 2.0 / 3.0 };
-    for ( double dOriginal : adValues )
+        // Several batches, so stream mode's caches and deltas are used.
+    for ( int nBatch = 0; nBatch < 3; nBatch++ )
     {
-        IASLib::CStringStream   oRound;
-        CRayStream              oWrite( oRound );
+        oRays.RemoveAll();
+        for ( int nIndex = 0; nIndex < 40; nIndex++ )
+        {
+            double d = adValues[ ( nIndex + nBatch ) % nValues ] + nIndex * 1e-9;
 
-        oWrite << dOriginal;
+            oRay.Set( d, -d, 0.5, d * 3.0, 1.0 / ( 1.0 + nIndex ), -0.25, 1e100, 1.0, nIndex, 1000 + nBatch );
+            oRays.Add( oRay );
+        }
 
-        IASLib::CStringStream   oRead( oRound.GetOutput().data(), oRound.GetOutput().size() );
-        CRayStream              oReadBack( oRead );
-        double                  dRead = 0.0;
+        CRayArray oRead;
+        Check( oDecoder.Rays( oEncoder.Rays( oRays ), oRead ), "a batch of rays decodes" );
+        Check( oRead.GetSize() == oRays.GetSize(), "every ray arrives" );
+        for ( int nIndex = 0; nIndex < oRead.GetSize() && nIndex < oRays.GetSize(); nIndex++ )
+        {
+            CRay &oA = oRays[ nIndex ];
+            CRay &oB = oRead[ nIndex ];
 
-        oReadBack >> dRead;
-        Check( dRead == dOriginal, "a double round-trips through its text form" );
+            Check( oA.GetX() == oB.GetX() && oA.GetY() == oB.GetY() && oA.GetZ() == oB.GetZ() &&
+                   oA.GetI() == oB.GetI() && oA.GetJ() == oB.GetJ() && oA.GetK() == oB.GetK() &&
+                   oA.GetT() == oB.GetT() && oA.GetInfluence() == oB.GetInfluence() &&
+                   oA.GetPixelX() == oB.GetPixelX() && oA.GetPixelY() == oB.GetPixelY(), "a ray arrives exactly" );
+        }
     }
 
-        // The pre-April-1997 layout: a whole part and a fraction of 2^31.
-    {
-        std::string             strLegacy = Bytes( "\xFF\xFF\xFF\xFC\x00\x00\x00\x00\x00\x00\x00\x00\x01\x47\xAE\x14", 16 );
-        IASLib::CStringStream   oLegacyBuffer( strLegacy.data(), strLegacy.size() );
-        CRayStream              oLegacy( oLegacyBuffer );
-        double                  dFirst, dSecond;
+    std::string strReadable = RayWire::ToReadable( MESSAGE_RAYS, oEncoder.Rays( oRays ) );
+    Check( strReadable.find( "\"influence\"" ) != std::string::npos && strReadable.find( "\"py\": 1002" ) != std::string::npos,
+           "a batch of rays can be read as JSON" );
 
-        oLegacy.SetLegacyDoubles( TRUE );
-        oLegacy >> dFirst >> dSecond;
-        Check( dFirst == -4.0, "a legacy double with a negative whole part" );
-        Check( dSecond > 0.00999 && dSecond < 0.01001, "a legacy double with a fraction" );
-    }
+    CRayArray oEmpty, oRead;
+    Check( oDecoder.Rays( oEncoder.Rays( oEmpty ), oRead ) && oRead.GetSize() == 0, "an empty batch (stop) arrives" );
+
+    RayWire::CEncoder   oColorOut( RAY_WIRE_ENGINE_ID );
+    RayWire::CDecoder   oColorIn( RAY_WIRE_MASTER_ID, RAY_WIRE_ENGINE_ID );
+    CColorArray         oColors, oColorsRead;
+
+    for ( int nIndex = 0; nIndex < nValues; nIndex++ )
+        oColors.Add( CColor( adValues[ nIndex ], 1.0 - adValues[ nIndex ], 0.3 ), nIndex, 2 * nIndex );
+    Check( oColorIn.Colors( oColorOut.Colors( oColors ), oColorsRead ), "a batch of colors decodes" );
+    Check( oColorsRead.GetSize() == oColors.GetSize(), "every color arrives" );
+    for ( int nIndex = 0; nIndex < oColorsRead.GetSize() && nIndex < oColors.GetSize(); nIndex++ )
+        Check( oColorsRead[ nIndex ] == oColors[ nIndex ] && oColorsRead.GetX( nIndex ) == oColors.GetX( nIndex ) &&
+               oColorsRead.GetY( nIndex ) == oColors.GetY( nIndex ), "a color arrives exactly" );
+
+    Check( ! oColorIn.Colors( std::string( "\x50garbage", 8 ), oColorsRead ), "a damaged packet is refused" );
 }
 
 static std::string ReadFile( const std::string &strFile )
@@ -209,6 +187,80 @@ static void JsonChecks( void )
                  "objects[0].materials[0]: unknown material type \"chrome\"" );
 }
 
+    // A ray from (0, 0.3, nZ) along z, toward the default triangle at z = 0.
+static bool HitsFrom( CObjects &oObject, double dZ )
+{
+    CRay    oRay;
+    CVector oHit;
+
+    oRay.Set( 0.0, 0.3, dZ, 0.0, 0.0, ( dZ < 0 ) ? 1.0 : -1.0, 1e100, 1.0, 0, 0 );
+    return oObject.Intersect( oRay, oHit ) ? true : false;
+}
+
+    // A scene's first object, loaded from JSON objects text.
+static CObjects *FirstObject( CScene &oScene, const char *strObjects )
+{
+    std::string strText = Minimal( "\"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 } ]",
+                                   ( std::string( "\"objects\": [ " ) + strObjects + " ]" ).c_str() );
+
+    if ( oScene.FromJson( strText ) != 0 )
+    {
+        fprintf( stderr, "FAILED: %s\n", oScene.GetLoadError() );
+        g_nFailures++;
+        return NULL;
+    }
+    return oScene.GetObjectAt( 0 );
+}
+
+static void TriangleChecks( void )
+{
+    CScene      oScene;
+    CObjects   *pObject;
+
+        // The corners (0,1,0), (1,0,0), (-1,0,0) face -z: their normal is
+        // (V2 - V1) x (V3 - V2) = (0, 0, -2).
+    pObject = FirstObject( oScene, "{ \"type\": \"triangle\", \"corners\": [[0, 1, 0], [1, 0, 0], [-1, 0, 0]] }" );
+    Check( pObject && HitsFrom( *pObject, -5.0 ), "a single-sided triangle is hit from the front" );
+    Check( pObject && ! HitsFrom( *pObject, 5.0 ), "a single-sided triangle is not hit from behind" );
+
+    pObject = FirstObject( oScene, "{ \"type\": \"triangle\", \"corners\": [[0, 1, 0], [1, 0, 0], [-1, 0, 0]], \"doubleSided\": true }" );
+    Check( pObject && HitsFrom( *pObject, -5.0 ) && HitsFrom( *pObject, 5.0 ), "a double-sided triangle is hit from both sides" );
+
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"triangle\", \"corners\": [[0, 0, 0], [1, 1, 1], [2, 2, 2]]" ),
+                 BAD_FILE, "objects[0]: the corners are in a line" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 1, 3]]" ),
+                 BAD_FILE, "objects[0].faces[0]: vertex indices must be whole numbers from 0 to 2" );
+
+        // A mesh of two faces folded along a shared edge: smooth shading must
+        // give the same normal from either face at a point on that edge, and
+        // flat shading different ones.
+    for ( int nSmooth = 0; nSmooth < 2; nSmooth++ )
+    {
+        std::string strMesh = std::string( "{ \"type\": \"mesh\", \"doubleSided\": true, \"smooth\": " ) + ( nSmooth ? "true" : "false" ) +
+                              ", \"vertices\": [[-1, 0, 0], [1, 0, 0], [0, 1, 0], [0, -1, -1]], \"faces\": [[0, 2, 1], [0, 1, 3]] }";
+        CScene  oMeshScene;
+        CMesh  *pMesh = dynamic_cast<CMesh *>( FirstObject( oMeshScene, strMesh.c_str() ) );
+
+        Check( pMesh && pMesh->GetFaceCount() == 2, "a mesh builds its faces" );
+        if ( ! pMesh )
+            continue;
+
+            // Shade the point (0.25, 0, 0) on the shared edge through each
+            // face, with no lights, and compare the normals the faces use.
+        CVector aoNormals[ 2 ];
+        for ( int nFace = 0; nFace < 2; nFace++ )
+            aoNormals[ nFace ] = pMesh->FaceNormalAt( nFace, CVector( 0.25, 0.0, 0.0 ) );
+
+        CVector oDifference = aoNormals[ 0 ] - aoNormals[ 1 ];
+        if ( nSmooth )
+            Check( oDifference.Magnitude() < 1e-12, "smooth faces agree on the normal along a shared edge" );
+        else
+            Check( oDifference.Magnitude() > 0.1, "flat faces keep their own normals" );
+    }
+}
+
 static void RoundTrip( const char *strScene, const char *strDir )
 {
     std::string strBase = std::string( strDir ) + "/roundtrip_";
@@ -239,8 +291,9 @@ int main( int argc, char **argv )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
     else
     {
-        FormatChecks();
+        WireChecks();
         JsonChecks();
+        TriangleChecks();
     }
 
     if ( g_nFailures == 0 )

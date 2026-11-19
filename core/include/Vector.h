@@ -11,7 +11,7 @@
 #ifndef __VECTOR_H__
 #define __VECTOR_H__
 
-#include "RayStream.h"
+#include "Globals.h"
 
 class CVector
 {
@@ -37,13 +37,13 @@ class CVector
     	virtual void        Normalize( void );
         virtual FLT         Dot( CVector &oDot );
         virtual FLT         Magnitude( void );
+            // The cross product this x oOther.
+        CVector             Cross( CVector &oOther );
         virtual void        Inside( BOOL bInside = FALSE );
         virtual BOOL        IsInside( void ) { return m_bInside; }
         virtual void        Rotate( CVector &oRotate );
         virtual void        Rotate( FLT nXRad, FLT nYRad, FLT nZRad );
 
-        friend CRayStream  &operator >>( CRayStream &oStream, CVector &oVector );
-        friend CRayStream  &operator <<( CRayStream &oStream, CVector &oVector );
 };
 
 #endif // __VECTOR_H__

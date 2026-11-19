@@ -7,14 +7,7 @@
         "imageFile": "scantest.out",
         "colorDepth": 8,
         "maximumDepth": 15,
-        "depthThreshold": 0.009999999776482582,
-        "reserved1997": {
-            "antialiasThreshold": 0.029999999795109034,
-            "causticThreshold": 0.009999999776482582,
-            "focalDisplacement": 2.6299999998882413,
-            "adaptiveFocalThreshold": 0.009999999776482582,
-            "fractalSeed": 0.039999999571591616
-        }
+        "depthThreshold": 0.01
     },
     "background": [1.0, 1.0, 1.0],
     "camera": {
@@ -22,8 +15,8 @@
         "lookAt": [0.0, 0.0, 0.0],
         "up": [0.0, 1.0, 0.0],
         "verticalAngle": 20.0,
-        "horizontalAngle": 26.66666666045785,
-        "aspectRatio": 1.3333333330228925,
+        "horizontalAngle": 26.666667,
+        "aspectRatio": 1.333333,
         "sampler": "none",
         "colorModel": "clip"
     },
@@ -42,7 +35,7 @@
                 },
                 {
                     "type": "reflective",
-                    "influence": 0.6999999997206032,
+                    "influence": 0.7,
                     "color": [0.5, 0.5, 0.5],
                     "diffuseReflectivity": 0.0,
                     "filterReflection": true
@@ -58,21 +51,21 @@
                 {
                     "type": "diffuse",
                     "influence": 0.0,
-                    "color": [0.5, 0.880859375, 0.5],
+                    "color": [0.5, 0.880859, 0.5],
                     "diffuseCast": false
                 },
                 {
                     "type": "specular",
-                    "influence": 0.39999999990686774,
-                    "color": [0.9296875, 0.99609375, 0.83203125],
-                    "power": 0.149999999906868,
-                    "indexOfRefraction": 1.98999999975786,
+                    "influence": 0.4,
+                    "color": [0.929688, 0.996094, 0.832031],
+                    "power": 0.15,
+                    "indexOfRefraction": 1.99,
                     "materialHighlight": true
                 },
                 {
                     "type": "reflective",
-                    "influence": 0.849999999627471,
-                    "color": [0.9140625, 0.892578125, 0.935546875],
+                    "influence": 0.85,
+                    "color": [0.914063, 0.892578, 0.935547],
                     "diffuseReflectivity": 0.0,
                     "filterReflection": true
                 }
@@ -87,21 +80,21 @@
                 {
                     "type": "specular",
                     "influence": 1.0,
-                    "color": [0.5, 0.5, 0.99609375],
-                    "power": 0.09999999962747097,
-                    "indexOfRefraction": 2.199999999254942,
+                    "color": [0.5, 0.5, 0.996094],
+                    "power": 0.1,
+                    "indexOfRefraction": 2.2,
                     "materialHighlight": false
                 },
                 {
                     "type": "diffuse",
-                    "influence": 0.09999999962747097,
-                    "color": [0.634765625, 0.57421875, 0.740234375],
+                    "influence": 0.1,
+                    "color": [0.634766, 0.574219, 0.740234],
                     "diffuseCast": false
                 },
                 {
                     "type": "transparent",
-                    "influence": 0.9899999997578561,
-                    "color": [0.94140625, 0.99609375, 0.96484375],
+                    "influence": 0.99,
+                    "color": [0.941406, 0.996094, 0.964844],
                     "indexOfRefraction": 1.0
                 }
             ]
@@ -109,19 +102,19 @@
         {
             "type": "plane",
             "position": [0.0, 0.0, 15.0],
-            "normal": [0.09950371878221631, 0.0, -0.9950371901504695],
+            "normal": [0.099504, 0.0, -0.995037],
             "color": [0.0, 0.0, 0.0],
             "materials": [
                 {
                     "type": "diffuse",
-                    "influence": 0.39999999990686774,
-                    "color": [0.5, 0.5, 0.732421875],
+                    "influence": 0.4,
+                    "color": [0.5, 0.5, 0.732422],
                     "diffuseCast": false
                 },
                 {
                     "type": "reflective",
-                    "influence": 0.599999999627471,
-                    "color": [0.568359375, 0.5859375, 0.88671875],
+                    "influence": 0.6,
+                    "color": [0.568359, 0.585938, 0.886719],
                     "diffuseReflectivity": 0.0,
                     "filterReflection": true
                 }
@@ -135,22 +128,22 @@
             "materials": [
                 {
                     "type": "specular",
-                    "influence": 0.8999999999068677,
+                    "influence": 0.9,
                     "color": [0.5, 0.5, 0.5],
-                    "power": 0.2999999998137355,
-                    "indexOfRefraction": 1.7999999998137355,
+                    "power": 0.3,
+                    "indexOfRefraction": 1.8,
                     "materialHighlight": false
                 },
                 {
                     "type": "diffuse",
-                    "influence": 0.6999999997206032,
-                    "color": [0.873046875, 0.2265625, 0.244140625],
+                    "influence": 0.7,
+                    "color": [0.873047, 0.226563, 0.244141],
                     "diffuseCast": false
                 },
                 {
                     "type": "ambient",
-                    "influence": 0.19999999972060323,
-                    "color": [0.99609375, 0.0, 0.0]
+                    "influence": 0.2,
+                    "color": [0.996094, 0.0, 0.0]
                 }
             ]
         }
@@ -164,7 +157,7 @@
         {
             "type": "point",
             "position": [35.0, 35.0, -35.0],
-            "color": [1.0, 0.9499999997206032, 0.9799999999813735]
+            "color": [1.0, 0.95, 0.98]
         }
     ]
 }

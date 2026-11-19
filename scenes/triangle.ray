@@ -7,23 +7,16 @@
         "imageFile": "ray.out",
         "colorDepth": 8,
         "maximumDepth": 15,
-        "depthThreshold": 0.009999999776482582,
-        "reserved1997": {
-            "antialiasThreshold": 0.029999999795109034,
-            "causticThreshold": 0.009999999776482582,
-            "focalDisplacement": 2.6299999998882413,
-            "adaptiveFocalThreshold": 0.009999999776482582,
-            "fractalSeed": 0.039999999571591616
-        }
+        "depthThreshold": 0.01
     },
     "background": [1.0, 1.0, 1.0],
     "camera": {
         "position": [0.0, 0.0, -5.0],
         "lookAt": [0.0, 0.5, 0.0],
         "up": [0.0, 1.0, 0.0],
-        "verticalAngle": 29.99999998009748,
-        "horizontalAngleRadians": 0.6981317000463605,
-        "aspectRatio": 1.3333333330228925,
+        "verticalAngle": 30.0,
+        "horizontalAngle": 40.0,
+        "aspectRatio": 1.333333,
         "sampler": "none",
         "colorModel": "clip"
     },
@@ -32,15 +25,11 @@
             "type": "triangle",
             "corners": [
                 [0.0, 1.0, 0.0],
-                [-1.0, 0.0, 0.0],
-                [1.0, 0.0, 0.0]
+                [1.0, 0.0, 0.0],
+                [-1.0, 0.0, 0.0]
             ],
-            "surfaceNormal": [0.0, 0.0, -1.0],
-            "normals": [
-                [0.0, 0.0, -1.0],
-                [0.0, 0.0, -1.0],
-                [0.0, 0.0, -1.0]
-            ],
+            "doubleSided": true,
+            "smooth": false,
             "color": [0.5, 0.5, 0.5],
             "materials": [
                 {
@@ -54,13 +43,13 @@
         {
             "type": "sphere",
             "center": [0.0, 1.0, 0.0],
-            "radius": 0.049999999813735485,
-            "color": [0.5, 0.99609375, 0.5],
+            "radius": 0.05,
+            "color": [0.5, 0.996094, 0.5],
             "materials": [
                 {
                     "type": "diffuse",
                     "influence": 1.0,
-                    "color": [0.5, 0.99609375, 0.5],
+                    "color": [0.5, 0.996094, 0.5],
                     "diffuseCast": false
                 }
             ]
@@ -68,13 +57,13 @@
         {
             "type": "sphere",
             "center": [-1.0, 0.0, 0.0],
-            "radius": 0.049999999813735485,
-            "color": [0.5, 0.5, 0.99609375],
+            "radius": 0.05,
+            "color": [0.5, 0.5, 0.996094],
             "materials": [
                 {
                     "type": "diffuse",
                     "influence": 1.0,
-                    "color": [0.5, 0.5, 0.99609375],
+                    "color": [0.5, 0.5, 0.996094],
                     "diffuseCast": false
                 }
             ]
@@ -82,13 +71,13 @@
         {
             "type": "sphere",
             "center": [1.0, 0.0, 0.0],
-            "radius": 0.049999999813735485,
-            "color": [0.99609375, 0.5, 0.5],
+            "radius": 0.05,
+            "color": [0.996094, 0.5, 0.5],
             "materials": [
                 {
                     "type": "diffuse",
                     "influence": 1.0,
-                    "color": [0.99609375, 0.5, 0.5],
+                    "color": [0.996094, 0.5, 0.5],
                     "diffuseCast": false
                 }
             ]

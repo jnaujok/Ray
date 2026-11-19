@@ -109,43 +109,6 @@ void CCamera::SetColorModel( CColorModel *pColorModel )
 
 DYNAMIC_IMPLEMENTS( CCamera, "camera" );
 
-CRayStream &operator >>( CRayStream &oStream, CCamera &oCamera )
-{
-    DWORD       dwVersion;
-
-    oStream >> dwVersion;
-
-    switch ( dwVersion )
-    {
-        case CAMERA_VERSION:
-            oStream >> oCamera.m_oPosition;
-            oStream >> oCamera.m_oPointAt;
-            oStream >> oCamera.m_oUp;
-            oStream >> oCamera.m_nVerticalAngle;
-            oStream >> oCamera.m_nHorizontalAngle;
-            oStream >> oCamera.m_nAspectRatio;
-            oCamera.CalcRotate();
-            break;
-
-        default:
-            break;
-    }
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CCamera &oCamera )
-{
-    oStream << CAMERA_VERSION;
-    oStream << oCamera.m_oPosition;
-    oStream << oCamera.m_oPointAt;
-    oStream << oCamera.m_oUp;
-    oStream << oCamera.m_nVerticalAngle;
-    oStream << oCamera.m_nHorizontalAngle;
-    oStream << oCamera.m_nAspectRatio;
-
-    return oStream;
-}
-
 #ifdef RAY_GUI
 
 void CCamera::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
@@ -173,13 +136,6 @@ void CCamera::SetProperties( void )
 
 #endif    
 
-static CVector Cross( CVector &oA, CVector &oB )
-{
-    return CVector( ( oA.GetY() * oB.GetZ() ) - ( oA.GetZ() * oB.GetY() ),
-                    ( oA.GetZ() * oB.GetX() ) - ( oA.GetX() * oB.GetZ() ),
-                    ( oA.GetX() * oB.GetY() ) - ( oA.GetY() * oB.GetX() ) );
-}
-
 void CCamera::CalcRotate( void )
 {
     CVector oCenterRay( m_oPointAt - m_oPosition );
@@ -201,17 +157,17 @@ void CCamera::CalcRotate( void )
         m_oForward = oAxisZ;            // the camera looks at its own position
 
     CVector oUp( m_oUp );
-    m_oRight = Cross( oUp, m_oForward );
+    m_oRight = oUp.Cross( m_oForward );
     if ( m_oRight.Magnitude() < 1e-9 )
     {
             // Looking straight along the up vector: let the top of the image
             // face +Z when looking down and -Z when looking up, so +X stays
             // to the right.
         oUp.Set( 0.0, 0.0, ( m_oForward.GetY() < 0.0 ) ? 1.0 : -1.0 );
-        m_oRight = Cross( oUp, m_oForward );
+        m_oRight = oUp.Cross( m_oForward );
     }
     m_oRight.Normalize();
-    m_oTop = Cross( m_oForward, m_oRight );
+    m_oTop = m_oForward.Cross( m_oRight );
     m_oTop.Normalize();
 }
 
@@ -287,8 +243,8 @@ void CCamera::ToJson( IASLib::CObjectNode &oNode )
 
 BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "position", "lookAt", "up", "verticalAngle", "verticalAngleRadians",
-                                              "horizontalAngle", "horizontalAngleRadians", "aspectRatio",
+    static const char *const astrFields[] = { "position", "lookAt", "up", "verticalAngle",
+                                              "horizontalAngle", "aspectRatio",
                                               "sampler", "colorModel", NULL };
     CPixelSampler  *pSampler;
     CColorModel    *pColorModel;

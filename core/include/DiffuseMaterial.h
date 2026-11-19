@@ -2,7 +2,7 @@
 #define __DIFFUSE_MATERIAL__
 
 #include "Material.h"
-#include "RayStream.h"
+#include "Globals.h"
 
 class CDiffuseMaterial : public CMaterial
 {
@@ -15,8 +15,6 @@ class CDiffuseMaterial : public CMaterial
 
                             CDiffuseMaterial( CColor &oColor );
 
-        friend CRayStream     &operator <<( CRayStream &oAr, CDiffuseMaterial &oMaterial );
-        friend CRayStream     &operator >>( CRayStream &oAr, CDiffuseMaterial &oMaterial );
 
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );

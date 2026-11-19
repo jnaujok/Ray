@@ -4,7 +4,7 @@
 #include "Globals.h"
 #endif
 
-#include "RayStream.h"
+#include "Globals.h"
 #include "MaterialList.h"
 #include "SceneJson.h"
 
@@ -62,62 +62,6 @@ void CMaterialList::SetInfluence( int nIndex, FLT nInfluence )
 {
     if ( ( nIndex >= 0 ) && ( nIndex < GetSize() ) )
         m_anInfluence[ (size_t)nIndex ] = nInfluence;
-}
-
-CRayStream &operator >>( CRayStream &oStream, CMaterialList &oList )
-{
-    DWORD               dwVersion;
-    DWORD               dwCount;
-    CMaterial          *pMaterial;
-    IASLib::CString             strMaterial;
-    CDynMaterialList    oMats;
-    FLT                 nInfluence;
-
-    oStream >> dwVersion;
-    switch ( dwVersion )
-    {
-        case MATERIAL_LIST_VERSION:
-            oList.RemoveAll();
-            oStream >> dwCount;
-            while ( dwCount )
-            {
-                oStream >> strMaterial;
-                pMaterial = oMats.Instantiate( strMaterial, oStream );
-                oStream >> nInfluence;
-                oList.Add( pMaterial, nInfluence );
-                dwCount--;
-            }
-            break;
-
-        default:
-            break;
-    }
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CMaterialList &oList )
-{
-    CMaterial          *pMaterial;
-    IASLib::CString             strMaterial;
-    CDynMaterialList    oMats;
-    FLT                 nInfluence;
-    int                 nCount;
-
-    oStream << MATERIAL_LIST_VERSION;
-
-    oStream << (DWORD)oList.GetSize();
-    nCount = 0;
-    while ( nCount < oList.GetSize() )
-    {
-        pMaterial = oList[ nCount ];
-        nInfluence = oList.GetInfluence( nCount );
-        strMaterial = pMaterial->ClassType();
-        oStream << strMaterial;
-        pMaterial->Out( oStream );
-        oStream << nInfluence;
-        nCount++;
-    }
-    return oStream;
 }
 
 void CMaterialList::ToJson( IASLib::CArrayNode &oArray )

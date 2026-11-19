@@ -37,37 +37,6 @@ m_oColor( oColor )
     m_bMaterialHighlight = FALSE;
 }
 
-CRayStream &operator <<( CRayStream &oAr, CSpecularMaterial &oMaterial )
-{
-    oAr << SPECULAR_MATERIAL_VERSION;
-    oAr << oMaterial.m_oColor;
-    oAr << oMaterial.m_nPower;
-    oAr << oMaterial.m_nIOR;
-    oAr << oMaterial.m_bMaterialHighlight;
-    return oAr;
-}
-
-CRayStream &operator >>( CRayStream &oAr, CSpecularMaterial &oMaterial )
-{
-    DWORD   dwVersion;
-
-    oAr >> dwVersion;
-
-    switch ( dwVersion )
-    {
-        case SPECULAR_MATERIAL_VERSION:
-            oAr >> oMaterial.m_oColor;
-            oAr >> oMaterial.m_nPower;
-            oAr >> oMaterial.m_nIOR;
-            oAr >> oMaterial.m_bMaterialHighlight;
-            break;
-
-        default:
-            break;
-    }
-    return oAr;
-}
-
 CColor CSpecularMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
     CColor      oReturn( 0, 0, 0 );

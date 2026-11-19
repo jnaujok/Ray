@@ -2,7 +2,7 @@
 #define __AMBIENT_MATERIAL__
 
 #include "Material.h"
-#include "RayStream.h"
+#include "Globals.h"
 
 class CAmbientMaterial : public CMaterial
 {
@@ -13,8 +13,6 @@ class CAmbientMaterial : public CMaterial
 
                             CAmbientMaterial( CColor &oColor );
 
-        friend CRayStream     &operator <<( CRayStream &oAr, CAmbientMaterial &oMaterial );
-        friend CRayStream     &operator >>( CRayStream &oAr, CAmbientMaterial &oMaterial );
 
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );

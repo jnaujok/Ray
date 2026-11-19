@@ -62,10 +62,32 @@ namespace
         return TRUE;
     }
 
-        // A number as JSON text that reads back as the same double.
-    std::string NumberText( const IASLib::CJsonNode &oNode )
+        // A value as JSON text for a scene file. Floating-point numbers are
+        // rounded to six decimal places, which is far finer than any scene
+        // needs and keeps files readable (0.7, not 0.6999999997206032).
+    std::string ScalarText( const IASLib::CJsonNode &oNode )
     {
-        return oNode.toJson( -1 );
+        if ( ! oNode.isNumber() || oNode.isIntegralNumber() )
+            return oNode.toJson( -1 );
+
+        double dValue = RayJson::Rounded( oNode.doubleValue() );
+
+        if ( ! isfinite( dValue ) || fabs( dValue ) >= 1e15 )
+            return oNode.toJson( -1 );
+        if ( dValue == 0.0 )
+            dValue = 0.0;       // no "-0.0"
+
+        char achBuffer[ 64 ];
+        snprintf( achBuffer, sizeof( achBuffer ), "%.6f", dValue );
+
+        std::string strText = achBuffer;
+        size_t      nLast = strText.find_last_not_of( '0' );
+
+            // Keep one decimal place, so the number still reads as a real one.
+        if ( strText[ nLast ] == '.' )
+            nLast++;
+        strText.erase( nLast + 1 );
+        return strText;
     }
 
     void EscapeKey( std::string &strOut, const std::string &strKey )
@@ -146,7 +168,7 @@ namespace
                 {
                     if ( nIndex )
                         strOut += ", ";
-                    strOut += NumberText( *oNode.get( nIndex ) );
+                    strOut += ScalarText( *oNode.get( nIndex ) );
                 }
                 strOut += ']';
             }
@@ -165,7 +187,7 @@ namespace
             }
         }
         else
-            strOut += oNode.toJson( -1 );
+            strOut += ScalarText( oNode );
     }
 }
 
@@ -355,22 +377,18 @@ namespace RayJson
 
     BOOL GetAngle( const IASLib::CJsonNode &oNode, const char *strKey, FLT &nRadians, BOOL bRequired )
     {
-        std::string strRadians = std::string( strKey ) + "Radians";
-        FLT         nValue;
+        FLT nDegrees = nRadians / RADIANS;
 
-        if ( ! oNode.isObject() )
-            return Fail( std::string( "must be an object, not " ) + TypeName( oNode ) );
-
-        if ( oNode.get( strRadians ) != NULL )
-            return GetNumber( oNode, strRadians.c_str(), nRadians, TRUE );
-
-        if ( oNode.get( strKey ) == NULL )
-            return bRequired ? Fail( std::string( "needs \"" ) + strKey + "\"" ) : TRUE;
-
-        if ( ! GetNumber( oNode, strKey, nValue, TRUE ) )
+        if ( ! GetNumber( oNode, strKey, nDegrees, bRequired ) )
             return FALSE;
-        nRadians = nValue * RADIANS;
+        if ( oNode.get( strKey ) != NULL )
+            nRadians = nDegrees * RADIANS;
         return TRUE;
+    }
+
+    double Rounded( double dValue )
+    {
+        return round( dValue * 1e6 ) / 1e6;
     }
 
     void PutNumber( IASLib::CObjectNode &oNode, const char *strKey, FLT nValue )
@@ -406,25 +424,7 @@ namespace RayJson
 
     void PutAngle( IASLib::CObjectNode &oNode, const char *strKey, FLT nRadians )
     {
-        double dDegrees = (double)( nRadians / RADIANS );
-
-            // The shortest decimal number of degrees that reads back exactly.
-        for ( int nPlaces = 0; nPlaces <= 15; nPlaces++ )
-        {
-            double dScale = pow( 10.0, nPlaces );
-            double dRounded = round( dDegrees * dScale ) / dScale;
-
-            if ( (FLT)( (FLT)dRounded * RADIANS ) == nRadians )
-            {
-                oNode.put( strKey, dRounded );
-                return;
-            }
-        }
-            // Not every double is some number of degrees times RADIANS.
-        if ( (FLT)( (FLT)dDegrees * RADIANS ) == nRadians )
-            oNode.put( strKey, dDegrees );
-        else
-            oNode.put( std::string( strKey ) + "Radians", (double)nRadians );
+        oNode.put( strKey, (double)( nRadians / RADIANS ) );
     }
 
     std::string Write( const IASLib::CJsonNode &oNode )

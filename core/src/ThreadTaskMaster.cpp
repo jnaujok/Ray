@@ -87,7 +87,7 @@ class CThreadTaskMaster::CWorker : public IASLib::CThread, public CTaskSlave
 
             if ( ! oItem.pScene )
                 return FALSE;
-            return RayWire::DecodeScene( *oItem.pScene, oScene ) ? TRUE : FALSE;
+            return ( oScene.FromJson( *oItem.pScene ) == 0 ) ? TRUE : FALSE;
         }
 
         virtual BOOL RaysFromMaster( CRayArray &oRays )
@@ -156,7 +156,8 @@ BOOL CThreadTaskMaster::EndTasks( void )
 
 BOOL CThreadTaskMaster::SceneToTasks( CScene &oScene )
 {
-    std::shared_ptr<const std::string> pScene( new std::string( RayWire::EncodeScene( oScene ) ) );
+        // Each worker gets its own copy of the scene, through its JSON text.
+    std::shared_ptr<const std::string> pScene( new std::string( oScene.ToJson( TRUE ) ) );
 
     for ( size_t nCount = 0; nCount < m_apWorkers.size(); nCount++ )
         m_apWorkers[ nCount ]->SendScene( pScene );

@@ -11,7 +11,7 @@
 * Copyright (c) 1997, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#include "RayStream.h"
+#include "Globals.h"
 
 namespace IASLib
 {
@@ -282,8 +282,6 @@ class CSettings
         void            SetFractalSeed( FLT nSeed ) { m_nFractalSeed = nSeed; }
         FLT             GetFractalSeed( void ) { return m_nFractalSeed; }
 
-        friend CRayStream &operator <<( CRayStream &oAr, CSettings &oSettings );
-        friend CRayStream &operator >>( CRayStream &oAr, CSettings &oSettings );
 
 #ifdef RAY_GUI
         void            Properties( void );

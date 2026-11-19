@@ -163,34 +163,6 @@ void CColor::Clip( void )
 }
 
 
-CRayStream &operator <<( CRayStream &oStream, CColor &oColor )
-{
-    oStream << COLOR_VERSION;
-    oStream << oColor.m_nRed;
-    oStream << oColor.m_nGreen;
-    oStream << oColor.m_nBlue;
-    return oStream;
-}
-
-CRayStream &operator >>( CRayStream &oStream, CColor &oColor )
-{
-    DWORD       dwVersion;
-
-    oStream >> dwVersion;
-    switch ( dwVersion )
-    {
-        case COLOR_VERSION:
-            oStream >> oColor.m_nRed;
-            oStream >> oColor.m_nGreen;
-            oStream >> oColor.m_nBlue;
-            break;
-
-        default:
-            break;
-    }
-    return oStream;
-}
-
 #ifdef RAY_GUI
 CColor::operator COLORREF( )
 {

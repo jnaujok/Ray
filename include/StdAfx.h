@@ -25,4 +25,4 @@
 #include "RayDoc.h"
 
 #include "Objects.h"
-#include "RayStream.h"
+#include "Globals.h"

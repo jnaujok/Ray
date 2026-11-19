@@ -31,34 +31,6 @@ m_oColor( oColor )
     m_bDiffuseCast = FALSE;
 }
 
-CRayStream &operator <<( CRayStream &oAr, CDiffuseMaterial &oMaterial )
-{
-    oAr << DIFFUSE_MATERIAL_VERSION;
-    oAr << oMaterial.m_oColor;
-    oAr << oMaterial.m_bDiffuseCast;
-
-    return oAr;
-}
-
-CRayStream &operator >>( CRayStream &oAr, CDiffuseMaterial &oMaterial )
-{
-    DWORD   dwVersion;
-
-    oAr >> dwVersion;
-
-    switch ( dwVersion )
-    {
-        case DIFFUSE_MATERIAL_VERSION:
-            oAr >> oMaterial.m_oColor;
-            oAr >> oMaterial.m_bDiffuseCast;
-            break;
-
-        default:
-            break;
-    }
-    return oAr;
-}
-
 CColor CDiffuseMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
         // Un-lit diffuse colors do nothing.

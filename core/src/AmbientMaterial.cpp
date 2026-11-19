@@ -30,32 +30,6 @@ m_oColor( oColor )
 {
 }
 
-CRayStream &operator <<( CRayStream &oAr, CAmbientMaterial &oMaterial )
-{
-    oAr << AMBIENT_MATERIAL_VERSION;
-    oAr << oMaterial.m_oColor;
-
-    return oAr;
-}
-
-CRayStream &operator >>( CRayStream &oAr, CAmbientMaterial &oMaterial )
-{
-    DWORD   dwVersion;
-
-    oAr >> dwVersion;
-
-    switch ( dwVersion )
-    {
-        case AMBIENT_MATERIAL_VERSION:
-            oAr >> oMaterial.m_oColor;
-            break;
-
-        default:
-            break;
-    }
-    return oAr;
-}
-
 CColor CAmbientMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
         // Simply return the ambient color and let the influence adjust the light. 

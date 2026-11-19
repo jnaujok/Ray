@@ -93,56 +93,6 @@ void CSphere::SetProperties( void )
 
 DYNAMIC_IMPLEMENTS( CSphere, "sphere" );
 
-CRayStream &operator >>( CRayStream &oStream, CSphere &oSphere )
-{
-    DWORD       dwVersion;
-    CColor      oColor;
-    CMaterial  *pMaterial;
-
-    oStream >> dwVersion;
-
-    switch( dwVersion )
-    {
-        case SPHERE_VERSION:
-            oStream >> oSphere.m_oCenter;
-            oStream >> oSphere.m_nRadius;
-            oStream >> oSphere.m_oColor;
-            oStream >> oSphere.m_oMaterials;
-            break;
-
-        case VERSION_2:
-            oStream >> oSphere.m_oCenter;
-            oStream >> oSphere.m_nRadius;
-            oStream >> oSphere.m_oMaterials;
-            oSphere.m_oColor.Set( 0.5, 0.5, 0.5 );
-            break;
-
-        case VERSION_1:
-            oStream >> oSphere.m_oCenter;
-            oStream >> oSphere.m_nRadius;
-            oStream >> oSphere.m_oColor;
-            pMaterial = new CDiffuseMaterial( oSphere.m_oColor );
-            oSphere.m_oMaterials.Add( pMaterial, 1.0 );
-            break;
-
-        default:
-            break;
-    }
-
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CSphere &oSphere )
-{
-    oStream << SPHERE_VERSION;
-    oStream << oSphere.m_oCenter;
-    oStream << oSphere.m_nRadius;
-    oStream << oSphere.m_oColor;
-    oStream << oSphere.m_oMaterials;
-
-    return oStream;
-}
-
 
 BOOL CSphere::Intersect( CRay &oRay, CVector &oIntersect )
 {

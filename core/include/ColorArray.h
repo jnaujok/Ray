@@ -4,7 +4,6 @@
 #include "Color.h"
 #include "Templates/TArray.h"
 
-class CRayStream;
 
 class CColorArray
 {
@@ -30,8 +29,6 @@ class CColorArray
         int             GetY( int nIndex );
         void            SetY( int nIndex, int nY );
 
-        friend CRayStream &operator >>( CRayStream &oStream, CColorArray &oList );
-        friend CRayStream &operator <<( CRayStream &oStream, CColorArray &oList );
 };
 
 #endif // __COLORARRAY_H__

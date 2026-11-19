@@ -26,8 +26,6 @@ class CPointLight : public CLight
 
         virtual CColor  GetShade( CVector oVector );
 
-        friend CRayStream  &operator >>( CRayStream &oStream, CPointLight &oLight );
-        friend CRayStream  &operator <<( CRayStream &oStream, CPointLight &oLight );
 
 #ifdef RAY_GUI
         virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );

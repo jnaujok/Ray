@@ -2,7 +2,7 @@
 #define __TRANSPARENT_MATERIAL__
 
 #include "Material.h"
-#include "RayStream.h"
+#include "Globals.h"
 
 class CTransparentMaterial : public CMaterial
 {
@@ -15,8 +15,6 @@ class CTransparentMaterial : public CMaterial
 
                             CTransparentMaterial( CColor oColor, FLT nIOR );
 
-        friend CRayStream     &operator <<( CRayStream &oAr, CTransparentMaterial &oMaterial );
-        friend CRayStream     &operator >>( CRayStream &oAr, CTransparentMaterial &oMaterial );
 
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );

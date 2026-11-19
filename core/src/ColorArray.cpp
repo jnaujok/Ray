@@ -4,7 +4,7 @@
 #include "Globals.h"
 #endif
 
-#include "RayStream.h"
+#include "Globals.h"
 #include "ColorArray.h"
 
 #define COLOR_ARRAY_VERSION       ((DWORD)1)
@@ -85,51 +85,4 @@ void CColorArray::SetY( int nIndex, int nY )
 {
     if ( ( nIndex >= 0 ) && ( nIndex < GetSize() ) )
         m_anYCoords[ (size_t)nIndex ] = nY;
-}
-
-CRayStream &operator >>( CRayStream &oStream, CColorArray &oList )
-{
-    DWORD               dwVersion;
-    DWORD               dwCount;
-    CColor              oColor;
-    DWORD               nX, nY;
-
-    oStream >> dwVersion;
-    switch ( dwVersion )
-    {
-        case COLOR_ARRAY_VERSION:
-            oList.RemoveAll();
-            oStream >> dwCount;
-            while ( dwCount )
-            {
-                oStream >> nX;
-                oStream >> nY;
-                oStream >> oColor;
-                oList.Add( oColor, (int)nX, (int)nY );
-                dwCount--;
-            }
-            break;
-
-        default:
-            break;
-    }
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CColorArray &oList )
-{
-    int                 nCount;
-
-    oStream << COLOR_ARRAY_VERSION;
-
-    oStream << (DWORD)oList.GetSize();
-    nCount = 0;
-    while ( nCount < oList.GetSize() )
-    {
-        oStream << (DWORD)oList.GetX(nCount);
-        oStream << (DWORD)oList.GetY(nCount);
-        oStream << oList[nCount];
-        nCount++;
-    }
-    return oStream;
 }

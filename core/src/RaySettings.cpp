@@ -47,88 +47,6 @@ CSettings::CSettings( int nWidth, int nHeight, int nColorDepth, LPCSTR strOutput
     m_nFractalSeed = 0.04;
 }
 
-CRayStream &operator <<( CRayStream &oAr, CSettings &oSettings )
-{
-    oAr << SETTINGS_VERSION;
-    oAr << oSettings.m_nImageWidth;
-    oAr << oSettings.m_nImageHeight;
-    oAr << oSettings.m_nColorDepth;
-    oAr << oSettings.m_strImageFile;
-    oAr << oSettings.m_bGammaCorrect;
-    oAr << oSettings.m_nGammaCorrection;
-    oAr << oSettings.m_bAdaptiveDepth;
-    oAr << oSettings.m_nAdaptiveDepthThreshold;
-    oAr << oSettings.m_nMaximumTraceDepth;
-    oAr << oSettings.m_bAntialias;
-    oAr << oSettings.m_bAdaptiveAntialiasing;
-    oAr << oSettings.m_nAntialiasThreshold;
-    oAr << oSettings.m_nMaximumAntialiasDepth;
-    oAr << oSettings.m_bAtmosphericEffects;
-    oAr << oSettings.m_bDistanceAttenuation;
-    oAr << oSettings.m_nDistanceHazeHemidepth;
-    oAr << oSettings.m_bCaustics;
-    oAr << oSettings.m_bAdaptiveCaustics;
-    oAr << oSettings.m_nMaximumCausticDepth;
-    oAr << oSettings.m_nCausticThreshold;
-    oAr << oSettings.m_bSimpleRadiosity;
-    oAr << oSettings.m_bTraceByColor;
-    oAr << oSettings.m_bFocalBlur;
-    oAr << oSettings.m_nDepthOfField;
-    oAr << oSettings.m_nFocalDisplacement;
-    oAr << oSettings.m_bAdaptiveFocalBlur;
-    oAr << oSettings.m_nAdaptiveFocalThreshold;
-    oAr << oSettings.m_bFractalTurbulence;
-    oAr << oSettings.m_nFractalSeed;
-
-    return oAr;
-}
-
-CRayStream &operator >>( CRayStream &oAr, CSettings &oSettings )
-{
-    DWORD       dwVersion;
-
-    oAr >> dwVersion;
-    switch ( dwVersion )
-    {
-        case SETTINGS_VERSION:
-            oAr >> oSettings.m_nImageWidth;
-            oAr >> oSettings.m_nImageHeight;
-            oAr >> oSettings.m_nColorDepth;
-            oAr >> oSettings.m_strImageFile;
-            oAr >> oSettings.m_bGammaCorrect;
-            oAr >> oSettings.m_nGammaCorrection;
-            oAr >> oSettings.m_bAdaptiveDepth;
-            oAr >> oSettings.m_nAdaptiveDepthThreshold;
-            oAr >> oSettings.m_nMaximumTraceDepth;
-            oAr >> oSettings.m_bAntialias;
-            oAr >> oSettings.m_bAdaptiveAntialiasing;
-            oAr >> oSettings.m_nAntialiasThreshold;
-            oAr >> oSettings.m_nMaximumAntialiasDepth;
-            oAr >> oSettings.m_bAtmosphericEffects;
-            oAr >> oSettings.m_bDistanceAttenuation;
-            oAr >> oSettings.m_nDistanceHazeHemidepth;
-            oAr >> oSettings.m_bCaustics;
-            oAr >> oSettings.m_bAdaptiveCaustics;
-            oAr >> oSettings.m_nMaximumCausticDepth;
-            oAr >> oSettings.m_nCausticThreshold;
-            oAr >> oSettings.m_bSimpleRadiosity;
-            oAr >> oSettings.m_bTraceByColor;
-            oAr >> oSettings.m_bFocalBlur;
-            oAr >> oSettings.m_nDepthOfField;
-            oAr >> oSettings.m_nFocalDisplacement;
-            oAr >> oSettings.m_bAdaptiveFocalBlur;
-            oAr >> oSettings.m_nAdaptiveFocalThreshold;
-            oAr >> oSettings.m_bFractalTurbulence;
-            oAr >> oSettings.m_nFractalSeed;
-            break;
-
-        default:
-            break;
-    }
-
-    return oAr;
-}
-
 #ifdef RAY_GUI
 #include "resource.h"
 #include "SettingsDialog.h"
@@ -175,28 +93,28 @@ void CSettings::ToJson( IASLib::CObjectNode &oNode )
 
     IASLib::CObjectNode *pReserved = new IASLib::CObjectNode;
     if ( m_bGammaCorrect != oDefault.m_bGammaCorrect ) RayJson::PutBool( *pReserved, "gammaCorrect", m_bGammaCorrect );
-    if ( m_nGammaCorrection != oDefault.m_nGammaCorrection ) RayJson::PutNumber( *pReserved, "gammaCorrection", m_nGammaCorrection );
+    if ( RayJson::Rounded( m_nGammaCorrection ) != RayJson::Rounded( oDefault.m_nGammaCorrection ) ) RayJson::PutNumber( *pReserved, "gammaCorrection", m_nGammaCorrection );
     if ( m_bAdaptiveDepth != oDefault.m_bAdaptiveDepth ) RayJson::PutBool( *pReserved, "adaptiveDepth", m_bAdaptiveDepth );
     if ( m_bAntialias != oDefault.m_bAntialias ) RayJson::PutBool( *pReserved, "antialias", m_bAntialias );
     if ( m_bAdaptiveAntialiasing != oDefault.m_bAdaptiveAntialiasing ) RayJson::PutBool( *pReserved, "adaptiveAntialiasing", m_bAdaptiveAntialiasing );
-    if ( m_nAntialiasThreshold != oDefault.m_nAntialiasThreshold ) RayJson::PutNumber( *pReserved, "antialiasThreshold", m_nAntialiasThreshold );
+    if ( RayJson::Rounded( m_nAntialiasThreshold ) != RayJson::Rounded( oDefault.m_nAntialiasThreshold ) ) RayJson::PutNumber( *pReserved, "antialiasThreshold", m_nAntialiasThreshold );
     if ( m_nMaximumAntialiasDepth != oDefault.m_nMaximumAntialiasDepth ) pReserved->put( "maximumAntialiasDepth", (int)m_nMaximumAntialiasDepth );
     if ( m_bAtmosphericEffects != oDefault.m_bAtmosphericEffects ) RayJson::PutBool( *pReserved, "atmosphericEffects", m_bAtmosphericEffects );
     if ( m_bDistanceAttenuation != oDefault.m_bDistanceAttenuation ) RayJson::PutBool( *pReserved, "distanceAttenuation", m_bDistanceAttenuation );
-    if ( m_nDistanceHazeHemidepth != oDefault.m_nDistanceHazeHemidepth ) RayJson::PutNumber( *pReserved, "distanceHazeHemidepth", m_nDistanceHazeHemidepth );
+    if ( RayJson::Rounded( m_nDistanceHazeHemidepth ) != RayJson::Rounded( oDefault.m_nDistanceHazeHemidepth ) ) RayJson::PutNumber( *pReserved, "distanceHazeHemidepth", m_nDistanceHazeHemidepth );
     if ( m_bCaustics != oDefault.m_bCaustics ) RayJson::PutBool( *pReserved, "caustics", m_bCaustics );
     if ( m_bAdaptiveCaustics != oDefault.m_bAdaptiveCaustics ) RayJson::PutBool( *pReserved, "adaptiveCaustics", m_bAdaptiveCaustics );
     if ( m_nMaximumCausticDepth != oDefault.m_nMaximumCausticDepth ) pReserved->put( "maximumCausticDepth", (int)m_nMaximumCausticDepth );
-    if ( m_nCausticThreshold != oDefault.m_nCausticThreshold ) RayJson::PutNumber( *pReserved, "causticThreshold", m_nCausticThreshold );
+    if ( RayJson::Rounded( m_nCausticThreshold ) != RayJson::Rounded( oDefault.m_nCausticThreshold ) ) RayJson::PutNumber( *pReserved, "causticThreshold", m_nCausticThreshold );
     if ( m_bSimpleRadiosity != oDefault.m_bSimpleRadiosity ) RayJson::PutBool( *pReserved, "simpleRadiosity", m_bSimpleRadiosity );
     if ( m_bTraceByColor != oDefault.m_bTraceByColor ) RayJson::PutBool( *pReserved, "traceByColor", m_bTraceByColor );
     if ( m_bFocalBlur != oDefault.m_bFocalBlur ) RayJson::PutBool( *pReserved, "focalBlur", m_bFocalBlur );
-    if ( m_nDepthOfField != oDefault.m_nDepthOfField ) RayJson::PutNumber( *pReserved, "depthOfField", m_nDepthOfField );
-    if ( m_nFocalDisplacement != oDefault.m_nFocalDisplacement ) RayJson::PutNumber( *pReserved, "focalDisplacement", m_nFocalDisplacement );
+    if ( RayJson::Rounded( m_nDepthOfField ) != RayJson::Rounded( oDefault.m_nDepthOfField ) ) RayJson::PutNumber( *pReserved, "depthOfField", m_nDepthOfField );
+    if ( RayJson::Rounded( m_nFocalDisplacement ) != RayJson::Rounded( oDefault.m_nFocalDisplacement ) ) RayJson::PutNumber( *pReserved, "focalDisplacement", m_nFocalDisplacement );
     if ( m_bAdaptiveFocalBlur != oDefault.m_bAdaptiveFocalBlur ) RayJson::PutBool( *pReserved, "adaptiveFocalBlur", m_bAdaptiveFocalBlur );
-    if ( m_nAdaptiveFocalThreshold != oDefault.m_nAdaptiveFocalThreshold ) RayJson::PutNumber( *pReserved, "adaptiveFocalThreshold", m_nAdaptiveFocalThreshold );
+    if ( RayJson::Rounded( m_nAdaptiveFocalThreshold ) != RayJson::Rounded( oDefault.m_nAdaptiveFocalThreshold ) ) RayJson::PutNumber( *pReserved, "adaptiveFocalThreshold", m_nAdaptiveFocalThreshold );
     if ( m_bFractalTurbulence != oDefault.m_bFractalTurbulence ) RayJson::PutBool( *pReserved, "fractalTurbulence", m_bFractalTurbulence );
-    if ( m_nFractalSeed != oDefault.m_nFractalSeed ) RayJson::PutNumber( *pReserved, "fractalSeed", m_nFractalSeed );
+    if ( RayJson::Rounded( m_nFractalSeed ) != RayJson::Rounded( oDefault.m_nFractalSeed ) ) RayJson::PutNumber( *pReserved, "fractalSeed", m_nFractalSeed );
     if ( pReserved->size() )
         oNode.set( "reserved1997", pReserved );
     else

@@ -9,6 +9,7 @@
 #define __SOCKETTASKSLAVE_H__
 
 #include "TaskSlave.h"
+#include "WireProtocol.h"
 
 #include <stdint.h>
 #include <string>
@@ -23,6 +24,8 @@ class CSocketTaskSlave : public CTaskSlave
 {
     protected:
         IASLib::CSocketStream  *m_pStream;
+        RayWire::CEncoder       m_oEncoder;     // colors to the master
+        RayWire::CDecoder       m_oDecoder;     // the scene and rays from it
         IASLib::CString         m_strLastError;
         unsigned long           m_nRaysTraced;
 

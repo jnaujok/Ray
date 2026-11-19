@@ -21,6 +21,8 @@
 
 CSocketTaskSlave::CSocketTaskSlave( void ) :
     m_pStream( NULL ),
+    m_oEncoder( RAY_WIRE_ENGINE_ID ),
+    m_oDecoder( RAY_WIRE_ENGINE_ID, RAY_WIRE_MASTER_ID ),
     m_nRaysTraced( 0 )
 {
 }
@@ -116,9 +118,9 @@ BOOL CSocketTaskSlave::SceneFromMaster( CScene &oScene )
     if ( ! Receive( MESSAGE_SCENE, strPayload ) )
         return FALSE;
 
-    if ( ! RayWire::DecodeScene( strPayload, oScene ) )
+    if ( ! m_oDecoder.Scene( strPayload, oScene ) )
     {
-        m_strLastError = "The scene from the master could not be read";
+        m_strLastError.Format( "The scene from the master could not be read: %s", m_oDecoder.GetError().c_str() );
         return FALSE;
     }
     return TRUE;
@@ -132,7 +134,11 @@ BOOL CSocketTaskSlave::RaysFromMaster( CRayArray &oRays )
     if ( ! Receive( MESSAGE_RAYS, strPayload ) )
         return FALSE;
 
-    RayWire::DecodeRays( strPayload, oRays );
+    if ( ! m_oDecoder.Rays( strPayload, oRays ) )
+    {
+        m_strLastError.Format( "Rays from the master could not be read: %s", m_oDecoder.GetError().c_str() );
+        return FALSE;
+    }
     return ( oRays.GetSize() != 0 );
 }
 
@@ -140,7 +146,7 @@ BOOL CSocketTaskSlave::ColorsToMaster( CColorArray &oColors )
 {
     try
     {
-        RayWire::SendFrame( *m_pStream, MESSAGE_COLOR, RayWire::EncodeColors( oColors ) );
+        RayWire::SendFrame( *m_pStream, MESSAGE_COLOR, m_oEncoder.Colors( oColors ) );
     }
     catch ( IASLib::CException &oException )
     {

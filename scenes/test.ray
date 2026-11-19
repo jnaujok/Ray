@@ -16,7 +16,7 @@
         "up": [0.0, 1.0, 0.0],
         "verticalAngle": 30.0,
         "horizontalAngle": 40.0,
-        "aspectRatio": 1.3333333333333333,
+        "aspectRatio": 1.333333,
         "sampler": "none",
         "colorModel": "clip"
     },
@@ -30,7 +30,7 @@
                 {
                     "type": "specular",
                     "influence": 0.8,
-                    "color": [0.794921875, 0.7265625, 0.5],
+                    "color": [0.794922, 0.726563, 0.5],
                     "power": 0.85,
                     "indexOfRefraction": 1.985,
                     "materialHighlight": true
@@ -38,7 +38,7 @@
                 {
                     "type": "diffuse",
                     "influence": 1.0,
-                    "color": [0.85546875, 0.720703125, 0.375],
+                    "color": [0.855469, 0.720703, 0.375],
                     "diffuseCast": false
                 }
             ]
@@ -52,13 +52,13 @@
                 {
                     "type": "diffuse",
                     "influence": 1.0,
-                    "color": [0.353515625, 0.5, 0.5],
+                    "color": [0.353516, 0.5, 0.5],
                     "diffuseCast": false
                 },
                 {
                     "type": "reflective",
                     "influence": 0.3,
-                    "color": [0.904296875, 0.88671875, 0.99609375],
+                    "color": [0.904297, 0.886719, 0.996094],
                     "diffuseReflectivity": 0.0,
                     "filterReflection": true
                 }

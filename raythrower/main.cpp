@@ -11,7 +11,6 @@
 #include "Scene.h"
 #include "ImageFile.h"
 #include "Color.h"
-#include "RayStream.h"
 #include "ThreadTaskMaster.h"
 #include "SocketTaskMaster.h"
 #include "WireProtocol.h"
@@ -47,11 +46,13 @@ namespace
         std::string strEngine;
         std::string strSampler;         // Empty: what the scene says.
         std::string strColorModel;      // Empty: what the scene says.
-        std::string strConvert;
+        std::string strSave;
         int         nTasks = 0;
         int         nPort = RAY_WIRE_DEFAULT_PORT;
         int         nTimeout = 60;
         int         nBatch = 0;
+        int         nWidth = 0;         // 0: the scene's size
+        int         nHeight = 0;
         bool        bListen = false;
         bool        bSpawn = false;
         bool        bQuiet = false;
@@ -71,6 +72,7 @@ namespace
         printf( "  --engine <path>             The rayengine to start (default: next to raythrower)\n" );
         printf( "  --timeout <seconds>         How long to wait for engines to connect (default 60)\n" );
         printf( "  --batch <rays>              Rays per batch sent to a task (default 127)\n" );
+        printf( "  --size <width>x<height>     Image size, instead of the scene's\n" );
         printf( "  --aa <mode>                 How each pixel is sampled (anti-aliasing), instead\n" );
         printf( "                              of what the scene says:\n" );
 
@@ -87,8 +89,8 @@ namespace
         for ( int nIndex = 0; nIndex < nTypes; nIndex++ )
             printf( "                                %-9s %s%s\n", aoModels[ nIndex ].strName, aoModels[ nIndex ].strDescription,
                     ( nIndex == 0 ) ? " (default)" : "" );
-        printf( "  --convert <file>            Save the scene as a JSON .ray file, with any --aa or\n" );
-        printf( "                              --color applied, and exit without tracing\n" );
+        printf( "  --save <file>               Save the scene, with any --aa or --color applied, and\n" );
+        printf( "                              exit without tracing\n" );
         printf( "  -q, --quiet                 Print only errors\n" );
         printf( "  -h, --help                  Show this help\n" );
     }
@@ -150,6 +152,21 @@ namespace
                 if ( strNext && strNext[ 0 ] != '-' && ParseInt( strNext, oOptions.nPort ) )
                     nCount++;
             }
+            else if ( strArg == "--size" )
+            {
+                int nWidth = 0, nHeight = 0;
+                char chExtra;
+
+                if ( strNext == NULL || sscanf( strNext, "%dx%d%c", &nWidth, &nHeight, &chExtra ) != 2 ||
+                     nWidth < 1 || nHeight < 1 || nWidth > 65535 || nHeight > 65535 )
+                {
+                    fprintf( stderr, "--size needs <width>x<height>, such as 640x480\n" );
+                    return false;
+                }
+                oOptions.nWidth = nWidth;
+                oOptions.nHeight = nHeight;
+                nCount++;
+            }
             else if ( strArg == "--tasks" || strArg == "--timeout" || strArg == "--batch" )
             {
                 int &nTarget = ( strArg == "--tasks" ) ? oOptions.nTasks :
@@ -161,7 +178,7 @@ namespace
                 }
                 nCount++;
             }
-            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--engine" || strArg == "--convert" )
+            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--engine" || strArg == "--save" )
             {
                 if ( strNext == NULL )
                 {
@@ -169,7 +186,7 @@ namespace
                     return false;
                 }
                 std::string &strTarget = ( strArg == "--ppm" ) ? oOptions.strPpm :
-                                         ( strArg == "--convert" ) ? oOptions.strConvert :
+                                         ( strArg == "--save" ) ? oOptions.strSave :
                                          ( strArg == "--engine" ) ? oOptions.strEngine : oOptions.strOutput;
                 strTarget = strNext;
                 nCount++;
@@ -367,15 +384,21 @@ int main( int argc, char **argv )
     if ( ! oOptions.strColorModel.empty() )
         oScene.GetCamera().SetColorModel( CColorModel::Create( oOptions.strColorModel.c_str() ) );
 
-    if ( ! oOptions.strConvert.empty() )
+    if ( oOptions.nWidth > 0 )
     {
-        if ( oScene.Save( oOptions.strConvert.c_str() ) != 0 )
+        oScene.GetSettings().SetImageWidth( oOptions.nWidth );
+        oScene.GetSettings().SetImageHeight( oOptions.nHeight );
+    }
+
+    if ( ! oOptions.strSave.empty() )
+    {
+        if ( oScene.Save( oOptions.strSave.c_str() ) != 0 )
         {
-            fprintf( stderr, "Couldn't write %s\n", oOptions.strConvert.c_str() );
+            fprintf( stderr, "Couldn't write %s\n", oOptions.strSave.c_str() );
             return 1;
         }
         if ( ! oOptions.bQuiet )
-            printf( "Scene saved as JSON to %s\n", oOptions.strConvert.c_str() );
+            printf( "Scene saved to %s\n", oOptions.strSave.c_str() );
         return 0;
     }
 

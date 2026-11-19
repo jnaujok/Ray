@@ -16,7 +16,7 @@
 #include "Vector.h"
 #include "Color.h"
 #include "Rays.h"
-#include "RayStream.h"
+#include "Globals.h"
 #include "MaterialList.h"
 
 #ifdef RAY_GUI
@@ -36,6 +36,7 @@ class CObjects
 {
     protected:
         CMaterialList       m_oMaterials;
+        BOOL                m_bOwnsMaterials;   // FALSE for a mesh's faces, which share the mesh's
 #ifdef RAY_GUI
         HTREEITEM           m_hObjectItem;
         HTREEITEM           m_hMaterialTree;
@@ -46,7 +47,6 @@ class CObjects
                             CObjects( void );
         virtual            ~CObjects( void );
       
-        virtual void        Serialize( CRayStream &oStream, BOOL ) = 0;
             // The object as JSON for a scene file: its fields go into oNode,
             // which already holds its "type". FromJson reads them back and
             // returns FALSE, with RayJson::Fail, if one is missing or bad.
@@ -56,6 +56,11 @@ class CObjects
         virtual BOOL        IsALight( void ) { return FALSE; }
         virtual BOOL        IsCamera( void ) { return FALSE; }
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect ) {return FALSE;}
+            // Intersect, unless this is pIgnore: the object a shadow or
+            // reflected ray leaves from. An object made of parts (a mesh)
+            // skips only the part pIgnore names, so it can shadow itself.
+        virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore )
+                            { return ( pIgnore == this ) ? FALSE : Intersect( oRay, oIntersect ); }
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
 #ifdef RAY_GUI
@@ -84,18 +89,14 @@ class CDynObject
     protected:
         static CDynObject  *m_pFirst;
         IASLib::CString             m_strObjectID;
-        CObjects   *(CFUNC *m_lpFunction)(CRayStream &oStream);
         CObjects   *(CFUNC *m_lpCreateEmpty)(void);
         LPCSTR              m_strJsonType;      // Its "type" in JSON scene files.
         CDynObject         *m_pNext;
     public:
-                            CDynObject( CObjects *(CFUNC *lpFunction)(CRayStream &oStream), LPCSTR nKey );
-                            CDynObject( CObjects *(CFUNC *lpFunction)(CRayStream &oStream), CObjects *(CFUNC *lpCreateEmpty)(void),
-                                        LPCSTR nKey, LPCSTR strJsonType );
+                            CDynObject( CObjects *(CFUNC *lpCreateEmpty)(void), LPCSTR nKey, LPCSTR strJsonType );
         virtual            ~CDynObject( void );
         int                 Compare( CDynObject *oCompare );
         BOOL                Match( LPCSTR lpszCompare );
-        CObjects           *MakeMe( CRayStream &oStream );
         CObjects           *MakeEmpty( void );
         LPCSTR              GetJsonType( void ) { return m_strJsonType; }
         CDynObject         *GetFirst( void );
@@ -109,7 +110,6 @@ class CDynList
     public:
                             CDynList( void );
         virtual            ~CDynList( void );
-        CObjects           *Instantiate( LPCSTR lpszName, CRayStream &oStream );
             // A new, default object of a JSON scene file's "type", or NULL.
         CObjects           *Create( LPCSTR strJsonType );
             // The JSON "type" of an object class (its ClassType()), or NULL.
@@ -118,31 +118,15 @@ class CDynList
 
 extern CDynList    *g_pDynamicList;   
 
-#define DYNAMIC_OBJECTS( x )    static CObjects* CFUNC CreateMe( CRayStream &oStream ) \
-                                {\
-                                    return new x( oStream );\
-                                } \
-                                static CObjects* CFUNC CreateEmpty( void ) \
+#define DYNAMIC_OBJECTS( x )    static CObjects* CFUNC CreateEmpty( void ) \
                                 {\
                                     return new x;\
                                 } \
                                 virtual void ToJson( IASLib::CObjectNode &oNode ); \
                                 virtual BOOL FromJson( const IASLib::CJsonNode &oNode ); \
-                                x( CRayStream &oStream );\
-                                virtual void Serialize( CRayStream &oStream, BOOL bLoad ) \
-                                { \
-                                    if (bLoad) \
-                                        oStream >> *this; \
-                                    else \
-                                        oStream << *this; \
-                                } \
                                 virtual LPCSTR ClassType( void ) { return #x; };
                             
-#define DYNAMIC_IMPLEMENTS( x, json )   static CDynObject  oDynObject( x::CreateMe, x::CreateEmpty, #x, json );\
-                                x::x( CRayStream &oStream )\
-                                {\
-                                    oStream >> *this; \
-                                }
+#define DYNAMIC_IMPLEMENTS( x, json )   static CDynObject  oDynObject( x::CreateEmpty, #x, json );
 #endif
 
 #endif      // __OBJECTS_H__

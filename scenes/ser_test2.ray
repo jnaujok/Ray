@@ -16,7 +16,7 @@
         "up": [0.0, 1.0, 0.0],
         "verticalAngle": 30.0,
         "horizontalAngle": 40.0,
-        "aspectRatio": 1.3333333333333333,
+        "aspectRatio": 1.333333,
         "sampler": "none",
         "colorModel": "clip"
     },

@@ -1,7 +1,5 @@
 # Regression tests: every readable sample scene is rendered and compared with
-# a reference render (some again with anti-aliasing or other color models);
-# the 1997 binary originals must render exactly the same as their JSON
-# conversions, and converting them must give the JSON files in scenes/; the TCP engines must produce exactly what the threads
+# a reference render (some again with anti-aliasing or other color models); the TCP engines must produce exactly what the threads
 # do, and scene files must survive a load and save.
 
 add_executable(compare_images compare_images.cpp)
@@ -15,9 +13,6 @@ file(ARCHIVE_EXTRACT INPUT "${CMAKE_CURRENT_SOURCE_DIR}/reference/renders.tar.gz
 set(RENDER_DIR "${CMAKE_CURRENT_BINARY_DIR}/renders")
 file(MAKE_DIRECTORY "${RENDER_DIR}")
 
-# The scenes in scenes/ are JSON; scenes/1997/ holds the binary originals.
-# stream_test1.ray and yyy.ray are development artifacts that no version of
-# the program could read (see scenes/README.md), so they have no JSON version.
 set(RAY_TEST_SCENES
     axis_test huh inside_sphere mat_test reflect_me reflect_test2 reflect_test3
     reflection_test scan_test ser_test ser_test2 spec_test test triangle triangle2 xxx)
@@ -50,27 +45,21 @@ foreach(scene IN LISTS RAY_TEST_SCENES)
     set_tests_properties(render_${scene} PROPERTIES FIXTURES_SETUP render_${scene} TIMEOUT 300)
 
     add_test(NAME roundtrip_${scene} COMMAND format_test ${scene_file} ${RENDER_DIR})
-
-        # The 1997 original renders exactly what its JSON conversion renders...
-    add_test(NAME legacy_${scene}
-             COMMAND ${CMAKE_COMMAND}
-                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                     -DCOMPARE=$<TARGET_FILE:compare_images>
-                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/1997/${scene}.ray
-                     -DOUTPUT=${RENDER_DIR}/${scene}_1997.raw
-                     -DEXACT_WITH=${RENDER_DIR}/${scene}.raw
-                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-    set_tests_properties(legacy_${scene} PROPERTIES FIXTURES_REQUIRED render_${scene} TIMEOUT 300)
-
-        # ...and converting it gives exactly the JSON file in scenes/.
-    add_test(NAME convert_${scene}
-             COMMAND ${CMAKE_COMMAND}
-                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                     -DLEGACY=${PROJECT_SOURCE_DIR}/scenes/1997/${scene}.ray
-                     -DEXPECTED=${scene_file}
-                     -DOUTPUT=${RENDER_DIR}/${scene}_converted.ray
-                     -P ${CMAKE_CURRENT_SOURCE_DIR}/ConvertTest.cmake)
 endforeach()
+
+# The Utah teapot: a smooth, double-sided mesh of 6,320 triangles. Rendered
+# small, since every ray inside its bounding box tests every face.
+add_test(NAME render_teapot
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/teapot.ray
+                 -DOUTPUT=${RENDER_DIR}/teapot.raw
+                 -DREFERENCE=${REFERENCE_DIR}/teapot.raw
+                 -DSIZE=160x120
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_teapot PROPERTIES TIMEOUT 600)
+add_test(NAME roundtrip_teapot COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/teapot.ray ${RENDER_DIR})
 
 foreach(model IN LISTS RAY_COLOR_MODELS)
     add_test(NAME render_color_${model}

@@ -22,7 +22,7 @@ v3.0. It is made of three programs and a shared core:
 
 | Part | Location | Platform |
 |------|----------|----------|
-| Ray tracing core: scene, objects, materials, samplers, color models, JSON and binary scene I/O, task masters | `core/` | all |
+| Ray tracing core: scene, objects (including meshes), materials, samplers, color models, JSON scene files, wire protocol, task masters | `core/` | all |
 | `raythrower`: command-line master (threads, or engines over TCP) | `raythrower/` | Windows, Linux, macOS |
 | `rayengine`: networked tracing task | `rayengine/` | Windows, Linux, macOS |
 | `Ray.exe`: MFC scene editor | `src/`, `include/`, `res/` | Windows only (MFC, MBCS) |
@@ -40,8 +40,9 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-- IASLib is fetched by CMake (`FetchContent`, tag `v3.0.0`). To use a local checkout, pass
-  `-DFETCHCONTENT_SOURCE_DIR_IASLIB=/path/to/IASLib`.
+- IASLib is fetched by CMake (`FetchContent`, pinned to commit `de038c0`, the one that added
+  SJSON, until IASLib tags a release with it). To use a local checkout, pass
+  `-DFETCHCONTENT_SOURCE_DIR_IASLIB=/path/to/IASLib`. SJSON's LZ4 and zstd support is kept off.
 - The GUI needs MSVC with MFC: `-DRAY_BUILD_GUI=ON`, then build the `Ray` target.
 - Run the tests under AddressSanitizer before changing anything in `core/`
   (`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"`); CI does.
@@ -51,20 +52,21 @@ ctest --test-dir build --output-on-failure
 ## Rules for the code
 
 - **Don't change the ray tracing logic** (intersection, shading, primary ray generation in
-  `CRay::CreateRay`, `CCamera::RayDirection`, and the pixel samplers) without being asked to. Fixing crashes and undefined behavior is fine.
+  `CRay::CreateRay`, `CCamera::RayDirection`, and the pixel samplers) without being asked to.
+  Fixing crashes and undefined behavior is fine.
 - **Scene files are JSON** (`.ray`, version 3; documented in `scenes/README.md`). Each scene class
   reads and writes its own fields in `ToJson`/`FromJson`, through the `RayJson` helpers in
   `SceneJson.h`; readers reject unknown fields and report errors with `RayJson::Fail`. Keep the
   format backward compatible: add optional fields with defaults, and bump `JSON_VERSION` in
   `Scene.cpp` only for a change old readers would get wrong. Update `scenes/README.md` with it.
-- **The 1997 binary format is read-only and frozen.** `CScene::Load` must keep reading versions 1
-  and 2 exactly, and nothing saves them. `CRayStream` still encodes the ray and color batches on
-  the wire exactly as the 1997 `CFileStream` did: plain `int` is a one-byte BOOL, `long`/`DWORD`
-  are 4 bytes on every platform, floating point is `%.18e` text. Don't add `CRayStream` overloads
-  that change which encoding a type gets.
-- **If JSON output changes**, regenerate the sample scenes with
-  `raythrower scenes/1997/<scene>.ray --convert scenes/<scene>.ray`; the `convert_*` tests check
-  that they match.
+- **The 1997 binary scene format is gone,** along with `CRayStream`. Don't bring back binary
+  scene files.
+- **The wire** (`WireProtocol.h`): the scene goes as SJSON, ray and color batches as fixed-layout
+  big-endian IEEE-754 doubles, for speed (SJSON costs tens of microseconds a ray to encode). Numbers
+  must cross exactly, so networked engines match threads byte for byte; the `network_*` tests and
+  `format_test`'s wire checks hold you to it. Bump `RAY_WIRE_VERSION` for any change.
+- **If JSON output changes**, re-save the sample scenes with
+  `raythrower scenes/<scene>.ray --save scenes/<scene>.ray` and check the renders still match.
 - Use IASLib for strings, streams, files, threads, sockets, and JSON rather than adding new
   hand-written versions. In core headers write `IASLib::CString` in full: the GUI also sees MFC's
   `CString`.
@@ -102,6 +104,7 @@ ctest --test-dir build --output-on-failure
 
 ## Known issues
 
-- `scenes/1997/yyy.ray` and `scenes/1997/stream_test1.ray` cannot be read (see `scenes/README.md`).
+- Meshes are slow: every ray inside a mesh's bounding box tests every face (there is no
+  acceleration structure within a mesh yet).
 - The MFC application can only be built on Windows; on Linux and macOS only the core and the
   command-line programs build.

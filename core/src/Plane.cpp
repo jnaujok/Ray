@@ -101,55 +101,6 @@ void CPlane::SetProperties( void )
 
 DYNAMIC_IMPLEMENTS( CPlane, "plane" );
 
-CRayStream &operator >>( CRayStream &oStream, CPlane &oPlane )
-{
-    DWORD               dwVersion;
-    CMaterial          *pMaterial;
-    CColor              oColor;
-
-    oStream >> dwVersion;
-
-    switch (dwVersion)
-    {
-        case PLANE_VERSION:
-            oStream >> oPlane.m_oPosition;
-            oStream >> oPlane.m_oNormal;
-            oStream >> oPlane.m_oColor;
-            oStream >> oPlane.m_oMaterials;
-            break;
-
-        case VERSION_2:
-            oStream >> oPlane.m_oPosition;
-            oStream >> oPlane.m_oNormal;
-            oStream >> oPlane.m_oMaterials;
-            break;
-
-        case VERSION_1:
-            oStream >> oPlane.m_oPosition;
-            oStream >> oPlane.m_oNormal;
-            oStream >> oColor;
-            pMaterial = new CDiffuseMaterial( oColor );
-            oPlane.m_oMaterials.Add( pMaterial, 1.0 );
-            break;
-
-        default:
-            break;
-    }
-
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CPlane &oPlane )
-{
-    oStream << PLANE_VERSION;
-    oStream << oPlane.m_oPosition;
-    oStream << oPlane.m_oNormal;
-    oStream << oPlane.m_oColor;
-    oStream << oPlane.m_oMaterials;
-
-    return oStream;
-}
-
 
 BOOL CPlane::Intersect( CRay &oRay, CVector &oIntersect )
 {

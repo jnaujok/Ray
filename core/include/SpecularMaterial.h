@@ -2,7 +2,7 @@
 #define __SPECULAR_MATERIAL__
 
 #include "Material.h"
-#include "RayStream.h"
+#include "Globals.h"
 
 class CSpecularMaterial : public CMaterial
 {
@@ -16,8 +16,6 @@ class CSpecularMaterial : public CMaterial
 
                             CSpecularMaterial( CColor oColor, FLT nPower );
 
-        friend CRayStream     &operator <<( CRayStream &oAr, CSpecularMaterial &oMaterial );
-        friend CRayStream     &operator >>( CRayStream &oAr, CSpecularMaterial &oMaterial );
 
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );

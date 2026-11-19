@@ -13,15 +13,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   same extension) that can be written and edited by hand. Only the camera is required; anything
   left out takes its default. Unknown fields are errors, so misspellings are caught, and every error
   says where it is (`objects[0].materials[1]: unknown field "colour"`). The format is documented in
-  `scenes/README.md`. It adds the background color and the camera's sampler and color model to what
-  the binary format held, and keeps every 1997 setting, the never-implemented ones under
-  `settings.reserved1997`. Built on IASLib's JSON support, which the build now turns on.
+  `scenes/README.md`. It adds the background color, the camera's sampler and color model, and
+  triangle and mesh options to what the binary format held, and keeps every 1997 setting, the
+  never-implemented ones under `settings.reserved1997`. Saved numbers are rounded to six decimal
+  places, and angles are in degrees. Built on IASLib's JSON support, which the build now turns on.
   - Each scene class reads and writes its own fields (`ToJson`/`FromJson`); the object and material
     registries give each class a JSON `type` name and can create one empty.
-  - `CScene::Load` tells JSON from the 1997 binary format by the first byte and reads both;
-    `CScene::Save` always writes JSON. `CScene::GetLoadError` says why a load failed.
-  - Angles are written in degrees when a decimal number of degrees reads back to exactly the same
-    radians, and otherwise in radians (`verticalAngleRadians`), so nothing changes in conversion.
+  - `CScene::GetLoadError` says why a load failed; a binary scene from 1996–1999 is recognized and
+    reported as no longer readable.
 - **Pixel samplers.** A camera owns a `CPixelSampler` that makes its primary rays and turns their
   colors into pixels, so new anti-aliasing or ray generation schemes are new subclasses attached
   with `CCamera::SetSampler` or named in the scene. `CTaskMaster::TraceScene` just runs the camera's
@@ -33,6 +32,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     Rays are tagged with their position on a doubled sample grid, so `rayengine` needs no change,
     and samples are summed in fixed point, so threads and networked engines produce identical
     images.
+- **Triangles work out their own normals** from their corners, instead of storing them, by the
+  edge traversal in the 1997 code (which had been commented out) with its order reversed:
+  (V2 − V1) × (V3 − V2). The 1997 order made faces of standard models such as OBJ files face
+  inward. The corner order decides the front; the two 1997 triangle scenes had their corners
+  reordered to keep facing the camera, and are double-sided. New `doubleSided` (a single-sided triangle can't be hit from behind; a double-sided one is
+  shaded from the side it is seen from) and `smooth` flags.
+- **Meshes** (`"type": "mesh"`, `CMesh`): a vertex list and faces given as vertex indices. The
+  faces are `CTriangle`s that share the mesh's materials. In a smooth mesh each vertex's normal is
+  the sum of the normals of the faces around it, and faces blend their corner normals by barycentric
+  weights, so shared edges show no seam. Rays that miss the mesh's bounding box skip all its faces,
+  and rays leaving a face skip only that face (`CObjects::Intersect` now takes the object to
+  ignore), so a mesh shadows and reflects itself.
+- **The Utah teapot** (`scenes/teapot.ray`, 6,320 triangles), and `tools/obj_to_ray.py`, which turns
+  OBJ models into meshes (with options to smooth, weld repeated vertices, and flip the odd model
+  wound the other way).
 - **Color models.** A camera owns a `CColorModel` that turns each pixel's linear color, of any
   brightness, into the image's bytes; samplers now hand over unclipped colors through a
   `CPixelWriter`. Color models are listed by name in `ColorModel.cpp`:
@@ -40,31 +54,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `gamma`: gamma encoding, with a `gamma` setting (default 2.2);
   - `srgb`: the sRGB curve;
   - `reinhard`: Reinhard tone mapping on luminance, with `exposure` and `white` settings, then sRGB.
-- `raythrower` options: `--aa <sampler>` and `--color <model>` override the scene's choices;
-  `--convert <file>` saves the scene as JSON and exits; `--help` lists the samplers and color
+- `raythrower` options: `--aa <sampler>`, `--color <model>` and `--size <w>x<h>` override the
+  scene's choices; `--save <file>` saves the scene and exits; `--help` lists the samplers and color
   models. It prints the rays traced and the rays per pixel, and says why a scene couldn't be read.
   The scene editor does not offer a sampler or color model yet.
-- `CRay::CreateRayAt`, which casts a primary ray through any point on the image, and
-  `CImageFile::PutRGB`.
-- Tests: four scenes rendered with corner anti-aliasing and one with each color model (new
-  references in `tests/reference/renders.tar.gz`); networked engines must match threads with
-  anti-aliasing on; each 1997 scene must render exactly what its JSON version renders and convert
-  to exactly the committed JSON file; JSON scenes with mistakes must fail with the right message
-  and leave the scene untouched.
+- `CRay::CreateRayAt`, which casts a primary ray through any point on the image,
+  `CImageFile::PutRGB`, `CVector::Cross`, and `CScene::GetObjectAt`.
+- Tests: four scenes rendered with corner anti-aliasing, one with each color model, and the teapot
+  (new references in `tests/reference/renders.tar.gz`); networked engines must match threads with
+  anti-aliasing on; rays and colors must cross the wire exactly; JSON scenes with mistakes must
+  fail with the right message and leave the scene untouched; triangles must cull back faces only
+  when single-sided, and smooth mesh faces must agree on the normal along a shared edge.
 
 ### Changed
 
-- The sample scenes in `scenes/` are now JSON, converted from the 1997 originals, which moved to
-  `scenes/1997/`. Every one renders exactly as before.
-- The scene is sent to `rayengine` as JSON. Ray and color batches stay binary. The wire protocol
-  version is now 2, so engines and masters must be from the same release.
-- The 1997 binary format is now read-only: it is still read exactly, but nothing writes it.
+- The sample scenes in `scenes/` are now JSON, converted from the 1997 originals and rounded to six
+  decimal places. Rounding moves a few pixels by one level, and `triangle2`, whose corners had
+  tilted normals to fake a curve, now renders flat; the reference renders were regenerated.
+- The wire protocol (version 3): the scene is sent as SJSON, IASLib's compact binary JSON; ray
+  and color batches are fixed-layout big-endian IEEE-754 doubles (72 bytes a ray, 32 a color),
+  which `RayWire::ToReadable` can show as JSON. SJSON was tried for the batches too, in stream,
+  stateless and schema modes, but it costs 30–45 µs a ray to encode, more than tracing it.
+  Engines and masters must be from the same release.
+- IASLib is pinned to commit `de038c0`, which added SJSON, until it tags a release with it. SJSON's
+  optional LZ4 and zstd support is left off, so every build is the same.
 - `CTaskMaster::ColorsFromTasks` no longer takes the image; colors go to the camera's sampler.
 - `CImageFile::PutPoint` writes through the `clip` color model, which also treats negative
   channels as 0 (the 1997 code converted them to a byte without a check, which is undefined).
 - `CRay::CreateRay( CScene &, ... )` takes pixel coordinates instead of angles, and the camera
   works out the direction (`CCamera::RayDirection`). `CTaskMaster::TraceScene` and the GUI preview
   loop no longer do their own angle stepping.
+
+### Removed
+
+- The binary scene format of 1996–1999 and `CRayStream`, with every class's stream operators,
+  stream constructors and `Serialize`, and the registries' stream factories. The 1997 binary
+  sample scenes are gone too (they are in the history); two of them could never be read anyway.
 
 ### Fixed
 

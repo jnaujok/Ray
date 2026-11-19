@@ -4,7 +4,7 @@
 #include "Globals.h"
 #endif
 
-#include "RayStream.h"
+#include "Globals.h"
 #include "Rays.h"
 #include "RayArray.h"
 
@@ -43,46 +43,4 @@ CRay &CRayArray::GetAt( int nIndex )
     if ( ( nIndex < 0 ) || ( nIndex >= GetSize() ) )
         return m_oEmpty;
     return m_aoItems[ (size_t)nIndex ];
-}
-
-CRayStream &operator >>( CRayStream &oStream, CRayArray &oList )
-{
-    DWORD               dwVersion;
-    DWORD               dwCount;
-    CRay                oRay;
-
-    oStream >> dwVersion;
-    switch ( dwVersion )
-    {
-        case RAYARRAY_VERSION:
-            oList.RemoveAll();
-            oStream >> dwCount;
-            while ( dwCount )
-            {
-                oStream >> oRay;
-                oList.Add( oRay );
-                dwCount--;
-            }
-            break;
-
-        default:
-            break;
-    }
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CRayArray &oList )
-{
-    int                 nCount;
-
-    oStream << RAYARRAY_VERSION;
-
-    oStream << (DWORD)oList.GetSize();
-    nCount = 0;
-    while ( nCount < oList.GetSize() )
-    {
-        oStream << oList.GetAt( nCount );
-        nCount++;
-    }
-    return oStream;
 }

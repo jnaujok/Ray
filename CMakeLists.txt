@@ -13,24 +13,32 @@ option(RAY_BUILD_GUI   "Build the Windows MFC scene editor (MSVC only)" OFF)
 option(RAY_BUILD_TESTS "Build the regression tests" ON)
 
 # ---------------------------------------------------------------------------
-# IASLib: strings, streams, files, threads, sockets, and JSON (scene files).
-# Only the pieces the ray tracer needs are switched on, so no database or TLS
-# libraries are required. IASLib's JSON support has no outside dependencies.
+# IASLib: strings, files, threads, sockets, JSON (scene files) and SJSON (the
+# compact binary JSON the master and engines talk in). Only the pieces the ray
+# tracer needs are switched on, so no database or TLS libraries are required.
+# SJSON can use liblz4 and libzstd when it finds them; they are kept out so
+# every build, and every build's network packets, are the same.
 # ---------------------------------------------------------------------------
 set(USE_THREADS          ON  CACHE BOOL "" FORCE)
 set(USE_NETWORK          ON  CACHE BOOL "" FORCE)
 set(USE_DATABASE         OFF CACHE BOOL "" FORCE)
 set(USE_SQLITE           OFF CACHE BOOL "" FORCE)
 set(USE_JSON             ON  CACHE BOOL "" FORCE)
+set(USE_SJSON            ON  CACHE BOOL "" FORCE)
+set(LZ4_INCLUDE_DIR      "" CACHE PATH "" FORCE)
+set(LZ4_LIBRARY          "" CACHE FILEPATH "" FORCE)
+set(ZSTD_INCLUDE_DIR     "" CACHE PATH "" FORCE)
+set(ZSTD_LIBRARY         "" CACHE FILEPATH "" FORCE)
 set(USE_MEMORY_DEBUGGING OFF CACHE BOOL "" FORCE)
 set(IASLIB_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
 set(CMAKE_DISABLE_FIND_PACKAGE_OpenSSL ON CACHE BOOL "" FORCE)
 
 include(FetchContent)
+# SJSON came after the v3.0.0 tag, so this pins the commit that added it
+# (de038c0, 2026-11-18) until there is a release tag to use.
 FetchContent_Declare(IASLib
     GIT_REPOSITORY https://github.com/jnaujok/IASLib.git
-    GIT_TAG        v3.0.0
-    GIT_SHALLOW    TRUE)
+    GIT_TAG        de038c077de025696015f3a3b70230f4380bb8bb)
 FetchContent_MakeAvailable(IASLib)
 
 # ---------------------------------------------------------------------------
@@ -57,6 +65,7 @@ set(RAY_CORE_SOURCES
     core/src/Material.cpp
     core/src/MaterialList.cpp
     core/src/Matrix.cpp
+    core/src/Mesh.cpp
     core/src/Objects.cpp
     core/src/ObjectsArray.cpp
     core/src/PixelSampler.cpp
@@ -66,7 +75,6 @@ set(RAY_CORE_SOURCES
     core/src/RayArray.cpp
     core/src/Rays.cpp
     core/src/RaySettings.cpp
-    core/src/RayStream.cpp
     core/src/ReflectiveMaterial.cpp
     core/src/ReinhardColorModel.cpp
     core/src/Scene.cpp

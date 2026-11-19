@@ -18,7 +18,7 @@
 
 #include "RaySettings.h"
 #include "Scene.h"
-#include "RayStream.h"
+#include "Globals.h"
 #include "SceneJson.h"
 
 #include "Exceptions/Exception.h"
@@ -38,9 +38,8 @@ static char THIS_FILE[] = __FILE__;
 #endif
 
 
-#define MAGIC_NUMBER    (DWORD)0x122771F3
-#define CURRENT_VERSION ((DWORD)0x02)
-#define VERSION_ONE     ((DWORD)0x01)
+    // The binary scene files of 1996-1999 began with this.
+#define MAGIC_NUMBER    "\x12\x27\x71\xF3"
 
     // JSON scene files say what they are, and their version follows on from
     // the two binary versions.
@@ -243,160 +242,6 @@ BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
 }
 #endif
 
-DWORD CScene::Serialize( CRayStream &oStream, BOOL bLoading )
-{
-    DWORD       nLength;
-    DWORD       nObjects;
-    IASLib::CString     strClassType;
-    CObjects   *pObject;
-    LPCSTR      pName;
-    int         nCount;
-        
-
-    if ( bLoading )
-    {
-
-        oStream >> nLength;
-        if ( nLength != MAGIC_NUMBER )
-            return BAD_FILE;
-
-        m_oObjects.RemoveAll();
-        m_oLights.RemoveAll();
-
-        oStream >> nLength;
-        switch ( nLength )
-        {
-            case VERSION_ONE:
-                    // Version one files all predate text-encoded doubles.
-                oStream.SetLegacyDoubles( TRUE );
-                oStream >> m_oSettings;
-
-                while ( oStream.DataAvailable() )
-                {
-                    oStream >> strClassType;
-
-                    pObject = g_pDynamicList->Instantiate( strClassType, oStream );
-
-                        // An unknown class leaves the stream in the middle of
-                        // its data, so nothing after it can be read.
-                    if ( pObject == NULL )
-                        return BAD_FILE;
-
-                    if ( pObject )
-                    {
-                        if ( pObject->IsCamera() )
-                        {
-                            m_oCamera = *((CCamera *)pObject);
-                            delete pObject;     // the camera is copied, not kept
-                        }
-                        else
-                        {
-                            if ( pObject->IsALight() )
-                            {
-                                AddLight( (CLight *)pObject );
-                            }
-                            else
-                            {
-                                AddObject( pObject );
-                            }
-                        }
-                    }
-                }
-                break;
-
-            case CURRENT_VERSION:
-                oStream >> m_oSettings;
-
-                oStream >> nObjects;
-
-                while ( nObjects )
-                {
-                    oStream >> strClassType;
-
-                    pObject = g_pDynamicList->Instantiate( strClassType, oStream );
-
-                        // An unknown class leaves the stream in the middle of
-                        // its data, so nothing after it can be read.
-                    if ( pObject == NULL )
-                        return BAD_FILE;
-
-                    if ( pObject )
-                    {
-                        if ( pObject->IsCamera() )
-                        {
-                            m_oCamera = *((CCamera *)pObject);
-                            delete pObject;     // the camera is copied, not kept
-                        }
-                        else
-                        {
-                            if ( pObject->IsALight() )
-                            {
-                                AddLight( (CLight *)pObject );
-                            }
-                            else
-                            {
-                                AddObject( pObject );
-                            }
-                        }
-                    }
-                    nObjects--;
-                }
-                break;
-
-            default:
-                return WRONG_VERSION;
-        }
-    }
-    else
-    {
-        nLength = MAGIC_NUMBER;
-        oStream << nLength;
-
-        nLength = CURRENT_VERSION;
-        oStream << nLength;
-
-        oStream << m_oSettings;
-
-        nObjects = 1 + m_oObjects.GetSize() + m_oLights.GetSize();
-
-        oStream << nObjects;
-
-        pName = m_oCamera.ClassType();
-        oStream << pName;
-
-        oStream << m_oCamera;
-        
-        nCount = 0;
-        while ( nCount < m_oObjects.GetSize() )
-        {
-            pObject = m_oObjects[ nCount ];
-            
-            pName = pObject->ClassType();
-            oStream << pName;
-
-            pObject->Serialize( oStream, FALSE );
-
-            nCount++;
-        }
-
-        nCount = 0;
-        while ( nCount < m_oLights.GetSize() )
-        {
-            pObject = m_oLights[ nCount ];
-            
-            pName = pObject->ClassType();
-
-            oStream << pName;
-
-            pObject->Serialize( oStream, FALSE );
-
-            nCount++;
-        }
-    }
-
-    return 0;
-}
-
 BOOL CScene::Intersect( CRay &oRay, CObjects *pIgnore )
 {
     int         nObject;
@@ -408,11 +253,8 @@ BOOL CScene::Intersect( CRay &oRay, CObjects *pIgnore )
     {
         pObject = m_oObjects[ nObject ];
 
-        if ( pObject != pIgnore )
-        {
-            if ( pObject->Intersect( oRay, oIntersect ) )
-                return TRUE;
-        }
+        if ( pObject->Intersect( oRay, oIntersect, pIgnore ) )
+            return TRUE;
         nObject++;
     }
     return FALSE;
@@ -449,11 +291,8 @@ BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny )
     while ( nCount < m_oObjects.GetSize() )
     {
         pObject = m_oObjects[ nCount ];
-        if ( pObject != pDeny )
-        {
-            if ( pObject->Intersect( oRay, oIntersect ) )
-                pIntersection = pObject;
-        }
+        if ( pObject->Intersect( oRay, oIntersect, pDeny ) )
+            pIntersection = pObject;
         nCount++;
     }
 
@@ -516,38 +355,11 @@ DWORD CScene::Load( const char *strFileName )
     if ( nStart < strData.size() && strData[ nStart ] == '{' )
         return FromJson( strData.substr( nStart ) );
 
-    m_strLoadError.clear();
-
-        // Files saved in the weeks when doubles were still binary but the
-        // header already said version two can only be told apart by trying.
-    for ( int nAttempt = 0; nAttempt < 2; nAttempt++ )
-    {
-        IASLib::CStringStream   oBuffer( strData.data(), strData.size() );
-        CRayStream              oStream( oBuffer );
-        DWORD                   nResult;
-
-        oStream.SetLegacyDoubles( nAttempt == 1 );
-        try
-        {
-            nResult = Serialize( oStream, TRUE );
-        }
-        catch ( IASLib::CException & )
-        {
-            nResult = BAD_FILE;
-        }
-
-        if ( nResult == 0 )
-            return 0;
-        if ( nResult == WRONG_VERSION )
-        {
-            m_strLoadError = "it was saved by a newer version of the ray tracer";
-            return nResult;
-        }
-    }
-
-    m_oObjects.RemoveAll();
-    m_oLights.RemoveAll();
-    m_strLoadError = "it is not a scene file this program can read";
+    if ( strData.compare( 0, 4, MAGIC_NUMBER, 4 ) == 0 )
+        m_strLoadError = "it is a binary scene from 1996-1999, which is no longer read; "
+                         "the sample scenes have JSON versions in scenes/";
+    else
+        m_strLoadError = "it is not a JSON scene file";
     return BAD_FILE;
 }
 
@@ -568,7 +380,15 @@ DWORD CScene::Save( const char *strFileName )
 
 std::string CScene::ToJson( BOOL bCompact )
 {
-    IASLib::CObjectNode     oRoot;
+    std::unique_ptr<IASLib::CObjectNode> pRoot( ToJsonTree() );
+
+    return bCompact ? pRoot->toJson( -1 ) : RayJson::Write( *pRoot );
+}
+
+IASLib::CObjectNode *CScene::ToJsonTree( void )
+{
+    IASLib::CObjectNode    *pRoot = new IASLib::CObjectNode;
+    IASLib::CObjectNode    &oRoot = *pRoot;
 
     oRoot.put( "format", JSON_FORMAT );
     oRoot.put( "version", JSON_VERSION );
@@ -593,7 +413,7 @@ std::string CScene::ToJson( BOOL bCompact )
         }
     }
 
-    return bCompact ? oRoot.toJson( -1 ) : RayJson::Write( oRoot );
+    return pRoot;
 }
 
     // Reads the array oRoot[ strKey ] of objects (bLights FALSE) or lights.
@@ -635,8 +455,23 @@ static BOOL ReadObjects( const IASLib::CJsonNode &oRoot, const char *strKey, BOO
 
 DWORD CScene::FromJson( const std::string &strText )
 {
+    RayJson::ClearError();
+
+    std::unique_ptr<IASLib::CJsonNode> pRoot( RayJson::Parse( strText ) );
+
+    if ( ! pRoot )
+    {
+        m_strLoadError = RayJson::GetError();
+        RayJson::ClearError();
+        return BAD_FILE;
+    }
+    return FromJsonTree( *pRoot );
+}
+
+DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
+{
     static const char *const astrFields[] = { "format", "version", "settings", "background", "camera", "objects", "lights", NULL };
-    std::unique_ptr<IASLib::CJsonNode>  pRoot;
+    const IASLib::CJsonNode            *pRoot = &oRoot;
     std::vector<CObjects *>             apObjects;
     std::vector<CObjects *>             apLights;
     CSettings                           oSettings;
@@ -647,9 +482,7 @@ DWORD CScene::FromJson( const std::string &strText )
     BOOL                                bRead = FALSE;
 
     RayJson::ClearError();
-    pRoot.reset( RayJson::Parse( strText ) );
 
-    if ( pRoot )
     {
         if ( ! RayJson::GetString( *pRoot, "format", strFormat, TRUE ) )
             ;

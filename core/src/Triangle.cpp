@@ -27,8 +27,6 @@ static char THIS_FILE[] = __FILE__;
 #endif
 #endif
 
-#define TRIANGLE_VERSION    ((DWORD)1)
-                  
 CTriangle::CTriangle( void )
 {
     CMaterial   *pMaterial;
@@ -37,38 +35,54 @@ CTriangle::CTriangle( void )
     m_oMaterials.Add( pMaterial, 1.0 );
     m_oColor.Set( 0.5, 0.5, 0.5 );
     m_oCorner1.Set( 0.0, 1.0, 0.0 );
-    m_oCorner2.Set( -1.0, 0.0, 0.0 );
-    m_oCorner3.Set( 1.0, 0.0, 0.0 );
-    m_oSurfaceNormal.Set( 0.0, 0.0, -1.0 );
-    m_oNormal1.Set( 0.0, 0.0, -1.0 );
-    m_oNormal2.Set( 0.0, 0.0, -1.0 );
-    m_oNormal3.Set( 0.0, 0.0, -1.0 );
+    m_oCorner2.Set( 1.0, 0.0, 0.0 );
+    m_oCorner3.Set( -1.0, 0.0, 0.0 );
+    m_bDoubleSided = FALSE;
+    m_bSmooth = FALSE;
+    CalcNormal();
 }
 
-CTriangle::CTriangle( CVector oVertex1,
-                      CVector oNormal1,
-                      CVector oVertex2,
-                      CVector oNormal2,
-                      CVector oVertex3,
-                      CVector oNormal3 )
+CTriangle::CTriangle( const CVector &oCorner1, const CVector &oCorner2, const CVector &oCorner3,
+                      BOOL bDoubleSided, BOOL bSmooth, CMaterialList *pMaterials ) :
+    m_oCorner1( oCorner1 ),
+    m_oCorner2( oCorner2 ),
+    m_oCorner3( oCorner3 ),
+    m_bDoubleSided( bDoubleSided ),
+    m_bSmooth( bSmooth )
+{
+    m_oColor.Set( 0.5, 0.5, 0.5 );
+    if ( pMaterials )
+    {
+        m_bOwnsMaterials = FALSE;
+        for ( int nIndex = 0; nIndex < pMaterials->GetSize(); nIndex++ )
+            m_oMaterials.Add( pMaterials->GetAt( nIndex ), pMaterials->GetInfluence( nIndex ) );
+    }
+    CalcNormal();
+}
+
+void CTriangle::CalcNormal( void )
 {
     CVector     oTemp1;
     CVector     oTemp2;
 
-    oTemp1 = oVertex2 - oVertex1;
-    oTemp2 = oVertex2 - oVertex3;
+    oTemp1 = m_oCorner2 - m_oCorner1;
+    oTemp2 = m_oCorner3 - m_oCorner2;
 
-//    m_oSurfaceNormal = oTemp1.Cross( oTemp2 );
+        // The same rule OBJ and most other model formats are made for, so
+        // their faces come out facing outward.
+    m_oSurfaceNormal = oTemp1.Cross( oTemp2 );
+    m_oSurfaceNormal.Normalize();
 
-    m_oCorner1 = oVertex1;
-    m_oCorner2 = oVertex2;
-    m_oCorner3 = oVertex3;
+    m_oNormal1 = m_oSurfaceNormal;
+    m_oNormal2 = m_oSurfaceNormal;
+    m_oNormal3 = m_oSurfaceNormal;
+}
 
+void CTriangle::SetCornerNormals( const CVector &oNormal1, const CVector &oNormal2, const CVector &oNormal3 )
+{
     m_oNormal1 = oNormal1;
     m_oNormal2 = oNormal2;
     m_oNormal3 = oNormal3;
-
-    m_oColor.Set( 0.5, 0.5, 0.5 );
 }
 
 CTriangle::~CTriangle( void )
@@ -109,50 +123,6 @@ void CTriangle::SetProperties( void )
 
 DYNAMIC_IMPLEMENTS( CTriangle, "triangle" );
 
-CRayStream &operator >>( CRayStream &oStream, CTriangle &oTriangle )
-{
-    DWORD       dwVersion;
-    CColor      oColor;
-
-    oStream >> dwVersion;
-
-    switch( dwVersion )
-    {
-        case TRIANGLE_VERSION:
-            oStream >> oTriangle.m_oCorner1;
-            oStream >> oTriangle.m_oCorner2;
-            oStream >> oTriangle.m_oCorner3;
-            oStream >> oTriangle.m_oSurfaceNormal;
-            oStream >> oTriangle.m_oNormal1;
-            oStream >> oTriangle.m_oNormal2;
-            oStream >> oTriangle.m_oNormal3;
-            oStream >> oTriangle.m_oColor;
-            oStream >> oTriangle.m_oMaterials;
-            break;
-
-        default:
-            break;
-    }
-
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CTriangle &oTriangle )
-{
-    oStream << TRIANGLE_VERSION;
-    oStream << oTriangle.m_oCorner1;
-    oStream << oTriangle.m_oCorner2;
-    oStream << oTriangle.m_oCorner3;
-    oStream << oTriangle.m_oSurfaceNormal;
-    oStream << oTriangle.m_oNormal1;
-    oStream << oTriangle.m_oNormal2;
-    oStream << oTriangle.m_oNormal3;
-    oStream << oTriangle.m_oColor;
-    oStream << oTriangle.m_oMaterials;
-
-    return oStream;
-}
-
 
 BOOL CTriangle::Intersect( CRay &oRay, CVector &oIntersect )
 {
@@ -181,6 +151,11 @@ BOOL CTriangle::Intersect( CRay &oRay, CVector &oIntersect )
     nDenom = ( nA * oRay.GetI()) + ( nB * oRay.GetJ() ) + ( nC * oRay.GetK() );
 
     if ( nDenom == 0.0 )
+        return FALSE;
+
+        // A single-sided triangle can't be hit from behind (a ray that
+        // travels the way its normal points).
+    if ( ! m_bDoubleSided && ( nDenom > 0.0 ) )
         return FALSE;
 
     nT = nNumer / nDenom;
@@ -224,33 +199,52 @@ CColor CTriangle::Shade( CLight *pLight, CVector &oIntersect ) // CArray <CLight
     return oColor;
 }
 
+CVector CTriangle::NormalAt( CVector &oPoint )
+{
+    CVector oNormal( m_oSurfaceNormal );
+
+    if ( m_bSmooth )
+    {
+            // Barycentric weights of the point: the share of the triangle
+            // facing each corner. On an edge the far corner's weight is 0, so
+            // faces that share the edge get the same normal along it.
+        CVector oEdge1 = m_oCorner2 - m_oCorner1;
+        CVector oEdge2 = m_oCorner3 - m_oCorner1;
+        CVector oToHit = oPoint - m_oCorner1;
+        FLT     n11 = oEdge1.Dot( oEdge1 );
+        FLT     n12 = oEdge1.Dot( oEdge2 );
+        FLT     n22 = oEdge2.Dot( oEdge2 );
+        FLT     nH1 = oToHit.Dot( oEdge1 );
+        FLT     nH2 = oToHit.Dot( oEdge2 );
+        FLT     nDenom = ( n11 * n22 ) - ( n12 * n12 );
+
+        if ( nDenom != 0.0 )
+        {
+            FLT     nWeight2 = ( ( n22 * nH1 ) - ( n12 * nH2 ) ) / nDenom;
+            FLT     nWeight3 = ( ( n11 * nH2 ) - ( n12 * nH1 ) ) / nDenom;
+            FLT     nWeight1 = 1.0 - nWeight2 - nWeight3;
+            CVector oPart1 = m_oNormal1 * nWeight1;
+            CVector oPart2 = m_oNormal2 * nWeight2;
+            CVector oPart3 = m_oNormal3 * nWeight3;
+
+            oNormal = oPart1 + oPart2;
+            oNormal = oNormal + oPart3;
+            oNormal.Normalize();
+        }
+    }
+    return oNormal;
+}
+
 CColor CTriangle::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
 {
-    CVector     oVector;
-    CVector     oLine1, oLine2, oLine3;
-    CVector     oSide;
-    FLT         Mag1, Mag2, Mag3;
-    CVector     oTemp1, oTemp2, oTemp3, oTemp4;
+    CVector     oNormal = NormalAt( oIntersect );
+    CVector     oDirection( oRay.GetI(), oRay.GetJ(), oRay.GetK() );
 
-    oLine1 = oIntersect - m_oCorner1;
-    Mag1 = oLine1.Magnitude();
-    oTemp1 = m_oNormal1 * ( 1.0 / Mag1 );
+        // Seen from behind, a double-sided triangle shows its back face.
+    if ( m_bDoubleSided && ( m_oSurfaceNormal.Dot( oDirection ) > 0.0 ) )
+        oNormal = oNormal * -1.0;
 
-    oLine2 = oIntersect - m_oCorner2;
-    Mag2 = oLine2.Magnitude();
-    oTemp2 = m_oNormal2 * ( 1.0 / Mag2 );
-
-    oLine3 = oIntersect - m_oCorner3;
-    Mag3 = oLine3.Magnitude();
-    oTemp3 = m_oNormal3 * ( 1.0 / Mag3 );
-
-    oTemp4 = oTemp1 + oTemp2;
-
-    oVector = oTemp3 + oTemp4;
-
-    oVector.Normalize();
-
-    return BaseShade( oScene, oRay, oIntersect, oVector );
+    return BaseShade( oScene, oRay, oIntersect, oNormal );
 }
 
     // Reads an array of three [x, y, z] vectors.
@@ -282,25 +276,25 @@ void CTriangle::ToJson( IASLib::CObjectNode &oNode )
     RayJson::AddVector( *pCorners, m_oCorner1 );
     RayJson::AddVector( *pCorners, m_oCorner2 );
     RayJson::AddVector( *pCorners, m_oCorner3 );
-    RayJson::PutVector( oNode, "surfaceNormal", m_oSurfaceNormal );
-
-    IASLib::CArrayNode *pNormals = oNode.putArray( "normals" );
-    RayJson::AddVector( *pNormals, m_oNormal1 );
-    RayJson::AddVector( *pNormals, m_oNormal2 );
-    RayJson::AddVector( *pNormals, m_oNormal3 );
+    RayJson::PutBool( oNode, "doubleSided", m_bDoubleSided );
+    RayJson::PutBool( oNode, "smooth", m_bSmooth );
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
 }
 
 BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "corners", "surfaceNormal", "normals", "color", "materials", NULL };
+    static const char *const astrFields[] = { "corners", "doubleSided", "smooth", "color", "materials", NULL };
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
          ! ReadThree( oNode, "corners", m_oCorner1, m_oCorner2, m_oCorner3 ) ||
-         ! RayJson::GetVector( oNode, "surfaceNormal", m_oSurfaceNormal, TRUE ) ||
-         ! ReadThree( oNode, "normals", m_oNormal1, m_oNormal2, m_oNormal3 ) )
+         ! RayJson::GetBool( oNode, "doubleSided", m_bDoubleSided, FALSE ) ||
+         ! RayJson::GetBool( oNode, "smooth", m_bSmooth, FALSE ) )
         return FALSE;
+
+    CalcNormal();
+    if ( m_oSurfaceNormal.Magnitude() == 0.0 )
+        return RayJson::Fail( "the corners are in a line, so the triangle has no surface" );
 
     return RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            m_oMaterials.FromJson( oNode, "materials" );

@@ -39,8 +39,6 @@ class CMaterialList
             // replaces are deleted (the object owning the list owns them).
         BOOL            FromJson( const IASLib::CJsonNode &oNode, const char *strKey );
 
-        friend CRayStream &operator >>( CRayStream &oStream, CMaterialList &oList );
-        friend CRayStream &operator <<( CRayStream &oStream, CMaterialList &oList );
 };
 
 #endif // __MATERIALLIST_H__

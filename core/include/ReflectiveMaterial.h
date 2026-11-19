@@ -2,7 +2,7 @@
 #define __REFLECTIVE_MATERIAL__
 
 #include "Material.h"
-#include "RayStream.h"
+#include "Globals.h"
 
 class CReflectiveMaterial : public CMaterial
 {
@@ -16,8 +16,6 @@ class CReflectiveMaterial : public CMaterial
 
                             CReflectiveMaterial( CColor oColor, FLT nReflect );
 
-        friend CRayStream     &operator <<( CRayStream &oAr, CReflectiveMaterial &oMaterial );
-        friend CRayStream     &operator >>( CRayStream &oAr, CReflectiveMaterial &oMaterial );
 
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );

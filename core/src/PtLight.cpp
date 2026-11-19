@@ -74,33 +74,6 @@ void CPointLight::SetProperties( void )
 
 DYNAMIC_IMPLEMENTS( CPointLight, "point" );
 
-CRayStream &operator >>( CRayStream &oStream, CPointLight &oLight )
-{
-    DWORD   dwVersion;
-
-    oStream >> dwVersion;
-
-    switch( dwVersion )
-    {
-        case PTLIGHT_VERSION:
-            oStream >> oLight.m_oColor;
-            oStream >> oLight.m_oPosition;
-            break;
-
-        default:
-            break;
-    }
-    return oStream;
-}
-
-CRayStream &operator <<( CRayStream &oStream, CPointLight &oLight )
-{
-    oStream << PTLIGHT_VERSION;
-    oStream << oLight.m_oColor;
-    oStream << oLight.m_oPosition;
-    return oStream;
-}
-
 void CPointLight::ToJson( IASLib::CObjectNode &oNode )
 {
     RayJson::PutVector( oNode, "position", m_oPosition );

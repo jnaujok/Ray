@@ -26,7 +26,8 @@ raythrower <FileToTrace> [options]
 | `--batch <rays>` | Rays per batch (default 127) |
 | `--aa <mode>` | Pixel sampler, instead of the scene's: `none`, or `corners` for five rays per pixel at its corners and center |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard` |
-| `--convert <file>` | Save the scene as a JSON `.ray` file, with any `--aa` or `--color` applied, and exit without tracing |
+| `--size <w>x<h>` | Image size, instead of the scene's |
+| `--save <file>` | Save the scene, with any `--aa`, `--color` or `--size` applied, and exit without tracing |
 | `-q`, `--quiet` | Print only errors |
 
 Without `--listen` it traces with one thread per task. When the trace finishes it prints the pixel
@@ -52,8 +53,8 @@ raythrower scenes/scan_test.ray -o scan.raw --ppm scan.ppm
 # The same, anti-aliased and tone mapped
 raythrower scenes/scan_test.ray --aa corners --color reinhard -o scan.raw --ppm scan.ppm
 
-# Turn a 1997 binary scene into JSON
-raythrower scenes/1997/scan_test.ray --convert scan_test.ray
+# Save a copy of a scene with anti-aliasing turned on in it
+raythrower scenes/scan_test.ray --aa corners --save scan_test_aa.ray
 
 # Four local engines over TCP
 raythrower scenes/scan_test.ray --listen --spawn -N4
@@ -64,9 +65,7 @@ raythrower scenes/scan_test.ray --listen 7997 -N3
 
 ## How it works
 
-`raythrower` loads the scene with `CScene::Load`, which reads JSON scenes and every binary format
-from 1997, and
-traces it with the shared `CTaskMaster::TraceScene` loop through a `CThreadTaskMaster` or a
+`raythrower` loads the scene with `CScene::Load` and traces it with the shared `CTaskMaster::TraceScene` loop through a `CThreadTaskMaster` or a
 `CSocketTaskMaster`. The code is in [`main.cpp`](main.cpp).
 
 ## Building

@@ -112,37 +112,6 @@ FLT CVector::Dot( CVector &oDot )
     return nResult;
 }
 
-CRayStream  &operator >>( CRayStream &oStream, CVector &oVector )
-{
-    DWORD       dwVersion;
-
-    oStream >> dwVersion;
-
-    switch (dwVersion)
-    {
-        case VECTOR_VERSION:
-            oStream >> oVector.m_nX;
-            oStream >> oVector.m_nY;
-            oStream >> oVector.m_nZ;
-            break;
-
-        default:
-            break;
-    }
-
-    return oStream;
-}
-
-CRayStream  &operator <<( CRayStream &oStream, CVector &oVector )
-{
-    oStream << VECTOR_VERSION;
-    oStream << oVector.m_nX;
-    oStream << oVector.m_nY;
-    oStream << oVector.m_nZ;
-
-    return oStream;
-}
-
 void CVector::Normalize( void )
 {
     FLT     nMagnitude;
@@ -155,6 +124,13 @@ void CVector::Normalize( void )
         m_nY /= nMagnitude;
         m_nZ /= nMagnitude;
     }
+}
+
+CVector CVector::Cross( CVector &oOther )
+{
+    return CVector( ( m_nY * oOther.m_nZ ) - ( m_nZ * oOther.m_nY ),
+                    ( m_nZ * oOther.m_nX ) - ( m_nX * oOther.m_nZ ),
+                    ( m_nX * oOther.m_nY ) - ( m_nY * oOther.m_nX ) );
 }
 
 FLT CVector::Magnitude( void )

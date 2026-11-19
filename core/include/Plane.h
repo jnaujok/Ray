@@ -24,8 +24,6 @@ class CPlane : public CObjects
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect );
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 
-        friend CRayStream  &operator >>( CRayStream &oStream, CPlane &oPlane );
-        friend CRayStream  &operator <<( CRayStream &oStream, CPlane &oPlane );
 
 #ifdef RAY_GUI
         virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );

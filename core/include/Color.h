@@ -10,7 +10,6 @@
 #define __COLOR_H__
 
 class CVector;
-class CRayStream;
 
 class CColor
 {
@@ -38,8 +37,6 @@ class CColor
         FLT         GetB( void ) {return m_nBlue; }
         void        Set( FLT nRed, FLT nGreen, FLT nBlue, FLT nGamma = 1.0 );
 
-        friend CRayStream &operator >>( CRayStream &oAr, CColor &oColor );
-        friend CRayStream &operator <<( CRayStream &oAr, CColor &oColor );
 
 #ifdef RAY_GUI
             // Casting operator for windows to change this object to a Windows Color

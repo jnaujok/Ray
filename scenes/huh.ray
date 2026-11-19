@@ -7,23 +7,16 @@
         "imageFile": "ray.out",
         "colorDepth": 8,
         "maximumDepth": 15,
-        "depthThreshold": 0.009999999776482582,
-        "reserved1997": {
-            "antialiasThreshold": 0.029999999795109034,
-            "causticThreshold": 0.009999999776482582,
-            "focalDisplacement": 2.6299999998882413,
-            "adaptiveFocalThreshold": 0.009999999776482582,
-            "fractalSeed": 0.039999999571591616
-        }
+        "depthThreshold": 0.01
     },
     "background": [1.0, 1.0, 1.0],
     "camera": {
         "position": [0.0, 0.0, -1000.0],
         "lookAt": [0.0, 0.0, 0.0],
         "up": [0.0, 1.0, 0.0],
-        "verticalAngle": 29.99999998009748,
-        "horizontalAngle": 39.99999998235678,
-        "aspectRatio": 1.3333333330228925,
+        "verticalAngle": 30.0,
+        "horizontalAngle": 40.0,
+        "aspectRatio": 1.333333,
         "sampler": "none",
         "colorModel": "clip"
     },
@@ -37,7 +30,7 @@
                 {
                     "type": "diffuse",
                     "influence": 1.0,
-                    "color": [0.20703125, 0.7265625, 0.255859375],
+                    "color": [0.207031, 0.726563, 0.255859],
                     "diffuseCast": false
                 }
             ]

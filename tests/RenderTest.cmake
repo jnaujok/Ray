@@ -2,7 +2,8 @@
 #
 #   cmake -DRAYTHROWER=... -DCOMPARE=... -DSCENE=... -DOUTPUT=...
 #         [-DREFERENCE=...] [-DMODE=threads|network] [-DEXACT_WITH=...]
-#         [-DAA=<sampler>] [-DCOLOR=<color model>] -P RenderTest.cmake
+#         [-DAA=<sampler>] [-DCOLOR=<color model>] [-DSIZE=<w>x<h>]
+#         -P RenderTest.cmake
 #
 # MODE network renders with rayengine processes over TCP. EXACT_WITH names
 # another render the output must match byte for byte. AA and COLOR pick the
@@ -18,6 +19,9 @@ if(AA)
 endif()
 if(COLOR)
     list(APPEND ARGS --color ${COLOR})
+endif()
+if(SIZE)
+    list(APPEND ARGS --size ${SIZE})
 endif()
 if(MODE STREQUAL "network")
     if(NOT PORT)

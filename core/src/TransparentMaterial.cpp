@@ -30,34 +30,6 @@ m_oColor( oColor )
     m_nIndexOfRefraction = nRefract;
 }
 
-CRayStream &operator <<( CRayStream &oAr, CTransparentMaterial &oMaterial )
-{
-    oAr << TRANSPARENT_MATERIAL_VERSION;
-    oAr << oMaterial.m_oColor;
-    oAr << oMaterial.m_nIndexOfRefraction;
-
-    return oAr;
-}
-
-CRayStream &operator >>( CRayStream &oAr, CTransparentMaterial &oMaterial )
-{
-    DWORD   dwVersion;
-
-    oAr >> dwVersion;
-
-    switch ( dwVersion )
-    {
-        case TRANSPARENT_MATERIAL_VERSION:
-            oAr >> oMaterial.m_oColor;
-            oAr >> oMaterial.m_nIndexOfRefraction;
-            break;
-
-        default:
-            break;
-    }
-    return oAr;
-}
-
 CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
     CColor      oReturn( 0, 0, 0 );

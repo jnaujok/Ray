@@ -8,7 +8,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus&logoColor=white)](#building)
 [![CMake](https://img.shields.io/badge/CMake-3.18%2B-064F8C.svg?logo=cmake&logoColor=white)](#building)
-[![Built on IASLib](https://img.shields.io/badge/built%20on-IASLib%203.0-8A2BE2.svg)](https://github.com/jnaujok/IASLib)
+[![Built on IASLib](https://img.shields.io/badge/built%20on-IASLib%203-8A2BE2.svg)](https://github.com/jnaujok/IASLib)
 [![Since 1997](https://img.shields.io/badge/since-1997-yellow.svg)](#about)
 
 [![Linux](https://img.shields.io/badge/Linux-GCC%20%7C%20Clang-FCC624.svg?logo=linux&logoColor=black)](#platforms)
@@ -48,17 +48,20 @@ engine processes on any number of machines, or by worker threads on one.
 
 It was originally written for [PVM](https://www.netlib.org/pvm3/) (Parallel Virtual Machine) on
 a cluster of Unix workstations. The cross-platform library written for it grew into
-[IASLib](https://github.com/jnaujok/IASLib), and the ray tracer now runs on IASLib v3.0: PVM is
+[IASLib](https://github.com/jnaujok/IASLib), and the ray tracer now runs on IASLib 3: PVM is
 replaced by plain TCP, and the command-line programs build on Windows, Linux, and macOS.
 The ray tracing itself is the 1997 code.
 
 <div align="center">
-<img src="docs/images/gallery.png" alt="Anti-aliased renders of six of the sample scenes" width="720">
+<img src="docs/images/gallery.png" alt="Anti-aliased renders of six of the sample scenes, including the Utah teapot" width="720">
 </div>
 
 ## Features
 
-- **Primitives:** spheres, planes, and triangles, each with its own transform.
+- **Primitives:** spheres, planes, triangles, and triangle meshes. A triangle's normal comes from
+  its corner order; it can be single- or double-sided, and flat or smooth. A mesh shares vertices
+  between faces, gives each vertex the sum of its faces' normals, and skips all its faces for rays
+  that miss its bounding box.
 - **Lights:** point lights.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by influence.
 - **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler. The first
@@ -75,8 +78,8 @@ The ray tracing itself is the 1997 code.
 - **Distributed rendering:** a master hands out batches of rays to `rayengine` processes over TCP and
   collects the traced colors. Engines can run anywhere that can reach the master.
 - **Local rendering:** the same master can trace with one thread per CPU instead.
-- **Old scenes load:** every readable binary scene file from 1997 loads, including ones from before
-  the file format's number encoding changed, and renders exactly as its JSON conversion does.
+- **Models:** [`tools/obj_to_ray.py`](tools/obj_to_ray.py) turns Wavefront OBJ models into meshes;
+  the sample scenes include the Utah teapot.
 
 ## How it works
 
@@ -115,10 +118,12 @@ The color model ([`core/include/ColorModel.h`](core/include/ColorModel.h)) then 
 linear color into bytes. Both are set in the scene's camera, or with `--aa` and `--color`, and the
 engines never need to know which are in use.
 
-Over TCP every message is framed as a tag, a length, and a payload. The scene is sent as JSON, the
-same as a scene file; the batches of rays and colors, which are sent constantly, stay in the compact
-binary encoding. See [`core/include/WireProtocol.h`](core/include/WireProtocol.h). An engine opens
-the connection with a hello carrying the protocol version (2 since scenes became JSON).
+Over TCP every message is framed as a tag, a length, and a payload. The scene is sent as an SJSON
+packet (IASLib's compact binary JSON) of the scene file's JSON. The batches of rays and colors,
+which are sent constantly, are fixed-layout IEEE-754 doubles, because SJSON costs far more per ray
+to encode than tracing the ray does; `RayWire::ToReadable` turns a batch into JSON for reading.
+Numbers cross exactly either way. See [`core/include/WireProtocol.h`](core/include/WireProtocol.h).
+An engine opens the connection with a hello carrying the protocol version (3).
 
 ## Platforms
 
@@ -132,7 +137,9 @@ All of them are built by CI on every push.
 ## Building
 
 You need CMake 3.18 or later and a C++17 compiler. CMake downloads
-[IASLib v3.0](https://github.com/jnaujok/IASLib) itself, and nothing else is required.
+[IASLib](https://github.com/jnaujok/IASLib) itself (pinned to the commit that added SJSON, until
+IASLib tags a release with it), and nothing else is required. SJSON's optional LZ4 and zstd
+support is left off, so every build is the same.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -173,10 +180,18 @@ raythrower scenes/scan_test.ray --aa corners --ppm scan_test.ppm
 raythrower scenes/scan_test.ray --color reinhard --ppm scan_test.ppm
 ```
 
-**Convert a 1997 binary scene** to JSON:
+**Render the Utah teapot** (6,320 triangles; every ray inside its bounding box tests every face,
+so it takes a while):
 
 ```sh
-raythrower old_scene.ray --convert new_scene.ray
+raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
+```
+
+**Bring in an OBJ model** as a mesh (`--weld` joins repeated vertices so the surface is smooth
+across seams):
+
+```sh
+tools/obj_to_ray.py model.obj --smooth --weld > model_mesh.json
 ```
 
 **Trace with engines on this machine**, started for you:
@@ -204,7 +219,8 @@ rayengine master.example.com 7997                       # on each of three machi
 | `--batch <rays>` | Rays per batch (default 127) |
 | `--aa <mode>` | Pixel sampler, instead of the scene's: `none` or `corners` |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard` |
-| `--convert <file>` | Save the scene as JSON (with any `--aa`/`--color`) and exit |
+| `--size <w>x<h>` | Image size, instead of the scene's |
+| `--save <file>` | Save the scene (with any `--aa`/`--color`/`--size`) and exit |
 
 Images are written in the original raw format: a 2-byte width, a 2-byte height (both big-endian),
 then RGB bytes. `--ppm` gives a copy any image viewer can open.
@@ -219,11 +235,10 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests render every sample scene and compare it with a reference render (four of them again
-with anti-aliasing, and one with each color model), check that each 1997 binary scene renders
-exactly what its JSON conversion does and converts to exactly the JSON file in `scenes/`, check
-that networked engines produce exactly the same bytes as threads, check that scene files survive a
-load and save, check that mistakes in JSON scenes are reported where they are, and check the binary
-encoding byte for byte against 1997. CI runs them on every platform, and again on Linux under
+with anti-aliasing, one with each color model, and the teapot), check that networked engines
+produce exactly the same bytes as threads and that rays and colors cross the wire exactly, check
+that scene files survive a load and save, check that mistakes in JSON scenes are reported where
+they are, and check triangle sidedness and that smooth mesh faces agree along shared edges. CI runs them on every platform, and again on Linux under
 AddressSanitizer and UndefinedBehaviorSanitizer.
 
 ## Repository layout
@@ -236,7 +251,8 @@ AddressSanitizer and UndefinedBehaviorSanitizer.
 | [`src/`](src), [`include/`](include) | MFC scene editor |
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
-| [`scenes/`](scenes) | Sample `.ray` scenes from 1997, as JSON; the binary originals are in `scenes/1997/` |
+| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and the Utah teapot |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |
 | [`docs/`](docs) | MFC AppWizard notes and README images |
@@ -273,14 +289,16 @@ their materials, and lights. Only the camera is required; anything else left out
 }
 ```
 
-Files saved from 1996 to 1999 are binary (versions 1 and 2). They still load, and
-`raythrower --convert` turns them into JSON. [`scenes/README.md`](scenes/README.md) describes every
-field, lists the sample scenes, and gives the format's history.
+Numbers are written rounded to six decimal places. The binary files of 1996–1999 are no longer
+read; the sample scenes were converted before that format was dropped.
+[`scenes/README.md`](scenes/README.md) describes every field, lists the sample scenes, and gives
+the format's history.
 
 ## Project status
 
-The code builds and runs again on current compilers, with the 1997 ray tracing unchanged apart from
-bug fixes. Work on the ray tracing itself has not resumed yet.
+The code builds and runs on current compilers, and work on the ray tracing has resumed: a corrected
+camera, anti-aliasing, color models, meshes, and JSON scenes so far. Next up are faster mesh
+intersection and choices for sampling and color in the scene editor.
 
 ## Changelog
 

@@ -62,8 +62,6 @@ class CCamera : public CObjects
 
         DYNAMIC_OBJECTS( CCamera );
 
-        friend CRayStream  &operator >>( CRayStream &oStream, CCamera &oCamera );
-        friend CRayStream  &operator <<( CRayStream &oStream, CCamera &oCamera );
 
         void        CalcRotate( void );
 

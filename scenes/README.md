@@ -1,13 +1,12 @@
 # Sample scenes
 
 The `.ray` files here are the test scenes from the original development in 1996–1997, converted
-to JSON. The binary originals are in [`1997/`](1997). The regression tests render every scene,
-compare it with the reference renders in [`tests/reference/`](../tests/reference), and check that
-each original renders exactly what its JSON version does and converts to exactly that file
-(`raythrower 1997/<scene>.ray --convert <scene>.ray`).
+to JSON, and the Utah teapot. The regression tests render every scene and compare it with the
+reference renders in [`tests/reference/`](../tests/reference). The binary originals were removed
+when the binary format was dropped; they are in the repository's history.
 
-| Scene | 1997 format | Notes |
-|-------|-------------|-------|
+| Scene | Saved in 1997 as | Notes |
+|-------|------------------|-------|
 | `axis_test.ray` | version 2 | Six colored spheres along the axes |
 | `inside_sphere.ray` | version 2 | Camera inside a sphere |
 | `mat_test.ray` | version 2 | Material test |
@@ -16,14 +15,14 @@ each original renders exactly what its JSON version does and converts to exactly
 | `ser_test.ray`, `ser_test2.ray` | version 2 | Serialization tests (`ser_test2` renders blank: nothing is in view) |
 | `spec_test.ray` | version 2 | Specular highlights |
 | `test.ray` | version 2 | |
-| `triangle.ray`, `triangle2.ray` | version 2 | Triangle primitives |
+| `triangle.ray`, `triangle2.ray` | version 2 | Triangle primitives. `triangle2` gave its corners tilted normals to fake a curve; triangles now work out their own, so it renders flat |
 | `xxx.ray` | version 1 | Read with the legacy number format |
 | `huh.ray` | transitional | Version-2 header with legacy numbers; renders blank |
-| `1997/yyy.ray` | **unreadable** | Saved by an in-between build that wrote an extra, undefined field |
-| `1997/stream_test1.ray` | **unreadable** | An early stream test: debug-heap fill bytes, not a scene |
+| `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
-Many numbers in the converted scenes look like `0.6999999997206032` rather than `0.7`. That is
-exactly what the 1997 files hold, and keeping it exact is what makes the renders identical.
+Two 1997 files, `yyy.ray` (saved by an in-between build that wrote an extra, undefined field) and
+`stream_test1.ray` (debug-heap fill bytes, not a scene), could never be read and were not
+converted.
 
 ## The JSON format (version 3)
 
@@ -31,7 +30,8 @@ A scene is one JSON object. Fields marked *required* must be there; any other fi
 out takes the default shown. A field the program doesn't know is an error, so a misspelling is
 reported rather than ignored, and every error names where it is (`objects[2].materials[0]: unknown
 field "colour"`). Vectors and colors are `[x, y, z]` and `[red, green, blue]` arrays; colors are
-linear, with 1 as full brightness, and may go above 1.
+linear, with 1 as full brightness, and may go above 1. Saved files round numbers to six decimal
+places.
 
 | Field | | |
 |-------|-|-|
@@ -61,7 +61,7 @@ linear, with 1 as full brightness, and may go above 1.
 | `position` | required | Where the camera is |
 | `lookAt` | required | The point at the center of the image |
 | `up` | `[0, 1, 0]` | Which way is up; the image's top edge faces this way |
-| `verticalAngle` | `30` | Vertical field of view in degrees. The horizontal one follows from the image's shape, so pixels are square. (`verticalAngleRadians` gives it in radians instead; the converter uses that when no number of degrees gives back the exact 1997 value.) |
+| `verticalAngle` | `30` | Vertical field of view in degrees. The horizontal one follows from the image's shape, so pixels are square. |
 | `horizontalAngle`, `aspectRatio` | `40`, `1.333…` | Kept from 1997; not used for rendering |
 | `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center) or `"corners"` (five rays, at its corners and center, about two per pixel) |
 | `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, or `"reinhard"` |
@@ -78,7 +78,17 @@ color, not used in shading), and `materials` (default: one diffuse material).
 |--------|--------|
 | `sphere` | `center` (required), `radius` (required) |
 | `plane` | `position` (required): a point on the plane; `normal` (required) |
-| `triangle` | `corners` (required): three points; `surfaceNormal` (required); `normals` (required): one per corner |
+| `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`) |
+| `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`) |
+
+A triangle's normal is worked out from its corners by the edge traversal (V2 − V1) × (V3 − V2), so
+the order of the corners decides which side is the front. It is the rule OBJ and most other model
+formats are made for. A single-sided triangle can only be hit
+from the front; a double-sided one can be hit from either side and is shaded from the side it is
+seen from. A flat triangle is shaded with that normal everywhere. In a smooth mesh each vertex's
+normal is the sum of the normals of the faces around it, and each face blends its corners' normals
+by barycentric weights, so neighboring faces meet without a seam. (A lone smooth triangle has no
+neighbors, so it shades flat.) A mesh's faces whose corners are in a line are left out.
 
 **Materials.** An object's look is the sum of its materials, each scaled by its `influence`
 (default `1`). Each has a `type` and a `color`.
@@ -104,9 +114,9 @@ color, not used in shading), and `materials` (default: one diffuse material).
 - **Version 2** (1997–1999) was binary too, but stored floating-point values as `%.18e` text and
   wrote an object count. For a few weeks files had the version-2 header but still used the old
   numbers; `CScene::Load` tries both.
-- **Version 3** (2026) is JSON, with the same file extension. It adds the background color and the
-  camera's sampler and color model. `CScene::Load` tells the formats apart by their first byte, and
-  saving always writes version 3.
+- **Version 3** (2026) is JSON, with the same file extension. It adds the background color, the
+  camera's sampler and color model, triangle sidedness and smoothing, and meshes; triangles no
+  longer store normals. The binary versions are no longer read.
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.
