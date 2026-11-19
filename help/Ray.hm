@@ -1,0 +1,68 @@
+// MAKEHELP.BAT generated Help Map file.  Used by RAY.HPJ. 
+ 
+// Commands (ID_* and IDM_*) 
+HID_VIEW_SCENE_TREE                     0x18003
+HID_OBJECT_ADD_SPHERE                   0x18004
+HID_OBJECT_ADD_PLANE                    0x18005
+HID_OBJECT_DELETE                       0x18006
+HID_LIGHT_ADD_POINT_LIGHT               0x18008
+HID_ADD_LIGHT_SPOT_LIGHT                0x18009
+HID_LIGHT_ADD_AREA_LIGHT                0x1800A
+HID_LIGHT_ADD_SPHERICAL                 0x1800B
+HID_LIGHT_DELETE                        0x1800C
+HID_OBJECTS_ADD_TRIANGLE                0x1800D
+HID_OBJECTS_ADD_SMOOTH_TRIANGLE         0x1800E
+HID_OBJECTS_ADD_TRIANGULAR_MESH         0x1800F
+HID_OBJECTS_ADD_POLYGONAL_MESH          0x18010
+HID_RENDER_KILL_TRACE                   0x18012
+HIDM_OBJECT_CUT                         0x18013
+HIDM_OBJECT_COPY                        0x18014
+HIDM_OBJECT_MATERIALS                   0x18016
+HIDM_MATERIAL_DELETE                    0x18018
+HIDM_OBJECT_PROPERTIES                  0x18019
+HIDM_OBJECT_PASTE                       0x1801A
+HIDM_MATERIALS_PROPERTIES               0x1801B
+HIDM_MATERIAL_PASTE                     0x1801C
+HIDM_MATERIAL_COPY                      0x1801D
+HIDM_MATERIAL_CUT                       0x1801E
+HIDM_MATERIAL_PROPERTIES                0x1801F
+HIDM_MATERIAL_ADD                       0x18020
+HIDM_MATERIAL_ADJUST                    0x18021
+HIDM_MATERIAL_LIST_DELETE               0x18022
+HIDM_MATERIAL_PROPERTY                  0x18023
+HIDM_MATERIAL_INFLUENCE                 0x18024
+HIDM_SETTINGS_PROPERTIES                0x18025
+ 
+// Prompts (IDP_*) 
+HIDP_SOCKETS_INIT_FAILED                0x30068
+ 
+// Resources (IDR_*) 
+HIDR_MAINFRAME                          0x20080
+HIDR_DRAYTYPE                           0x20081
+HIDR_RAYTYPE                            0x20081
+HIDR_OBJECT_POPUP                       0x20090
+HIDR_MATERIALS_POPUP                    0x20091
+HIDR_MATERIAL_MENU                      0x20092
+HIDR_SETTINGS_POPUP                     0x20098
+ 
+// Dialogs (IDD_*) 
+HIDD_ABOUTBOX                           0x20064
+HIDD_SCENE_TREE_DLG                     0x20082
+HIDD_ADD_POINT_LIGHT                    0x20085
+HIDD_ADD_OBJECT_PLANE                   0x20086
+HIDD_ADD_OBJECT_SPHERE                  0x20087
+HIDD_SET_COLOR_DIALOG                   0x20088
+HIDD_PLANE_PROPERTIES                   0x20089
+HIDD_SPHERE_PROPERTIES                  0x2008A
+HIDD_CAMERA_PROPERTIES                  0x2008B
+HIDD_POINT_LIGHT_PROPERTIES             0x2008C
+HIDD_MATERIALS_DLG                      0x2008D
+HIDD_DIFFUSE_DIALOG                     0x20091
+HIDD_SPECULAR_DIALOG                    0x20092
+HIDD_REFLECTIVE_DIALOG                  0x20093
+HIDD_INFLUENCE_DLG                      0x20094
+HIDD_ADD_MATERIALS_DLG                  0x20095
+HIDD_TRANSPARENT_DIALOG                 0x20096
+HIDD_SETTINGS_DIALOG                    0x20097
+ 
+// Frame Controls (IDW_*) 

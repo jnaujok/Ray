@@ -1,0 +1,999 @@
+//Microsoft Developer Studio generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)\r\n"
+    "#ifdef _WIN32\r\n"
+    "LANGUAGE 9, 1\r\n"
+    "#pragma code_page(1252)\r\n"
+    "#endif\r\n"
+    "#include ""Ray.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""afxres.rc""         // Standard components\r\n"
+    "#include ""afxprint.rc""       // printing/print preview resources\r\n"
+    "#endif\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON    DISCARDABLE     "Ray.ico"
+IDR_DRAYTYPE            ICON    DISCARDABLE     "RayDoc.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Bitmap
+//
+
+IDR_MAINFRAME           BITMAP  MOVEABLE PURE   "Toolbar.bmp"
+IDB_ABOUT_BITMAP        BITMAP  DISCARDABLE     "about_bi.bmp"
+IDB_SCENE_TREE_IMAGE_LIST BITMAP  DISCARDABLE     "scene_tr.bmp"
+IDB_LARGE_ICONS         BITMAP  DISCARDABLE     "bitmap1.bmp"
+IDB_SMALL_ICONS         BITMAP  DISCARDABLE     "small_ic.bmp"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Toolbar
+//
+
+IDR_MAINFRAME TOOLBAR DISCARDABLE  16, 15
+BEGIN
+    BUTTON      ID_FILE_NEW
+    BUTTON      ID_FILE_OPEN
+    BUTTON      ID_FILE_SAVE
+    SEPARATOR
+    BUTTON      ID_EDIT_CUT
+    BUTTON      ID_EDIT_COPY
+    BUTTON      ID_EDIT_PASTE
+    SEPARATOR
+    BUTTON      IDC_RENDER_RAY_TRACE
+    BUTTON      ID_RENDER_KILL_TRACE
+    SEPARATOR
+    BUTTON      ID_OBJECT_ADD_SPHERE
+    BUTTON      ID_OBJECT_ADD_PLANE
+    SEPARATOR
+    BUTTON      ID_LIGHT_ADD_POINT_LIGHT
+    SEPARATOR
+    BUTTON      ID_FILE_PRINT
+    BUTTON      ID_APP_ABOUT
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MAINFRAME MENU PRELOAD DISCARDABLE 
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New\tCtrl+N",                ID_FILE_NEW
+        MENUITEM "&Open...\tCtrl+O",            ID_FILE_OPEN
+        MENUITEM SEPARATOR
+        MENUITEM "P&rint Setup...",             ID_FILE_PRINT_SETUP
+        MENUITEM SEPARATOR
+        MENUITEM "Recent File",                 ID_FILE_MRU_FILE1, GRAYED
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       ID_APP_EXIT
+    END
+    POPUP "&View"
+    BEGIN
+        MENUITEM "&Toolbar",                    ID_VIEW_TOOLBAR
+        MENUITEM "&Status Bar",                 ID_VIEW_STATUS_BAR
+        MENUITEM SEPARATOR
+        MENUITEM "Scene &Hierarchy",            ID_VIEW_SCENE_TREE
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About Ray...",               ID_APP_ABOUT
+    END
+END
+
+IDR_RAYTYPE MENU PRELOAD DISCARDABLE 
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New\tCtrl+N",                ID_FILE_NEW
+        MENUITEM "&Open...\tCtrl+O",            ID_FILE_OPEN
+        MENUITEM "&Close",                      ID_FILE_CLOSE
+        MENUITEM "&Save\tCtrl+S",               ID_FILE_SAVE
+        MENUITEM "Save &As...",                 ID_FILE_SAVE_AS
+        MENUITEM SEPARATOR
+        MENUITEM "&Print...\tCtrl+P",           ID_FILE_PRINT
+        MENUITEM "Print Pre&view",              ID_FILE_PRINT_PREVIEW
+        MENUITEM "P&rint Setup...",             ID_FILE_PRINT_SETUP
+        MENUITEM SEPARATOR
+        MENUITEM "Recent File",                 ID_FILE_MRU_FILE1, GRAYED
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",                       ID_APP_EXIT
+    END
+    POPUP "&Edit"
+    BEGIN
+        MENUITEM "&Undo\tCtrl+Z",               ID_EDIT_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Cu&t\tCtrl+X",                ID_EDIT_CUT
+        MENUITEM "&Copy\tCtrl+C",               ID_EDIT_COPY
+        MENUITEM "&Paste\tCtrl+V",              ID_EDIT_PASTE
+    END
+    POPUP "&View"
+    BEGIN
+        MENUITEM "&Toolbar",                    ID_VIEW_TOOLBAR
+        MENUITEM "&Status Bar",                 ID_VIEW_STATUS_BAR
+        MENUITEM SEPARATOR
+        MENUITEM "Scene &Hierarchy",            ID_VIEW_SCENE_TREE
+    END
+    POPUP "&Render"
+    BEGIN
+        MENUITEM "&Ray Trace",                  IDC_RENDER_RAY_TRACE
+        MENUITEM "&Kill Trace",                 ID_RENDER_KILL_TRACE
+    END
+    POPUP "&Objects"
+    BEGIN
+        POPUP "&Add"
+        BEGIN
+            MENUITEM "&Sphere",                     ID_OBJECT_ADD_SPHERE
+            MENUITEM "&Plane",                      ID_OBJECT_ADD_PLANE
+            MENUITEM SEPARATOR
+            MENUITEM "&Triangle",                   ID_OBJECTS_ADD_TRIANGLE
+            , GRAYED
+            MENUITEM "Sm&ooth Triangle",            ID_OBJECTS_ADD_SMOOTH_TRIANGLE
+            , GRAYED
+            MENUITEM "Triangular &Mesh",            ID_OBJECTS_ADD_TRIANGULAR_MESH
+            , GRAYED
+            MENUITEM "Pol&ygonal Mesh",             ID_OBJECTS_ADD_POLYGONAL_MESH
+            , GRAYED
+        END
+        MENUITEM "&Delete",                     ID_OBJECT_DELETE
+    END
+    POPUP "&Lights"
+    BEGIN
+        POPUP "&Add"
+        BEGIN
+            MENUITEM "&Point Light",                ID_LIGHT_ADD_POINT_LIGHT
+            MENUITEM SEPARATOR
+            MENUITEM "&Spot Light",                 ID_ADD_LIGHT_SPOT_LIGHT
+            , GRAYED
+            MENUITEM "&Area Light",                 ID_LIGHT_ADD_AREA_LIGHT
+            , GRAYED
+            MENUITEM "Sp&herical Light",            ID_LIGHT_ADD_SPHERICAL
+            , GRAYED
+        END
+        MENUITEM "&Delete",                     ID_LIGHT_DELETE
+    END
+    POPUP "&Window"
+    BEGIN
+        MENUITEM "&New Window",                 ID_WINDOW_NEW
+        MENUITEM "&Cascade",                    ID_WINDOW_CASCADE
+        MENUITEM "&Tile",                       ID_WINDOW_TILE_HORZ
+        MENUITEM "&Arrange Icons",              ID_WINDOW_ARRANGE
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About Ray...",               ID_APP_ABOUT
+    END
+END
+
+IDR_OBJECT_POPUP MENU DISCARDABLE 
+BEGIN
+    MENUITEM "Cu&t",                        IDM_OBJECT_CUT
+    MENUITEM "&Copy",                       IDM_OBJECT_COPY
+    MENUITEM "&Paste",                      IDM_OBJECT_PASTE
+    MENUITEM SEPARATOR
+    MENUITEM "&Materials...",               IDM_OBJECT_MATERIALS
+    MENUITEM SEPARATOR
+    MENUITEM "P&roperties...",              IDM_OBJECT_PROPERTIES
+END
+
+IDR_MATERIALS_POPUP MENU DISCARDABLE 
+BEGIN
+    MENUITEM "Cu&t",                        IDM_MATERIAL_CUT
+    MENUITEM "&Copy",                       IDM_MATERIAL_COPY
+    MENUITEM "&Paste",                      IDM_MATERIAL_PASTE
+    MENUITEM SEPARATOR
+    MENUITEM "P&roperties...",              IDM_MATERIAL_PROPERTIES
+    MENUITEM SEPARATOR
+    MENUITEM "Delete",                      IDM_MATERIAL_DELETE
+END
+
+IDR_MATERIAL_MENU MENU DISCARDABLE 
+BEGIN
+    MENUITEM "Properties...",               IDM_MATERIAL_PROPERTY
+    MENUITEM SEPARATOR
+    MENUITEM "Influence",                   IDM_MATERIAL_INFLUENCE
+    MENUITEM SEPARATOR
+    MENUITEM "Add",                         IDM_MATERIAL_ADD
+    MENUITEM "Delete",                      IDM_MATERIAL_LIST_DELETE
+END
+
+IDR_SETTINGS_POPUP MENU DISCARDABLE 
+BEGIN
+    MENUITEM "Properties",                  IDM_SETTINGS_PROPERTIES
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDR_MAINFRAME ACCELERATORS PRELOAD MOVEABLE PURE 
+BEGIN
+    "N",            ID_FILE_NEW,            VIRTKEY, CONTROL
+    "O",            ID_FILE_OPEN,           VIRTKEY, CONTROL
+    "S",            ID_FILE_SAVE,           VIRTKEY, CONTROL
+    "P",            ID_FILE_PRINT,          VIRTKEY, CONTROL
+    "Z",            ID_EDIT_UNDO,           VIRTKEY, CONTROL
+    "X",            ID_EDIT_CUT,            VIRTKEY, CONTROL
+    "C",            ID_EDIT_COPY,           VIRTKEY, CONTROL
+    "V",            ID_EDIT_PASTE,          VIRTKEY, CONTROL
+    VK_BACK,        ID_EDIT_UNDO,           VIRTKEY, ALT
+    VK_DELETE,      ID_EDIT_CUT,            VIRTKEY, SHIFT
+    VK_INSERT,      ID_EDIT_COPY,           VIRTKEY, CONTROL
+    VK_INSERT,      ID_EDIT_PASTE,          VIRTKEY, SHIFT
+    VK_F6,          ID_NEXT_PANE,           VIRTKEY 
+    VK_F6,          ID_PREV_PANE,           VIRTKEY, SHIFT
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOG DISCARDABLE  0, 0, 276, 199
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About Distributed Ray-Trace"
+FONT 8, "MS Sans Serif"
+BEGIN
+    LTEXT           "Distributed Ray-Trace",IDC_STATIC,91,7,119,8,
+                    SS_NOPREFIX
+    DEFPUSHBUTTON   "OK",IDOK,237,7,32,14,WS_GROUP
+    LTEXT           "Jeffrey R. Naujok",IDC_STATIC,91,19,56,8
+    LTEXT           "Computer Science 537: Operating Systems",IDC_STATIC,91,
+                    28,136,8
+    LTEXT           "Instructor: Greg Wolfe",IDC_STATIC,91,37,70,8
+    LTEXT           "Copyright ©1996, Jeffrey R. Naujok",IDC_STATIC,91,184,
+                    113,8
+    CONTROL         131,IDC_STATIC,"Static",SS_BITMAP | SS_REALSIZEIMAGE | 
+                    SS_SUNKEN,3,6,81,186
+END
+
+IDD_SCENE_TREE_DLG DIALOGEX 0, 0, 150, 313
+STYLE DS_3DLOOK | WS_CHILD
+FONT 8, "MS Sans Serif", 0, 0, 0x1
+BEGIN
+    CONTROL         "Tree1",IDC_SCENE_TREE,"SysTreeView32",TVS_HASBUTTONS | 
+                    TVS_HASLINES | TVS_LINESATROOT | TVS_EDITLABELS | 
+                    TVS_DISABLEDRAGDROP | WS_BORDER | WS_GROUP | WS_TABSTOP,
+                    7,7,136,299,WS_EX_CLIENTEDGE
+END
+
+IDD_ADD_POINT_LIGHT DIALOG DISCARDABLE  0, 0, 291, 78
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add a Point Light Source"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,234,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,234,24,50,14
+    LTEXT           "Location:",IDC_STATIC,13,21,30,8
+    EDITTEXT        IDC_X_COORD,27,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",IDC_STATIC,17,34,8,8
+    EDITTEXT        IDC_Y_COORD,107,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",IDC_STATIC,97,34,8,8
+    EDITTEXT        IDC_Z_COORD,187,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",IDC_STATIC,177,34,8,8
+    EDITTEXT        IDC_RED_COMPONENT,28,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "R",IDC_STATIC,18,60,8,8
+    EDITTEXT        IDC_GREEN_COMPONENT,108,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "G",IDC_STATIC,98,60,8,8
+    EDITTEXT        IDC_BLUE_COMPONENT,188,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "B",IDC_STATIC,178,60,8,8
+    LTEXT           "Color:",IDC_STATIC,13,47,19,8
+END
+
+IDD_ADD_OBJECT_PLANE DIALOG DISCARDABLE  0, 0, 291, 78
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add an Infinite Plane"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,234,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,234,24,50,14
+    LTEXT           "Location:",IDC_STATIC,13,21,30,8
+    EDITTEXT        IDC_X_COORD,27,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",IDC_STATIC,17,34,8,8
+    EDITTEXT        IDC_Y_COORD,107,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",IDC_STATIC,97,34,8,8
+    EDITTEXT        IDC_Z_COORD,187,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",IDC_STATIC,177,34,8,8
+    EDITTEXT        IDC_NORMAL_I,28,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "i",IDC_STATIC,18,60,8,8
+    EDITTEXT        IDC_NORMAL_J,108,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "j",IDC_STATIC,98,60,8,8
+    EDITTEXT        IDC_NORMAL_K,188,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "k",IDC_STATIC,178,60,8,8
+    LTEXT           "Normal",IDC_STATIC,13,47,19,8
+END
+
+IDD_ADD_OBJECT_SPHERE DIALOG DISCARDABLE  0, 0, 291, 78
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add a Sphere"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,234,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,234,24,50,14
+    LTEXT           "Location:",-1,13,21,30,8
+    EDITTEXT        IDC_X_COORD,27,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",-1,17,34,8,8
+    EDITTEXT        IDC_Y_COORD,107,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",-1,97,34,8,8
+    EDITTEXT        IDC_Z_COORD,187,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",-1,177,34,8,8
+    EDITTEXT        IDC_RADIUS,28,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "R",-1,18,60,8,8
+    LTEXT           "Radius:",-1,13,47,25,8
+END
+
+IDD_SET_COLOR_DIALOG DIALOG DISCARDABLE  0, 0, 240, 126
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Set Color"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,183,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,183,24,50,14
+    CONTROL         "",IDC_SAMPLE_FRAME,"Static",SS_BLACKFRAME | SS_SUNKEN,
+                    175,52,58,58
+    CONTROL         "Slider1",IDC_SLIDER_RED,"msctls_trackbar32",TBS_TOP | 
+                    WS_TABSTOP,24,19,124,21
+    CONTROL         "Slider1",IDC_SLIDER_GREEN,"msctls_trackbar32",TBS_TOP | 
+                    WS_TABSTOP,24,58,124,19
+    CONTROL         "Slider1",IDC_SLIDER_BLUE,"msctls_trackbar32",TBS_TOP | 
+                    WS_TABSTOP,24,97,124,22
+    LTEXT           "Red",IDC_STATIC,22,7,14,8
+    LTEXT           "Green",IDC_STATIC,22,44,20,8
+    LTEXT           "Blue",IDC_STATIC,22,88,15,8
+    LTEXT           "0.00",IDC_RED_VALUE,150,25,15,8
+    LTEXT           "0.00",IDC_GREEN_VALUE,150,63,15,8
+    LTEXT           "0.00",IDC_BLUE_VALUE,150,104,15,8
+END
+
+IDD_PLANE_PROPERTIES DIALOG DISCARDABLE  0, 0, 295, 76
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Plane Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,238,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,238,24,50,14
+    LTEXT           "Location:",IDC_STATIC,7,7,30,8
+    EDITTEXT        IDC_X_COORD,21,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",IDC_STATIC,11,20,8,8
+    EDITTEXT        IDC_Y_COORD,101,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",IDC_STATIC,91,20,8,8
+    EDITTEXT        IDC_Z_COORD,181,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",IDC_STATIC,171,20,8,8
+    EDITTEXT        IDC_NORMAL_I,22,43,40,14,ES_AUTOHSCROLL
+    LTEXT           "i",IDC_STATIC,12,46,8,8
+    EDITTEXT        IDC_NORMAL_J,102,43,40,14,ES_AUTOHSCROLL
+    LTEXT           "j",IDC_STATIC,92,46,8,8
+    EDITTEXT        IDC_NORMAL_K,182,43,40,14,ES_AUTOHSCROLL
+    LTEXT           "k",IDC_STATIC,172,46,8,8
+    LTEXT           "Normal",IDC_STATIC,7,33,30,8
+    PUSHBUTTON      "Set Color...",IDC_SET_COLOR,238,44,50,14
+END
+
+IDD_SPHERE_PROPERTIES DIALOG DISCARDABLE  0, 0, 299, 78
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Sphere Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,242,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,242,24,50,14
+    LTEXT           "Location:",-1,13,21,30,8
+    EDITTEXT        IDC_X_COORD,27,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",-1,17,34,8,8
+    EDITTEXT        IDC_Y_COORD,107,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",-1,97,34,8,8
+    EDITTEXT        IDC_Z_COORD,187,31,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",-1,177,34,8,8
+    EDITTEXT        IDC_RADIUS,28,57,40,14,ES_AUTOHSCROLL
+    LTEXT           "R",-1,18,60,8,8
+    LTEXT           "Radius:",-1,13,47,25,8
+    PUSHBUTTON      "Set Color...",IDC_SET_COLOR,242,43,50,14
+END
+
+IDD_CAMERA_PROPERTIES DIALOG DISCARDABLE  0, 0, 295, 103
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Camera Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,238,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,238,24,50,14
+    LTEXT           "Location:",IDC_STATIC,7,7,30,8
+    EDITTEXT        IDC_X_COORD,21,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",IDC_STATIC,11,20,8,8
+    EDITTEXT        IDC_Y_COORD,101,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",IDC_STATIC,91,20,8,8
+    EDITTEXT        IDC_Z_COORD,181,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",IDC_STATIC,171,20,8,8
+    EDITTEXT        IDC_POINT_AT_X,22,43,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",IDC_STATIC,12,46,8,8
+    EDITTEXT        IDC_POINT_AT_Y,102,43,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",IDC_STATIC,92,46,8,8
+    EDITTEXT        IDC_POINT_AT_Z,182,43,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",IDC_STATIC,172,46,8,8
+    LTEXT           "Point At:",IDC_STATIC,7,33,28,8
+    LTEXT           "Camera View Angle:",IDC_STATIC,7,62,64,8
+    EDITTEXT        IDC_CAMERA_ANGLE,7,71,40,14,ES_AUTOHSCROLL
+END
+
+IDD_POINT_LIGHT_PROPERTIES DIALOG DISCARDABLE  0, 0, 295, 76
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Point Light Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,238,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,238,24,50,14
+    LTEXT           "Location:",-1,7,7,30,8
+    EDITTEXT        IDC_X_COORD,21,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "X",-1,11,20,8,8
+    EDITTEXT        IDC_Y_COORD,101,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "Y",-1,91,20,8,8
+    EDITTEXT        IDC_Z_COORD,181,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "Z",-1,171,20,8,8
+    PUSHBUTTON      "Set Color...",IDC_SET_COLOR,238,45,50,14
+END
+
+IDD_MATERIALS_DLG DIALOGEX 0, 0, 230, 150
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Materials"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "P&roperties",IDC_PROPERTY_BUTTON,172,7,50,14
+    PUSHBUTTON      "&Close",IDCANCEL,172,24,50,14
+    CONTROL         "List1",IDC_MATERIAL_LIST,"SysListView32",LVS_REPORT | 
+                    LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | 
+                    WS_TABSTOP,7,7,158,136,WS_EX_CLIENTEDGE
+END
+
+IDD_DIFFUSE_DIALOG DIALOG DISCARDABLE  0, 0, 294, 63
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Diffuse Material Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,237,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,237,24,50,14
+    PUSHBUTTON      "Set Color...",IDC_SET_COLOR,237,42,50,14
+    CONTROL         "Cast rays for diffuse ambience.",IDC_CAST_DIFFUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,7,129,12
+END
+
+IDD_SPECULAR_DIALOG DIALOG DISCARDABLE  0, 0, 294, 62
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Specular Material Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,237,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,237,24,50,14
+    PUSHBUTTON      "Set Color...",IDC_SET_COLOR,237,41,50,14
+    CONTROL         "Use the material color for highlights (metallic)",
+                    IDC_MATERIAL_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,7,45,155,10
+    EDITTEXT        IDC_POWER_VALUE,44,7,41,14,ES_AUTOHSCROLL
+    LTEXT           "Sharpness",IDC_STATIC,7,10,34,8
+    EDITTEXT        IDC_IOR_VALUE,73,26,41,14,ES_AUTOHSCROLL
+    LTEXT           "Index of Refraction",IDC_STATIC,7,29,61,8
+END
+
+IDD_REFLECTIVE_DIALOG DIALOG DISCARDABLE  0, 0, 294, 62
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Reflective Material Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,237,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,237,24,50,14
+    PUSHBUTTON      "Set Color...",IDC_SET_COLOR,237,41,50,14
+    CONTROL         "Filter reflection to material color",
+                    IDC_FILTER_REFLECTION,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,7,27,155,10
+    EDITTEXT        IDC_DIFFUSE_REFLECTION,71,7,41,14,ES_AUTOHSCROLL
+    LTEXT           "Diffuse Reflectivity",-1,7,10,60,8
+END
+
+IDD_INFLUENCE_DLG DIALOG DISCARDABLE  0, 0, 157, 46
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Influence"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,100,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,100,24,50,14
+    EDITTEXT        IDC_INFLUENCE_EDIT,41,7,40,14,ES_AUTOHSCROLL
+    LTEXT           "Influence",IDC_STATIC,7,9,30,8
+END
+
+IDD_ADD_MATERIALS_DLG DIALOGEX 0, 0, 230, 150
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add Materials"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "&Add",IDC_ADD_BUTTON,173,7,50,14
+    PUSHBUTTON      "&Close",IDCANCEL,173,24,50,14
+    CONTROL         "List1",IDC_MATERIAL_LIST,"SysListView32",LVS_REPORT | 
+                    LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | 
+                    WS_TABSTOP,7,7,158,136,WS_EX_CLIENTEDGE
+END
+
+IDD_TRANSPARENT_DIALOG DIALOG DISCARDABLE  0, 0, 294, 62
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Transparent Material Properties"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,237,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,237,24,50,14
+    PUSHBUTTON      "Set Color...",IDC_SET_COLOR,237,41,50,14
+    EDITTEXT        IDC_DIFFUSE_REFLECTION,79,7,41,14,ES_AUTOHSCROLL
+    LTEXT           "Index Of Refraction",-1,7,10,66,10
+END
+
+IDD_SETTINGS_DIALOG DIALOG DISCARDABLE  0, 0, 228, 69
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Settings"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,171,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,171,24,50,14
+    LTEXT           "Image Width:",IDC_STATIC,8,11,43,8
+    EDITTEXT        IDC_IMAGE_WIDTH,52,8,40,14,ES_AUTOHSCROLL
+    LTEXT           "Image Height:",IDC_STATIC,8,27,45,8
+    EDITTEXT        IDC_IMAGE_HEIGHT,52,24,40,14,ES_AUTOHSCROLL
+    LTEXT           "Image File Name:",IDC_STATIC,8,44,56,8
+    EDITTEXT        IDC_IMAGE_FILE_NAME,68,42,146,14,ES_AUTOHSCROLL
+END
+
+
+#ifndef _MAC
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "\0"
+            VALUE "FileDescription", "Ray MFC Application\0"
+            VALUE "FileVersion", "1, 0, 0, 1\0"
+            VALUE "InternalName", "Ray\0"
+            VALUE "LegalCopyright", "Copyright © 1996\0"
+            VALUE "LegalTrademarks", "\0"
+            VALUE "OriginalFilename", "Ray.EXE\0"
+            VALUE "ProductName", "Ray Application\0"
+            VALUE "ProductVersion", "1, 0, 0, 1\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+#endif    // !_MAC
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO DISCARDABLE 
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 269
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 192
+    END
+
+    IDD_SCENE_TREE_DLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 143
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 306
+    END
+
+    IDD_ADD_POINT_LIGHT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 284
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 71
+    END
+
+    IDD_ADD_OBJECT_PLANE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 284
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 71
+    END
+
+    IDD_ADD_OBJECT_SPHERE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 284
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 71
+    END
+
+    IDD_SET_COLOR_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 233
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 119
+    END
+
+    IDD_PLANE_PROPERTIES, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 288
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 69
+    END
+
+    IDD_SPHERE_PROPERTIES, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 292
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 71
+    END
+
+    IDD_CAMERA_PROPERTIES, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 288
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 96
+    END
+
+    IDD_POINT_LIGHT_PROPERTIES, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 288
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 69
+    END
+
+    IDD_MATERIALS_DLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 222
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 143
+    END
+
+    IDD_DIFFUSE_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 287
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 56
+    END
+
+    IDD_SPECULAR_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 287
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 55
+    END
+
+    IDD_REFLECTIVE_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 287
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 55
+    END
+
+    IDD_INFLUENCE_DLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 150
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 39
+    END
+
+    IDD_ADD_MATERIALS_DLG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 223
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 143
+    END
+
+    IDD_TRANSPARENT_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 287
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 55
+    END
+
+    IDD_SETTINGS_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 221
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 62
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    IDP_SOCKETS_INIT_FAILED "Windows sockets initialization failed."
+END
+
+STRINGTABLE PRELOAD DISCARDABLE 
+BEGIN
+    IDR_MAINFRAME           "Ray"
+    IDR_DRAYTYPE            "\nRay\nRay\n\n\nRay.Document\nRay Document"
+END
+
+STRINGTABLE PRELOAD DISCARDABLE 
+BEGIN
+    AFX_IDS_APP_TITLE       "Ray"
+    AFX_IDS_IDLEMESSAGE     "Ready"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_INDICATOR_EXT        "EXT"
+    ID_INDICATOR_CAPS       "CAP"
+    ID_INDICATOR_NUM        "NUM"
+    ID_INDICATOR_SCRL       "SCRL"
+    ID_INDICATOR_OVR        "OVR"
+    ID_INDICATOR_REC        "REC"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_FILE_NEW             "Create a new document\nNew"
+    ID_FILE_OPEN            "Open an existing document\nOpen"
+    ID_FILE_CLOSE           "Close the active document\nClose"
+    ID_FILE_SAVE            "Save the active document\nSave"
+    ID_FILE_SAVE_AS         "Save the active document with a new name\nSave As"
+    ID_FILE_PAGE_SETUP      "Change the printing options\nPage Setup"
+    ID_FILE_PRINT_SETUP     "Change the printer and printing options\nPrint Setup"
+    ID_FILE_PRINT           "Print the active document\nPrint"
+    ID_FILE_PRINT_PREVIEW   "Display full pages\nPrint Preview"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_APP_ABOUT            "Display program information, version number and copyright\nAbout"
+    ID_APP_EXIT             "Quit the application; prompts to save documents\nExit"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_FILE_MRU_FILE1       "Open this document"
+    ID_FILE_MRU_FILE2       "Open this document"
+    ID_FILE_MRU_FILE3       "Open this document"
+    ID_FILE_MRU_FILE4       "Open this document"
+    ID_FILE_MRU_FILE5       "Open this document"
+    ID_FILE_MRU_FILE6       "Open this document"
+    ID_FILE_MRU_FILE7       "Open this document"
+    ID_FILE_MRU_FILE8       "Open this document"
+    ID_FILE_MRU_FILE9       "Open this document"
+    ID_FILE_MRU_FILE10      "Open this document"
+    ID_FILE_MRU_FILE11      "Open this document"
+    ID_FILE_MRU_FILE12      "Open this document"
+    ID_FILE_MRU_FILE13      "Open this document"
+    ID_FILE_MRU_FILE14      "Open this document"
+    ID_FILE_MRU_FILE15      "Open this document"
+    ID_FILE_MRU_FILE16      "Open this document"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_NEXT_PANE            "Switch to the next window pane\nNext Pane"
+    ID_PREV_PANE            "Switch back to the previous window pane\nPrevious Pane"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_WINDOW_NEW           "Open another window for the active document\nNew Window"
+    ID_WINDOW_ARRANGE       "Arrange icons at the bottom of the window\nArrange Icons"
+    ID_WINDOW_CASCADE       "Arrange windows so they overlap\nCascade Windows"
+    ID_WINDOW_TILE_HORZ     "Arrange windows as non-overlapping tiles\nTile Windows"
+    ID_WINDOW_TILE_VERT     "Arrange windows as non-overlapping tiles\nTile Windows"
+    ID_WINDOW_SPLIT         "Split the active window into panes\nSplit"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_EDIT_CLEAR           "Erase the selection\nErase"
+    ID_EDIT_CLEAR_ALL       "Erase everything\nErase All"
+    ID_EDIT_COPY            "Copy the selection and put it on the Clipboard\nCopy"
+    ID_EDIT_CUT             "Cut the selection and put it on the Clipboard\nCut"
+    ID_EDIT_FIND            "Find the specified text\nFind"
+    ID_EDIT_PASTE           "Insert Clipboard contents\nPaste"
+    ID_EDIT_REPEAT          "Repeat the last action\nRepeat"
+    ID_EDIT_REPLACE         "Replace specific text with different text\nReplace"
+    ID_EDIT_SELECT_ALL      "Select the entire document\nSelect All"
+    ID_EDIT_UNDO            "Undo the last action\nUndo"
+    ID_EDIT_REDO            "Redo the previously undone action\nRedo"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_VIEW_TOOLBAR         "Show or hide the toolbar\nToggle ToolBar"
+    ID_VIEW_STATUS_BAR      "Show or hide the status bar\nToggle StatusBar"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    AFX_IDS_SCSIZE          "Change the window size"
+    AFX_IDS_SCMOVE          "Change the window position"
+    AFX_IDS_SCMINIMIZE      "Reduce the window to an icon"
+    AFX_IDS_SCMAXIMIZE      "Enlarge the window to full size"
+    AFX_IDS_SCNEXTWINDOW    "Switch to the next document window"
+    AFX_IDS_SCPREVWINDOW    "Switch to the previous document window"
+    AFX_IDS_SCCLOSE         "Close the active window and prompts to save the documents"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    AFX_IDS_SCRESTORE       "Restore the window to normal size"
+    AFX_IDS_SCTASKLIST      "Activate Task List"
+    AFX_IDS_MDICHILD        "Activate this window"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    AFX_IDS_PREVIEW_CLOSE   "Close print preview mode\nCancel Preview"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_VIEW_SCENE_TREE      "Show or hide the Scene Hierarchy window"
+    ID_OBJECT_ADD_SPHERE    "Add a sphere to a scene"
+    ID_OBJECT_ADD_PLANE     "Add a plane to the scene"
+    ID_OBJECT_DELETE        "Delete the currently selected object"
+    ID_LIGHT_ADD_POINT_LIGHT "Add a point light to the scene"
+    ID_ADD_LIGHT_SPOT_LIGHT "Add a directed point spot light to the scene"
+    ID_LIGHT_ADD_AREA_LIGHT "Add an area light to the scene"
+    ID_LIGHT_ADD_SPHERICAL  "Add a spherical light to the scene"
+    ID_LIGHT_DELETE         "Delete the currently selected light"
+    ID_OBJECTS_ADD_TRIANGLE "Add a triangle to the scene"
+    ID_OBJECTS_ADD_SMOOTH_TRIANGLE 
+                            "Add a normal interpolated triangle to the scene"
+    ID_OBJECTS_ADD_TRIANGULAR_MESH 
+                            "Add a surface mesh composed of joined triangles"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_OBJECTS_ADD_POLYGONAL_MESH "Add a polygonal mesh to the scene"
+    IDC_RENDER_RAY_TRACE    "Ray trace the current scene"
+    ID_RENDER_KILL_TRACE    "Stop the current trace."
+    IDM_OBJECT_CUT          "Cut this object to the clipboard"
+    IDM_OBJECT_COPY         "Create a copy of this object on the clipboard"
+    IDC_OBJECT_PASTE        "Paste an object or material from the clipboard"
+    IDM_OBJECT_MATERIALS    "Edit the materials for this object"
+    IDC_OBJECT_PROPERTIES   "Edit the object's properties"
+    IDM_MATERIAL_DELETE     "Delete this material"
+    IDM_MATERIALS_PROPERTIES "Edit the material's properties"
+    IDM_MATERIAL_PROPERTIES "Edit the material's properties."
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    IDM_MATERIAL_ADD        "Add a new material to this object"
+    IDM_MATERIAL_ADJUST     "Adjust the Influence of this material"
+    IDM_MATERIAL_LIST_DELETE "Delete this material"
+    IDM_MATERIAL_PROPERTY   "Adjust the properties of this material"
+    IDM_SETTINGS_PROPERTIES "Change the scene-wide settings"
+END
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#define _AFX_NO_SPLITTER_RESOURCES
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE 9, 1
+#pragma code_page(1252)
+#endif
+#include "Ray.rc2"  // non-Microsoft Visual C++ edited resources
+#include "afxres.rc"         // Standard components
+#include "afxprint.rc"       // printing/print preview resources
+#endif
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

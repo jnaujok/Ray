@@ -1,0 +1,26 @@
+# Build output
+/build/
+Debug/
+Release/
+*.o
+/rayengine/rayengine
+/raythrower/raythrower
+
+# Visual C++ intermediate / IDE state
+*.obj
+*.pch
+*.pdb
+*.idb
+*.ilk
+*.res
+*.ncb
+*.opt
+*.aps
+*.plg
+*.sbr
+*.bsc
+*.hlp
+
+# CMake
+CMakeCache.txt
+CMakeFiles/

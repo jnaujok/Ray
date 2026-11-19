@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+# Visual C++ 6 will not load project/workspace files without CRLF; cmd.exe wants CRLF too.
+*.dsp text eol=crlf
+*.dsw text eol=crlf
+*.clw text eol=crlf
+*.bat text eol=crlf
+
+# Original, untouched historical files
+/legacy/** -text
+/help/** -text
+
+# Binary assets
+*.ray binary
+*.raw binary
+*.out binary
+*.lib binary
+*.bmp binary
+*.ico binary
