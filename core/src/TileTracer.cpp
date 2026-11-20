@@ -17,6 +17,9 @@
 #include "PixelSampler.h"
 #include "Rays.h"
 #include "Color.h"
+#include "Lens.h"
+#include "Sampling.h"
+#include "Spectrum.h"
 
 CTileTracer::CTileTracer( void ) :
     m_pColors( NULL )
@@ -57,6 +60,38 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
             if ( oRay.GetWeight() != 1.0 )
                 oColor = oColor * oRay.GetWeight();
             nRays++;
+        }
+        else if ( oCamera.IsSpectral() )
+        {
+                // Traced spectrally, the lens is sent four single
+                // wavelengths, one from each quarter of the range, each weighed
+                // by how its wavelength looks (see Spectrum.h).
+            FLT nU, nV;
+            FLT anSum[ 3 ] = { 0.0, 0.0, 0.0 };
+
+            oRay.SamplePoint( RaySampling::PURPOSE_WAVELENGTH, nU, nV );
+
+            FLT nWhere = RaySpectrum::WhereInPart( nU, nV );
+
+            for ( int nPart = 0; nPart < RaySpectrum::PARTS; nPart++ )
+            {
+                FLT     nNanometers;
+                FLT     anWeight[ 3 ];
+
+                RaySpectrum::PartWeights( nPart, nWhere, nNanometers, anWeight );
+
+                int     nChannel = CLens::WavelengthChannel( nNanometers );
+                CRay    oChannelRay;
+                CColor  oSeen;
+
+                oChannelRay.CreateRayAt( oScene, oRay.GetImageX(), oRay.GetImageY(), oRay.GetPixelX(), oRay.GetPixelY(), 1.0, nChannel );
+                oScene.TraceRay( oChannelRay, oSeen, NULL );
+                anSum[ 0 ] += oSeen.GetR() * anWeight[ 0 ] * oChannelRay.GetWeight();
+                anSum[ 1 ] += oSeen.GetG() * anWeight[ 1 ] * oChannelRay.GetWeight();
+                anSum[ 2 ] += oSeen.GetB() * anWeight[ 2 ] * oChannelRay.GetWeight();
+                nRays++;
+            }
+            oColor.Set( anSum[ 0 ] / RaySpectrum::PARTS, anSum[ 1 ] / RaySpectrum::PARTS, anSum[ 2 ] / RaySpectrum::PARTS );
         }
         else
         {

@@ -3,8 +3,11 @@
 *                                                                        *
 *   A surface made of triangles that share their vertices: a list of     *
 *   vertices, and faces given as three vertex indices each. The faces    *
-*   are ordinary CTriangles, owned by the mesh and sharing its           *
-*   materials. Each vertex gets a normal, the sum of the normals of      *
+*   stay indices (a face is shaded through a stand-in CTriangle made     *
+*   when it is hit, sharing the mesh's materials), and the shape is      *
+*   built once and shared by every mesh given the same geometry, as      *
+*   each thread's copy of a scene is. Each vertex gets a normal, the     *
+*   sum of the normals of                                                *
 *   every face it belongs to, so a smooth mesh shades as one curved      *
 *   surface; the scene file can give the vertex normals instead. The corner order of each face decides its front, as for     *
 *   CTriangle.                                                           *
@@ -37,12 +40,6 @@ namespace ModelFile
 
 class CMesh : public CObjects
 {
-    protected:
-        std::vector<CVector>    m_aoVertices;
-        std::vector<int>        m_anFaces;          // three vertex indices a face
-        std::vector<CVector>    m_aoGivenNormals;   // one a vertex, or empty to sum the faces' normals
-        std::vector<FLT>        m_anUVs;            // u and v for each vertex, or empty
-
     public:
             // How a mesh without uvs works out surface coordinates.
         enum EUVMap { UVMAP_NONE, UVMAP_PLANAR, UVMAP_CYLINDRICAL, UVMAP_SPHERICAL, UVMAP_BOX };
@@ -76,8 +73,6 @@ class CMesh : public CObjects
         int                     m_nAlign;           // EAlign
         CVector                 m_oTranslation;
 
-            // Works out each face's corner coordinates from the UV map.
-        void                    MapUVs( void );
             // The "uvMap" JSON field, read and written.
         BOOL                    ReadUVMap( const IASLib::CJsonNode &oNode, BOOL bUnused );
         void                    UVMapToJson( IASLib::CObjectNode &oNode ) const;
@@ -87,30 +82,79 @@ class CMesh : public CObjects
         BOOL                    m_bSmooth;
         CColor                  m_oColor;
 
-        std::vector<CTriangle *> m_apFaces;         // built from the above
-        CVector                 m_oMinimum;         // the bounding box
-        CVector                 m_oMaximum;
-        CTriangle              *m_pHitFace;         // the face Intersect hit last
-
+    public:
             // The bounding volume hierarchy: each node a box around its
-            // faces, either two child nodes or (a leaf) a run of m_anOrder.
+            // faces, either two child nodes or (a leaf) a run of anOrder.
         struct SNode
         {
             FLT                 anMin[ 3 ];
             FLT                 anMax[ 3 ];
             int                 nLeft;              // child nodes, if nCount is 0
             int                 nRight;
-            int                 nFirst;             // the leaf's faces in m_anOrder
+            int                 nFirst;             // the leaf's faces in anOrder
             int                 nCount;
         };
-        std::vector<SNode>      m_aoNodes;          // the root first
-        std::vector<int>        m_anOrder;          // face indices, grouped by leaf
 
-        void                    DeleteFaces( void );
+            // Everything about a mesh's shape, built once and never changed
+            // after: what SetGeometry was given, and the faces, normals,
+            // surface coordinates and tree worked out from it. Faces are
+            // three vertex indices each, not objects; a face is shaded
+            // through a stand-in CTriangle made for it when it is hit. Every
+            // mesh given the same geometry (each thread's copy of a scene)
+            // shares one, so it is built and held once.
+        struct SGeometry
+        {
+                // What SetGeometry was given.
+            std::vector<CVector>        aoVertices;
+            std::vector<int>            anFaces;            // three vertex indices a face, as given
+            std::vector<CVector>        aoGivenNormals;     // one a vertex, or empty to sum the faces' normals
+            std::vector<FLT>            anUVs;              // u and v for each vertex, or empty
+            std::vector<CColor>         aoGivenColors;      // one a face as given, or empty
+            std::vector<unsigned char>  abGivenHasColor;
+            BOOL                        bSmooth;
+            BOOL                        bDoubleSided;
+            SUVMap                      oUVMap;
+
+                // The faces kept (those with a surface), in order.
+            std::vector<int>            anKept;             // three vertex indices each
+            std::vector<CVector>        aoFaceNormals;      // each face's unit normal
+            std::vector<CVector>        aoVertexNormals;    // what a smooth face blends, one a vertex (empty if not smooth)
+            std::vector<FLT>            anCornerUVs;        // six a face (u, v at each corner), or empty
+            std::vector<CColor>         aoFaceColors;       // one a face, or empty
+            std::vector<unsigned char>  abFaceHasColor;
+            CVector                     oMinimum;           // the bounding box
+            CVector                     oMaximum;
+            std::vector<SNode>          aoNodes;            // the root first
+            std::vector<int>            anOrder;            // face indices, grouped by leaf
+
+            int                         FaceCount( void ) const { return (int)aoFaceNormals.size(); }
+        };
+
+            /// How many geometries are alive and shared (for tests).
+        static int              SharedGeometries( void );
+            /// The geometry this mesh uses, which every mesh given the same
+            /// shape shares (for tests).
+        const SGeometry        *GetGeometry( void ) const { return m_pGeometry.get(); }
+
+    protected:
+        std::shared_ptr<const SGeometry> m_pGeometry;
+        int                     m_nHitFace;         // the face Intersect hit last, or -1
+            // Stand-ins for faces a csg asked for with HitPart, which it
+            // keeps pointers to while it works out its own hit.
+        std::vector<std::unique_ptr<CTriangle>> m_apLeafFaces;
+        std::vector<int>        m_anLeafFace;       // which face each of those is
+
+            // A stand-in triangle for face nFace (for shading and the like).
+        CTriangle              *MakeFace( int nFace );
+
         BOOL                    HitsBox( CRay &oRay );
+            // Builds a geometry's faces, normals, coordinates and tree.
+        static void             Build( SGeometry &oGeometry );
+        static void             MapUVs( SGeometry &oGeometry );
             // Builds the tree, each box nMargin larger than its faces.
-        void                    BuildTree( FLT nMargin );
-        int                     BuildNode( int nFirst, int nCount, const std::vector<FLT> &anCenters, FLT nMargin, int nDepth );
+        static void             BuildTree( SGeometry &oGeometry, FLT nMargin );
+        static int              BuildNode( SGeometry &oGeometry, int nFirst, int nCount, const std::vector<FLT> &anCenters, FLT nMargin,
+                                           int nDepth );
             // Whether the ray passes through a node's box before nLimit.
         static BOOL             HitsNode( const SNode &oNode, const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit );
             // HitsNode, and where the ray enters the box (0 if it starts inside).
@@ -141,23 +185,23 @@ class CMesh : public CObjects
         BOOL                    LoadModel( const std::string &strData, const std::string &strName, std::string &strError );
             /// Whether the mesh came from a model file.
         BOOL                    IsFromFile( void ) const { return ! m_strFile.empty(); }
-        int                     GetFaceCount( void ) const { return (int)m_apFaces.size(); }
+        int                     GetFaceCount( void ) const { return m_pGeometry ? m_pGeometry->FaceCount() : 0; }
             /// The vertices, where they are in the scene.
-        const std::vector<CVector> &GetVertices( void ) const { return m_aoVertices; }
+        const std::vector<CVector> &GetVertices( void ) const;
             /// Face nFace's color from a colored model file, if it has one.
-        BOOL                    FaceColor( int nFace, CColor &oColor ) { CVector oAny; return m_apFaces[ (size_t)nFace ]->SurfaceColor( oAny, oColor ); }
+        BOOL                    FaceColor( int nFace, CColor &oColor );
             /// Whether the faces have surface coordinates (from "uvs", a
             /// model file's, or a UV map).
-        BOOL                    HasUVs( void ) const { return ! m_anUVs.empty(); }
+        BOOL                    HasUVs( void ) const { return m_pGeometry && ! m_pGeometry->anUVs.empty(); }
             /// Sets the UV map, used when there are no uvs; it takes effect
             /// at the next SetGeometry.
         void                    SetUVMap( const SUVMap &oMap ) { m_oUVMap = oMap; }
             /// Face nFace's surface coordinates at a point on it.
-        BOOL                    FaceCoordsAt( int nFace, CVector oPoint, FLT &nU, FLT &nV ) { return m_apFaces[ (size_t)nFace ]->SurfaceCoords( oPoint, nU, nV ); }
+        BOOL                    FaceCoordsAt( int nFace, CVector oPoint, FLT &nU, FLT &nV );
             /// The normal face nFace shades with at a point on it.
-        CVector                 FaceNormalAt( int nFace, CVector oPoint ) { return m_apFaces[ (size_t)nFace ]->NormalAt( oPoint ); }
+        CVector                 FaceNormalAt( int nFace, CVector oPoint );
             /// Whether face nFace has the mesh's bump map (for tests).
-        BOOL                    FaceHasBump( int nFace ) const { return m_apFaces[ (size_t)nFace ]->GetBump() ? TRUE : FALSE; }
+        BOOL                    FaceHasBump( int nFace );
 
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect );
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore );
@@ -166,7 +210,7 @@ class CMesh : public CObjects
         virtual BOOL            GetBounds( CVector &oMinimum, CVector &oMaximum );
             // The face its last Intersect hit. A mesh is taken to be closed
             // (a csg needs it to be; a mesh with holes gives wrong results).
-        virtual CObjects       *HitPart( BOOL &bFlip ) { bFlip = FALSE; return m_pHitFace ? (CObjects *)m_pHitFace : (CObjects *)this; }
+        virtual CObjects       *HitPart( BOOL &bFlip );
         virtual BOOL            IsClosed( void ) { return TRUE; }
             /// Intersect without the tree: every face, in order. The tree
             /// must find exactly what this does; the tests hold it to that.

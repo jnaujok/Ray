@@ -32,6 +32,7 @@
         },
         "colorModel": "clip",
         "clamp": 1.5,
+        "dispersion": "spectral",
         "lens": {
             "prescription": "double-gauss-50mm",
             "focusDistance": 21.0,

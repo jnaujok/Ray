@@ -66,18 +66,25 @@ CTriangle::CTriangle( const CVector &oCorner1, const CVector &oCorner2, const CV
     CalcNormal();
 }
 
-void CTriangle::CalcNormal( void )
+CVector CTriangle::FaceNormal( CVector oCorner1, CVector oCorner2, CVector oCorner3 )
 {
     CVector     oTemp1;
     CVector     oTemp2;
+    CVector     oNormal;
 
-    oTemp1 = m_oCorner2 - m_oCorner1;
-    oTemp2 = m_oCorner3 - m_oCorner2;
+    oTemp1 = oCorner2 - oCorner1;
+    oTemp2 = oCorner3 - oCorner2;
 
         // The same rule OBJ and most other model formats are made for, so
         // their faces come out facing outward.
-    m_oSurfaceNormal = oTemp1.Cross( oTemp2 );
-    m_oSurfaceNormal.Normalize();
+    oNormal = oTemp1.Cross( oTemp2 );
+    oNormal.Normalize();
+    return oNormal;
+}
+
+void CTriangle::CalcNormal( void )
+{
+    m_oSurfaceNormal = FaceNormal( m_oCorner1, m_oCorner2, m_oCorner3 );
 
     m_oNormal1 = m_oSurfaceNormal;
     m_oNormal2 = m_oSurfaceNormal;
@@ -132,51 +139,66 @@ DYNAMIC_IMPLEMENTS( CTriangle, "triangle" );
 
 BOOL CTriangle::Intersect( CRay &oRay, CVector &oIntersect )
 {
+    FLT     anOrigin[ 3 ] = { oRay.GetX(), oRay.GetY(), oRay.GetZ() };
+    FLT     anDirection[ 3 ] = { oRay.GetI(), oRay.GetJ(), oRay.GetK() };
+    FLT     nT;
+    CVector oPoint;
+
+    if ( ! HitFace( m_oCorner1, m_oCorner2, m_oCorner3, m_oSurfaceNormal, m_bDoubleSided, anOrigin, anDirection, oRay.GetT(),
+                    nT, oPoint ) )
+        return FALSE;
+    oRay.SetT( nT );
+    oIntersect = oPoint;
+    return TRUE;
+}
+
+BOOL CTriangle::HitFace( CVector oCorner1, CVector oCorner2, CVector oCorner3, CVector oNormal,
+                         BOOL bDoubleSided, const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit,
+                         FLT &nT, CVector &oPoint )
+{
     FLT     nA;
     FLT     nB;
     FLT     nC;
     FLT     nD;
     FLT     nDenom;
     FLT     nNumer;
-    FLT     nT;
     CVector oLine1, oLine2, oLine3;
     FLT     nAngle;
-    CVector oPoint;
 
         // Here we develop the parametric equation for a plane
-    nA = m_oSurfaceNormal.GetX();
-    nB = m_oSurfaceNormal.GetY();
-    nC = m_oSurfaceNormal.GetZ();
-    nD = -( (m_oSurfaceNormal.GetX() * m_oCorner1.GetX() ) + 
-            (m_oCorner1.GetY() * m_oSurfaceNormal.GetY() ) +
-            (m_oCorner1.GetZ() * m_oSurfaceNormal.GetZ() ) );
+    nA = oNormal.GetX();
+    nB = oNormal.GetY();
+    nC = oNormal.GetZ();
+    nD = -( (oNormal.GetX() * oCorner1.GetX() ) +
+            (oCorner1.GetY() * oNormal.GetY() ) +
+            (oCorner1.GetZ() * oNormal.GetZ() ) );
 
         // The solution is given by t= -(ax+by+cz+d)/(ai+bj+ck)
 
-    nNumer = - ( (nA * oRay.GetX()) + ( nB * oRay.GetY() ) + ( nC * oRay.GetZ() ) + nD );
-    nDenom = ( nA * oRay.GetI()) + ( nB * oRay.GetJ() ) + ( nC * oRay.GetK() );
+    nNumer = - ( (nA * anOrigin[ 0 ]) + ( nB * anOrigin[ 1 ] ) + ( nC * anOrigin[ 2 ] ) + nD );
+    nDenom = ( nA * anDirection[ 0 ]) + ( nB * anDirection[ 1 ] ) + ( nC * anDirection[ 2 ] );
 
     if ( nDenom == 0.0 )
         return FALSE;
 
         // A single-sided triangle can't be hit from behind (a ray that
         // travels the way its normal points).
-    if ( ! m_bDoubleSided && ( nDenom > 0.0 ) )
+    if ( ! bDoubleSided && ( nDenom > 0.0 ) )
         return FALSE;
 
     nT = nNumer / nDenom;
 
-    if ( ( nT > 0.0 ) && ( nT < oRay.GetT() ) )
+    if ( ( nT > 0.0 ) && ( nT < nLimit ) )
     {
             // We know that we intersect the plane of the triangle, now we limit it to within
             // the boundaries of the triangle.
-        oPoint.Set( (oRay.GetI() * nT) + oRay.GetX(), 
-                    (oRay.GetJ() * nT) + oRay.GetY(),
-                    (oRay.GetK() * nT) + oRay.GetZ() );
+        oPoint.Set( (anDirection[ 0 ] * nT) + anOrigin[ 0 ],
+                    (anDirection[ 1 ] * nT) + anOrigin[ 1 ],
+                    (anDirection[ 2 ] * nT) + anOrigin[ 2 ] );
         nAngle = 0.0;
-        oLine1 = m_oCorner1 - oPoint;
-        oLine2 = m_oCorner2 - oPoint;
-        oLine3 = m_oCorner3 - oPoint;
+        oLine1 = oCorner1 - oPoint;
+        oLine2 = oCorner2 - oPoint;
+        oLine3 = oCorner3 - oPoint;
         oLine1.Normalize();
         oLine2.Normalize();
         oLine3.Normalize();
@@ -188,11 +210,7 @@ BOOL CTriangle::Intersect( CRay &oRay, CVector &oIntersect )
         nAngle = ABS( nAngle - ( 2 * PI ) );
 
         if ( nAngle < 1e-6 )
-        {
-            oRay.SetT( nT );
-            oIntersect = oPoint;
             return TRUE;
-        }
     }
 
         // No intersection

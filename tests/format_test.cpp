@@ -43,6 +43,7 @@
 #include "ModelFile.h"
 #include "LayersTexture.h"
 #include "FaceColorTexture.h"
+#include "Spectrum.h"
 
 
 #include <math.h>
@@ -2587,6 +2588,176 @@ static void DispersionChecks( void )
            "an Abbe number round-trips, and none is written when there is none" );
 }
 
+static void SpectralChecks( void )
+{
+        // An even spread of wavelengths weighs up to exactly white.
+    const int   STEPS = 34000;
+    double      adSum[ 3 ] = { 0.0, 0.0, 0.0 };
+
+    for ( int nStep = 0; nStep < STEPS; nStep++ )
+    {
+        FLT anWeight[ 3 ];
+
+        RaySpectrum::Weights( RaySpectrum::SHORTEST + ( ( nStep + 0.5 ) * ( RaySpectrum::LONGEST - RaySpectrum::SHORTEST ) / STEPS ), anWeight );
+        for ( int nIndex = 0; nIndex < 3; nIndex++ )
+            adSum[ nIndex ] += anWeight[ nIndex ] / STEPS;
+    }
+    Check( fabs( adSum[ 0 ] - 1.0 ) < 1e-9 && fabs( adSum[ 1 ] - 1.0 ) < 1e-9 && fabs( adSum[ 2 ] - 1.0 ) < 1e-9,
+           "spectral weights over an even spread of wavelengths add up to white" );
+
+    FLT anRed[ 3 ], anGreen[ 3 ], anBlue[ 3 ];
+
+    RaySpectrum::Weights( 650.0, anRed );
+    RaySpectrum::Weights( 530.0, anGreen );
+    RaySpectrum::Weights( 450.0, anBlue );
+    Check( anRed[ 0 ] > anRed[ 1 ] && anRed[ 0 ] > anRed[ 2 ] && anGreen[ 1 ] > anGreen[ 0 ] && anGreen[ 1 ] > anGreen[ 2 ] &&
+           anBlue[ 2 ] > anBlue[ 0 ] && anBlue[ 2 ] > anBlue[ 1 ], "650 nm looks red, 530 nm green and 450 nm blue" );
+    Check( RaySpectrum::PartWavelength( 0, 0.0 ) == RaySpectrum::SHORTEST && RaySpectrum::PartWavelength( RaySpectrum::PARTS - 1, 1.0 ) == RaySpectrum::LONGEST,
+           "a split's parts cover the range" );
+
+        // Wavelength channels, and the same index as the lens's lines.
+    int nChannel = CLens::WavelengthChannel( 500.0 );
+
+    Check( CLens::IsSpectral( nChannel ) && ! CLens::IsSpectral( CLens::CHANNEL_BLUE ) && CLens::ChannelWavelength( nChannel ) == 500.0,
+           "a wavelength channel carries its wavelength" );
+    Check( CLens::IndexAt( 1.5, 20.0, 0.65627 ) == CLens::DispersedIndex( 1.5, 20.0, CLens::CHANNEL_RED ) &&
+           CLens::IndexAt( 1.5, 20.0, 0.48613 ) == CLens::DispersedIndex( 1.5, 20.0, CLens::CHANNEL_BLUE ) &&
+           ABS( CLens::IndexAt( 1.5, 20.0, 0.58756 ) - 1.5 ) < 1e-12, "the index at a wavelength matches the C, d and F lines" );
+    Check( ABS( CLens::DispersedIndex( 1.5, 20.0, CLens::WavelengthChannel( 656.27 ) ) - CLens::DispersedIndex( 1.5, 20.0, CLens::CHANNEL_RED ) ) < 1e-12 &&
+           CLens::DispersedIndex( 1.5, 0.0, nChannel ) == 1.5, "a wavelength channel disperses as its line does" );
+
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( WithLens( "{ \"prescription\": \"double-gauss-50mm\" }" ) ) == 0, "a lens scene loads" );
+
+        CLens *pLens = oScene.GetCamera().GetLens();
+
+        Check( pLens && ABS( pLens->FocalLengthIn( CLens::WavelengthChannel( 656.27 ) ) - pLens->FocalLengthIn( CLens::CHANNEL_RED ) ) < 1e-6 &&
+               ABS( pLens->FocalLengthIn( CLens::WavelengthChannel( 486.13 ) ) - pLens->FocalLengthIn( CLens::CHANNEL_BLUE ) ) < 1e-6,
+               "a lens traced at a wavelength focuses as in that line's channel" );
+    }
+
+        // A spectral camera: white light splits at dispersive glass into
+        // single wavelengths, the same each time; without dispersive glass
+        // nothing changes.
+    std::string strSpectral = GlassBallBeforeWall( "\"indexOfRefraction\": 1.5, \"abbe\": 20" );
+    std::string strClear = GlassBallBeforeWall( "\"indexOfRefraction\": 1.5" );
+
+    strSpectral.replace( strSpectral.find( "\"lookAt\": [0, 0, 0] }" ), 21, "\"lookAt\": [0, 0, 0], \"dispersion\": \"spectral\" }" );
+    strClear.replace( strClear.find( "\"lookAt\": [0, 0, 0] }" ), 21, "\"lookAt\": [0, 0, 0], \"dispersion\": \"spectral\" }" );
+
+    CScene oSpectral, oRgb, oClearSpectral, oClearRgb;
+
+    Check( oSpectral.FromJson( strSpectral ) == 0 && oRgb.FromJson( GlassBallBeforeWall( "\"indexOfRefraction\": 1.5, \"abbe\": 20" ) ) == 0 &&
+           oClearSpectral.FromJson( strClear ) == 0 && oClearRgb.FromJson( GlassBallBeforeWall( "\"indexOfRefraction\": 1.5" ) ) == 0,
+           "spectral and RGB glass scenes load" );
+    Check( oSpectral.GetCamera().IsSpectral() && ! oRgb.GetCamera().IsSpectral(), "\"dispersion\": \"spectral\" is read" );
+
+    bool bSame = true, bRepeats = true, bDiffers = false;
+
+    for ( int nStep = 0; nStep < 40; nStep++ )
+    {
+        double  dX = -0.9 + nStep * 0.045;
+        CColor  oFirst = TraceChannel( oSpectral, dX, 0.31, CLens::CHANNEL_ALL );
+        CColor  oAgain = TraceChannel( oSpectral, dX, 0.31, CLens::CHANNEL_ALL );
+        CColor  oRgbSeen = TraceChannel( oRgb, dX, 0.31, CLens::CHANNEL_ALL );
+        CColor  oClearOne = TraceChannel( oClearSpectral, dX, 0.31, CLens::CHANNEL_ALL );
+        CColor  oClearTwo = TraceChannel( oClearRgb, dX, 0.31, CLens::CHANNEL_ALL );
+
+        if ( oFirst.GetR() != oAgain.GetR() || oFirst.GetG() != oAgain.GetG() || oFirst.GetB() != oAgain.GetB() )
+            bRepeats = false;
+        if ( oFirst.GetR() != oRgbSeen.GetR() || oFirst.GetB() != oRgbSeen.GetB() )
+            bDiffers = true;
+        if ( oClearOne.GetR() != oClearTwo.GetR() || oClearOne.GetG() != oClearTwo.GetG() || oClearOne.GetB() != oClearTwo.GetB() )
+            bSame = false;
+    }
+    Check( bRepeats, "spectral dispersion picks the same wavelengths every time" );
+    Check( bDiffers, "spectral dispersion sees differently from red, green and blue" );
+    Check( bSame, "without dispersive glass, a spectral camera sees exactly what an RGB one does" );
+
+    CScene oSaved;
+
+    Check( oSaved.FromJson( oSpectral.ToJson() ) == 0 && oSaved.GetCamera().IsSpectral() &&
+           oSpectral.ToJson().find( "\"dispersion\": \"spectral\"" ) != std::string::npos &&
+           oRgb.ToJson().find( "dispersion" ) == std::string::npos, "\"dispersion\" round-trips, and rgb isn't written" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0] }", "\"lookAt\": [0, 0, 0], \"dispersion\": \"rainbow\" }" ),
+                 BAD_FILE, "unknown dispersion \"rainbow\" (rgb or spectral)" );
+}
+
+static void LeanMeshChecks( void )
+{
+        // Two scenes with the same mesh share one geometry, which goes when
+        // the last mesh using it does.
+    const char *strMesh = "{ \"type\": \"mesh\", \"doubleSided\": true, \"vertices\": [[-1, -1, 0], [1, -1, 0], [0, 1, 0], [0, 0, -1]], "
+                          "\"faces\": [[0, 2, 1], [0, 1, 3], [1, 2, 3], [2, 0, 3]] }";
+    int         nBefore = CMesh::SharedGeometries();
+
+    {
+        CScene  oFirst, oSecond, oOther;
+        CMesh  *pFirst = dynamic_cast<CMesh *>( FirstObject( oFirst, strMesh ) );
+        CMesh  *pSecond = dynamic_cast<CMesh *>( FirstObject( oSecond, strMesh ) );
+        CMesh  *pOther = dynamic_cast<CMesh *>( FirstObject( oOther, "{ \"type\": \"mesh\", \"vertices\": [[-1, -1, 0], [1, -1, 0], [0, 1, 0]], "
+                                                                       "\"faces\": [[0, 2, 1]] }" ) );
+
+        Check( pFirst && pSecond && pOther && pFirst->GetGeometry() == pSecond->GetGeometry() &&
+               pFirst->GetGeometry() != pOther->GetGeometry(), "meshes with the same shape share one geometry, others don't" );
+        Check( CMesh::SharedGeometries() == nBefore + 2, "each shape is built once" );
+
+            // Threads loading copies of a scene at once share it too.
+        std::string             strText = oFirst.ToJson();
+        const CMesh::SGeometry *apSeen[ 8 ] = { NULL };
+        std::vector<std::thread> aoThreads;
+        std::vector<std::unique_ptr<CScene>> apScenes( 8 );
+
+        for ( int nThread = 0; nThread < 8; nThread++ )
+        {
+            aoThreads.push_back( std::thread( [ &, nThread ]()
+            {
+                apScenes[ (size_t)nThread ].reset( new CScene );
+                if ( apScenes[ (size_t)nThread ]->FromJson( strText ) == 0 )
+                {
+                    CMesh *pMesh = dynamic_cast<CMesh *>( apScenes[ (size_t)nThread ]->GetObjectAt( 0 ) );
+
+                    apSeen[ nThread ] = pMesh ? pMesh->GetGeometry() : NULL;
+                }
+            } ) );
+        }
+        for ( size_t nThread = 0; nThread < aoThreads.size(); nThread++ )
+            aoThreads[ nThread ].join();
+
+        bool bShared = true;
+
+        for ( int nThread = 0; nThread < 8; nThread++ )
+            bShared = bShared && ( apSeen[ nThread ] == pFirst->GetGeometry() );
+        Check( bShared, "every thread's copy of a scene shares the mesh's geometry" );
+
+        if ( pFirst )
+        {
+                // A face's stand-in: the same one each time a csg asks, rays
+                // leaving it skip only that face, and two stand-ins for one
+                // face are one surface.
+            CRay    oRay = RayFrom( 0.0, -0.2, -5.0, 0.0, 0.0, 1.0 );
+            CVector oHit;
+            BOOL    bFlip;
+
+            Check( pFirst->Intersect( oRay, oHit ) == TRUE, "a ray hits the lean mesh" );
+
+            CObjects *pPart = pFirst->HitPart( bFlip );
+
+            Check( pPart != pFirst && pFirst->HitPart( bFlip ) == pPart && pPart->MeshFaceOf( pFirst ) >= 0 &&
+                   pPart->MeshFaceOf( pSecond ) == -1, "a mesh's hit part is a stand-in for its face, the same each time" );
+
+            CRay oOn = RayFrom( 0.0, -0.2, -5.0, 0.0, 0.0, 1.0 );
+
+            Check( pFirst->Intersect( oOn, oHit, pPart ) == TRUE && oOn.GetT() > oRay.GetT(),
+                   "a ray ignoring a face goes on to the mesh's next face" );
+            Check( pFirst->Intersect( oOn, oHit, pFirst ) == FALSE, "a ray ignoring the mesh misses it" );
+        }
+    }
+    Check( CMesh::SharedGeometries() == nBefore, "a geometry goes when the last mesh using it does" );
+}
+
 static void ClampChecks( void )
 {
     CScene oScene;
@@ -3083,6 +3254,8 @@ int main( int argc, char **argv )
         EnvironmentChecks();
         CsgChecks();
         DispersionChecks();
+        SpectralChecks();
+        LeanMeshChecks();
         ClampChecks();
         ModelChecks();
         SceneEditChecks();

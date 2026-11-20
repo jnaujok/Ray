@@ -126,6 +126,12 @@ class CObjects
             // Whether the object encloses a volume, every ray crossing in and
             // out of it, so a csg can use it.
         virtual BOOL        IsClosed( void ) { return FALSE; }
+            // Which face of the mesh pMesh this object stands for (a mesh
+            // shades a face through a stand-in made for it), or -1.
+        virtual int         MeshFaceOf( const CObjects *pMesh ) const { (void)pMesh; return -1; }
+            // Whether this and pOther are the same surface: the same object,
+            // or stand-ins for the same face of a mesh.
+        virtual BOOL        SameSurface( const CObjects *pOther ) const { return ( pOther == this ) ? TRUE : FALSE; }
         CMaterialList      &GetMaterials( void ) { return m_oMaterials; }
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }

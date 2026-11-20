@@ -10,6 +10,81 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.11.1] - 2026-11-20
+
+Rainbows and lean meshes: dispersion can be traced wavelength by wavelength, so glass and a
+chromatic lens smear colors into a continuous rainbow instead of three bars, and meshes keep their
+faces as indices in one geometry every thread shares, so a large model costs its memory once.
+Scenes without the new field render byte for byte as before.
+
+### Added
+
+- **Spectral dispersion** (`"dispersion": "spectral"` on the camera; the default, `"rgb"`, is the
+  red, green and blue split of 2026-alpha-0.10). Where white light would split into colors, at
+  dispersive glass or through a chromatic lens, it splits instead into four single wavelengths, one
+  from each quarter of 380 to 720 nm, all at the same place in their quarters. That place comes
+  from where the ray's sample falls in its pixel (`RaySampling::PURPOSE_WAVELENGTH`), so a pixel's
+  samples spread evenly over the range and every run, thread and engine picks the same ones. (Four
+  give a quarter of three's grain in red and a fifth in green, for a third more rays; picking
+  wavelengths in proportion to their weights was tried and was grainier in red.) Each wavelength is bent by
+  the Cauchy index at that wavelength, through `indexOfRefraction` and the Abbe number, sharing the
+  lens's arithmetic (`CLens::IndexAt`; `DispersedIndex` now uses it for the C and F lines too, with
+  the same results). What each sees is weighed by how its wavelength looks: the CIE 1931 color
+  matching functions (Wyman, Sloan and Shirley's 2013 fit) turned to linear sRGB, each scaled so an
+  even spread of wavelengths adds up to exactly white (`RaySpectrum::Weights`, in the new
+  `Spectrum.h`). The smear is a little grainier than red, green and blue, so it wants many rays a
+  pixel. Rays carry their wavelength in their channel
+  (`CLens::WavelengthChannel`, to a hundredth of a nanometer); a lens traces it at its own index,
+  and takes its share of light from the nearest of the red, green and blue tables. Nothing crosses
+  the wire differently.
+
+  ![Before and after: the prism test, the chromatic lens test and the torture test's prism traced in red, green and blue (left) and spectrally (right)](docs/images/changelog/spectral.png)
+
+  Top, the prism test at 64 rays a pixel: the flint prism and ball split each white bar into three
+  colored copies before, and fan it into a spectrum after, overlapping its neighbors' into a smear
+  of every hue; the ball's edges fringe yellow, orange and blue instead of red, green and blue.
+  Middle, the chromatic lens test (an uncorrected BK7 singlet), enlarged: the same fringes, a
+  little grainier. Bottom, the torture test's prism at full size.
+
+### Changed
+
+- **`torture_test`, `prism_test` and `chromatic_test` trace their dispersion spectrally.** Their
+  reference renders and README previews and the full-size `docs/images/torture_test.png` are
+  regenerated; no other render changes. The full-size torture test takes 2,112 CPU-seconds against
+  1,733 before (its chromatic lens now traces four wavelengths a sample instead of three
+  channels), about two and a half minutes on an idle 16-core machine.
+- **Meshes are lean, and shared between threads.** A mesh no longer makes a `CTriangle` object for
+  each face: it keeps its vertices, normals and surface coordinates in arrays with three vertex
+  indices a face, and its tree, and intersects the faces itself (`CTriangle::HitFace`, the
+  triangle's own test, shared so the arithmetic is the same). A face hit is shaded through a
+  stand-in triangle made for it on the spot; a csg asking for a mesh's part gets one stand-in per
+  face, kept. Rays leaving a face skip only that face (`CObjects::MeshFaceOf`), and glass knows a
+  ray came out through the same face it went in by (`CObjects::SameSurface`). All of it, the
+  geometry and its tree, is built once and held in a `CMesh::SGeometry` that every mesh given the
+  same shape shares: each thread's copy of a scene finds the one already built (by a hash of what
+  it was made from, checked bit for bit), and it goes when the last mesh using it does. A model
+  file's bytes are shared the same way. Every render is byte for byte as before.
+
+  On a Release build here (16 cores, other work running; the torture test with its red, green and
+  blue camera, so only the mesh change differs), the test renders' peak memory and time:
+
+  | Render | Threads | Peak memory before → after | Wall time before → after | CPU time before → after |
+  |---|---|---|---|---|
+  | `render_benchy` (320×240) | 4 | 1256 MB → 288 MB | 4.5 s → 3.5 s | 12.1 s → 10.5 s |
+  | `render_benchy` (320×240) | 16 | 4274 MB → 793 MB | 6.3 s → 2.3 s | 39.5 s → 17.5 s |
+  | `render_torture` (160×120) | 4 | 1328 MB → 357 MB | 9.8 s → 10.0 s | 31.0 s → 34.4 s |
+  | `render_torture` (160×120) | 16 | 4517 MB → 933 MB | 11.8 s → 8.4 s | 66.9 s → 46.7 s |
+
+  More threads now make the Benchy render faster instead of slower, since they no longer each
+  build its 225,706 faces. What memory is left per thread is mostly each copy of the scene
+  reading its JSON text (with the model file's bytes inside) while it loads.
+
+### Fixed
+
+- The Windows CI job runs the tests labelled `slow` again (the Benchy load that timed out there was
+  fixed in 2026-alpha-0.11); `ctest -LE slow` still skips them for a quick local run.
+- The known issue of a large model costing memory once per thread is gone from `CLAUDE.md`.
+
 ## [2026-alpha-0.11] - 2026-11-20
 
 Models and prints: meshes load STL (binary, ASCII and colored) and OBJ files into the scene and its
@@ -977,7 +1052,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11.1...HEAD
+[2026-alpha-0.11.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11...2026-alpha-0.11.1
 [2026-alpha-0.11]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.10...2026-alpha-0.11
 [2026-alpha-0.10]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.9...2026-alpha-0.10
 [2026-alpha-0.9]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.8...2026-alpha-0.9

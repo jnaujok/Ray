@@ -23,6 +23,7 @@
             "seed": 0
         },
         "colorModel": "clip",
+        "dispersion": "spectral",
         "lens": {
             "surfaces": [
                 {

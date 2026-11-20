@@ -9,6 +9,7 @@
 #include "SceneJson.h"
 #include "Sampling.h"
 #include "Lens.h"
+#include "Spectrum.h"
 
 #include <math.h>
 
@@ -122,6 +123,39 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
         // channel goes on as three, red, green and blue, each keeping only
         // its own channel of what it sees. From here on each stays in its
         // channel, so further glass bends it by that channel's index too.
+    if ( ( m_nAbbe > 0.0 ) && ( oViewIncident.GetChannel() == CLens::CHANNEL_ALL ) && oScene.GetCamera().IsSpectral() )
+    {
+            // Traced spectrally, it goes on as four single wavelengths, one
+            // from each quarter of the range, each weighed by how its
+            // wavelength looks (see Spectrum.h).
+        FLT     nU, nV;
+        FLT     anSum[ 3 ] = { 0.0, 0.0, 0.0 };
+
+        oViewIncident.SamplePoint( RaySampling::PURPOSE_WAVELENGTH, nU, nV );
+
+        FLT     nWhere = RaySpectrum::WhereInPart( nU, nV );
+
+        for ( int nPart = 0; nPart < RaySpectrum::PARTS; nPart++ )
+        {
+            FLT     nNanometers;
+            FLT     anWeight[ 3 ];
+
+            RaySpectrum::PartWeights( nPart, nWhere, nNanometers, anWeight );
+
+            CRay    oChannelRay( oViewIncident );
+            CVector oPoint( oIntersect );
+            CVector oChannelNormal( oNormal );
+
+            oChannelRay.SetChannel( CLens::WavelengthChannel( nNanometers ) );
+
+            CColor  oSeen = GetColor( oScene, oChannelRay, oPoint, oChannelNormal, pIntersect );
+
+            anSum[ 0 ] += oSeen.GetR() * anWeight[ 0 ];
+            anSum[ 1 ] += oSeen.GetG() * anWeight[ 1 ];
+            anSum[ 2 ] += oSeen.GetB() * anWeight[ 2 ];
+        }
+        return CColor( anSum[ 0 ] / RaySpectrum::PARTS, anSum[ 1 ] / RaySpectrum::PARTS, anSum[ 2 ] / RaySpectrum::PARTS );
+    }
     if ( ( m_nAbbe > 0.0 ) && ( oViewIncident.GetChannel() == CLens::CHANNEL_ALL ) )
     {
         FLT anChannel[ 3 ];
@@ -158,7 +192,8 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
 
         // Whether the ray reached this surface from inside the object: it
         // went in through this material (or was turned back inside by it).
-    BOOL        bLeaving = ( oViewIncident.GetInside() == pIntersect ) ? TRUE : FALSE;
+    const CObjects *pInside = oViewIncident.GetInside();
+    BOOL        bLeaving = ( pInside == pIntersect || ( pInside && pIntersect && pInside->SameSurface( pIntersect ) ) ) ? TRUE : FALSE;
     BOOL        bPasses = Refract( oView, oNormal, nIndex, oTransmit );
 
         // Rough (frosted) glass bends the ray through a microfacet normal
