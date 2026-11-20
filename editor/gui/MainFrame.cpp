@@ -13,7 +13,10 @@
 #include <wx/splitter.h>
 #include <wx/statusbr.h>
 
+#include <cstdlib>
+#include <cstring>
 #include <memory>
+#include <vector>
 
 using namespace RayEditor;
 
