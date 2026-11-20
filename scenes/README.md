@@ -19,6 +19,7 @@ when the binary format was dropped; they are in the repository's history.
 | `xxx.ray` | version 1 | Read with the legacy number format |
 | `huh.ray` | transitional | Version-2 header with legacy numbers; renders blank |
 | `lens_test.ray` | | `scan_test` through a real lens: the built-in double Gauss wide open (f/2), focused on the glass sphere, with 1 scene unit = 10 cm and a 5×5 stratified sampler |
+| `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
 Two 1997 files, `yyy.ray` (saved by an in-between build that wrote an extra, undefined field) and
@@ -93,11 +94,21 @@ tracing.
 | `sensorWidth` | `36` | In mm (36 is full frame); the height follows from the image's shape |
 | `millimetersPerUnit` | `1000` | How big a scene unit is (1000: scene units are meters) |
 | `seed` | `0` | Picks the points rays cross the lens at |
+| `chromatic` | `true` | Trace red, green and blue apart where the glasses have Abbe numbers; `false` traces every channel at the d line, a third of the work |
 
 Each surface: `radius` of curvature in mm (positive when its center of curvature is toward the
 sensor; `0` for flat), `thickness` to the next surface in mm (the last one's is ignored: focusing
 places the sensor), `ior` of what follows it (default `1`, air), `aperture`, its semi-aperture
-(radius) in mm, and `stop: true` for the aperture stop, which must be flat. A prescription that
+(radius) in mm, `stop: true` for the aperture stop, which must be flat, and `abbe`, the Abbe number
+of the glass that follows (leave it out for no dispersion).
+
+**Chromatic aberration.** Glass bends short wavelengths more than long ones. Each glass's index is
+fitted to a Cauchy curve, n = A + B/λ², through its `ior` (at the d line, 587.6 nm) and its Abbe
+number, and each sample is traced three times: red at the C line (656.3 nm), green at the d line
+and blue at the F line (486.1 nm), each keeping only its own channel. Where the paths part, colors
+fringe; green uses `ior` as given, so focus and exposure are worked out for it. The built-in double
+Gauss is corrected for color, so its fringes are faint; a single lens shows them plainly
+(`chromatic_test.ray`). A prescription that
 doesn't converge light, or can't focus at the distance asked, is reported when the scene loads.
 
 **Objects.** Each has a `type`, a `color` (default `[0.5, 0.5, 0.5]`; the 1997 editor's base

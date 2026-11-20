@@ -22,6 +22,15 @@
 *                   which a ray hits the barrel                          *
 *       stop        whether this is the aperture stop (flat); its        *
 *                   opening follows the f-number                         *
+*       abbe        the Abbe number of the glass that follows (0: no     *
+*                   dispersion)                                          *
+*                                                                        *
+*   Chromatic aberration: glass bends short wavelengths more than long   *
+*   ones. With Abbe numbers, each glass's index is fitted to a Cauchy    *
+*   curve, n = A + B / wavelength^2, through its index at the d line and *
+*   its Abbe number, and the red, green and blue channels are traced at  *
+*   the C (656.3 nm), d (587.6 nm) and F (486.1 nm) lines. Green is the  *
+*   index as given, so focus and exposure are worked out for it.         *
 *                                                                        *
 *   In the lens's own frame, in millimeters, the front surface is at     *
 *   z = 0 and light travels toward +z, to the sensor. The camera puts    *
@@ -68,7 +77,12 @@ class CLens
             FLT                 nIor;
             FLT                 nAperture;
             BOOL                bStop;
+            FLT                 nAbbe;          // 0: the glass doesn't disperse
         };
+
+            // The channel a ray is traced in: every channel at the d line, or
+            // one of red, green and blue at its own wavelength.
+        enum EChannel { CHANNEL_ALL = 0, CHANNEL_RED = 1, CHANNEL_GREEN = 2, CHANNEL_BLUE = 3 };
 
             // One entry of the table of lenses that can be named in a scene.
         struct SPrescription
@@ -87,6 +101,7 @@ class CLens
         FLT                     m_nSensorWidth;     // mm
         FLT                     m_nMillimetersPerUnit;
         int                     m_nSeed;
+        BOOL                    m_bChromatic;       // trace the channels apart, if any glass disperses
 
             // Worked out by Prepare().
         std::vector<FLT>        m_anVertexZ;        // each surface's place on the axis
@@ -101,10 +116,13 @@ class CLens
             // Traces a ray through the surfaces, forward (toward the
             // sensor) or backward. The ray is changed in place; FALSE if it
             // is blocked or totally internally reflected.
-        BOOL                    Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT nStopRadius ) const;
+        BOOL                    Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT nStopRadius,
+                                       int nChannel = CHANNEL_ALL ) const;
+            // The index of what follows surface nIndex (or air, for -1) in a channel.
+        FLT                     IorAt( int nIndex, int nChannel ) const;
             // Where a paraxial ray from an on-axis point nObjectZ (or from
             // infinity, if bInfinity) crosses the axis behind the lens.
-        BOOL                    ImageZ( FLT nObjectZ, BOOL bInfinity, FLT &nImageZ ) const;
+        BOOL                    ImageZ( FLT nObjectZ, BOOL bInfinity, FLT &nImageZ, int nChannel = CHANNEL_ALL ) const;
 
     public:
                                 CLens( void );
@@ -131,7 +149,12 @@ class CLens
             /// element (an even spread of them covers it evenly). FALSE if
             /// the lens blocks the ray.
         BOOL                    RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLensV,
-                                        FLT anOrigin[ 3 ], FLT anDirection[ 3 ] ) const;
+                                        FLT anOrigin[ 3 ], FLT anDirection[ 3 ], int nChannel = CHANNEL_ALL ) const;
+            /// Whether the channels are traced apart: some glass has an Abbe
+            /// number, and chromatic aberration isn't turned off.
+        BOOL                    IsChromatic( void ) const;
+            /// The focal length for a channel's wavelength (after Prepare).
+        FLT                     FocalLengthIn( int nChannel ) const;
         int                     GetSeed( void ) const { return m_nSeed; }
 
         FLT                     GetFocalLength( void ) const { return m_nFocalLength; }

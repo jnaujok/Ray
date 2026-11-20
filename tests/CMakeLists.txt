@@ -98,6 +98,20 @@ add_test(NAME render_lens
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(render_lens PROPERTIES TIMEOUT 600)
 add_test(NAME roundtrip_lens_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/lens_test.ray ${RENDER_DIR})
+# Chromatic aberration: scan_test through an uncorrected BK7 singlet, each
+# sample traced in red, green and blue apart.
+add_test(NAME render_chromatic
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/chromatic_test.ray
+                 -DOUTPUT=${RENDER_DIR}/chromatic_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/chromatic_test.raw
+                 -DSIZE=160x120
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_chromatic PROPERTIES FIXTURES_SETUP render_chromatic TIMEOUT 600)
+add_test(NAME roundtrip_chromatic_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/chromatic_test.ray ${RENDER_DIR})
+
 add_test(NAME render_sampler_stratified
          COMMAND ${CMAKE_COMMAND}
                  -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -186,6 +200,23 @@ add_test(NAME network_sampler_random4
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_sampler_random4 PROPERTIES FIXTURES_REQUIRED render_sampler_random4
                                                         RESOURCE_LOCK ray_network TIMEOUT 300)
+
+# The channel a ray is traced in travels in its tag; it must come back from
+# networked engines intact.
+math(EXPR port "${port} + 1")
+add_test(NAME network_chromatic
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/chromatic_test.ray
+                 -DOUTPUT=${RENDER_DIR}/chromatic_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DSIZE=160x120
+                 -DEXACT_WITH=${RENDER_DIR}/chromatic_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_chromatic PROPERTIES FIXTURES_REQUIRED render_chromatic
+                                                  RESOURCE_LOCK ray_network TIMEOUT 600)
 
 # raythrower --spawn starts the rayengine next to it.
 add_dependencies(raythrower rayengine)

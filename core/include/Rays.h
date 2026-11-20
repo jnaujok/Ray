@@ -30,12 +30,19 @@ class CRay
         long            m_nPixelX;
         long            m_nPixelY;
         long            m_nDepth;
+            // Where on the image a primary ray was made for (not sent to
+            // engines; the master uses it to remake the ray per channel).
+        FLT             m_nImageX;
+        FLT             m_nImageY;
     public:
                         CRay( void );
                         CRay( const CRay &oSource );
         virtual        ~CRay( void );
         virtual void    CreateRay( CScene &oScene, int nX, int nY, FLT nInfluence = 1.0 );
-        virtual void    CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int nTagY, FLT nInfluence = 1.0 );
+        virtual void    CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int nTagY, FLT nInfluence = 1.0,
+                                     int nChannel = 0 );
+        FLT             GetImageX( void ) const { return m_nImageX; }
+        FLT             GetImageY( void ) const { return m_nImageY; }
         virtual void    CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX, int nY );
 
 

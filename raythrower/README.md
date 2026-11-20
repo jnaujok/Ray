@@ -51,7 +51,8 @@ each cell, all weighted equally (n from 1 to 32, default 4). It is the sampler t
 lens, where every ray takes its own path through the glass.
 
 When the scene's camera has a lens, `raythrower` prints its focal length, f-number, focus distance
-and where the sensor sits before it traces.
+and where the sensor sits before it traces, and, for a lens with chromatic aberration, its focal
+length in red, green and blue. Such a lens traces three rays per sample.
 
 `--color` picks how pixel colors become bytes. `clip`, the default, is the 1997 look. `gamma` and
 `srgb` encode for today's displays, which makes the 1997 scenes, lit for a screen without gamma

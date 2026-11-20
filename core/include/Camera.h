@@ -105,7 +105,10 @@ class CCamera : public CObjects
             // nImageX and nImageY, the point in pixels, pick where a ray
             // crosses the lens). FALSE if the lens blocks it.
         BOOL        PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, FLT nImageY,
-                                CVector &oOrigin, CVector &oDirection );
+                                CVector &oOrigin, CVector &oDirection, int nChannel = 0 );
+            // How many channels each sample is traced in: 3 for a lens with
+            // chromatic aberration (red, green and blue apart), else 1.
+        int         GetChannels( void ) const { return ( m_pLens && m_pLens->IsChromatic() ) ? 3 : 1; }
             // What every pixel is scaled by: 1 for a pinhole.
         FLT         GetExposure( void ) const { return m_pLens ? m_pLens->GetExposure() : 1.0; }
         FLT         GetXRotate( void ) { return m_nXRotate; }

@@ -20,24 +20,31 @@
     // Rays across the rear element, each way, to measure the exposure.
 #define EXPOSURE_GRID       128
 
+    // The Fraunhofer lines, in micrometers: the channels' wavelengths.
+#define WAVELENGTH_C        0.65627     // red
+#define WAVELENGTH_D        0.58756     // green
+#define WAVELENGTH_F        0.48613     // blue
+
 namespace
 {
         // The double Gauss of US patent 2,673,491 (Tronnier): 50 mm, f/2,
         // as tabulated by Kolb, Mitchell and Hanrahan, "A Realistic Camera
-        // Model for Computer Graphics" (1995). Apertures are semi-apertures.
+        // Model for Computer Graphics" (1995), with its Abbe numbers (three
+        // of its glasses are catalogue glasses: SF15 1.699/30.1, F5
+        // 1.603/38.0 and LaF3 1.717/48.0). Apertures are semi-apertures.
     const CLens::SSurface s_aoDoubleGauss50[] =
     {
-        {  29.475, 3.76,  1.67,  12.6,  FALSE },
-        {  84.83,  0.12,  1.0,   12.6,  FALSE },
-        {  19.275, 4.025, 1.67,  11.5,  FALSE },
-        {  40.77,  3.275, 1.699, 11.5,  FALSE },
-        {  12.75,  5.705, 1.0,   9.0,   FALSE },
-        {   0.0,   4.5,   1.0,   8.55,  TRUE  },
-        { -14.495, 1.18,  1.603, 8.5,   FALSE },
-        {  40.77,  6.065, 1.658, 10.0,  FALSE },
-        { -20.385, 0.19,  1.0,   10.0,  FALSE },
-        { 437.065, 3.22,  1.717, 10.0,  FALSE },
-        { -39.73,  0.0,   1.0,   10.0,  FALSE },
+        {  29.475, 3.76,  1.67,  12.6,  FALSE, 47.1 },
+        {  84.83,  0.12,  1.0,   12.6,  FALSE, 0.0  },
+        {  19.275, 4.025, 1.67,  11.5,  FALSE, 47.1 },
+        {  40.77,  3.275, 1.699, 11.5,  FALSE, 30.1 },
+        {  12.75,  5.705, 1.0,   9.0,   FALSE, 0.0  },
+        {   0.0,   4.5,   1.0,   8.55,  TRUE,  0.0  },
+        { -14.495, 1.18,  1.603, 8.5,   FALSE, 38.0 },
+        {  40.77,  6.065, 1.658, 10.0,  FALSE, 57.3 },
+        { -20.385, 0.19,  1.0,   10.0,  FALSE, 0.0  },
+        { 437.065, 3.22,  1.717, 10.0,  FALSE, 48.0 },
+        { -39.73,  0.0,   1.0,   10.0,  FALSE, 0.0  },
     };
 
     const CLens::SPrescription s_aoPrescriptions[] =
@@ -71,6 +78,7 @@ CLens::CLens( void ) :
     m_nSensorWidth( 36.0 ),
     m_nMillimetersPerUnit( 1000.0 ),
     m_nSeed( 0 ),
+    m_bChromatic( TRUE ),
     m_nFocalLength( 0.0 ),
     m_nWideOpen( 0.0 ),
     m_nStopRadius( 0.0 ),
@@ -107,7 +115,50 @@ void CLens::SetSurfaces( const std::vector<SSurface> &aoSurfaces )
     m_bPrepared = FALSE;
 }
 
-BOOL CLens::Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT nStopRadius ) const
+FLT CLens::IorAt( int nIndex, int nChannel ) const
+{
+    if ( nIndex < 0 )
+        return 1.0;
+
+    const SSurface &oSurface = m_aoSurfaces[ (size_t)nIndex ];
+
+    if ( nChannel == CHANNEL_ALL || nChannel == CHANNEL_GREEN || ! m_bChromatic ||
+         ! ( oSurface.nAbbe > 0.0 ) || oSurface.nIor == 1.0 )
+        return oSurface.nIor;
+
+        // Cauchy's n = A + B / wavelength^2, through n at the d line and the
+        // Abbe number V = ( n_d - 1 ) / ( n_F - n_C ).
+    FLT nB = ( oSurface.nIor - 1.0 ) /
+             ( oSurface.nAbbe * ( ( 1.0 / ( WAVELENGTH_F * WAVELENGTH_F ) ) - ( 1.0 / ( WAVELENGTH_C * WAVELENGTH_C ) ) ) );
+    FLT nA = oSurface.nIor - ( nB / ( WAVELENGTH_D * WAVELENGTH_D ) );
+    FLT nWavelength = ( nChannel == CHANNEL_RED ) ? WAVELENGTH_C : WAVELENGTH_F;
+
+    return nA + ( nB / ( nWavelength * nWavelength ) );
+}
+
+BOOL CLens::IsChromatic( void ) const
+{
+    if ( ! m_bChromatic )
+        return FALSE;
+    for ( size_t nIndex = 0; nIndex < m_aoSurfaces.size(); nIndex++ )
+    {
+        if ( m_aoSurfaces[ nIndex ].nAbbe > 0.0 && m_aoSurfaces[ nIndex ].nIor != 1.0 )
+            return TRUE;
+    }
+    return FALSE;
+}
+
+FLT CLens::FocalLengthIn( int nChannel ) const
+{
+    FLT anOrigin[ 3 ] = { 0.0, PARAXIAL_HEIGHT, -1.0 };
+    FLT anDirection[ 3 ] = { 0.0, 0.0, 1.0 };
+
+    if ( ! m_bPrepared || ! Trace( anOrigin, anDirection, TRUE, 1e300, nChannel ) || anDirection[ 1 ] >= 0.0 )
+        return 0.0;
+    return -PARAXIAL_HEIGHT / ( anDirection[ 1 ] / anDirection[ 2 ] );
+}
+
+BOOL CLens::Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT nStopRadius, int nChannel ) const
 {
     int nCount = (int)m_aoSurfaces.size();
 
@@ -115,8 +166,8 @@ BOOL CLens::Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT n
     {
         int             nIndex = bForward ? nStep : ( nCount - 1 - nStep );
         const SSurface &oSurface = m_aoSurfaces[ (size_t)nIndex ];
-        FLT             nBefore = ( nIndex == 0 ) ? 1.0 : m_aoSurfaces[ (size_t)nIndex - 1 ].nIor;
-        FLT             nAfter = oSurface.nIor;
+        FLT             nBefore = IorAt( nIndex - 1, nChannel );
+        FLT             nAfter = IorAt( nIndex, nChannel );
         FLT             nVertex = m_anVertexZ[ (size_t)nIndex ];
         FLT             anHit[ 3 ];
         FLT             anNormal[ 3 ];
@@ -209,7 +260,7 @@ BOOL CLens::Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT n
     return TRUE;
 }
 
-BOOL CLens::ImageZ( FLT nObjectZ, BOOL bInfinity, FLT &nImageZ ) const
+BOOL CLens::ImageZ( FLT nObjectZ, BOOL bInfinity, FLT &nImageZ, int nChannel ) const
 {
     FLT anOrigin[ 3 ];
     FLT anDirection[ 3 ];
@@ -254,7 +305,7 @@ BOOL CLens::ImageZ( FLT nObjectZ, BOOL bInfinity, FLT &nImageZ ) const
         Normalize( anDirection );
     }
 
-    if ( ! Trace( anOrigin, anDirection, TRUE, nFullStop ) || anDirection[ 1 ] == 0.0 )
+    if ( ! Trace( anOrigin, anDirection, TRUE, nFullStop, nChannel ) || anDirection[ 1 ] == 0.0 )
         return FALSE;
 
     nImageZ = anOrigin[ 2 ] + ( ( -anOrigin[ 1 ] / anDirection[ 1 ] ) * anDirection[ 2 ] );
@@ -397,7 +448,8 @@ BOOL CLens::Prepare( FLT nDefaultFocus, std::string &strError )
     return TRUE;
 }
 
-BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLensV, FLT anOrigin[ 3 ], FLT anDirection[ 3 ] ) const
+BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLensV, FLT anOrigin[ 3 ], FLT anDirection[ 3 ],
+                    int nChannel ) const
 {
     if ( ! m_bPrepared || ! ( nAspect > 0.0 ) )
         return FALSE;
@@ -438,7 +490,7 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
     anDirection[ 2 ] = m_anVertexZ.back() - anOrigin[ 2 ];
     Normalize( anDirection );
 
-    return Trace( anOrigin, anDirection, FALSE, m_nStopRadius );
+    return Trace( anOrigin, anDirection, FALSE, m_nStopRadius, nChannel );
 }
 
 std::string CLens::Describe( void ) const
@@ -449,7 +501,16 @@ std::string CLens::Describe( void ) const
               "%s: %.1f mm, f/%.2f (opens to f/%.2f), focused at %g scene units, sensor %.1f mm wide, %.2f mm behind the rear surface",
               m_strPrescription.empty() ? "lens" : m_strPrescription.c_str(), (double)m_nFocalLength, (double)GetFNumber(),
               (double)m_nWideOpen, (double)m_nFocusedAt, (double)m_nSensorWidth, (double)GetFilmDistance() );
-    return achBuffer;
+
+    std::string strDescription = achBuffer;
+
+    if ( IsChromatic() )
+    {
+        snprintf( achBuffer, sizeof( achBuffer ), "; chromatic: focal length %.3f mm red, %.3f green, %.3f blue",
+                  (double)FocalLengthIn( CHANNEL_RED ), (double)FocalLengthIn( CHANNEL_GREEN ), (double)FocalLengthIn( CHANNEL_BLUE ) );
+        strDescription += achBuffer;
+    }
+    return strDescription;
 }
 
 void CLens::ToJson( IASLib::CObjectNode &oNode ) const
@@ -471,6 +532,8 @@ void CLens::ToJson( IASLib::CObjectNode &oNode ) const
             RayJson::PutNumber( *pSurface, "aperture", oSurface.nAperture );
             if ( oSurface.bStop )
                 RayJson::PutBool( *pSurface, "stop", TRUE );
+            if ( oSurface.nAbbe > 0.0 )
+                RayJson::PutNumber( *pSurface, "abbe", oSurface.nAbbe );
         }
     }
     if ( m_nFNumber > 0.0 )
@@ -480,13 +543,15 @@ void CLens::ToJson( IASLib::CObjectNode &oNode ) const
     RayJson::PutNumber( oNode, "sensorWidth", m_nSensorWidth );
     RayJson::PutNumber( oNode, "millimetersPerUnit", m_nMillimetersPerUnit );
     oNode.put( "seed", m_nSeed );
+    if ( ! m_bChromatic )
+        RayJson::PutBool( oNode, "chromatic", FALSE );
 }
 
 BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "prescription", "surfaces", "fNumber", "focusDistance", "sensorWidth",
-                                              "millimetersPerUnit", "seed", NULL };
-    static const char *const astrSurface[] = { "radius", "thickness", "ior", "aperture", "stop", NULL };
+                                              "millimetersPerUnit", "seed", "chromatic", NULL };
+    static const char *const astrSurface[] = { "radius", "thickness", "ior", "aperture", "stop", "abbe", NULL };
     std::string             strPrescription;
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
@@ -495,7 +560,8 @@ BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
          ! RayJson::GetNumber( oNode, "focusDistance", m_nFocusDistance, FALSE ) ||
          ! RayJson::GetNumber( oNode, "sensorWidth", m_nSensorWidth, FALSE ) ||
          ! RayJson::GetNumber( oNode, "millimetersPerUnit", m_nMillimetersPerUnit, FALSE ) ||
-         ! RayJson::GetInt( oNode, "seed", m_nSeed, 0, 2147483647, FALSE ) )
+         ! RayJson::GetInt( oNode, "seed", m_nSeed, 0, 2147483647, FALSE ) ||
+         ! RayJson::GetBool( oNode, "chromatic", m_bChromatic, FALSE ) )
         return FALSE;
 
     if ( m_nFNumber < 0.0 )
@@ -529,15 +595,18 @@ BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
     {
         RayJson::CWhere             oElement( "", nIndex );
         const IASLib::CJsonNode    &oSurfaceNode = *pSurfaces->get( nIndex );
-        SSurface                    oSurface = { 0.0, 0.0, 1.0, 0.0, FALSE };
+        SSurface                    oSurface = { 0.0, 0.0, 1.0, 0.0, FALSE, 0.0 };
 
         if ( ! RayJson::OnlyFields( oSurfaceNode, astrSurface ) ||
              ! RayJson::GetNumber( oSurfaceNode, "radius", oSurface.nRadius, TRUE ) ||
              ! RayJson::GetNumber( oSurfaceNode, "thickness", oSurface.nThickness, TRUE ) ||
              ! RayJson::GetNumber( oSurfaceNode, "ior", oSurface.nIor, FALSE ) ||
              ! RayJson::GetNumber( oSurfaceNode, "aperture", oSurface.nAperture, TRUE ) ||
-             ! RayJson::GetBool( oSurfaceNode, "stop", oSurface.bStop, FALSE ) )
+             ! RayJson::GetBool( oSurfaceNode, "stop", oSurface.bStop, FALSE ) ||
+             ! RayJson::GetNumber( oSurfaceNode, "abbe", oSurface.nAbbe, FALSE ) )
             return FALSE;
+        if ( oSurface.nAbbe < 0.0 )
+            return RayJson::Fail( "abbe can't be negative" );
         if ( oSurface.nThickness < 0.0 )
             return RayJson::Fail( "thickness can't be negative" );
         if ( ! ( oSurface.nIor >= 1.0 ) )

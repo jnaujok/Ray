@@ -26,7 +26,8 @@ CTaskMaster::CTaskMaster( void ) :
     m_nRaysTraced( 0 ),
     m_nRaysToTrace( 0 ),
     m_pSampler( NULL ),
-    m_pWriter( NULL )
+    m_pWriter( NULL ),
+    m_nChannels( 1 )
 {
 }
 
@@ -48,10 +49,41 @@ BOOL CTaskMaster::EndTrace( void )
     return ( nCount < 100 );
 }
 
+    // With channels apart, a ray's channel is in the top two bits of its
+    // tag's y, which samplers never use.
+#define CHANNEL_SHIFT       30
+#define CHANNEL_TAG_MASK    0x3FFFFFFFu
+
 void CTaskMaster::PutSample( int nX, int nY, const CColor &oColor )
 {
-    if ( m_pSampler && m_pWriter )
+    if ( ! m_pSampler || ! m_pWriter )
+        return;
+
+    if ( m_nChannels == 1 )
+    {
         m_pSampler->PutSample( *m_pWriter, nX, nY, oColor );
+        return;
+    }
+
+        // Keep the channel the ray was traced for; once a sample's three
+        // channels are in, hand the whole color to the sampler.
+    uint32_t        nTagY = (uint32_t)nY;
+    int             nChannel = (int)( nTagY >> CHANNEL_SHIFT );
+    int             nPlainY = (int)( nTagY & CHANNEL_TAG_MASK );
+    uint64_t        nKey = ( (uint64_t)(uint32_t)nX << 32 ) | (uint32_t)nPlainY;
+    CColor          oPart( oColor );
+    SChannelParts  &oParts = m_mapParts[ nKey ];
+
+    if ( nChannel < 1 || nChannel > 3 )
+        return;
+    oParts.anColor[ nChannel - 1 ] = ( nChannel == 1 ) ? oPart.GetR() : ( nChannel == 2 ) ? oPart.GetG() : oPart.GetB();
+    if ( ++oParts.nParts == 3 )
+    {
+        CColor oWhole( oParts.anColor[ 0 ], oParts.anColor[ 1 ], oParts.anColor[ 2 ] );
+
+        m_mapParts.erase( nKey );
+        m_pSampler->PutSample( *m_pWriter, nX, nPlainY, oWhole );
+    }
 }
 
     // Collects whatever colors the tasks have finished. Returns FALSE if a
@@ -110,7 +142,9 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
 
     m_pSampler = &oSampler;
     m_pWriter = &oWriter;
-    m_nRaysToTrace = oSampler.Begin( oSettings.GetImageWidth(), oSettings.GetImageHeight() );
+    m_nChannels = oScene.GetCamera().GetChannels();
+    m_mapParts.clear();
+    m_nRaysToTrace = oSampler.Begin( oSettings.GetImageWidth(), oSettings.GetImageHeight() ) * m_nChannels;
 
     m_bTracing = true;
     m_bStop = false;
@@ -120,7 +154,24 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
         bRetVal = FALSE;
 
     while ( bRetVal && oSampler.NextRay( oScene, oRay ) )
-        bRetVal = QueueRay( oRay, oRays, nCurrentTask );
+    {
+        if ( m_nChannels == 1 )
+            bRetVal = QueueRay( oRay, oRays, nCurrentTask );
+        else
+        {
+                // A chromatic lens sends each wavelength its own way: remake
+                // the sampler's ray once for each channel.
+            CRay oChannelRay;
+
+            for ( int nChannel = 1; bRetVal && nChannel <= 3; nChannel++ )
+            {
+                oChannelRay.CreateRayAt( oScene, oRay.GetImageX(), oRay.GetImageY(), oRay.GetPixelX(),
+                                         (int)( (uint32_t)oRay.GetPixelY() | ( (uint32_t)nChannel << CHANNEL_SHIFT ) ),
+                                         1.0, nChannel );
+                bRetVal = QueueRay( oChannelRay, oRays, nCurrentTask );
+            }
+        }
+    }
 
     if ( bRetVal && oRays.GetSize() )
         bRetVal = RaysToTask( oRays, nCurrentTask );
@@ -134,6 +185,7 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
     }
 
     oSampler.End();
+    m_mapParts.clear();
     m_pSampler = NULL;
     m_pWriter = NULL;
     m_bTracing = false;

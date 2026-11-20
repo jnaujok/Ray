@@ -51,6 +51,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   example prescription in the design brief this started from turned out to be a diverging lens
   (focal length −16 mm), which can't form an image; such lenses are rejected with that message.
   A camera without a lens is the same pinhole as before, byte for byte. New `scenes/lens_test.ray`.
+  - Chromatic aberration: surfaces take an `abbe` number for the glass that follows. Each glass's
+    index is fitted to a Cauchy curve through its d-line index and Abbe number, and each sample is
+    traced three times, red at the C line (656.3 nm), green at the d line (587.6 nm) and blue at
+    the F line (486.1 nm), each keeping only its channel; the task master recombines them. The
+    channel travels in the top bits of the ray's tag, so engines and the wire format are
+    unchanged and networked images still match threads. Green uses the index as given, so focus
+    and exposure are unchanged. `"chromatic": false` turns it off. The built-in double Gauss has
+    its Abbe numbers (from Kolb's table; three of its glasses match catalogue SF15, F5 and LaF3),
+    and is corrected for color (red and blue focal lengths within 0.06 mm), so its fringes are
+    faint; new `scenes/chromatic_test.ray` uses an uncorrected BK7 singlet, whose color focus
+    shift (0.75 mm) matches the textbook f/V.
   - `stratified` sampler (`CStratifiedSampler`): an n×n grid of equally weighted rays per pixel,
     each at a random point in its cell (`grid`, n, default 4; `seed`). Equal weights matter with a
     lens, where the `random` sampler's half-weight center ray makes every blocked ray a dark speck.
@@ -89,7 +100,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`docs/images/tests/`) from `tests/reference/renders.tar.gz`.
 - `CRay::CreateRayAt`, which casts a primary ray through any point on the image,
   `CImageFile::PutRGB`, `CVector::Cross`, and `CScene::GetObjectAt`.
-- Tests: a lens render and lens checks (the double Gauss's focal length, f-number and focus, and
+- Tests: lens and chromatic renders (and a networked chromatic render, which must match threads),
+  checks of each lens's color focus shifts, a lens render and lens checks (the double Gauss's focal length, f-number and focus, and
   the errors for unusable lenses), the stratified sampler, four scenes rendered with corner
   anti-aliasing, one with `box` and with `random` at 2, 4
   and 9 rays (and networked `random`, which must match threads exactly), one with each color

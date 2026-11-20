@@ -77,8 +77,9 @@ The ray tracing itself is the 1997 code.
 - **Real lenses:** give the camera a lens prescription (spherical glass surfaces, front to back, as
   in lens patents) and rays are traced from the sensor back through each element. Rays the barrel or
   aperture stop blocks go dark, so depth of field, vignetting, and the lens's own aberrations and
-  distortion come out of the optics. Focus and exposure are worked out automatically; a 50 mm f/2
-  double Gauss is built in.
+  distortion come out of the optics. Give the glasses Abbe numbers and red, green and blue are
+  traced at their own wavelengths, for chromatic aberration. Focus and exposure are worked out
+  automatically; a 50 mm f/2 double Gauss is built in.
 
   <img src="docs/images/lens.png" alt="scan_test through a pinhole, and through the double Gauss at f/2 focused on the glass sphere" width="650">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
@@ -254,8 +255,9 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests render every sample scene and compare it with a reference render (four of them again with
-corner anti-aliasing, one with each other sampler and color model, the teapot, and a real lens).
-They also check that a lens has the focal length, f-number and focus its prescription should, that
+corner anti-aliasing, one with each other sampler and color model, the teapot, and two real lenses).
+They also check that a lens has the focal length, f-number, focus and color dispersion its
+prescription should, that
 networked engines produce exactly the same bytes as threads and that rays and colors cross the wire
 exactly, that scene files survive a load and save, that mistakes in JSON scenes are reported where
 they are, and triangle sidedness and that smooth mesh faces agree along shared edges. CI runs them
@@ -279,7 +281,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/reflect_test3.png" alt="render_reflect_test3" width="260"><br><code>render_reflect_test3</code></td><td align="center"><img src="docs/images/tests/reflection_test.png" alt="render_reflection_test" width="260"><br><code>render_reflection_test</code></td><td align="center"><img src="docs/images/tests/scan_test.png" alt="render_scan_test" width="260"><br><code>render_scan_test</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/ser_test.png" alt="render_ser_test" width="260"><br><code>render_ser_test</code></td><td align="center"><img src="docs/images/tests/ser_test2.png" alt="render_ser_test2 (blank by design)" width="260"><br><code>render_ser_test2 (blank by design)</code></td><td align="center"><img src="docs/images/tests/spec_test.png" alt="render_spec_test" width="260"><br><code>render_spec_test</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random` and

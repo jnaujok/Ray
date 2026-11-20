@@ -14,6 +14,7 @@
 #include "Globals.h"
 
 #include <atomic>
+#include <unordered_map>
 
 class CScene;
 class CImageFile;
@@ -35,6 +36,16 @@ class CTaskMaster
         long long           m_nRaysToTrace;
         CPixelSampler      *m_pSampler;     // The camera's sampler, during a trace.
         CPixelWriter       *m_pWriter;      // The image and color model, during a trace.
+        int                 m_nChannels;    // 3: each sample is traced in red, green and blue apart.
+
+            // With channels apart, the parts of each sample that have come
+            // back, by tag, until all three are in.
+        struct SChannelParts
+        {
+            FLT             anColor[ 3 ];
+            int             nParts;
+        };
+        std::unordered_map<uint64_t, SChannelParts> m_mapParts;
 
             /// Hands a traced color to the camera's sampler, which puts it in
             /// the image. (nX, nY) is the tag the sampler gave the ray.

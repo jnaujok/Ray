@@ -348,6 +348,35 @@ static void LensChecks( void )
     Check( oScene.ToJson().find( "\"surfaces\"" ) != std::string::npos && oScene.ToJson().find( "\"stop\": true" ) != std::string::npos,
            "a lens given surface by surface saves its surfaces" );
 
+        // Chromatic aberration: a BK7 singlet focuses blue nearer than red, by
+        // about f / V; the double Gauss is corrected, so its colors nearly agree.
+    const char *strSinglet = "{ \"surfaces\": [ { \"radius\": 50, \"thickness\": 5, \"ior\": 1.5168, \"abbe\": 64.17, \"aperture\": 12 }, "
+                             "{ \"radius\": -50, \"thickness\": 3, \"aperture\": 12 }, "
+                             "{ \"radius\": 0, \"thickness\": 0, \"aperture\": 7, \"stop\": true } ], \"focusDistance\": 5 }";
+    Check( oScene.FromJson( WithLens( strSinglet ) ) == 0, "a singlet with an Abbe number loads" );
+    pLens = oScene.GetCamera().GetLens();
+    if ( pLens )
+    {
+        FLT nRed = pLens->FocalLengthIn( CLens::CHANNEL_RED );
+        FLT nGreen = pLens->FocalLengthIn( CLens::CHANNEL_GREEN );
+        FLT nBlue = pLens->FocalLengthIn( CLens::CHANNEL_BLUE );
+
+        Check( nRed > nGreen && nGreen > nBlue, "a singlet focuses red farther away than green, and green than blue" );
+        Check( ABS( ( nRed - nBlue ) - nGreen / 64.17 ) < 0.1 * nGreen / 64.17, "a singlet's color focus shift is about f / V" );
+        Check( nGreen == pLens->GetFocalLength(), "green is traced at the index as given" );
+        Check( oScene.GetCamera().GetChannels() == 3, "a dispersing lens traces three channels" );
+    }
+    Check( oScene.ToJson().find( "\"abbe\": 64.17" ) != std::string::npos, "Abbe numbers are saved" );
+
+    Check( oScene.FromJson( WithLens( "{ \"prescription\": \"double-gauss-50mm\" }" ) ) == 0, "the double Gauss loads again" );
+    pLens = oScene.GetCamera().GetLens();
+    Check( pLens && ABS( pLens->FocalLengthIn( CLens::CHANNEL_RED ) - pLens->FocalLengthIn( CLens::CHANNEL_BLUE ) ) < 0.1,
+           "the double Gauss is corrected for color (red and blue focal lengths within 0.1 mm)" );
+    Check( oScene.FromJson( WithLens( "{ \"prescription\": \"double-gauss-50mm\", \"chromatic\": false }" ) ) == 0 &&
+           oScene.GetCamera().GetChannels() == 1, "chromatic aberration can be turned off" );
+    ExpectError( WithLens( "{ \"surfaces\": [ { \"radius\": 50, \"thickness\": 5, \"ior\": 1.5, \"abbe\": -3, \"aperture\": 10 } ] }" ),
+                 BAD_FILE, "camera.lens.surfaces[0]: abbe can't be negative" );
+
         // The blueprint's "simplified double Gauss" diverges: it can't form an image.
     ExpectError( WithLens( "{ \"surfaces\": [ { \"radius\": 38.94, \"thickness\": 5.12, \"ior\": 1.658, \"aperture\": 16.3 }, "
                            "{ \"radius\": 101.44, \"thickness\": 4.11, \"aperture\": 15.1 }, "

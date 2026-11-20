@@ -42,6 +42,8 @@ CRay::CRay( void )
     m_nPixelX = 0;
     m_nPixelY = 0;
     m_nDepth = 0;
+    m_nImageX = 0.0;
+    m_nImageY = 0.0;
 }
 
 CRay::CRay( const CRay &oRay )
@@ -57,6 +59,8 @@ CRay::CRay( const CRay &oRay )
     m_nPixelX = oRay.m_nPixelX;
     m_nPixelY = oRay.m_nPixelY;
     m_nDepth = oRay.m_nDepth;
+    m_nImageX = oRay.m_nImageX;
+    m_nImageY = oRay.m_nImageY;
 }
 
 CRay::~CRay( void )
@@ -76,6 +80,8 @@ CRay &CRay::operator =( const CRay &oRay )
     m_nPixelX = oRay.m_nPixelX;
     m_nPixelY = oRay.m_nPixelY;
     m_nDepth = oRay.m_nDepth;
+    m_nImageX = oRay.m_nImageX;
+    m_nImageY = oRay.m_nImageY;
 
     return *this;
 }
@@ -109,8 +115,9 @@ void CRay::CreateRay( CScene &oScene, int nX, int nY, FLT nInfluence )
     // The primary ray from the camera through the point (nImageX, nImageY) on
     // the image, measured in pixels from its top left corner: (0, 0) is that
     // corner and (width, height) the bottom right one. The ray is labeled
-    // with (nTagX, nTagY), which comes back with its color.
-void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int nTagY, FLT nInfluence )
+    // with (nTagX, nTagY), which comes back with its color. nChannel picks
+    // the wavelength a chromatic lens traces it at (CLens::EChannel).
+void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int nTagY, FLT nInfluence, int nChannel )
 {
     CCamera        &oCamera = oScene.GetCamera();
     CSettings      &oSettings = oScene.GetSettings();
@@ -125,8 +132,10 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
         // A ray the camera's lens blocks gets no influence, so it traces as
         // black.
     if ( ! oCamera.PrimaryRay( ( ( nImageX * 2.0 ) / nWidth ) - 1.0, 1.0 - ( ( nImageY * 2.0 ) / nHeight ),
-                               nWidth / nHeight, nImageX, nImageY, oStartPos, oDirection ) )
+                               nWidth / nHeight, nImageX, nImageY, oStartPos, oDirection, nChannel ) )
         nInfluence = 0.0;
+    m_nImageX = nImageX;
+    m_nImageY = nImageY;
 
     m_nX = oStartPos.GetX();
     m_nY = oStartPos.GetY();
