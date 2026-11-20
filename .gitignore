@@ -24,3 +24,6 @@ Release/
 # CMake
 CMakeCache.txt
 CMakeFiles/
+
+# Output of commands run under nohup
+nohup.out

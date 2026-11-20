@@ -10,6 +10,10 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+### Changed
+
+- `.gitignore` ignores `nohup.out`.
+
 ## [2026-alpha-0.3] - 2026-11-19
 
 The ray tracing has resumed: a corrected camera, anti-aliasing, color models, real lenses with
