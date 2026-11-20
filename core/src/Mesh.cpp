@@ -550,6 +550,52 @@ BOOL CMesh::Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore )
     return bHit;
 }
 
+BOOL CMesh::Occludes( CRay &oRay, CObjects *pIgnore )
+{
+    if ( pIgnore == this || m_aoNodes.empty() || ! HitsBox( oRay ) )
+        return FALSE;
+
+    FLT     anOrigin[ 3 ] = { oRay.GetX(), oRay.GetY(), oRay.GetZ() };
+    FLT     anDirection[ 3 ] = { oRay.GetI(), oRay.GetJ(), oRay.GetK() };
+    FLT     nLimit = oRay.GetT();
+    int     anStack[ 128 ];
+    int     nStack = 0;
+    CVector oHit;
+
+    anStack[ nStack++ ] = 0;
+    while ( nStack > 0 )
+    {
+        const SNode &oNode = m_aoNodes[ (size_t)anStack[ --nStack ] ];
+
+        if ( ! HitsNode( oNode, anOrigin, anDirection, nLimit ) )
+            continue;
+        if ( oNode.nCount == 0 )
+        {
+            anStack[ nStack++ ] = oNode.nRight;
+            anStack[ nStack++ ] = oNode.nLeft;
+            continue;
+        }
+        for ( int nIndex = oNode.nFirst; nIndex < oNode.nFirst + oNode.nCount; nIndex++ )
+        {
+            CTriangle  *pFace = m_apFaces[ (size_t)m_anOrder[ (size_t)nIndex ] ];
+            CRay        oTry( oRay );
+
+            if ( pFace != pIgnore && pFace->Intersect( oTry, oHit ) )
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+BOOL CMesh::GetBounds( CVector &oMinimum, CVector &oMaximum )
+{
+    if ( m_apFaces.empty() )
+        return FALSE;
+    oMinimum = m_oMinimum;
+    oMaximum = m_oMaximum;
+    return TRUE;
+}
+
 BOOL CMesh::IntersectEachFace( CRay &oRay, CVector &oIntersect )
 {
     CVector oHit;

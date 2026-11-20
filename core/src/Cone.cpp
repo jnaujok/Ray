@@ -335,3 +335,38 @@ BOOL CCone::FromJson( const IASLib::CJsonNode &oNode )
            ReadEnds( oNode ) &&
            Prepare();
 }
+
+    // A box a little larger than [anLow, anHigh], so hits a hair outside the
+    // exact shape (as some tests allow) are inside it.
+static void PadBounds( FLT anLow[ 3 ], FLT anHigh[ 3 ], CVector &oMinimum, CVector &oMaximum )
+{
+    FLT nMargin = 1e-6 * ( 1.0 + ( anHigh[ 0 ] - anLow[ 0 ] ) + ( anHigh[ 1 ] - anLow[ 1 ] ) + ( anHigh[ 2 ] - anLow[ 2 ] ) );
+
+    oMinimum.Set( anLow[ 0 ] - nMargin, anLow[ 1 ] - nMargin, anLow[ 2 ] - nMargin );
+    oMaximum.Set( anHigh[ 0 ] + nMargin, anHigh[ 1 ] + nMargin, anHigh[ 2 ] + nMargin );
+}
+
+BOOL CCone::GetBounds( CVector &oMinimum, CVector &oMaximum )
+{
+    FLT anAxis[ 3 ] = { m_oAxis.GetX(), m_oAxis.GetY(), m_oAxis.GetZ() };
+    FLT anBase[ 3 ] = { m_oBase.GetX(), m_oBase.GetY(), m_oBase.GetZ() };
+    FLT anTop[ 3 ] = { m_oTop.GetX(), m_oTop.GetY(), m_oTop.GetZ() };
+    FLT anLow[ 3 ], anHigh[ 3 ];
+
+        // The box around the two end circles: a circle of radius r square to
+        // the axis reaches r * sqrt( 1 - axis^2 ) along each scene axis.
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        FLT nSpread = 1.0 - ( anAxis[ nAxis ] * anAxis[ nAxis ] );
+        FLT nAcross = SQRT( ( nSpread > 0.0 ) ? nSpread : 0.0 );
+        FLT nBaseLow = anBase[ nAxis ] - ( m_nBaseRadius * nAcross );
+        FLT nBaseHigh = anBase[ nAxis ] + ( m_nBaseRadius * nAcross );
+        FLT nTopLow = anTop[ nAxis ] - ( m_nTopRadius * nAcross );
+        FLT nTopHigh = anTop[ nAxis ] + ( m_nTopRadius * nAcross );
+
+        anLow[ nAxis ] = ( nBaseLow < nTopLow ) ? nBaseLow : nTopLow;
+        anHigh[ nAxis ] = ( nBaseHigh > nTopHigh ) ? nBaseHigh : nTopHigh;
+    }
+    PadBounds( anLow, anHigh, oMinimum, oMaximum );
+    return TRUE;
+}

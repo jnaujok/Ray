@@ -48,6 +48,7 @@ class CCamera : public CObjects
         std::unique_ptr<CColorModel>    m_pColorModel;
             // A real lens, or NULL for a pinhole camera.
         std::unique_ptr<CLens>          m_pLens;
+        BOOL                            m_bAimOnly = FALSE;     // see SetAimOnly
         std::string                     m_strLensError;     // why the lens couldn't be prepared
     public:
                     CCamera( void );
@@ -98,6 +99,11 @@ class CCamera : public CObjects
             // or at the look-at point; it returns FALSE, with the reason in
             // GetLensError, if the lens can't be used.
         CLens      *GetLens( void ) { return m_pLens.get(); }
+            // While set, primary rays are only aimed, as by a pinhole, not
+            // traced through the lens: for a ray wanted only for where it
+            // falls on the image (a chromatic lens's sampler ray, which is
+            // made again for each channel).
+        void        SetAimOnly( BOOL bAimOnly ) { m_bAimOnly = bAimOnly; }
         BOOL        SetLens( CLens *pLens );
         const char *GetLensError( void ) const { return m_strLensError.c_str(); }
 

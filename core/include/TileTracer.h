@@ -25,10 +25,10 @@ class CScene;
     // A rectangle of the image, in pixels.
 struct STile
 {
-    int nLeft;
-    int nTop;
-    int nWidth;
-    int nHeight;
+    int nLeft = 0;
+    int nTop = 0;
+    int nWidth = 0;
+    int nHeight = 0;
 };
 
 class CTileTracer : public CPixelWriter

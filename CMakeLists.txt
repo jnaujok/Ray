@@ -49,6 +49,7 @@ FetchContent_MakeAvailable(IASLib)
 # static library would let the linker drop them.
 # ---------------------------------------------------------------------------
 set(RAY_CORE_SOURCES
+    core/src/AdaptiveSampler.cpp
     core/src/AmbientMaterial.cpp
     core/src/Box.cpp
     core/src/BoxSampler.cpp

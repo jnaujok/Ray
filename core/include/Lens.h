@@ -81,6 +81,18 @@ class CLens
             FLT                 nAbbe;          // 0: the glass doesn't disperse
         };
 
+            // An exit pupil: an ellipse on the rear element (in mm, for a
+            // point of the sensor on the +x axis) around everywhere rays get
+            // through.
+        struct SPupil
+        {
+            FLT                 nCenterX;
+            FLT                 nCenterY;
+            FLT                 nHalfX;             // the ellipse's half widths
+            FLT                 nHalfY;
+            BOOL                bOpen;              // FALSE: no light gets through at all
+        };
+
             // The channel a ray is traced in: every channel at the d line, or
             // one of red, green and blue at its own wavelength.
         enum EChannel { CHANNEL_ALL = 0, CHANNEL_RED = 1, CHANNEL_GREEN = 2, CHANNEL_BLUE = 3 };
@@ -106,6 +118,10 @@ class CLens
 
             // Worked out by Prepare().
         std::vector<FLT>        m_anVertexZ;        // each surface's place on the axis
+            // What follows each surface (from -1, the air in front) in each
+            // channel, worked out once by Prepare: IorAt is in every step of
+            // every ray through the lens.
+        std::vector<FLT>        m_anIorTable[ 4 ];
         FLT                     m_nFocalLength;
         FLT                     m_nWideOpen;        // the smallest f-number
         FLT                     m_nStopRadius;      // the stop's opening at the f-number
@@ -118,32 +134,32 @@ class CLens
             // center, an ellipse on the rear element (in mm, for a point on
             // the +x axis) around everywhere rays get through. Rays are aimed
             // only inside it.
-        struct SPupil
+            // The exit pupil for each ring of the sensor, and the share of
+            // rays aimed at the rear element that get through at each ring's
+            // edges in each channel traced. Prepare works them out (on every
+            // core) unless the scene file brought them for the same lens
+            // setup; they go into the scene, so tasks never work them out.
+        struct STables
         {
-            FLT                 nCenterX;
-            FLT                 nCenterY;
-            FLT                 nHalfX;             // the ellipse's half widths
-            FLT                 nHalfY;
-            BOOL                bOpen;              // FALSE: no light gets through at all
+            std::vector<SPupil> aoRings;
+            std::vector<FLT>    anPass[ 4 ];        // by channel; empty if not traced
         };
-            // The rings, worked out as rays first need them, and shared by
-            // every lens in the program with the same prescription, focus
-            // and aperture (the threads' copies of a scene, for one).
-        struct SPupilTable;
-        std::shared_ptr<SPupilTable> m_pPupil;
+        std::shared_ptr<const STables> m_pTables;
+        std::string             m_strTablesKey;     // what m_pTables were worked out for
+        std::shared_ptr<const STables> m_pLoadedTables; // from the scene file, until Prepare checks them
+        std::string             m_strLoadedKey;
         FLT                     m_nPupilReach;      // the sensor radius the rings cover, in mm
 
-            /// The exit pupil for a ring, worked out if it hasn't been yet.
-        const SPupil           &PupilFor( int nRing ) const;
+            /// What the tables depend on (the surfaces, stop, sensor and
+            /// channels), as a short fingerprint.
+        std::string             TablesKey( void ) const;
+            /// Works out the tables on every core.
+        void                    BuildTables( void );
             /// Works out one ring's exit pupil.
         void                    FindPupil( int nRing, SPupil &oPupil ) const;
             /// The share of rays aimed anywhere on the rear element from a
-            /// point nKnot rings out on the sensor that get through, in a
-            /// channel; worked out if it hasn't been yet.
-        FLT                     PassFor( int nKnot, int nChannel ) const;
+            /// point nKnot rings out on the sensor that get through.
         FLT                     FindPass( int nKnot, int nChannel ) const;
-            /// The table for a lens set up like oLens, made if there is none.
-        static std::shared_ptr<SPupilTable> SharedPupilTable( const CLens &oLens );
 
             // Traces a ray through the surfaces, forward (toward the
             // sensor) or backward. The ray is changed in place; FALSE if it
@@ -152,6 +168,7 @@ class CLens
                                        int nChannel = CHANNEL_ALL ) const;
             // The index of what follows surface nIndex (or air, for -1) in a channel.
         FLT                     IorAt( int nIndex, int nChannel ) const;
+        FLT                     WorkOutIor( int nIndex, int nChannel ) const;
             // Where a paraxial ray from an on-axis point nObjectZ (or from
             // infinity, if bInfinity) crosses the axis behind the lens.
         BOOL                    ImageZ( FLT nObjectZ, BOOL bInfinity, FLT &nImageZ, int nChannel = CHANNEL_ALL ) const;
@@ -201,6 +218,8 @@ class CLens
             /// From the rear surface to the sensor, in mm.
         FLT                     GetFilmDistance( void ) const;
         FLT                     GetExposure( void ) const { return m_nExposure; }
+            /// Whether the exit pupil tables are worked out (after Prepare).
+        BOOL                    HasTables( void ) const { return m_pTables ? TRUE : FALSE; }
         FLT                     GetMillimetersPerUnit( void ) const { return m_nMillimetersPerUnit; }
         int                     GetSurfaceCount( void ) const { return (int)m_aoSurfaces.size(); }
             /// A line describing the prepared lens, for raythrower.

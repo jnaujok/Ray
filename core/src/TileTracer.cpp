@@ -37,8 +37,18 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
     anColors.assign( (size_t)( oTile.nWidth > 0 ? oTile.nWidth : 0 ) * (size_t)( oTile.nHeight > 0 ? oTile.nHeight : 0 ) * 3, 0.0 );
 
     oSampler.Begin( oTile.nLeft, oTile.nTop, oTile.nWidth, oTile.nHeight );
-    while ( oSampler.NextRay( oScene, oRay ) )
+    for ( ;; )
     {
+            // With channels apart, the sampler's own ray is only where the
+            // sample falls; it needn't go through the lens.
+        oCamera.SetAimOnly( nChannels > 1 ? TRUE : FALSE );
+
+        BOOL bMore = oSampler.NextRay( oScene, oRay );
+
+        oCamera.SetAimOnly( FALSE );
+        if ( ! bMore )
+            break;
+
         CColor oColor;
 
         if ( nChannels == 1 )

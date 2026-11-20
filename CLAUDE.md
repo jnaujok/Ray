@@ -44,6 +44,8 @@ ctest --test-dir build --output-on-failure
   SJSON, until IASLib tags a release with it). To use a local checkout, pass
   `-DFETCHCONTENT_SOURCE_DIR_IASLIB=/path/to/IASLib`. SJSON's LZ4 and zstd support is kept off.
 - The GUI needs MSVC with MFC: `-DRAY_BUILD_GUI=ON`, then build the `Ray` target.
+- Time renders with a Release build (`-DCMAKE_BUILD_TYPE=Release`); a Debug build is several
+  times slower and misleads.
 - Run the tests under AddressSanitizer before changing anything in `core/`
   (`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"`); CI does.
 - **Every change that alters rendered output gets before and after images in `CHANGELOG.md`:** a
@@ -112,6 +114,11 @@ ctest --test-dir build --output-on-failure
   Materials read their color through `CMaterial::ColorAt`, so a texture applies to any of them.
   Anything a texture reads from a file must also be written into the scene when
   `RayJson::EmbeddingData()` is set, since engines may not have the file.
+- **Objects that can be bounded** override `CObjects::GetBounds` (a box a little larger than the
+  shape, since some hit tests allow a hair outside it) so the scene's tree can skip them, and
+  objects made of parts override `Occludes` to stop at the first part a shadow ray hits. The tree
+  must find exactly what testing every object in order does (`ClosestHitByEachObject`), ties
+  included; `format_test` checks it.
 - **New object, light, or material classes** register a JSON `type` name in
   `DYNAMIC_IMPLEMENTS( CClass, "name" )` or `IMPLEMENT_MATERIAL( CClass, Name, "name" )`, and the
   macros make them implement `ToJson` and `FromJson`.

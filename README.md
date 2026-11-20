@@ -66,7 +66,9 @@ The ray tracing itself is the 1997 code.
   its corner order; it can be single- or double-sided, and flat or smooth, with corner normals that
   can be given to override the computed ones. A mesh shares vertices
   between faces, gives each vertex the sum of its faces' normals, and keeps its faces in a bounding
-  volume hierarchy, so a ray tests only the few faces near its path.
+  volume hierarchy, so a ray tests only the few faces near its path. The scene keeps its objects
+  in one too (planes, which are infinite, are tested every time), and shadow rays stop at the
+  first thing in the way.
 
   <img src="docs/images/tests/primitives_test.png" alt="A capped cylinder, an open tube, a cone, a textured truncated cone, a textured cube, and a glass box on a checkered floor" width="320">
 - **Lights:** point lights.
@@ -82,9 +84,10 @@ The ray tracing itself is the 1997 code.
 - **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler: `corners`
   (five rays per pixel, four of them corners shared with the neighbors, about two rays a pixel),
   `box` (four rays halfway from the center to each corner), `random` (a center ray worth half
-  the pixel plus N random rays), or `stratified` (an n×n grid of equally weighted rays, each at a
-  random point in its cell; best for real lenses). Random points are reproducible, so every run
-  gives the same image.
+  the pixel plus N random rays), `stratified` (an n×n grid of equally weighted rays, each at a
+  random point in its cell; best for real lenses), or `adaptive` (at least 9 rays a pixel, then
+  more only where they disagree: on the torture test, 28% less error than a 5×5 grid for the same
+  rays). Random points are reproducible, so every run gives the same image.
 - **Camera:** pinhole camera with position, look-at point, up vector, and vertical field of view;
   square pixels at any image size.
 - **Real lenses:** give the camera a lens prescription (spherical glass surfaces, front to back, as
@@ -242,8 +245,8 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
 **Render the torture test**, every kind of object (the teapot too), mirrors, glass and textures
-through the double Gauss lens at 25 rays a pixel, at its full 1024×768 (about 4 minutes on a
-16-core machine):
+through the double Gauss lens at 25 rays a pixel, at its full 1024×768 (about a minute on a
+16-core machine, with a Release build):
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
@@ -283,7 +286,7 @@ rayengine master.example.com 7997                       # on each of three machi
 | `--engine <path>` | The `rayengine` to start (default: the one next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for engines to connect (default 60) |
 | `--tile <pixels>` | Size of the square tiles tasks ask for (default 32) |
-| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`; settings after a colon, as in `random:samples=9` |
+| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, `stratified`, or `adaptive`; settings after a colon, as in `random:samples=9` or `adaptive:min=16,threshold=0.005` |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, `reinhard`, or `hdr`; settings as for `--aa`, as in `reinhard:exposure=1.5` |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene (with any `--aa`/`--color`/`--size`) as a scene archive, textures inside, and exit |
@@ -314,7 +317,8 @@ and another joins), and that tiles and pixels cross the wire
 exactly (including texture images embedded in the scene), that scene files survive a load and save, that mistakes in JSON scenes are reported where
 they are, triangle sidedness and that smooth mesh faces agree along shared edges, where rays hit
 cylinders, cones, and boxes and the normals there, and that a mesh's bounding volume hierarchy finds
-exactly the hits testing every face does. With Python 3 installed, they also decode the PNG and
+exactly the hits testing every face does, and that the scene's tree finds exactly the hits and
+shadows testing every object does. With Python 3 installed, they also decode the PNG and
 HDR output (with Python's own zlib) and check it against the raw image. CI runs them
 on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -340,13 +344,14 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td></tr>
 </table>
 
-**Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random` and
-`stratified` (3×3) samplers on `scan_test` (compare with `render_scan_test` above).
+**Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
+`stratified` (3×3) and `adaptive` samplers on `scan_test` (compare with `render_scan_test` above).
 
 <table>
 <tr><td align="center"><img src="docs/images/tests/scan_test_aa.png" alt="render_aa_scan_test (corners)" width="260"><br><code>render_aa_scan_test (corners)</code></td><td align="center"><img src="docs/images/tests/axis_test_aa.png" alt="render_aa_axis_test (corners)" width="260"><br><code>render_aa_axis_test (corners)</code></td><td align="center"><img src="docs/images/tests/triangle_aa.png" alt="render_aa_triangle (corners)" width="260"><br><code>render_aa_triangle (corners)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/xxx_aa.png" alt="render_aa_xxx (corners)" width="260"><br><code>render_aa_xxx (corners)</code></td><td align="center"><img src="docs/images/tests/scan_test_box.png" alt="render_sampler_box" width="260"><br><code>render_sampler_box</code></td><td align="center"><img src="docs/images/tests/scan_test_random2.png" alt="render_sampler_random2" width="260"><br><code>render_sampler_random2</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/scan_test_random4.png" alt="render_sampler_random4" width="260"><br><code>render_sampler_random4</code></td><td align="center"><img src="docs/images/tests/scan_test_random9.png" alt="render_sampler_random9" width="260"><br><code>render_sampler_random9</code></td><td align="center"><img src="docs/images/tests/scan_test_stratified.png" alt="render_sampler_stratified" width="260"><br><code>render_sampler_stratified</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/scan_test_adaptive.png" alt="render_sampler_adaptive" width="260"><br><code>render_sampler_adaptive</code></td></tr>
 </table>
 
 **Color models** (`--color`) on `scan_test`. The 1997 scenes were lit for screens without gamma

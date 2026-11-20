@@ -26,7 +26,7 @@ raythrower <FileToTrace> [options]
 | `--engine <path>` | The `rayengine` to start (default: next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for each engine to connect (default 60) |
 | `--tile <pixels>` | Size of the square tiles tasks ask for (default 32). With `--listen`, `-N` engines must connect before tracing starts; more can join at any time |
-| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`, with any settings after a colon (`random:samples=9,seed=2`, `stratified:grid=8`) |
+| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, `stratified`, or `adaptive`, with any settings after a colon (`random:samples=9,seed=2`, `stratified:grid=8`, `adaptive:min=16,max=100,threshold=0.005`) |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, `reinhard`, or `hdr`, with settings as for `--aa` (`reinhard:exposure=1.5`, `hdr:exposure=2`) |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene, with any `--aa`, `--color` or `--size` applied, as a scene archive (with its texture images inside), and exit without tracing |
@@ -48,6 +48,11 @@ and averages them equally.
 rays at random points in the pixel, which share the other half: N + 1 rays a pixel (N from 1 to
 1024, default 4). The points come from a hash of the pixel, the ray's number and `seed` (default 0),
 so the same scene always gives the same image, however the work is split between tasks.
+
+`--aa adaptive` gives each pixel at least `min` rays (default 9), then more, one at a time, until the
+standard error of its brightness is under `threshold` (default 0.01) or it has `max` (default 64):
+flat areas stop early and edges, textures and blur get the most. With a real lens it gives less
+noise than `stratified` for the same number of rays.
 
 `--aa stratified:grid=n` cuts each pixel into an n×n grid and traces one ray at a random point in
 each cell, all weighted equally (n from 1 to 32, default 4). It is the sampler to use with a real

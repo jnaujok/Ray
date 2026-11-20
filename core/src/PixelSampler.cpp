@@ -10,6 +10,7 @@
 #include "BoxSampler.h"
 #include "RandomSampler.h"
 #include "StratifiedSampler.h"
+#include "AdaptiveSampler.h"
 
 #include "SceneJson.h"
 
@@ -22,6 +23,7 @@ namespace
     CPixelSampler *CreateBox( void )    { return new CBoxSampler; }
     CPixelSampler *CreateRandom( void ) { return new CRandomSampler; }
     CPixelSampler *CreateStratified( void ) { return new CStratifiedSampler; }
+    CPixelSampler *CreateAdaptive( void ) { return new CAdaptiveSampler; }
 
         // Every sampler that can be chosen by name. The first is the default.
     const CPixelSampler::SType s_aoTypes[] =
@@ -33,6 +35,9 @@ namespace
                      "half (settings: samples, N, default 4; seed, default 0)",                  CreateRandom },
         { "stratified", "an n x n grid of equally weighted rays, each at a random point in its "
                         "cell; best for a real lens (settings: grid, n, default 4; seed)",      CreateStratified },
+        { "adaptive", "more rays only where a pixel's rays disagree: at least min (default 9), "
+                      "at most max (default 64), until the brightness is within threshold "
+                      "(default 0.01; seed)",                                                    CreateAdaptive },
     };
 }
 

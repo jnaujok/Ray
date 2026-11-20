@@ -14,7 +14,10 @@
 *       nRays = Begin( x, y, width, height );   the tile, in pixels      *
 *       while ( NextRay( scene, ray ) )   trace the ray                  *
 *       PutSample( writer, ... )          once for every traced ray,     *
-*                                         in any order                   *
+*                                         straight after tracing it      *
+*                                         (CTileTracer does), which lets *
+*                                         a sampler decide on its next   *
+*                                         ray from the colors so far     *
 *       End();                                                           *
 *                                                                        *
 *   Rays, tags and pixels are in image coordinates. A sampler only       *

@@ -20,10 +20,10 @@ namespace
         // What the master sends a worker.
     struct SInbox
     {
-        CTaskSlave::EMessage                nKind;
+        CTaskSlave::EMessage                nKind = CTaskSlave::FROM_MASTER_STOP;
         std::shared_ptr<const std::string>  pScene;     // FROM_MASTER_SCENE: its JSON
         STile                               oTile;      // FROM_MASTER_TILE
-        uint32_t                            nTrace;
+        uint32_t                            nTrace = 0;
     };
 }
 
