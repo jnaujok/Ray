@@ -9,6 +9,11 @@ class CTransparentMaterial : public CMaterial
     protected:
         CColor              m_oColor;
         FLT                 m_nIndexOfRefraction;
+            // Absorption inside: light that has gone m_nAttenuationDistance
+            // through the object is left m_oAttenuationColor (Beer-Lambert,
+            // so twice as far is that color squared). 0 absorbs nothing.
+        CColor              m_oAttenuationColor;
+        FLT                 m_nAttenuationDistance;
 
     public:
                             DEFINE_MATERIAL( CTransparentMaterial );
@@ -24,6 +29,10 @@ class CTransparentMaterial : public CMaterial
             // with normal oNormal (either way round) into or out of glass of
             // index nIndex. FALSE for total internal reflection, when oTransmit
             // is the reflected direction instead.
+            // What is left of light that has gone nDistance through the
+            // object: m_oAttenuationColor to the power nDistance /
+            // m_nAttenuationDistance, per channel.
+        CColor              Attenuation( FLT nDistance ) const;
         static BOOL         Refract( CVector oView, CVector oNormal, FLT nIndex, CVector &oTransmit );
 #ifdef RAY_GUI
         virtual void        Properties( void );

@@ -155,6 +155,19 @@ add_test(NAME render_primitives
 set_tests_properties(render_primitives PROPERTIES FIXTURES_SETUP render_primitives TIMEOUT 300)
 add_test(NAME roundtrip_primitives_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/primitives_test.ray ${RENDER_DIR})
 
+# Solid textures (marble, wood, noise) and glass that absorbs by the
+# distance light goes through it.
+add_test(NAME render_solid_textures
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/solid_textures_test.ray
+                 -DOUTPUT=${RENDER_DIR}/solid_textures_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/solid_textures_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_solid_textures PROPERTIES FIXTURES_SETUP render_solid_textures TIMEOUT 300)
+add_test(NAME roundtrip_solid_textures_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/solid_textures_test.ray ${RENDER_DIR})
+
 # The torture test: every kind of object (the teapot too), reflection,
 # refraction and textures, through the double Gauss with a 5x5 stratified
 # sampler. Rendered small; the scene itself is 1024x768.
@@ -320,6 +333,20 @@ add_test(NAME network_primitives
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_primitives PROPERTIES FIXTURES_REQUIRED render_primitives
                                                    RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_solid_textures
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/solid_textures_test.ray
+                 -DOUTPUT=${RENDER_DIR}/solid_textures_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/solid_textures_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_solid_textures PROPERTIES FIXTURES_REQUIRED render_solid_textures
+                                                       RESOURCE_LOCK ray_network TIMEOUT 300)
 
 # PNG and Radiance HDR output, checked with Python's own zlib.
 find_package(Python3 COMPONENTS Interpreter)

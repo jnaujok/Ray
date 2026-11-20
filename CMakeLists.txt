@@ -72,10 +72,12 @@ set(RAY_CORE_SOURCES
     core/src/Lens.cpp
     core/src/Light.cpp
     core/src/LightArray.cpp
+    core/src/MarbleTexture.cpp
     core/src/Material.cpp
     core/src/MaterialList.cpp
     core/src/Matrix.cpp
     core/src/Mesh.cpp
+    core/src/NoiseTexture.cpp
     core/src/Objects.cpp
     core/src/ObjectsArray.cpp
     core/src/PixelAccumulator.cpp
@@ -90,6 +92,7 @@ set(RAY_CORE_SOURCES
     core/src/Scene.cpp
     core/src/SceneJson.cpp
     core/src/SocketTaskMaster.cpp
+    core/src/SolidTexture.cpp
     core/src/SocketTaskSlave.cpp
     core/src/SpecularMaterial.cpp
     core/src/Sphere.cpp
@@ -105,6 +108,7 @@ set(RAY_CORE_SOURCES
     core/src/Triangle.cpp
     core/src/Vector.cpp
     core/src/WireProtocol.cpp
+    core/src/WoodTexture.cpp
 )
 
 add_library(ray_core OBJECT ${RAY_CORE_SOURCES})

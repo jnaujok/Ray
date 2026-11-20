@@ -15,6 +15,7 @@
 
 class CScene;
 class CVector;
+class CObjects;
 
 class CRay
 {
@@ -37,6 +38,10 @@ class CRay
             // engines; the master uses it to remake the ray per channel).
         FLT             m_nImageX;
         FLT             m_nImageY;
+            // The transparent object the ray is travelling through, or NULL
+            // (outside everything). Set where a ray goes into or out of
+            // glass, so the far side knows how far it went inside.
+        const CObjects *m_pInside;
     public:
                         CRay( void );
                         CRay( const CRay &oSource );
@@ -71,6 +76,8 @@ class CRay
         void            Increment( void ) { m_nDepth++; }
         virtual int     GetDepth( void ) { return m_nDepth; }
         virtual void    SetDepth( int nDepth ) { m_nDepth = nDepth; }
+        const CObjects *GetInside( void ) const { return m_pInside; }
+        void            SetInside( const CObjects *pInside ) { m_pInside = pInside; }
 
 };
 

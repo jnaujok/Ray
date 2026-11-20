@@ -8,6 +8,8 @@
 #include "Scene.h"
 #include "SceneJson.h"
 
+#include <math.h>
+
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -18,14 +20,22 @@ static char THIS_FILE[] = __FILE__;
 
 IMPLEMENT_MATERIAL( CTransparentMaterial, Transparent Material, "transparent" );
 
+    // How far past a surface a ray through it starts, so it doesn't hit
+    // that surface again.
+#define TRANSMIT_STEP   0.01
+
 CTransparentMaterial::CTransparentMaterial( void ) :
-m_oColor( 0.5, 0.5, 0.5 )
+m_oColor( 0.5, 0.5, 0.5 ),
+m_oAttenuationColor( 1.0, 1.0, 1.0 ),
+m_nAttenuationDistance( 0.0 )
 {
     m_nIndexOfRefraction = 1.0;
 }
 
 CTransparentMaterial::CTransparentMaterial( CColor oColor, FLT nRefract ) :
-m_oColor( oColor )
+m_oColor( oColor ),
+m_oAttenuationColor( 1.0, 1.0, 1.0 ),
+m_nAttenuationDistance( 0.0 )
 {
     m_nIndexOfRefraction = nRefract;
 }
@@ -83,6 +93,16 @@ BOOL CTransparentMaterial::Refract( CVector oView, CVector oNormal, FLT nIndex, 
     return TRUE;
 }
 
+CColor CTransparentMaterial::Attenuation( FLT nDistance ) const
+{
+    CColor  oLeft( m_oAttenuationColor );
+    FLT     nPower = nDistance / m_nAttenuationDistance;
+
+    return CColor( (FLT)pow( (double)oLeft.GetR(), (double)nPower ),
+                   (FLT)pow( (double)oLeft.GetG(), (double)nPower ),
+                   (FLT)pow( (double)oLeft.GetB(), (double)nPower ) );
+}
+
 CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
     CColor      oTransparent;
@@ -98,9 +118,12 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
 
     oView.Normalize();
 
-    Refract( oView, oNormal, m_nIndexOfRefraction, oTransmit );
+        // Whether the ray reached this surface from inside the object: it
+        // went in through this material (or was turned back inside by it).
+    BOOL        bLeaving = ( oViewIncident.GetInside() == pIntersect ) ? TRUE : FALSE;
+    BOOL        bPasses = Refract( oView, oNormal, m_nIndexOfRefraction, oTransmit );
 
-    oTransStep = oTransmit * 0.01;
+    oTransStep = oTransmit * TRANSMIT_STEP;
 
     oTemp = oIntersect + oTransStep;
 
@@ -111,10 +134,24 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
 
     oTransmitted.SetT( 1e100 );
     oTransmitted.SetDepth( oViewIncident.GetDepth() );
+        // Passing through the surface changes sides; reflecting inside it
+        // (past the critical angle) keeps the ray where it was.
+    oTransmitted.SetInside( ( bLeaving != bPasses ) ? pIntersect : NULL );
 
     oScene.TraceRay( oTransmitted, oTransparent, NULL );
 
     oTransparent = oTransparent * ColorAt( m_oColor, oIntersect, pIntersect );
+
+        // Coming out, the light this ray carries crossed the object from
+        // where the ray went in (it started TRANSMIT_STEP past there).
+    if ( bLeaving && ( m_nAttenuationDistance > 0.0 ) )
+    {
+        CVector oInside( oIntersect.GetX() - oViewIncident.GetX(),
+                         oIntersect.GetY() - oViewIncident.GetY(),
+                         oIntersect.GetZ() - oViewIncident.GetZ() );
+
+        oTransparent = oTransparent * Attenuation( oInside.Magnitude() + TRANSMIT_STEP );
+    }
 
     return oTransparent;
 }
@@ -172,13 +209,32 @@ void CTransparentMaterial::ToJson( IASLib::CObjectNode &oNode )
 {
     RayJson::PutColor( oNode, "color", m_oColor );
     RayJson::PutNumber( oNode, "indexOfRefraction", m_nIndexOfRefraction );
+    if ( m_nAttenuationDistance > 0.0 )
+    {
+        RayJson::PutColor( oNode, "attenuationColor", m_oAttenuationColor );
+        RayJson::PutNumber( oNode, "attenuationDistance", m_nAttenuationDistance );
+    }
 }
 
 BOOL CTransparentMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "influence", "texture", "color", "indexOfRefraction", NULL };
+    static const char *const astrFields[] = { "influence", "texture", "color", "indexOfRefraction",
+                                              "attenuationColor", "attenuationDistance", NULL };
 
-    return RayJson::OnlyFields( oNode, astrFields ) &&
-           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
-           RayJson::GetNumber( oNode, "indexOfRefraction", m_nIndexOfRefraction, FALSE );
+    if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+         ! RayJson::GetColor( oNode, "color", m_oColor, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "indexOfRefraction", m_nIndexOfRefraction, FALSE ) ||
+         ! RayJson::GetColor( oNode, "attenuationColor", m_oAttenuationColor, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "attenuationDistance", m_nAttenuationDistance, FALSE ) )
+        return FALSE;
+    if ( m_nAttenuationDistance < 0.0 )
+        return RayJson::Fail( "attenuationDistance can't be negative" );
+
+    CColor oLeft( m_oAttenuationColor );
+
+    if ( ( oLeft.GetR() < 0.0 ) || ( oLeft.GetR() > 1.0 ) ||
+         ( oLeft.GetG() < 0.0 ) || ( oLeft.GetG() > 1.0 ) ||
+         ( oLeft.GetB() < 0.0 ) || ( oLeft.GetB() > 1.0 ) )
+        return RayJson::Fail( "attenuationColor must be between 0 and 1" );
+    return TRUE;
 }

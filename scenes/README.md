@@ -23,6 +23,7 @@ when the binary format was dropped; they are in the repository's history.
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
 | `torture_test.ray` | | Everything at once, at 1024×768: the teapot (a mirror-tinted copper glaze) among a mirror sphere, a glass sphere, a textured sphere, a solid-checker column, an open gold tube, a cone, a textured truncated cone, a green glass cube, a textured box and a textured triangle, on a reflective checkered floor before a mirror wall in a black frame, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
+| `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
@@ -181,7 +182,14 @@ make the shape smooth (`"smooth": false` with them is an error).
 | `diffuse` | `diffuseCast` (default `false`) |
 | `specular` | A Cook–Torrance highlight. `power` (default `1`) is the surface's Beckmann roughness: smaller is a smaller, sharper highlight (0.1–0.3 is glossy; 1 is very rough). `indexOfRefraction` (default `1.5`) sets the Fresnel reflection, stronger at grazing angles; `materialHighlight` (default `false`) |
 | `reflective` | A mirror reflection, tinted by `color` with `filterReflection` (default `false`); `diffuseReflectivity` (default `0`) |
-| `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` |
+| `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` at each surface it crosses. `attenuationColor` (default `[1, 1, 1]`, each 0 to 1) and `attenuationDistance` (default `0`, off) absorb light by how far it goes inside: after `attenuationDistance` it is `attenuationColor`, after twice that the color squared (Beer–Lambert) |
+
+Absorption is measured from where a ray goes into an object through its transparent material to
+where it next meets that object, so the object should be closed (a sphere, a capped cylinder or
+cone, a box, or a closed mesh). A ray turned back inside past the critical angle keeps absorbing.
+Glass inside other glass is not tracked: a ray coming out of the inner piece is taken to be
+outside both. Shadows are not tinted; glass shadows like any other object. For glass whose color
+deepens with thickness, set `color` to white and give the color with `attenuationColor`.
 
 **Textures.** Any material can have a `texture` that gives its color at each point instead of its
 `color`. A texture is an object with a `type`:
@@ -189,7 +197,18 @@ make the shape smooth (`"smooth": false` with them is an error).
 | `type` | Fields |
 |--------|--------|
 | `checker` | `colors` (two colors, default black and white), `size` (default `1`), `solid` (default `false`: squares in surface coordinates; `true`: cubes in the scene, which needs no surface coordinates) |
+| `marble` | Bands across `axis` (default `[1, 0, 0]`), one each `scale`, bent by turbulence into veins: the ramp's first color is the veins, its last the stone. Default `turbulence` `2.5`; default colors white marble with gray veins |
+| `wood` | Rings about the line through `origin` along `axis` (default `[0, 1, 0]`), one each `scale`, wobbled by noise; each ring runs through the ramp, its last color the dark edge. Default `turbulence` `0.3`; default colors pine |
+| `noise` | The noise itself, for stone, granite or clouds: with `turbulence` `0` (the default), smooth layered noise through the ramp; with more, `turbulence` times the turbulence function, which has sharp creases. Default colors black to white |
 | `image` | `file` (required: a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
+
+`marble`, `wood` and `noise` are solid: they fill space, so an object looks carved from a block and
+needs no surface coordinates. They share these fields: `colors` (a ramp of two or more colors,
+evenly spaced and blended between), `scale` (default `1`: the size of the pattern in scene units),
+`origin` (default `[0, 0, 0]`: where the pattern is centered), `turbulence`, `octaves` (default
+`6`, from 1 to 12: layers of noise, each twice as fine and half as strong), and `seed` (default
+`0`: each seed is a different block, and the same seed always the same one). The noise is Perlin's
+gradient noise. The pattern stays put in the scene, so moving an object moves it through the block.
 
 Surface coordinates: on a sphere, u is longitude (once around, left to right as seen from −z) and v
 latitude (0 at the bottom, 1 at the top). On the side of a cylinder or cone, u is the angle about

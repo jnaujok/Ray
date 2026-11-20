@@ -45,6 +45,7 @@ CRay::CRay( void )
     m_nDepth = 0;
     m_nImageX = 0.0;
     m_nImageY = 0.0;
+    m_pInside = NULL;
 }
 
 CRay::CRay( const CRay &oRay )
@@ -63,6 +64,7 @@ CRay::CRay( const CRay &oRay )
     m_nDepth = oRay.m_nDepth;
     m_nImageX = oRay.m_nImageX;
     m_nImageY = oRay.m_nImageY;
+    m_pInside = oRay.m_pInside;
 }
 
 CRay::~CRay( void )
@@ -85,6 +87,7 @@ CRay &CRay::operator =( const CRay &oRay )
     m_nDepth = oRay.m_nDepth;
     m_nImageX = oRay.m_nImageX;
     m_nImageY = oRay.m_nImageY;
+    m_pInside = oRay.m_pInside;
 
     return *this;
 }
@@ -107,6 +110,7 @@ void CRay::CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX
     m_nPixelX = nX;
     m_nPixelY = nY;
     m_nDepth = 0;
+    m_pInside = NULL;
 }
 
     // The primary ray from the camera through the center of pixel (nX, nY),
@@ -155,6 +159,7 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
     m_nPixelX = nTagX;
     m_nPixelY = nTagY;
     m_nDepth = 0;
+    m_pInside = NULL;
 }
 
 void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInfluence, int nPixelX, int nPixelY )
@@ -171,6 +176,7 @@ void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInf
     m_nPixelX = nPixelX;
     m_nPixelY = nPixelY;
     m_nDepth = 0;
+    m_pInside = NULL;
 }
 
 void CRay::SetT( FLT nNewT )
