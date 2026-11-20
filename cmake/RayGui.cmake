@@ -15,6 +15,7 @@ set(RAY_GUI_SOURCES
     src/ChildFrm.cpp
     src/DiffuseMaterialPropDlg.cpp
     src/InfluenceDlg.cpp
+    src/JsonEditDlg.cpp
     src/MainFrm.cpp
     src/MaterialsDlg.cpp
     src/PlanePropertiesDlg.cpp

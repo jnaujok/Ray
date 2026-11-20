@@ -81,6 +81,10 @@ class CCsg : public CObjects
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore );
         virtual BOOL            GetBounds( CVector &oMinimum, CVector &oMaximum );
         virtual BOOL            SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV );
+            // A part's own colors and texture space carry through, as its
+            // surface coordinates do.
+        virtual BOOL            SurfaceColor( CVector &oPoint, CColor &oColor );
+        virtual CVector         TextureSpace( const CVector &oPoint ) const;
         virtual BOOL            SurfaceNormal( CVector &oPoint, CVector &oNormal );
         virtual CObjects       *HitPart( BOOL &bFlip ) { bFlip = m_bHitFlip; return m_pHitLeaf ? m_pHitLeaf : (CObjects *)this; }
         virtual BOOL            IsClosed( void ) { return TRUE; }

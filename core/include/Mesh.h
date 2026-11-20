@@ -26,7 +26,14 @@
 #include "Objects.h"
 #include "Triangle.h"
 
+#include <memory>
+#include <string>
 #include <vector>
+
+namespace ModelFile
+{
+    struct SModel;
+}
 
 class CMesh : public CObjects
 {
@@ -48,11 +55,34 @@ class CMesh : public CObjects
             FLT                 anScale[ 2 ];       // repeats in u and v
         };
 
+            // How a model file is placed: scaled (by m_oScale, or uniformly
+            // to m_nFitSize across), turned (degrees about x, then y, then
+            // z), aligned, then moved by m_oTranslation.
+        enum EAlign { ALIGN_NONE, ALIGN_CENTER, ALIGN_BOTTOM };
+
     protected:
         SUVMap                  m_oUVMap;
 
+            // A model file the geometry came from, or empty.
+        std::string             m_strFile;          // its name in the scene
+        std::string             m_strFilePath;      // where on the disk it came from (empty: the archive or the scene)
+        std::shared_ptr<const std::string> m_pFileData;
+            // The file as read, shared by every copy of the scene that names
+            // it, so it is read once while any of them lives.
+        std::shared_ptr<const ModelFile::SModel> m_pModel;
+        CVector                 m_oScale;
+        FLT                     m_nFitSize;         // 0: use m_oScale
+        CVector                 m_oRotation;
+        int                     m_nAlign;           // EAlign
+        CVector                 m_oTranslation;
+
             // Works out each face's corner coordinates from the UV map.
         void                    MapUVs( void );
+            // The "uvMap" JSON field, read and written.
+        BOOL                    ReadUVMap( const IASLib::CJsonNode &oNode, BOOL bUnused );
+        void                    UVMapToJson( IASLib::CObjectNode &oNode ) const;
+            // Reads a mesh that names a model "file", and loads it.
+        BOOL                    ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bDoubleSided );
         BOOL                    m_bDoubleSided;
         BOOL                    m_bSmooth;
         CColor                  m_oColor;
@@ -80,9 +110,11 @@ class CMesh : public CObjects
         BOOL                    HitsBox( CRay &oRay );
             // Builds the tree, each box nMargin larger than its faces.
         void                    BuildTree( FLT nMargin );
-        int                     BuildNode( int nFirst, int nCount, const std::vector<FLT> &anCenters, FLT nMargin );
+        int                     BuildNode( int nFirst, int nCount, const std::vector<FLT> &anCenters, FLT nMargin, int nDepth );
             // Whether the ray passes through a node's box before nLimit.
         static BOOL             HitsNode( const SNode &oNode, const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit );
+            // HitsNode, and where the ray enters the box (0 if it starts inside).
+        static BOOL             NodeEntry( const SNode &oNode, const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit, FLT &nEntry );
 
     public:
                                 DYNAMIC_OBJECTS( CMesh );
@@ -99,8 +131,24 @@ class CMesh : public CObjects
         BOOL                    SetGeometry( const std::vector<CVector> &aoVertices, const std::vector<int> &anFaces,
                                              BOOL bSmooth, BOOL bDoubleSided,
                                              const std::vector<CVector> &aoNormals = std::vector<CVector>(),
-                                             const std::vector<FLT> &anUVs = std::vector<FLT>() );
+                                             const std::vector<FLT> &anUVs = std::vector<FLT>(),
+                                             const std::vector<CColor> &aoFaceColors = std::vector<CColor>(),
+                                             const std::vector<unsigned char> &abHasColor = std::vector<unsigned char>() );
+            /// Loads the geometry from a model file's contents (STL or OBJ;
+            /// strName picks the format) and places it with the model
+            /// settings below. FALSE, with a reason in strError, if the file
+            /// can't be read.
+        BOOL                    LoadModel( const std::string &strData, const std::string &strName, std::string &strError );
+            /// Whether the mesh came from a model file.
+        BOOL                    IsFromFile( void ) const { return ! m_strFile.empty(); }
         int                     GetFaceCount( void ) const { return (int)m_apFaces.size(); }
+            /// The vertices, where they are in the scene.
+        const std::vector<CVector> &GetVertices( void ) const { return m_aoVertices; }
+            /// Face nFace's color from a colored model file, if it has one.
+        BOOL                    FaceColor( int nFace, CColor &oColor ) { CVector oAny; return m_apFaces[ (size_t)nFace ]->SurfaceColor( oAny, oColor ); }
+            /// Whether the faces have surface coordinates (from "uvs", a
+            /// model file's, or a UV map).
+        BOOL                    HasUVs( void ) const { return ! m_anUVs.empty(); }
             /// Sets the UV map, used when there are no uvs; it takes effect
             /// at the next SetGeometry.
         void                    SetUVMap( const SUVMap &oMap ) { m_oUVMap = oMap; }
@@ -126,6 +174,7 @@ class CMesh : public CObjects
         virtual CColor          Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
             /// The faces share the mesh's bump map, as they share its materials.
         virtual void            SetBump( const std::shared_ptr<const CBumpMap> &pBump );
+        virtual void            SetTextureFrame( const std::shared_ptr<const STextureFrame> &pFrame );
 
 #ifdef RAY_GUI
         virtual void            ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );

@@ -129,6 +129,31 @@ class CScene
             /// Writes the scene as a plain JSON file, for editing by hand, and
             /// the files it uses beside it, under the names it gives them.
         DWORD               SaveJson( const char *strFileName );
+
+            /// One part of the scene as JSON text, for editing by hand (the
+            /// scene editor's "Edit as JSON"): "settings", "camera",
+            /// "environment" (empty if there is none), "objects/N" or
+            /// "lights/N" (from 0). Empty if there is no such part.
+        std::string         PartToJson( const std::string &strPart );
+            /// Replaces a part of the scene with one read from strText: a part
+            /// named as above, or "objects/+" or "lights/+" to add one at the
+            /// end. Empty text removes an object, a light or the environment.
+            /// Files the text names are read relative to strDirectory, or
+            /// from the archive strArchive (if not empty) when it has them.
+            /// Returns 0 or BAD_FILE (see GetLoadError); on failure the scene
+            /// is as it was.
+        DWORD               EditPart( const std::string &strPart, const std::string &strText,
+                                      const std::string &strDirectory, const std::string &strArchive = std::string() );
+            /// Where an object or light is in its list, or -1.
+        int                 IndexOfObject( CObjects *pObject );
+        int                 IndexOfLight( CObjects *pLight );
+#ifdef RAY_GUI
+            /// Forgets the tree items, so the next ToTree builds them again
+            /// (after the tree has been emptied).
+        void                ForgetTreeItems( void ) { m_hObjects = m_hLights = m_hCamera = NULL; }
+#endif
+        int                 GetLightCount( void ) const { return m_oLights.GetSize(); }
+        int                 GetObjectCount( void ) const { return m_oObjects.GetSize(); }
         virtual CLight     *GetLight( int nIndex );
             /// The scene's nIndex'th object (not light), or NULL.
         CObjects           *GetObjectAt( int nIndex ) { return ( nIndex >= 0 && nIndex < m_oObjects.GetSize() ) ? m_oObjects[ nIndex ] : NULL; }

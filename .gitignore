@@ -8,6 +8,8 @@ Release/
 
 # Visual C++ intermediate / IDE state
 *.obj
+# ...but OBJ model files are scenes' data.
+!/scenes/models/*.obj
 *.pch
 *.pdb
 *.idb

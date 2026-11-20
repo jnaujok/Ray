@@ -1,0 +1,123 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 320,
+        "imageHeight": 240,
+        "imageFile": "benchy_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 8,
+        "depthThreshold": 0.01
+    },
+    "background": [0.55, 0.7, 0.95],
+    "camera": {
+        "position": [64.0, 32.0, -60.0],
+        "lookAt": [18.0, 15.0, -2.0],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 17.0,
+        "horizontalAngle": 22.666667,
+        "aspectRatio": 1.333333,
+        "sampler": {
+            "type": "stratified",
+            "grid": 3,
+            "seed": 0
+        },
+        "colorModel": "srgb"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.08, 0.08]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.8,
+                    "color": [0.8, 0.8, 0.8],
+                    "diffuseCast": false
+                }
+            ]
+        },
+        {
+            "type": "mesh",
+            "file": "models/3DBenchy.stl",
+            "scale": [1.0, 1.0, 1.0],
+            "rotation": [-90.0, 0.0, 0.0],
+            "align": "bottom",
+            "translation": [0.0, 0.0, 0.0],
+            "smooth": false,
+            "doubleSided": false,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.04, 0.01]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "layers",
+                        "colors": [
+                            [0.8, 0.36, 0.07],
+                            [0.95, 0.45, 0.1]
+                        ],
+                        "scale": 0.1,
+                        "origin": [0.0, 0.0, 0.0],
+                        "turbulence": 0.0,
+                        "octaves": 6,
+                        "seed": 0,
+                        "axis": [0.0, 0.0, 1.0]
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.3,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.25,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "layers",
+                    "colors": [
+                        [0.0, 0.0, 0.0],
+                        [1.0, 1.0, 1.0]
+                    ],
+                    "scale": 0.1,
+                    "origin": [0.0, 0.0, 0.0],
+                    "turbulence": 0.0,
+                    "octaves": 6,
+                    "seed": 0,
+                    "axis": [0.0, 0.0, 1.0]
+                },
+                "depth": 0.03,
+                "step": 0.002
+            }
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "position": [80.0, 120.0, -90.0],
+            "color": [0.9, 0.9, 0.9]
+        },
+        {
+            "type": "point",
+            "position": [-90.0, 60.0, -40.0],
+            "color": [0.35, 0.35, 0.4]
+        }
+    ]
+}

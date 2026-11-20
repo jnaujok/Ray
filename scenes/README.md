@@ -29,6 +29,8 @@ when the binary format was dropped; they are in the repository's history.
 | `environment_test.ray` | | An environment map: the HDR sky `textures/sky.hdr` behind the scene, in a mirror ball and through a glass one, lighting a white ball, a small red one and a checkered floor (`samples` 8, so the floor darkens under the balls), with a sun whose direction matches the sky's, with a 4×4 stratified sampler |
 | `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
 | `csg_test.ray` | | Constructive solid geometry: a glass lens blank (two balls' intersection), a bowl (a ball with a smaller one and a turned box taken out, blue outside, white inside and clay at the cut rim, by `childMaterials`), a die (a rounded cube, itself the intersection of a cube and a ball, with six pips drilled in and painted black) and a hammered gold capsule (a cylinder and two balls, with a bump map), with a 3×3 stratified sampler |
+| `models_test.ray` | | Model files: a puzzle cube from a VisCAM-colored STL, a gem from a Magics-colored STL (four faces with their own colors, four with the model's), both shown by the `faceColors` texture, and a ring from an OBJ file of quads with texture coordinates and normals, wearing an image texture, each placed by `fitSize` or `scale`, `rotation`, `align` and `translation`, with a 2×2 stratified sampler |
+| `benchy_test.ray` | | 3DBenchy (`models/3DBenchy.stl`, 225,706 triangles) printed in orange plastic, close up on its bow, its 0.1 mm layer lines a `layers` texture for both its color and its bump map, with a 3×3 stratified sampler |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they split into red, green and blue, with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -160,7 +162,7 @@ color, not used in shading), `materials` (default: one diffuse material), and op
 | `cone` | `base` and `top` (required): the centers of its ends; `baseRadius` (required); `topRadius` (default `0`, a point; more makes a truncated cone); `capped` (default `true`) |
 | `box` | `center` (required); `size` (required): one number for a cube, or `[x, y, z]`, each more than 0; `rotation` (default `[0, 0, 0]`): degrees about x, then y, then z |
 | `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each corner; `uvs`: a `[u, v]` for each corner |
-| `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex; `uvs`: one for each vertex, or `uvMap` (below) |
+| `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex; `uvs`: one for each vertex, or `uvMap` (below). Or, instead of `vertices`, `faces`, `normals` and `uvs`, a model `file` (an STL or OBJ file) and its placement: see *Model files* below |
 | `csg` | `operation` (required): `"union"`, `"intersection"` or `"difference"`; `objects` (required): two or more closed shapes; `childMaterials` (default `false`) |
 
 A cylinder or cone points from `base` to `top`, any way. Capped, its ends are closed with flat discs
@@ -187,6 +189,50 @@ is turned inside out where it is subtracted.
 { "type": "csg", "operation": "difference", "childMaterials": true, "objects": [
     { "type": "box", "center": [0, 0.5, 0], "size": 1, "materials": [ { "type": "diffuse", "color": [1, 1, 1] } ] },
     { "type": "sphere", "center": [0, 1.03, 0], "radius": 0.09, "materials": [ { "type": "diffuse", "color": [0, 0, 0] } ] } ] }
+```
+
+**Model files.** A mesh can take its triangles from a `file`, relative to the scene file as
+texture images are, and goes into a saved scene's archive (and, as `data`, into the copy of the
+scene each networked engine gets) the same way:
+
+- **STL**, binary or ASCII. A binary file is told by its size (80 bytes of header, a count, and 50
+  bytes a triangle), since many begin `solid` as ASCII ones do. Corners at exactly the same place
+  are joined, so `"smooth": true` can blend across faces; the facet normals in the file are ignored,
+  and each face's corners run counterclockwise seen from outside, as the standard says.
+- **Colored STL**, in either informal convention: Materialise Magics (`COLOR=` and the model's
+  red, green, blue and alpha bytes in the header; a face whose attribute has bit 15 clear has its
+  own color, red in bits 0–4, green 5–9, blue 10–14; with it set the model's) or VisCAM and
+  SolidView (no `COLOR=`; a face whose attribute has bit 15 set has a color, blue in bits 0–4, green
+  5–9, red 10–14). The colors show through the `faceColors` texture (below), on whichever materials
+  should show them.
+- **OBJ**: `v`, `vt`, `vn` and `f` lines. A face can have any number of corners (it is split into
+  a fan of triangles), each `v`, `v/vt`, `v//vn` or `v/vt/vn`, counted from 1 or, negative, back
+  from the last one read. Texture coordinates are kept only if every corner has them, normals
+  likewise, and an OBJ's normals make the mesh smooth. Objects, groups, smoothing groups and
+  materials (`o`, `g`, `s`, `usemtl`, `mtllib`) are ignored: the mesh's own `materials` cover all of
+  it.
+
+A file is named `.stl` or `.obj`; another name is told apart by its contents. The model is placed
+by these fields, in this order:
+
+| Field | Default | |
+|-------|---------|---|
+| `scale` | `1` | A number, or `[x, y, z]`; none can be 0. A negative one mirrors the model (its faces still face out) |
+| `fitSize` | | Instead of `scale`: scales the model evenly so that, turned, it is this wide at its widest |
+| `rotation` | `[0, 0, 0]` | Degrees about x, then y, then z, as a box turns. Most printable models stand on z: `[-90, 0, 0]` stands them on y |
+| `align` | `"none"` | `"center"` centers the turned model's box on the origin; `"bottom"` centers it in x and z with its lowest point at y = 0 |
+| `translation` | `[0, 0, 0]` | Moves it, last |
+
+`smooth`, `doubleSided`, `uvMap`, `materials` and `bump` work as for any mesh. Textures and bump
+maps on a model are looked up in the file's own coordinates, before its placement, so they move,
+turn and grow with it: a solid texture's `scale` is in the file's units (millimeters, for a
+printable model), and the `layers` texture follows the print axis however the model is placed. A
+large file is read once however many copies of the scene a render makes, but each copy (one a
+thread) builds its own faces, about 460 bytes a triangle: 3DBenchy takes about 250 MB a thread.
+
+```json
+{ "type": "mesh", "file": "models/3DBenchy.stl", "fitSize": 2, "rotation": [-90, 0, 0], "align": "bottom",
+  "translation": [-4, 0, -7], "materials": [ { "type": "diffuse", "color": [1, 1, 1], "texture": { "type": "layers" } } ] }
 ```
 
 A triangle's normal is worked out from its corners by the edge traversal (V2 − V1) × (V3 − V2), so
@@ -239,15 +285,18 @@ surface through glass is not traced.
 | `marble` | Bands across `axis` (default `[1, 0, 0]`), one each `scale`, bent by turbulence into veins: the ramp's first color is the veins, its last the stone. Default `turbulence` `2.5`; default colors white marble with gray veins |
 | `wood` | Rings about the line through `origin` along `axis` (default `[0, 1, 0]`), one each `scale`, wobbled by noise; each ring runs through the ramp, its last color the dark edge. Default `turbulence` `0.3`; default colors pine |
 | `noise` | The noise itself, for stone, granite or clouds: with `turbulence` `0` (the default), smooth layered noise through the ramp; with more, `turbulence` times the turbulence function, which has sharp creases. Default colors black to white |
+| `layers` | The layer lines of a 3D print: rounded ridges, one each `scale` (default `0.1`) along `axis` (default `[0, 0, 1]`, the print direction of a model file), 0 at the seams and rising along a parabola to 1 in the middle of each layer, through the ramp. As a color it darkens the seams (default colors light gray to white); as a bump map's texture, with colors black to white, it gives each layer its rounded edge. `turbulence` (default `0`) wobbles the layers slowly, its noise about twenty layers across |
+| `faceColors` | The colors a colored model file gives its faces; `default` (default `[0.8, 0.8, 0.8]`) where a face has none or the surface isn't from such a file |
 | `image` | `file` (required: a PNG, a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
 
-`marble`, `wood` and `noise` are solid: they fill space, so an object looks carved from a block and
+`marble`, `wood`, `noise` and `layers` are solid: they fill space, so an object looks carved from a block and
 needs no surface coordinates. They share these fields: `colors` (a ramp of two or more colors,
 evenly spaced and blended between), `scale` (default `1`: the size of the pattern in scene units),
 `origin` (default `[0, 0, 0]`: where the pattern is centered), `turbulence`, `octaves` (default
 `6`, from 1 to 12: layers of noise, each twice as fine and half as strong), and `seed` (default
 `0`: each seed is a different block, and the same seed always the same one). The noise is Perlin's
-gradient noise. The pattern stays put in the scene, so moving an object moves it through the block.
+gradient noise. The pattern stays put in the scene, so moving an object moves it through the block,
+except on a mesh loaded from a file, whose textures are looked up in the file's own coordinates.
 
 Surface coordinates: on a sphere, u is longitude (once around, left to right as seen from −z) and v
 latitude (0 at the bottom, 1 at the top). On the side of a cylinder or cone, u is the angle about

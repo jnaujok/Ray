@@ -10,6 +10,102 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.11] - 2026-11-20
+
+Models and prints: meshes load STL (binary, ASCII and colored) and OBJ files into the scene and its
+archive, with 3DBenchy as the sample; a layer-lines texture makes them look 3D-printed; the mesh
+tree is built by the surface area heuristic and walked nearest first; and the scene editor can
+edit, add, delete and import anything as JSON. Scenes without the new fields render byte for byte
+as before.
+
+### Added
+
+- **Model files.** A `mesh` can take a `file` instead of `vertices` and `faces`: an STL, binary
+  or ASCII (a binary one told by its size, since many begin `solid` as ASCII ones do; corners at
+  the same place joined), or an OBJ (`v`, `vt`, `vn`, `f`; faces of any number of corners split
+  into fans; negative indices; texture coordinates and normals kept where every corner has them;
+  objects, groups and materials ignored). `ModelFile` reads them.
+  - Placed by `scale` (a number or `[x, y, z]`; a negative one mirrors the model, its faces turned
+    back to face out) or `fitSize` (evenly, to that width at its widest), `rotation` (degrees about
+    x, then y, then z, as a box), `align` (`"center"`, or `"bottom"`: centered in x and z on
+    y = 0) and `translation`, in that order. Most printable models stand on z, so
+    `"rotation": [-90, 0, 0]` stands them on y.
+  - The file goes into a saved archive and out beside `--save-json`, and into each engine's copy
+    of the scene as `data`, through `RayJson::ReadSceneFile` and `SceneFileName` like texture
+    images. It is read once, however many copies of the scene a render makes (a cache by the
+    file's contents); each copy still builds its own faces, so a large model costs memory per
+    thread (a known issue).
+  - Textures and bump maps on a model are looked up in its file's own coordinates (each object can
+    now have a texture frame, `CObjects::TextureSpace`, and textures get their point through
+    `CObjects::TextureAt`), so they move, turn and grow with it.
+- **Colored STL files** in both informal conventions: Materialise Magics (`COLOR=` in the header,
+  bit 15 clear for a face's own color, red in the low bits) and VisCAM/SolidView (bit 15 set, blue
+  in the low bits). The new **`faceColors` texture** shows each face's color (`default` where it
+  has none), on whichever materials should show it, so a highlight can stay white.
+- **The `layers` texture**: the rounded layer lines of a 3D print, one each `scale` (default
+  `0.1`) along `axis` (default `[0, 0, 1]`, a model file's print direction), 0 at the seams and
+  rising along a parabola to 1 in each layer's middle. As a color it darkens the seams; as a bump
+  map's texture it gives each layer its rounded edge. With a model's textures in its file's
+  millimeters, 0.1 is 0.1 mm, along the print axis however the model is turned.
+
+  ![Before and after: 3DBenchy's bow in plain orange (left) and with printed layer lines as color and bump map (right); below, a full-size crop of the torture test before and after](docs/images/changelog/models-layers.png)
+
+  Above, Benchy's bow and hawse hole in plain orange plastic, then printed: the layer lines run
+  round the hull, catching the light on each rounded bead, and crowd together where the hull
+  curves away. Below, a full-size crop of the torture test's foreground at 0.10 and 0.11: an
+  orange Benchy and a ring from an OBJ file join the scene (a puzzle cube from a colored STL
+  stands further to the right).
+- **3DBenchy** (`scenes/models/3DBenchy.stl`): the 3D-printer test boat by Creative Tools, from its
+  official repository, unmodified. It is dedicated to the public domain (CC0 1.0), which
+  3dbenchy.com now states, so it can be included; `NOTICE` and `scenes/models/README.md` credit
+  it. `tools/make_models.py` writes the other model files the tests use: a VisCAM-colored puzzle
+  cube, a Magics-colored gem and an OBJ ring.
+- **The scene editor edits anything as JSON.** `CScene::PartToJson` and `CScene::EditPart` give
+  and replace one part of a scene (`settings`, `camera`, `environment`, `objects/N`, `lights/N`,
+  or `objects/+` and `lights/+` to add one; empty text removes it), checked as a scene file is and
+  leaving the scene as it was if the text is refused. In `Ray.exe` the tree's right-click menus
+  use them through a new JSON dialog (`CJsonEditDlg`): *Edit as JSON* and *Delete* on any object
+  or light, and on the scene *Edit Settings*, *Edit Camera* (sampler, color model, exposure,
+  clamp, lens), *Edit Environment*, *Add Object*, *Add Light* and *Import Model (STL, OBJ)*. So
+  every shape, light, texture, bump map and camera setting the core has gained can be added and
+  edited, if not yet with a dialog of its own.
+- **Tests.** `scenes/models_test.ray` (the cube, the gem and the ring) and
+  `scenes/benchy_test.ray` (Benchy close up in orange plastic with layer lines), each with render,
+  round-trip and network tests, reference renders, README previews and entries in the Expected
+  output table. `format_test` checks binary, ASCII and colored STL (both conventions) and OBJ
+  reading (quads, negative indices, mixed corners, every error), placement (scale, turn, move,
+  `align`, `fitSize`, mirroring), that a placed model's textures are looked up at the point in
+  its file, the `layers` and `faceColors` textures, editing parts of a scene, and every new error
+  message; with `--textures` it loads Benchy and checks its size, that its tree finds exactly the
+  hits testing every face does, the sample models' colors and texture coordinates, and that a
+  scene's model files go into an archive and out beside a JSON file unchanged.
+
+### Changed
+
+- **A mesh's tree is built by the surface area heuristic and walked nearest first.** Each split is
+  the one, of sixteen bins along each axis, that leaves a ray the fewest faces to test, weighing
+  each side by its box's area; a node no split helps stays a leaf of up to sixteen faces, and past
+  64 levels the tree splits at the median. The ray visits the nearer child first and skips a box
+  it enters beyond the closest hit so far. The hit found is the same (the tests hold every ray to
+  the face-by-face answer), and every render is byte for byte as before; on a Release build the
+  teapot at 640×480 takes 22% less CPU time and the torture test 9% less.
+- **The torture test** has a layer-lined orange 3DBenchy, a puzzle cube from a colored STL and a
+  ring from an OBJ file on the floor in front. Its reference render, README preview and full-size
+  image are regenerated.
+- The slow render tests (`render_torture`, `render_benchy`, `network_benchy`, `render_prism`,
+  `network_prism`) carry the CTest label `slow`, so `ctest -LE slow` runs only the quick ones. CI's Windows job
+  skips them, as its runners are small; Linux, macOS and the sanitizer job still run them.
+- `.gitignore` still ignores Visual C++ `.obj` files, but no longer OBJ models in `scenes/models/`;
+  `.gitattributes` marks STL files binary and OBJ files text.
+
+### Fixed
+
+- `CMesh::Intersect` on a mesh with no faces read the first node of its empty tree; it now misses.
+- Loading 3DBenchy took minutes on Windows: the hash that joins its corners left its low bits the
+  same for every corner (a float made a double has 29 low bits of zeros), and MSVC's tables pick a
+  bucket by the low bits, so all 225,706 went in one. The hash now mixes every bit. And each mesh
+  holds the model it read, so the copies of a scene a render makes really do share one reading.
+
 ## [2026-alpha-0.10] - 2026-11-20
 
 Solids and spectra: constructive solid geometry, which makes lens blanks, bowls and drilled dice
@@ -881,7 +977,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.10...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11...HEAD
+[2026-alpha-0.11]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.10...2026-alpha-0.11
 [2026-alpha-0.10]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.9...2026-alpha-0.10
 [2026-alpha-0.9]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.8...2026-alpha-0.9
 [2026-alpha-0.8]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.7...2026-alpha-0.8

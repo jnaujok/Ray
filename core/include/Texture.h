@@ -31,10 +31,12 @@ namespace IASLib
     // Where on a surface a texture is looked up.
 struct STexturePoint
 {
-    CVector             oPoint;         // the hit point, in the scene
+    CVector             oPoint;         // the hit point, in the object's texture space (usually the scene's)
     FLT                 nU;             // surface coordinates, if bHasUV
     FLT                 nV;
     BOOL                bHasUV;
+    CColor              oColor;         // the surface's own color (a colored model's face), if bHasColor
+    BOOL                bHasColor;
 };
 
 class CTexture

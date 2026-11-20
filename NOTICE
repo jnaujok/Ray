@@ -8,3 +8,9 @@ which is licensed under the GNU Lesser General Public License, version 3.
 IASLib is not covered by the Apache License; its source, and the means to
 relink this program against a modified copy of it, are available from that
 repository and from this project's CMake build.
+
+scenes/models/3DBenchy.stl is #3DBenchy by Creative Tools, designed by
+Daniel Noree (https://www.3dbenchy.com), from
+https://github.com/CreativeTools/3DBenchy, included unmodified. It has been
+dedicated to the public domain under Creative Commons CC0 1.0 Universal and
+is not covered by the Apache License.

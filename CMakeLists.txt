@@ -65,12 +65,14 @@ set(RAY_CORE_SOURCES
     core/src/CornerSampler.cpp
     core/src/Cylinder.cpp
     core/src/DiffuseMaterial.cpp
+    core/src/FaceColorTexture.cpp
     core/src/GammaColorModel.cpp
     core/src/HdrColorModel.cpp
     core/src/ImageExport.cpp
     core/src/ImageFile.cpp
     core/src/ImageWriter.cpp
     core/src/ImageTexture.cpp
+    core/src/LayersTexture.cpp
     core/src/Lens.cpp
     core/src/Light.cpp
     core/src/LightArray.cpp
@@ -79,6 +81,7 @@ set(RAY_CORE_SOURCES
     core/src/MaterialList.cpp
     core/src/Matrix.cpp
     core/src/Mesh.cpp
+    core/src/ModelFile.cpp
     core/src/NoiseTexture.cpp
     core/src/Objects.cpp
     core/src/ObjectsArray.cpp

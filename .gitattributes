@@ -22,3 +22,7 @@
 
 # Reference renders and other archives
 *.gz binary
+
+# Model files: STL is binary (or, rarely, ASCII kept byte for byte); OBJ is text.
+*.stl binary
+*.obj text eol=lf

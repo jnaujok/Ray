@@ -39,6 +39,19 @@ Python 3, and writes the same files every time:
 tools/make_textures.py
 ```
 
+## `make_models.py`
+
+Makes the small model files in `scenes/models/` that `models_test.ray`, the tests and the torture
+test use: `color_cube.stl` (a puzzle cube of colored stickers with black gaps, a binary STL colored
+the VisCAM/SolidView way), `magics_gem.stl` (an octahedron colored the Materialise Magics way, four
+faces with their own colors and four with the model's) and `ring.obj` (a torus of quads with
+texture coordinates and normals, written with negative indices and with lines a reader ignores).
+It needs only Python 3, and writes the same files every time:
+
+```sh
+tools/make_models.py
+```
+
 ## `obj_to_ray.py`
 
 Turns a Wavefront OBJ model into a Ray mesh object (JSON), ready to put in a scene's `objects`

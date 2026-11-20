@@ -10,6 +10,8 @@
 #include "MarbleTexture.h"
 #include "NoiseTexture.h"
 #include "WoodTexture.h"
+#include "LayersTexture.h"
+#include "FaceColorTexture.h"
 
 #include <string.h>
 
@@ -20,6 +22,8 @@ namespace
     CTexture *CreateMarble( void )  { return new CMarbleTexture; }
     CTexture *CreateWood( void )    { return new CWoodTexture; }
     CTexture *CreateNoise( void )   { return new CNoiseTexture; }
+    CTexture *CreateLayers( void )  { return new CLayersTexture; }
+    CTexture *CreateFaceColors( void ) { return new CFaceColorTexture; }
 
         // Every texture that can be named in a scene.
     const CTexture::SType s_aoTypes[] =
@@ -29,6 +33,8 @@ namespace
         { "marble",  "solid marble: bands bent into veins by turbulence",     CreateMarble },
         { "wood",    "solid wood: rings about an axis, wobbled by noise",     CreateWood },
         { "noise",   "solid noise or turbulence through a ramp of colors",    CreateNoise },
+        { "layers",  "the rounded layer lines of a 3D-printed part",          CreateLayers },
+        { "faceColors", "the colors a colored model file gives its faces",    CreateFaceColors },
     };
 }
 

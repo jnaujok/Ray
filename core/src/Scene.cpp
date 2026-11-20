@@ -870,6 +870,227 @@ static BOOL ReadObjects( const IASLib::CJsonNode &oRoot, const char *strKey, BOO
     return TRUE;
 }
 
+    // Splits "objects/3" into "objects" and 3 ("+" is -1). FALSE if the part
+    // isn't a list entry.
+static BOOL SplitPart( const std::string &strPart, std::string &strList, int &nIndex )
+{
+    size_t nSlash = strPart.find( '/' );
+
+    if ( nSlash == std::string::npos )
+        return FALSE;
+    strList = strPart.substr( 0, nSlash );
+    if ( strList != "objects" && strList != "lights" )
+        return FALSE;
+
+    std::string strIndex = strPart.substr( nSlash + 1 );
+
+    if ( strIndex == "+" )
+    {
+        nIndex = -1;
+        return TRUE;
+    }
+    if ( strIndex.empty() || strIndex.find_first_not_of( "0123456789" ) != std::string::npos || strIndex.size() > 9 )
+        return FALSE;
+    nIndex = atoi( strIndex.c_str() );
+    return TRUE;
+}
+
+std::string CScene::PartToJson( const std::string &strPart )
+{
+    std::unique_ptr<IASLib::CObjectNode>    pRoot( ToJsonTree() );
+    const IASLib::CJsonNode                *pNode = NULL;
+    std::string                             strList;
+    int                                     nIndex;
+
+    if ( strPart == "settings" || strPart == "camera" || strPart == "environment" )
+        pNode = pRoot->get( strPart.c_str() );
+    else if ( SplitPart( strPart, strList, nIndex ) && nIndex >= 0 )
+    {
+        const IASLib::CJsonNode *pArray = pRoot->get( strList.c_str() );
+
+        if ( pArray && nIndex < pArray->size() )
+            pNode = pArray->get( nIndex );
+    }
+    return pNode ? RayJson::Write( *pNode ) : std::string();
+}
+
+int CScene::IndexOfObject( CObjects *pObject )
+{
+    for ( int nIndex = 0; nIndex < m_oObjects.GetSize(); nIndex++ )
+    {
+        if ( m_oObjects[ nIndex ] == pObject )
+            return nIndex;
+    }
+    return -1;
+}
+
+int CScene::IndexOfLight( CObjects *pLight )
+{
+    for ( int nIndex = 0; nIndex < m_oLights.GetSize(); nIndex++ )
+    {
+        if ( (CObjects *)m_oLights[ nIndex ] == pLight )
+            return nIndex;
+    }
+    return -1;
+}
+
+DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, const std::string &strDirectory,
+                        const std::string &strArchive )
+{
+    std::string strList;
+    int         nIndex = 0;
+    BOOL        bList = SplitPart( strPart, strList, nIndex );
+    BOOL        bLights = bList && strList == "lights";
+    int         nCount = bLights ? m_oLights.GetSize() : m_oObjects.GetSize();
+    BOOL        bEmpty = ( strText.find_first_not_of( " \t\r\n" ) == std::string::npos );
+
+    RayJson::ClearError();
+    m_strLoadError.clear();
+    if ( ! bList && strPart != "settings" && strPart != "camera" && strPart != "environment" )
+    {
+        m_strLoadError = "there is no part of a scene called \"" + strPart + "\"";
+        return BAD_FILE;
+    }
+    if ( bList && nIndex >= nCount )
+    {
+        m_strLoadError = "there is no " + strPart;
+        return BAD_FILE;
+    }
+
+        // Empty text removes the part, where it can be removed.
+    if ( bEmpty )
+    {
+        if ( strPart == "environment" )
+        {
+            m_pEnvironment.reset();
+            return 0;
+        }
+        if ( bList && nIndex >= 0 )
+        {
+            if ( bLights )
+            {
+                CLight *pOld = m_oLights[ nIndex ];
+
+                m_oLights.Delete( nIndex );
+                delete pOld;
+            }
+            else
+            {
+                CObjects *pOld = m_oObjects[ nIndex ];
+
+                m_oObjects.Delete( nIndex );
+                delete pOld;
+                ForgetTree();
+            }
+            return 0;
+        }
+        m_strLoadError = "the " + strPart + " can't be left out";
+        return BAD_FILE;
+    }
+
+    std::unique_ptr<IASLib::CJsonNode> pNode( RayJson::Parse( strText ) );
+
+    if ( ! pNode )
+    {
+        m_strLoadError = RayJson::GetError();
+        RayJson::ClearError();
+        return BAD_FILE;
+    }
+
+        // Files are read from the archive, if it has them, else the disk.
+    RayJson::CBaseDirectory                 oBase( strDirectory );
+    IASLib::CResourceFile                   oArchive;
+    std::unique_ptr<RayJson::CArchiveSource> pSource;
+    BOOL                                    bRead = FALSE;
+
+    if ( ! strArchive.empty() && oArchive.Open( strArchive.c_str(), IASLib::CResourceFile::READ_ONLY ) )
+        pSource.reset( new RayJson::CArchiveSource( oArchive ) );
+
+    if ( strPart == "settings" )
+    {
+        CSettings       oSettings;
+        RayJson::CWhere oWhere( "settings" );
+
+        if ( oSettings.FromJson( *pNode ) )
+        {
+            m_oSettings = oSettings;
+            bRead = TRUE;
+        }
+    }
+    else if ( strPart == "camera" )
+    {
+        CCamera         oCamera;
+        RayJson::CWhere oWhere( "camera" );
+
+        if ( oCamera.FromJson( *pNode ) )
+        {
+            m_oCamera = oCamera;
+            bRead = TRUE;
+        }
+    }
+    else if ( strPart == "environment" )
+    {
+        std::shared_ptr<CEnvironment>   pEnvironment( new CEnvironment );
+        RayJson::CWhere                 oWhere( "environment" );
+
+        if ( pEnvironment->FromJson( *pNode ) )
+        {
+            m_pEnvironment = pEnvironment;
+            bRead = TRUE;
+        }
+    }
+    else
+    {
+            // Read as the scene reads its lists, from a list of one.
+        IASLib::CObjectNode     oRoot;
+        std::vector<CObjects *> apRead;
+
+        oRoot.putArray( strList.c_str() )->add( pNode.release() );
+        if ( ReadObjects( oRoot, strList.c_str(), bLights, apRead ) && apRead.size() == 1 )
+        {
+            if ( bLights )
+            {
+                if ( nIndex < 0 )
+                    m_oLights.Add( (CLight *)apRead[ 0 ] );
+                else
+                {
+                    CLight *pOld = m_oLights[ nIndex ];
+
+                    m_oLights.Delete( nIndex );
+                    m_oLights.Insert( (CLight *)apRead[ 0 ], nIndex );
+                    delete pOld;
+                }
+            }
+            else
+            {
+                if ( nIndex < 0 )
+                    m_oObjects.Add( apRead[ 0 ] );
+                else
+                {
+                    CObjects *pOld = m_oObjects[ nIndex ];
+
+                    m_oObjects.Delete( nIndex );
+                    m_oObjects.Insert( apRead[ 0 ], nIndex );
+                    delete pOld;
+                }
+                ForgetTree();
+            }
+            apRead.clear();
+            bRead = TRUE;
+        }
+        for ( size_t nRead = 0; nRead < apRead.size(); nRead++ )
+            delete apRead[ nRead ];
+    }
+
+    if ( ! bRead )
+    {
+        m_strLoadError = RayJson::GetError();
+        RayJson::ClearError();
+        return BAD_FILE;
+    }
+    return 0;
+}
+
 DWORD CScene::FromJson( const std::string &strText )
 {
     RayJson::ClearError();
