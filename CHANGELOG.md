@@ -10,6 +10,66 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.12] - 2026-11-20
+
+A scene editor for every platform: `ray-editor`, built on wxWidgets for Windows, Linux and macOS,
+with a scene tree, a property grid and JSON editing for every part of a scene, a shaded OpenGL view
+that you orbit, pan, zoom and click to select in, and a Render button that ray-traces the view
+progressively over it. Rendering doesn't change: every reference render is byte for byte as before.
+
+### Added
+
+- **`ray-editor`, the cross-platform scene editor** (`editor/`, built with
+  `-DRAY_BUILD_EDITOR=ON`; see [`editor/README.md`](editor/README.md)). It sits beside the MFC
+  editor, which is unchanged.
+  - **Scene tree** on the left: the settings, the camera, the environment, the objects (each with
+    its materials under it) and the lights.
+  - **Properties** on the right, two ways: a property grid of the selected part's fields (numbers,
+    switches, text, x/y/z or red/green/blue for vectors and colors, and its materials, texture,
+    bump map, sampler, lens and so on as sections), and a JSON page for anything else. Every change
+    goes through the scene's own reader; if it refuses, the reason shows and nothing changes.
+  - **Shaded view** in the middle (`wxGLCanvas`): every object tessellated and lit by the scene's
+    lights (up to eight; a lamp at the eye if there are none), glass see-through, a csg's parts
+    faint, icons for every light and the camera's frustum, the selection outlined, and a wireframe
+    overlay to turn on. Drag to orbit, right-drag to pan, wheel to zoom; a click picks the object
+    under it with the tracer's own hit test. *Look Through Scene Camera* shows what the camera
+    sees, and *Set Scene Camera to This View* moves the camera there.
+  - **Render** (F5) ray-traces the view at its size over it, with the tracer's own thread task
+    master: a quick pass (a ray a pixel at a quarter of the size), then the scene's sampler. Moving
+    the view or changing the scene stops it; the finished image saves as a PNG.
+  - **Editing:** undo and redo (whole-scene snapshots, up to 100 steps or 256 MB), new objects
+    (sphere, box, plane, cylinder, cone, triangle), lights (point, spot, directional, sphere,
+    rectangle) and a sky from templates, duplicate, delete, and STL or OBJ import (a mesh fitted
+    to two units, standing on the floor).
+  - **Files:** new, open (scene archives and JSON), and save as a `.ray` archive or as `.json`.
+  - **How it's built:** the logic (`editor/logic/`: the document, tessellation, the view's camera,
+    picking and the progressive render) uses no window toolkit and is always built; only
+    `editor/gui/` uses wxWidgets. CMake uses an installed wxWidgets 3.1+ or fetches 3.2.6 (pinned
+    by SHA-256) and builds only `base`, `core`, `gl` and `propgrid`, as static libraries (about
+    five minutes on a 16-core machine). The view uses OpenGL 1.x fixed-function calls only, so it
+    runs on Windows' `opengl32`, macOS's legacy 2.1 profile and Mesa alike.
+- **`editor_logic` test** (`tests/editor_test.cpp`, 151 checks, no display needed): every
+  template is a part the scene accepts; bad edits are refused with a reason and change nothing;
+  undo and redo walk edits, additions, duplicates and deletions back and forth; spheres, boxes
+  (turned as the tracer turns them), planes, cones and csgs tessellate correctly, and every object
+  in the torture test draws; the view aims rays exactly as `CCamera::RayDirection` does (within
+  10⁻⁹) and its OpenGL matrices put a point where the ray through it lands; picking finds the ball,
+  the floor and the sky; models import, scenes save as archives and JSON and read back; and the
+  progressive render finishes, matches a render without the quick pass, and stops at once when
+  asked.
+- **CI** builds `ray-editor` on Linux, macOS and Windows (the `editor` job, with wxWidgets'
+  build cached between runs) and uploads it.
+- **`CImageFile` can keep an image in memory** (`CImageFile( nWidth, nHeight )`, `GetMemory`),
+  and `PutRGB` is virtual, so a subclass sees each pixel as it arrives: the editor's progressive
+  render uses it.
+
+### Fixed
+
+- **Loading a scene file that isn't there no longer crashes.** IASLib's `CFile` throws when a file
+  can't be opened, and `CScene::Load` let the exception escape; it now returns `BAD_FILE` with
+  "the file can't be opened", as it always meant to. (`raythrower` with a wrong file name crashed
+  the same way.)
+
 ## [2026-alpha-0.11.1] - 2026-11-20
 
 Rainbows and lean meshes: dispersion can be traced wavelength by wavelength, so glass and a
@@ -1052,7 +1112,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11.1...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12...HEAD
+[2026-alpha-0.12]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11.1...2026-alpha-0.12
 [2026-alpha-0.11.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11...2026-alpha-0.11.1
 [2026-alpha-0.11]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.10...2026-alpha-0.11
 [2026-alpha-0.10]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.9...2026-alpha-0.10

@@ -18,19 +18,29 @@ Guidance for Claude Code when working in this repository.
 ## Project overview
 
 Ray is a distributed ray tracer from 1997, rebuilt on [IASLib](https://github.com/jnaujok/IASLib)
-v3.0. It is made of three programs and a shared core:
+v3.0. It is made of four programs and a shared core:
 
 | Part | Location | Platform |
 |------|----------|----------|
 | Ray tracing core: scene, objects (including meshes), materials, samplers, color models, JSON scene files, wire protocol, task masters | `core/` | all |
 | `raythrower`: command-line master (threads, or engines over TCP) | `raythrower/` | Windows, Linux, macOS |
 | `rayengine`: networked tracing task | `rayengine/` | Windows, Linux, macOS |
+| `ray-editor`: cross-platform scene editor (wxWidgets) | `editor/` (`logic/` toolkit-free, `gui/` wxWidgets) | Windows, Linux, macOS |
 | `Ray.exe`: MFC scene editor | `src/`, `include/`, `res/` | Windows only (MFC, MBCS) |
 
-The core is compiled twice: once as the `ray_core` OBJECT library for the command-line programs,
-and again inside the GUI target with `RAY_GUI` defined, which turns on the tree-view and dialog
-code in the scene classes. Keep `ray_core` an OBJECT library: object and material classes register
-themselves from static constructors, which a static library would let the linker drop.
+The core is compiled twice: once as the `ray_core` OBJECT library for the command-line programs
+and `ray-editor`, and again inside the MFC target with `RAY_GUI` defined, which turns on the
+tree-view and dialog code in the scene classes. Keep `ray_core` an OBJECT library: object and
+material classes register themselves from static constructors, which a static library would let
+the linker drop.
+
+`ray-editor` uses `ray_core` without `RAY_GUI`: it must never include MFC headers or use the
+`RAY_GUI` code. Its logic (`editor/logic/`, the `ray_editor_logic` OBJECT library: document,
+undo, tessellation, the view's camera, picking, the progressive render) includes no wxWidgets
+headers, is always built, and is tested by `editor_test` without a display; only `editor/gui/`
+uses wxWidgets. Its view's camera must aim rays exactly as `CCamera::RayDirection` does (the
+scene's coordinates are left-handed); `editor_test` checks it. The view uses OpenGL 1.x
+fixed-function calls only, so it runs on Windows' `opengl32`, macOS's legacy profile and Mesa.
 
 ## Building and testing
 
@@ -44,6 +54,11 @@ ctest --test-dir build --output-on-failure
   SJSON, until IASLib tags a release with it). To use a local checkout, pass
   `-DFETCHCONTENT_SOURCE_DIR_IASLIB=/path/to/IASLib`. SJSON's LZ4 and zstd support is kept off.
 - The GUI needs MSVC with MFC: `-DRAY_BUILD_GUI=ON`, then build the `Ray` target.
+- The cross-platform editor: `-DRAY_BUILD_EDITOR=ON`, then build the `ray-editor` target. CMake
+  uses an installed wxWidgets (`find_package`) or fetches 3.2.6 (pinned by SHA-256 in
+  `cmake/RayEditor.cmake`) and builds only `base`, `core`, `gl` and `propgrid`, static. Linux needs
+  `libgtk-3-dev` and `libgl1-mesa-dev`. `-DRAY_WXWIDGETS_URL=file:///…` fetches a local tarball.
+  New editor source files go in `cmake/RayEditor.cmake` (GUI) or `editor/CMakeLists.txt` (logic).
 - Time renders with a Release build (`-DCMAKE_BUILD_TYPE=Release`); a Debug build is several
   times slower and misleads.
 - Run the tests under AddressSanitizer before changing anything in `core/`
@@ -142,5 +157,5 @@ ctest --test-dir build --output-on-failure
 
 ## Known issues
 
-- The MFC application can only be built on Windows; on Linux and macOS only the core and the
-  command-line programs build.
+- The MFC application can only be built on Windows; on Linux and macOS the core, the command-line
+  programs and `ray-editor` build.
