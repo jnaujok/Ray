@@ -602,7 +602,8 @@ static void ArchiveChecks( const char *strScenes, const char *strDir )
     std::string strArchive = std::string( strDir ) + "/archive_test.ray";
     std::string strJsonDir = std::string( strDir ) + "/archive_json";
     std::string strJson = strJsonDir + "/scene.ray";
-    std::string strImage = std::filesystem::absolute( std::string( strScenes ) + "/textures/uv_grid.ppm" ).string();
+        // Forward slashes: a Windows path's backslashes would be JSON escapes.
+    std::string strImage = std::filesystem::absolute( std::string( strScenes ) + "/textures/uv_grid.ppm" ).generic_string();
     CScene      oScene;
 
     {
