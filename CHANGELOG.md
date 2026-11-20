@@ -10,6 +10,67 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.8] - 2026-11-20
+
+Surface detail: bump and normal maps that tilt the shading normal so surfaces look dented, grooved
+or rough while their shapes stay smooth, and PNG image textures of every kind, read by Ray's own
+decoder. Scenes without the new fields render byte for byte as before.
+
+### Added
+
+- **Bump and normal maps.** Any object takes a `bump`: a `texture` and a `mode`. In `"height"`
+  mode (the default) the texture is read as heights (the average of its red, green and blue, times
+  `depth`, default 0.05 scene units) and the normal tilts down their slope, found by looking the
+  texture up `step` (default 0.001) either side of the point along the surface. Solid textures need
+  no surface coordinates, so `noise` makes hammered metal or orange peel on anything, and an
+  object's own wood or marble texture makes its grain stand out. In `"normal"` mode the texture is a
+  tangent-space normal map (OpenGL convention: flat is (0.5, 0.5, 1), green toward increasing v),
+  tilted by `strength` (default 1); the surface's u and v directions are worked out from its
+  surface coordinates, so it works on every object that has them, across a sphere's seam too.
+  - The bump map belongs to the object, not to one of its materials, so the diffuse shading, the
+    highlight, and reflected and refracted rays all follow the same bumps; a mesh's faces share the
+    mesh's, as they share its materials (`CObjects::BaseShade` tilts the normal once, before any
+    material sees it).
+  - A tilted normal that would face away from the ray, as at the rim of a sphere, is passed over
+    for the smooth one, so a surface is never lit from behind.
+  - Nothing new crosses the wire beyond the scene's own fields: images in a bump map travel inside
+    the scene like any texture's, so networked engines match threads byte for byte.
+- **PNG image textures.** An `image` texture (and so a normal map) can be a PNG of any kind:
+  grayscale, RGB, palette, grayscale with alpha or RGBA, at 1, 2, 4, 8 or 16 bits a channel,
+  interlaced or not (`CPngImage`). Low bit depths are scaled to the full range, 16-bit channels
+  rounded to 8 bits, and alpha is ignored. The data is inflated by a small decoder of our own, so
+  nothing new is needed to build; chunk CRCs and the zlib checksum are checked, and a damaged or
+  truncated file is reported when the scene loads, never read past. A saved scene keeps the PNG
+  file itself in its archive.
+- **`scenes/bump_test.ray`**: a brick wall (a PNG color texture and an interlaced PNG normal map)
+  lit from the side, a hammered copper ball and an orange-peel ball, a box embossed with bricks by a
+  16-bit grayscale PNG height map, and a wood floor bumped by its own grain. New tests
+  `render_bump` (with a reference render and a README preview), `roundtrip_bump_test` and
+  `network_bump`. `format_test` decodes PNGs of every color type and bit depth, interlaced and
+  not, with every filter type, exactly; refuses damaged CRCs, every truncation, palette indices past
+  the palette and unknown critical chunks; inflates stored and dynamic Huffman blocks (one made by
+  zlib) and catches a wrong checksum and damaged data; checks that a height ramp tilts the normal
+  by exactly depth times its slope, that a normal map tilts it toward u by its red and toward v by
+  its green times `strength`, that a flat map changes nothing on a sphere, that a normal facing away
+  from the ray is passed over, that every object type saves and reads back its `bump` and a mesh's
+  faces share it, and that bad settings are reported.
+- **`tools/make_textures.py`** makes the three brick PNGs in `scenes/textures/` (color, normal map
+  and 16-bit height map) with only the Python standard library.
+
+  ![Before and after: the bump test with smooth surfaces (left) and with bump and normal maps (right); below, the torture test's foreground before and after](docs/images/changelog/bump-maps.png)
+
+  Above, the new test scene with its bump maps taken out, and as it is: the copper ball is
+  hammered, the orange has its peel, the plain box is embossed with bricks, the floor's grain
+  stands out, and the bricks' edges catch the side light. Below, the torture test: the gold tube is
+  hammered, and the box behind the teapot is now bricks, a PNG texture with a PNG normal map.
+
+### Changed
+
+- **The torture test uses the new features:** the textured box is bricks (`bricks.png` with the
+  `bricks_normal.png` normal map), the gold tube and the green cone are hammered by `noise` height
+  maps, and the mirror's wooden frame is bumped by its own grain. Its reference render, README
+  preview and full-size image are regenerated.
+
 ## [2026-alpha-0.7] - 2026-11-20
 
 Softness: frosted glass and brushed mirrors, and area lights that cast soft shadows, all picking
@@ -657,7 +718,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.7...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.8...HEAD
+[2026-alpha-0.8]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.7...2026-alpha-0.8
 [2026-alpha-0.7]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.6...2026-alpha-0.7
 [2026-alpha-0.6]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.5...2026-alpha-0.6
 [2026-alpha-0.5]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4.1...2026-alpha-0.5

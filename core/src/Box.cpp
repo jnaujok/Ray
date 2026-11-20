@@ -233,11 +233,12 @@ void CBox::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutVector( oNode, "rotation", m_oRotation );
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+    BumpToJson( oNode );
 }
 
 BOOL CBox::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "center", "size", "rotation", "color", "materials", NULL };
+    static const char *const astrFields[] = { "center", "size", "rotation", "color", "materials", "bump", NULL };
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
          ! RayJson::GetVector( oNode, "center", m_oCenter, TRUE ) )
@@ -262,6 +263,7 @@ BOOL CBox::FromJson( const IASLib::CJsonNode &oNode )
     return RayJson::GetVector( oNode, "rotation", m_oRotation, FALSE ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            m_oMaterials.FromJson( oNode, "materials" ) &&
+           BumpFromJson( oNode ) &&
            Prepare();
 }
 

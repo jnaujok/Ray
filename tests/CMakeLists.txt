@@ -181,6 +181,21 @@ add_test(NAME render_soft
 set_tests_properties(render_soft PROPERTIES FIXTURES_SETUP render_soft TIMEOUT 900)
 add_test(NAME roundtrip_soft_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/soft_test.ray ${RENDER_DIR})
 
+# Bump and normal maps, and PNG textures: a brick wall (a PNG color and a
+# PNG normal map), hammered copper and orange peel (noise height maps), a
+# box embossed by a 16-bit PNG height map, and a wood floor bumped by its
+# own grain.
+add_test(NAME render_bump
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/bump_test.ray
+                 -DOUTPUT=${RENDER_DIR}/bump_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/bump_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_bump PROPERTIES FIXTURES_SETUP render_bump TIMEOUT 300)
+add_test(NAME roundtrip_bump_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/bump_test.ray ${RENDER_DIR})
+
 # The torture test: every kind of object (the teapot too), reflection,
 # refraction and textures, through the double Gauss with a 5x5 stratified
 # sampler. Rendered small; the scene itself is 1024x768.
@@ -374,6 +389,21 @@ add_test(NAME network_soft
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_soft PROPERTIES FIXTURES_REQUIRED render_soft
                                              RESOURCE_LOCK ray_network TIMEOUT 900)
+
+    # The engines get the PNG images inside the scene, so they need no files.
+math(EXPR port "${port} + 1")
+add_test(NAME network_bump
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/bump_test.ray
+                 -DOUTPUT=${RENDER_DIR}/bump_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/bump_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_bump PROPERTIES FIXTURES_REQUIRED render_bump
+                                             RESOURCE_LOCK ray_network TIMEOUT 300)
 
 # PNG and Radiance HDR output, checked with Python's own zlib.
 find_package(Python3 COMPONENTS Interpreter)

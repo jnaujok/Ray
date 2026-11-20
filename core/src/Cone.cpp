@@ -310,7 +310,8 @@ BOOL CCone::ReadEnds( const IASLib::CJsonNode &oNode )
            RayJson::GetVector( oNode, "top", m_oTop, TRUE ) &&
            RayJson::GetBool( oNode, "capped", m_bCapped, FALSE ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
-           m_oMaterials.FromJson( oNode, "materials" );
+           m_oMaterials.FromJson( oNode, "materials" ) &&
+           BumpFromJson( oNode );
 }
 
 void CCone::ToJson( IASLib::CObjectNode &oNode )
@@ -322,11 +323,12 @@ void CCone::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutBool( oNode, "capped", m_bCapped );
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+    BumpToJson( oNode );
 }
 
 BOOL CCone::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "base", "top", "baseRadius", "topRadius", "capped", "color", "materials", NULL };
+    static const char *const astrFields[] = { "base", "top", "baseRadius", "topRadius", "capped", "color", "materials", "bump", NULL };
 
     m_nTopRadius = 0.0;
     return RayJson::OnlyFields( oNode, astrFields ) &&

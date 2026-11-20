@@ -6,10 +6,11 @@
 *   beyond (or with the edge pixels stretched, without "repeat").        *
 *   Pixels are blended bilinearly.                                       *
 *                                                                        *
-*   Images are binary PPM (P6) or plain PPM (P3) files, as raythrower    *
-*   --ppm writes, or Ray's own raw images. A pixel's bytes are taken as  *
-*   the color directly (byte / 255), matching the default color model;   *
-*   with "srgb" they are decoded from the sRGB curve first.              *
+*   Images are PNG files (any kind: see PngImage.h), binary PPM (P6) or  *
+*   plain PPM (P3) files, as raythrower --ppm writes, or Ray's own raw   *
+*   images. A pixel's bytes are taken as the color directly (byte /      *
+*   255), matching the default color model; with "srgb" they are         *
+*   decoded from the sRGB curve first.                                   *
 *                                                                        *
 *   A scene names the image file; a saved scene archive carries the file *
 *   inside it, and a JSON scene names it relative to the scene file. A   *
@@ -59,7 +60,7 @@ class CImageTexture : public CTexture
         virtual CTexture       *Clone( void ) const { return new CImageTexture( *this ); }
         virtual const char     *GetName( void ) const { return "image"; }
 
-            /// Decodes a PPM or Ray raw image from a file's contents (strName
+            /// Decodes a PNG, PPM or Ray raw image from a file's contents (strName
             /// names it in messages); FALSE, with why in strError, if it
             /// can't be read.
         static BOOL             ParseImage( const std::string &strData, const std::string &strName, SImage &oImage, std::string &strError );

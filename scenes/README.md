@@ -22,8 +22,9 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed-gold tube, a cone, a textured truncated cone, a green glass cube that absorbs by thickness, a textured box and a textured triangle, on a reflective checkered floor before a mirror wall in a wooden frame, lit by a sphere light, a point light and a rectangle light, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map) and a textured triangle, on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light and a rectangle light, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
+| `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -142,7 +143,8 @@ Gauss is corrected for color, so its fringes are faint; a single lens shows them
 doesn't converge light, or can't focus at the distance asked, is reported when the scene loads.
 
 **Objects.** Each has a `type`, a `color` (default `[0.5, 0.5, 0.5]`; the 1997 editor's base
-color, not used in shading), and `materials` (default: one diffuse material).
+color, not used in shading), `materials` (default: one diffuse material), and optionally a `bump`
+(a bump or normal map; see **Bump and normal maps** below).
 
 | `type` | Fields |
 |--------|--------|
@@ -201,7 +203,7 @@ deepens with thickness, set `color` to white and give the color with `attenuatio
 | `marble` | Bands across `axis` (default `[1, 0, 0]`), one each `scale`, bent by turbulence into veins: the ramp's first color is the veins, its last the stone. Default `turbulence` `2.5`; default colors white marble with gray veins |
 | `wood` | Rings about the line through `origin` along `axis` (default `[0, 1, 0]`), one each `scale`, wobbled by noise; each ring runs through the ramp, its last color the dark edge. Default `turbulence` `0.3`; default colors pine |
 | `noise` | The noise itself, for stone, granite or clouds: with `turbulence` `0` (the default), smooth layered noise through the ramp; with more, `turbulence` times the turbulence function, which has sharp creases. Default colors black to white |
-| `image` | `file` (required: a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
+| `image` | `file` (required: a PNG, a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
 
 `marble`, `wood` and `noise` are solid: they fill space, so an object looks carved from a block and
 needs no surface coordinates. They share these fields: `colors` (a ramp of two or more colors,
@@ -234,6 +236,35 @@ whole texture, and a corner on the axis (a pole) takes its face's other corners'
 blended bilinearly. When a scene is copied to a task its images travel inside it (as base64
 `pixels`), so networked engines need no files; a saved scene carries its images in its archive.
 
+PNG images can be any kind the standard allows: grayscale, RGB, palette, grayscale with alpha or
+RGBA, at 1, 2, 4, 8 or 16 bits a channel, interlaced or not. Low bit depths are scaled up to the
+full range, 16-bit channels are rounded to 8 bits, and alpha is ignored (the color is used as it
+is). Ray reads them with its own decoder, so nothing else is needed; a damaged file is reported
+when the scene loads. `tools/make_textures.py` makes the brick images in `textures/`.
+
+**Bump and normal maps.** An object's `bump` tilts the normal it is shaded with, so light and
+highlights fall as if the surface were dented, grooved or rough, while rays still hit the smooth
+shape and its outline stays smooth. It belongs to the object, so every material on it (diffuse,
+specular, reflection and refraction) sees the same bumps, and a mesh's faces share the mesh's.
+
+| `bump` field | Default | |
+|--------------|---------|-|
+| `texture` | required | Any texture (as for a material): what the bumps are read from |
+| `mode` | `"height"` | `"height"`: the texture is a height field, each point's height the average of its red, green and blue; `"normal"`: the texture is a tangent-space normal map |
+| `depth` | `0.05` | Height maps only: how high, in scene units, a texture value of 1 stands. Negative turns the bumps into dents |
+| `strength` | `1` | Normal maps only, 0 to 100: how far the map's tilt is followed (0 is flat) |
+| `step` | `0.001` | How far either side of a point, in scene units, the texture is looked up to find the slope (height maps) or the surface's u and v directions (normal maps) |
+
+A height map tilts the normal down the slope of its heights. Solid textures (`marble`, `wood`,
+`noise`) need no surface coordinates, so they bump any object: a little `noise` makes hammered
+metal or orange peel, and an object's own wood or marble texture as its bump makes the grain
+stand out. A normal map's red, green and blue, each 0 to 1, are the normal's parts (2c − 1) along
+the surface's u direction, its v direction and straight out: the common OpenGL convention, flat at
+(0.5, 0.5, 1), with green toward increasing v (up the image). The u and v directions come from the
+object's surface coordinates (above), so it needs them. A tilted normal that would face away from
+the ray, as at the rim of a sphere, is passed over for the smooth one, so a surface is never lit
+from behind.
+
 **Lights.**
 
 | `type` | Fields |
@@ -265,7 +296,9 @@ same image, and networked engines give exactly the same as threads.
 - **Version 3** (2026) is JSON, with the same file extension. It adds the background color, the
   camera's sampler and color model, triangle sidedness and smoothing, meshes, and cylinders, cones
   and boxes; triangles no
-  longer store normals. The binary versions are no longer read.
+  longer store normals. The binary versions are no longer read. Later additions are optional
+  fields that older readers would refuse but that change nothing when left out, such as an
+  object's `bump` (2026-alpha-0.8).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.
