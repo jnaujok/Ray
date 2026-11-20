@@ -11,7 +11,7 @@ when the binary format was dropped; they are in the repository's history.
 | `inside_sphere.ray` | version 2 | Camera inside a sphere |
 | `mat_test.ray` | version 2 | Material test |
 | `reflect_me.ray`, `reflect_test2.ray`, `reflect_test3.ray`, `reflection_test.ray` | version 2 | Reflection tests |
-| `scan_test.ray` | version 2 | Reflective and transparent spheres on a plane |
+| `scan_test.ray` | version 2 | Reflective and transparent spheres on a plane. The glass sphere's index was 1.0 in 1997, which looked like glass only because refraction was computed wrong; it is 1.5 now (as in `lens_test` and `chromatic_test`) |
 | `ser_test.ray`, `ser_test2.ray` | version 2 | Serialization tests (`ser_test2` renders blank: nothing is in view) |
 | `spec_test.ray` | version 2 | Specular highlights |
 | `test.ray` | version 2 | |
@@ -154,9 +154,9 @@ make the shape smooth (`"smooth": false` with them is an error).
 |--------|--------------|
 | `ambient` | none |
 | `diffuse` | `diffuseCast` (default `false`) |
-| `specular` | `power` (default `1`), `indexOfRefraction` (default `1`), `materialHighlight` (default `false`) |
-| `reflective` | `diffuseReflectivity` (default `0`), `filterReflection` (default `false`) |
-| `transparent` | `indexOfRefraction` (default `1`) |
+| `specular` | A Cook–Torrance highlight. `power` (default `1`) is the surface's Beckmann roughness: smaller is a smaller, sharper highlight (0.1–0.3 is glossy; 1 is very rough). `indexOfRefraction` (default `1.5`) sets the Fresnel reflection, stronger at grazing angles; `materialHighlight` (default `false`) |
+| `reflective` | A mirror reflection, tinted by `color` with `filterReflection` (default `false`); `diffuseReflectivity` (default `0`) |
+| `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` |
 
 **Textures.** Any material can have a `texture` that gives its color at each point instead of its
 `color`. A texture is an object with a `type`:

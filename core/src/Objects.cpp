@@ -135,8 +135,17 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
                 pMaterial = m_oMaterials[ nMaterial ];
                 if ( m_oMaterials.GetInfluence( nMaterial ) != 0.0 )
                 {
+                        // Each material gets its own copies: materials adjust
+                        // the normal and light vector (normalizing them, turning
+                        // the normal toward the viewer), and those changes must
+                        // not reach the next material, the next light, or the
+                        // object (a plane's normal is its own member).
+                    CVector oMaterialNormal( oNormal );
+                    CVector oMaterialToLight( oToLight );
+                    CVector oPoint( oIntersect );
+
                     oLight = pLight->GetShade( oToLight );
-                    oColor = pMaterial->GetColor( oScene, oRay, oLight, oToLight, oIntersect, oNormal, this );
+                    oColor = pMaterial->GetColor( oScene, oRay, oLight, oMaterialToLight, oPoint, oMaterialNormal, this );
                     oReturn = oReturn + ( oColor * m_oMaterials.GetInfluence( nMaterial ) );
                 }
                 nMaterial++;
@@ -155,13 +164,23 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
         pMaterial = m_oMaterials[ nMaterial ];
         if ( m_oMaterials.GetInfluence( nMaterial ) != 0.0 )
         {
-            oColor = pMaterial->GetColor( oScene, oRay, oIntersect, oNormal, this );
+                // The ray's influence on its pixel, scaled by this material's
+                // share: a reflected or refracted ray made from it carries that
+                // on, so depthThreshold can stop rays that no longer matter.
+                // (The color is scaled by the material's influence here, once;
+                // it is not scaled by the ray's influence as well, which would
+                // count it again at every bounce.)
+            CRay    oMaterialRay( oRay );
+            CVector oMaterialNormal( oNormal );
+            CVector oPoint( oIntersect );
+
+            oMaterialRay.SetInfluence( oRay.GetInfluence() * ABS( m_oMaterials.GetInfluence( nMaterial ) ) );
+            oColor = pMaterial->GetColor( oScene, oMaterialRay, oPoint, oMaterialNormal, this );
             oReturn = oReturn + ( oColor * m_oMaterials.GetInfluence( nMaterial ) );
         }
         nMaterial++;
     }
 
-    oReturn = oReturn * oRay.GetInfluence();
     return oReturn;
 }
 

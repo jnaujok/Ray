@@ -9,10 +9,13 @@
 #include "ColorArray.h"
 #include "WireProtocol.h"
 #include "Mesh.h"
+#include "SpecularMaterial.h"
+#include "TransparentMaterial.h"
 #include "Scene.h"
 #include "ReinhardColorModel.h"
 
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -494,6 +497,76 @@ static void UVMapChecks( void )
                  BAD_FILE, "objects[0].uvMap: axis must be" );
 }
 
+    // The angle in degrees between a direction and -N (straight through).
+static double AngleFromNormal( CVector oDirection, CVector oInto )
+{
+    oDirection.Normalize();
+    oInto.Normalize();
+    return acos( fmax( -1.0, fmin( 1.0, oDirection.Dot( oInto ) ) ) ) * 180.0 / 3.14159265358979323846;
+}
+
+static void MaterialChecks( void )
+{
+    CVector oNormal( 0.0, 1.0, 0.0 );
+    CVector oDown( 0.0, -1.0, 0.0 );
+    CVector oUp( 0.0, 1.0, 0.0 );
+    CVector oTransmit;
+
+        // Snell: 45 degrees into glass of index 1.5 comes out at
+        // asin( sin 45 / 1.5 ) = 28.1255 degrees from the normal.
+    CVector oIn45( 0.70710678118654752, -0.70710678118654752, 0.0 );
+    Check( CTransparentMaterial::Refract( oIn45, oNormal, 1.5, oTransmit ) &&
+           ABS( AngleFromNormal( oTransmit, oDown ) - 28.1255 ) < 0.001, "refraction into glass follows Snell's law" );
+
+        // And back out: 28.1255 degrees inside leaves at 45.
+    CVector oInside( sin( 28.1255 * 3.14159265358979323846 / 180 ), cos( 28.1255 * 3.14159265358979323846 / 180 ), 0.0 );
+    Check( CTransparentMaterial::Refract( oInside, oNormal, 1.5, oTransmit ) &&
+           ABS( AngleFromNormal( oTransmit, oUp ) - 45.0 ) < 0.001, "refraction out of glass follows Snell's law" );
+
+    Check( CTransparentMaterial::Refract( oDown, oNormal, 1.5, oTransmit ) && AngleFromNormal( oTransmit, oDown ) < 1e-9,
+           "a ray straight into glass goes straight on" );
+
+        // Past the critical angle (41.8 degrees for 1.5), from inside, all of
+        // it reflects.
+    CVector oSteep( sin( 60.0 * 3.14159265358979323846 / 180 ), cos( 60.0 * 3.14159265358979323846 / 180 ), 0.0 );
+    Check( ! CTransparentMaterial::Refract( oSteep, oNormal, 1.5, oTransmit ) && oTransmit.GetY() < 0.0 &&
+           ABS( AngleFromNormal( oTransmit, oDown ) - 60.0 ) < 1e-6, "past the critical angle the ray reflects inside" );
+
+        // Specular: no highlight (and no NaN) for a light on the horizon or
+        // behind the surface; a highlight where the light mirrors to the eye.
+    CScene              oScene;
+    CSpecularMaterial   oSpecular;
+    CColor              oWhite( 1, 1, 1 );
+    CRay                oEye;
+    CVector             oHit( 0, 0, 0 );
+
+    Check( oScene.FromJson( s_strMinimal ) == 0, "a scene for the material checks loads" );
+    oEye.Set( -1.0, 1.0, 0.0, 0.70710678118654752, -0.70710678118654752, 0.0, 1e100, 1.0, 0, 0 );
+
+    CVector oHorizon( 1.0, 0.0, 0.0 ), oBehind( 1.0, -1.0, 0.0 ), oMirror( 1.0, 1.0, 0.0 ), oN( oNormal );
+    CColor  oColor = oSpecular.GetColor( oScene, oEye, oWhite, oHorizon, oHit, oN, NULL );
+    Check( oColor.GetR() == 0.0 && oColor.GetG() == 0.0, "no highlight from a light on the horizon" );
+    oN = oNormal;
+    oColor = oSpecular.GetColor( oScene, oEye, oWhite, oBehind, oHit, oN, NULL );
+    Check( oColor.GetR() == 0.0, "no highlight from a light behind the surface" );
+    oN = oNormal;
+    oColor = oSpecular.GetColor( oScene, oEye, oWhite, oMirror, oHit, oN, NULL );
+    Check( oColor.GetR() > 0.0 && isfinite( (double)oColor.GetR() ), "a highlight where the light mirrors to the eye, with the default index" );
+
+        // Shading a plane from behind must not change the plane.
+    CScene oPlaneScene;
+    Check( oPlaneScene.FromJson( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                                          "\"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 1, 0]" ) ) == 0,
+           "a plane scene loads" );
+    std::string strBefore = oPlaneScene.ToJson();
+    CRay        oFromBelow;
+    CColor      oResult;
+
+    oFromBelow.Set( 0.3, -2.0, 0.1, 0.0, 1.0, 0.0, 1e100, 1.0, 0, 0 );
+    oPlaneScene.TraceRay( oFromBelow, oResult, NULL );
+    Check( oPlaneScene.ToJson() == strBefore, "shading a plane from behind leaves the plane as it was" );
+}
+
 static void RoundTrip( const char *strScene, const char *strDir )
 {
     std::string strBase = std::string( strDir ) + "/roundtrip_";
@@ -568,6 +641,7 @@ int main( int argc, char **argv )
         TriangleChecks();
         LensChecks();
         UVMapChecks();
+        MaterialChecks();
     }
 
     if ( g_nFailures == 0 )

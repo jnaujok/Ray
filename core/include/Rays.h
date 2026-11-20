@@ -55,6 +55,7 @@ class CRay
         virtual FLT     GetZ(void) {return m_nZ;}
         virtual FLT     GetT(void) {return m_nT;}
         virtual FLT     GetInfluence( void ) { return m_nInfluence; }
+        void            SetInfluence( FLT nInfluence ) { m_nInfluence = nInfluence; }
         virtual void    SetT( FLT nNewT );
             // Sets every field (as the wire protocol carries them), with a
             // depth of 0.

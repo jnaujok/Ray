@@ -95,7 +95,7 @@
                     "type": "transparent",
                     "influence": 0.99,
                     "color": [0.941406, 0.996094, 0.964844],
-                    "indexOfRefraction": 1.0
+                    "indexOfRefraction": 1.5
                 }
             ]
         },

@@ -19,6 +19,12 @@ class CTransparentMaterial : public CMaterial
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual void        SetColor( CColor &oColor ) { m_oColor = oColor; }
+
+            // The direction a ray going along oView takes through a surface
+            // with normal oNormal (either way round) into or out of glass of
+            // index nIndex. FALSE for total internal reflection, when oTransmit
+            // is the reflected direction instead.
+        static BOOL         Refract( CVector oView, CVector oNormal, FLT nIndex, CVector &oTransmit );
 #ifdef RAY_GUI
         virtual void        Properties( void );
         virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );

@@ -25,7 +25,7 @@ CSpecularMaterial::CSpecularMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 )
 {
     m_nPower = 1.0;
-    m_nIOR = 1.0;
+    m_nIOR = 1.5;           // an index of 1 gives no Fresnel reflection at all
     m_bMaterialHighlight = FALSE;
 }
 
@@ -33,7 +33,7 @@ CSpecularMaterial::CSpecularMaterial( CColor oColor, FLT nPower ) :
 m_oColor( oColor )
 {
     m_nPower = nPower;
-    m_nIOR = 1.0;
+    m_nIOR = 1.5;
     m_bMaterialHighlight = FALSE;
 }
 
@@ -80,21 +80,32 @@ CColor CSpecularMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor 
         oToLt.Normalize();
 
         oNormal.Normalize();
-    
-        nNDotL = oNormal.Dot( oToLt );
 
         oView.Normalize();
+
+            // Shade the side the viewer sees, as the diffuse material does.
+        if ( oNormal.Dot( oView ) < 0.0 )
+            oNormal = oNormal * -1.0;
+
+        nNDotL = oNormal.Dot( oToLt );
+        nNDotV = oNormal.Dot( oView );
+
+            // A light behind the surface, or a surface seen edge on, gives no
+            // highlight (and would divide by zero below).
+        if ( ( nNDotL <= 0.0 ) || ( nNDotV <= 0.0 ) )
+            return oSpecular;
 
         oH = oToLt + oView;
         oH = oH * 0.5;
 
         oH.Normalize();
 
-        nNDotV = oNormal.Dot( oView );
-
         nNDotH = oNormal.Dot( oH );
 
         nVDotH = oView.Dot( oH );
+
+        if ( ( nNDotH <= 0.0 ) || ( nVDotH <= 0.0 ) )
+            return oSpecular;
 
         nDenom = PI * nNDotL * nNDotV;
 
@@ -126,20 +137,30 @@ CColor CSpecularMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor 
         else
             nG = 1.0;
 
+            // Fresnel, for unpolarized light: with c = V.H and
+            // g = sqrt( n^2 + c^2 - 1 ),
+            //   F = ( g - c )^2 / ( 2 ( g + c )^2 ) * ( 1 + ( ( c ( g + c ) - 1 ) / ( c ( g - c ) + 1 ) )^2 ).
+            // An index below 1 can leave nothing under the root: all of it
+            // is reflected.
         c = nVDotH;
-        g = SQRT( ( m_nIOR * m_nIOR ) + ( c * c ) - 1);
+        g = ( m_nIOR * m_nIOR ) + ( c * c ) - 1.0;
 
-        gMinusc = g - c;
-        gPlusc = g + c;
+        if ( g <= 0.0 )
+            nF = 1.0;
+        else
+        {
+            g = SQRT( g );
+            gMinusc = g - c;
+            gPlusc = g + c;
 
-        x = ( gMinusc * gMinusc ) / ( gPlusc * gPlusc );
-        y = (c * gPlusc) - 1.0;
-        y *= y;
-        z = (c * gMinusc) + 1.0;
-        z *= z;
+            x = ( gMinusc * gMinusc ) / ( gPlusc * gPlusc );
+            y = (c * gPlusc) - 1.0;
+            y *= y;
+            z = (c * gMinusc) + 1.0;
+            z *= z;
 
-
-        nF = 0.50 * ( x * ( 1 + ( y / z ) ) );
+            nF = 0.50 * ( x * ( 1 + ( y / z ) ) );
+        }
 
         nRs = ( nF * nD * nG ) / nDenom;
 

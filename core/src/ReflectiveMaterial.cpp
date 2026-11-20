@@ -52,14 +52,11 @@ CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVect
     oNormal.Normalize();
 
     oView.Normalize();
-    
-    o2N = oNormal * 2.0;
-    o2N = o2N * ( oNormal.Dot( oView ) );
 
-    oReflection = oView + o2N;
-
-    if ( ( oReflection.Magnitude() > 1.0001 ) || ( oReflection.Magnitude() < 0.9999 ) )
-        oReflection = oView - o2N;
+        // The mirror direction, R = V - 2 ( N.V ) N, whichever way the
+        // normal faces.
+    o2N = oNormal * ( 2.0 * oNormal.Dot( oView ) );
+    oReflection = oView - o2N;
 
     oReflect.CreateRay( oReflection, oIntersect, oViewIncident.GetInfluence(), oViewIncident.GetPixelX(), oViewIncident.GetPixelY() );
 

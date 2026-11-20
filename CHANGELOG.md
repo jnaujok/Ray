@@ -113,7 +113,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`docs/images/tests/`) from `tests/reference/renders.tar.gz`.
 - `CRay::CreateRayAt`, which casts a primary ray through any point on the image,
   `CImageFile::PutRGB`, `CVector::Cross`, and `CScene::GetObjectAt`.
-- Tests: UV mapper checks (each projection, seam unwrapping, poles, errors) and a textured teapot
+- Tests: material checks (Snell's law in and out, total internal reflection, specular edge
+  cases and default index, and that shading a plane leaves it unchanged); UV mapper checks (each projection, seam unwrapping, poles, errors) and a textured teapot
   render; a texture render and a networked one (the image must reach the engines), texture checks
   (embedding, loading a copy without the files, errors); lens and chromatic renders (and a networked chromatic render, which must match threads),
   checks of each lens's color focus shifts, a lens render and lens checks (the double Gauss's focal length, f-number and focus, and
@@ -166,6 +167,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sample scenes are gone too (they are in the history); two of them could never be read anyway.
 
 ### Fixed
+
+- **Material math** (`CTransparentMaterial`, `CSpecularMaterial`, `CReflectiveMaterial`,
+  `CObjects::BaseShade`):
+  - Refraction had the wrong sign on the cos θ₁ term of Snell's law in vector form, entering and
+    leaving glass, so rays bent far too much (45° into glass of index 1.5 came out at 14.5°
+    instead of 28.1°), and past the critical angle it took the square root of a negative number.
+    It now follows T = ηV + (η cos θ₁ − cos θ₂)N with the normal facing the ray, and reflects
+    inside on total internal reflection (`CTransparentMaterial::Refract`).
+  - Materials were handed the surface normal by reference, and the diffuse material turned it
+    toward the viewer in place. For a plane that was the plane's own normal, so shading changed
+    the scene (and could flip a plane's texture), depending on which side the last ray came from.
+    Each material now works on its own copies.
+  - The specular (Cook–Torrance) material didn't turn the normal toward the viewer, and divided
+    0 by 0 (a NaN, a black pixel) on the shadow line; it now has no highlight for lights behind or
+    surfaces edge on. Its default index of refraction was 1.0, which makes the Fresnel term 0 and
+    the highlight vanish; it is 1.5 now (the teapot shows its highlight). An index below 1 is
+    treated as total reflection rather than a NaN.
+  - Reflected and refracted rays now carry their parent's influence times the material's, so
+    `depthThreshold` prunes rays that no longer matter; `BaseShade` no longer also multiplies its
+    result by the ray's influence, which would have counted it again at every bounce.
+  - The reflection direction is computed directly as V − 2(N·V)N (it was right, by way of a
+    detour).
+  - `scan_test`'s glass sphere had index 1.0, which looked like glass only because of the
+    refraction bug; it, and `lens_test` and `chromatic_test`, now use 1.5. Every reference render,
+    preview and README image was regenerated.
 
 - Camera rays were distorted. The camera was aimed by adding the difference between its view
   direction and +Z to every ray instead of rotating the rays, which sheared the image: spheres came

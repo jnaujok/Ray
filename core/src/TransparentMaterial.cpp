@@ -37,6 +37,52 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CCol
     return oReturn;
 }
 
+BOOL CTransparentMaterial::Refract( CVector oView, CVector oNormal, FLT nIndex, CVector &oTransmit )
+{
+    FLT         nIOR;
+    FLT         nCosTheta1;
+    FLT         nCosTheta2;
+    CVector     oStep;
+
+    oNormal.Normalize();
+    oView.Normalize();
+
+        // Snell's law in vector form. With the normal turned against the
+        // ray (so cos1 = -N.V is positive) and eta = n1 / n2:
+        //   cos2^2 = 1 - eta^2 ( 1 - cos1^2 )
+        //   T = eta V + ( eta cos1 - cos2 ) N
+        // Entering the glass (the ray against the outward normal), eta is
+        // 1 / n; leaving it, n.
+    nCosTheta1 = -oNormal.Dot( oView );
+
+    if ( nCosTheta1 >= 0.0 )
+        nIOR = 1.0 / nIndex;
+    else
+    {
+        nIOR = nIndex;
+        oNormal = oNormal * -1.0;
+        nCosTheta1 = -nCosTheta1;
+    }
+
+    nCosTheta2 = 1.0 - ( nIOR * nIOR * ( 1.0 - ( nCosTheta1 * nCosTheta1 ) ) );
+
+    if ( nCosTheta2 < 0.0 )
+    {
+            // Total internal reflection: past the critical angle, inside the
+            // denser glass, nothing gets out and the ray reflects.
+        oStep = oNormal * ( 2.0 * nCosTheta1 );
+        oTransmit = oView + oStep;
+        return FALSE;
+    }
+
+    CVector oViewStep = oView * nIOR;
+
+    nCosTheta2 = SQRT( nCosTheta2 );
+    oStep = oNormal * ( ( nIOR * nCosTheta1 ) - nCosTheta2 );
+    oTransmit = oViewStep + oStep;
+    return TRUE;
+}
+
 CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
     CColor      oTransparent;
@@ -45,30 +91,14 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
                        oIntersect.GetZ() - oViewIncident.GetZ() );
     CRay        oTransmitted;
     CVector     oTransmit;
-    CVector     o2N;
-    FLT         nIOR;
-    FLT         nCosTheta1;
-    FLT         nCosTheta2;
     CVector     oTemp;
     CVector     oTransStep;
-    CVector     oViewStep;
 
     oNormal.Normalize();
 
     oView.Normalize();
-    
-    nCosTheta1 = oNormal.Dot( oView );
 
-    if ( nCosTheta1 < 0 )
-        nIOR = m_nIndexOfRefraction;
-    else
-        nIOR = 1.0 / m_nIndexOfRefraction;
-
-    nCosTheta2 = SQRT( 1 - ( ( 1 / ( nIOR *nIOR ) ) * ( 1 - ( nCosTheta1 * nCosTheta1 ) ) ) );
-
-    oViewStep = oView * ( 1.0 / nIOR );
-    oTransStep = oNormal * ( nCosTheta2 - ( ( 1 / nIOR ) * nCosTheta1 ) );
-    oTransmit =  oViewStep - oTransStep;
+    Refract( oView, oNormal, m_nIndexOfRefraction, oTransmit );
 
     oTransStep = oTransmit * 0.01;
 
