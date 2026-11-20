@@ -10,6 +10,63 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.7] - 2026-11-20
+
+Softness: frosted glass and brushed mirrors, and area lights that cast soft shadows, all picking
+their directions and points from where each ray falls in its pixel, so a stratified sampler
+smooths them and every render is the same each time. Scenes without the new fields render byte
+for byte as before.
+
+### Added
+
+- **Rough glass and mirrors.** `transparent` and `reflective` take a `roughness` (default `0`, up
+  to `1`). Each ray bends or reflects about a microfacet normal drawn from a GGX
+  (Trowbridge–Reitz) distribution of that roughness about the surface's normal, so frosted glass
+  blurs what is behind it and a brushed or satin mirror blurs its reflection; a microfacet that
+  would send the ray the wrong way through the surface is passed over for the smooth direction.
+  Smooth materials don't write a `roughness`, so existing scenes save as before.
+- **Area lights: `sphereLight` and `rectangleLight`.** A glowing ball (`radius`) or panel (sides
+  `edge1` and `edge2`, shining only to the side `edge1` × `edge2` points to), each with `samples`
+  (default `1`, up to 256). Each point is shaded from that many points of the light, each with its
+  own shadow ray and an even share of its color, so shadows are dark where none of the light can be
+  seen and fade through a penumbra where some can. Like point lights they don't fall off with
+  distance and the camera doesn't see them; point lights are unchanged.
+- **Where the samples come from.** Each ray carries a sample point (where its primary ray fell in
+  its pixel) and a key (from its pixel and the bounces since). A rough surface or an area light uses
+  that point, shifted, turned and mirrored by a hash of the key, its depth and what it's for, so a
+  sampler that spreads its rays evenly over a pixel (`stratified`, `adaptive`) spreads them evenly
+  over the blur and the light. A ray made at a surface picks again from a point hashed from its
+  parent's: reusing the same point there tied each bounce to the one before in a way fixed for the
+  pixel, and frosted glass came out with a speckle that more rays never smoothed. Nothing is random,
+  so networked engines match threads byte for byte; nothing new crosses the wire.
+- **`scenes/soft_test.ray`**: three glass panes before a striped poster (clear, roughness 0.08 and
+  0.3), a mirror ball and a brushed gold one, and soft shadows from a rectangle light and a sphere
+  light, with a 6×6 stratified sampler. New tests `render_soft` (with a reference render and a
+  README preview), `roundtrip_soft_test` and `network_soft`. `format_test` checks that the new
+  fields read, save and read back, that bad values are reported, that GGX microfacets tilt as the
+  distribution says (half within atan of the roughness), that a sphere light's points lie on the
+  disc it shows, that a rectangle light shines only to its front, that hiding half of one gives half
+  its light, and that rough glass is the same every time for the same ray.
+
+  ![Before and after: the soft test with smooth glass and point lights (left) and with frosted glass, a brushed ball and area lights (right); below, the torture test before and after](docs/images/changelog/soft-lights.png)
+
+  Above, the new test scene drawn with what the renderer had before (smooth surfaces, point lights
+  at the area lights' centers) and as it is now: the middle and right panes blur the stripes behind
+  them, the gold ball's reflection is brushed, and the shadows of the post and the red ball are soft
+  at their edges. Below, the torture test: the glass ball is frosted, the gold tube brushed, and the
+  shadows soften under the new sphere and rectangle lights.
+
+### Changed
+
+- **The torture test uses the new features:** the glass sphere is frosted (roughness 0.12), the
+  gold tube brushed (0.15), the key light a sphere light of radius 3 and the overhead fill a 3 × 3
+  rectangle light. Its reference render, README preview and full-size image are regenerated; its
+  description in `scenes/README.md`, which still had the copper teapot and black frame, is brought
+  up to date.
+- **`CLAUDE.md`: every new feature goes into the torture test** in the same change, with its
+  reference render, README preview and full-size image regenerated; and every release updates the
+  release gallery.
+
 ## [2026-alpha-0.6] - 2026-11-20
 
 Solid noise textures (marble, wood, and noise for granite and stone) and glass that absorbs light
@@ -600,7 +657,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.6...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.7...HEAD
+[2026-alpha-0.7]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.6...2026-alpha-0.7
 [2026-alpha-0.6]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.5...2026-alpha-0.6
 [2026-alpha-0.5]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4.1...2026-alpha-0.5
 [2026-alpha-0.4.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4...2026-alpha-0.4.1

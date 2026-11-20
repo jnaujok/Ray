@@ -13,6 +13,8 @@
 #ifndef __RAYS_H__
 #define __RAYS_H__
 
+#include <stdint.h>
+
 class CScene;
 class CVector;
 class CObjects;
@@ -42,6 +44,14 @@ class CRay
             // (outside everything). Set where a ray goes into or out of
             // glass, so the far side knows how far it went inside.
         const CObjects *m_pInside;
+            // Where the primary ray fell in its pixel (each 0 up to 1), and a
+            // key made from the pixel and the bounces since: rough surfaces
+            // and area lights pick their directions and points from these
+            // (SamplePoint), so rays spread evenly over a pixel spread evenly
+            // over them too.
+        FLT             m_nSampleU;
+        FLT             m_nSampleV;
+        uint64_t        m_nSampleKey;
     public:
                         CRay( void );
                         CRay( const CRay &oSource );
@@ -78,6 +88,16 @@ class CRay
         virtual void    SetDepth( int nDepth ) { m_nDepth = nDepth; }
         const CObjects *GetInside( void ) const { return m_pInside; }
         void            SetInside( const CObjects *pInside ) { m_pInside = pInside; }
+            /// A ray made from another at a surface (reflected or refracted)
+            /// takes a sample point hashed from its parent's (independent of
+            /// it) and a key for the branch.
+        void            InheritSample( const CRay &oParent, uint64_t nBranch );
+            /// The point of the unit square this ray uses for nPurpose
+            /// (RaySampling::EPurpose): its sample point, shifted (wrapping
+            /// round) and turned by a hash of its key, its depth and the
+            /// purpose. Over a pixel's rays the points stay as evenly spread
+            /// as the sampler made them.
+        void            SamplePoint( uint64_t nPurpose, FLT &nU, FLT &nV ) const;
 
 };
 

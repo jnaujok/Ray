@@ -26,6 +26,9 @@
 #include "MarbleTexture.h"
 #include "NoiseTexture.h"
 #include "WoodTexture.h"
+#include "SphereLight.h"
+#include "RectangleLight.h"
+#include "Sampling.h"
 #include "SceneJson.h"
 #include "Scene.h"
 #include "ReinhardColorModel.h"
@@ -641,6 +644,184 @@ static void AbsorptionChecks( void )
                  BAD_FILE, "attenuationColor must be between 0 and 1" );
 }
 
+    // A floor lit by a 2 x 2 rectangle light 4 above it (64 samples), seen
+    // by a ray from below the height of strBlocker, if any. The floor is
+    // white and diffuse, the background black.
+static CColor UnderPanel( const char *strBlocker )
+{
+    std::string strText =
+        "{ \"format\": \"Ray scene\", \"version\": 3, \"background\": [0, 0, 0],\n"
+        "  \"camera\": { \"position\": [0, 1, -10], \"lookAt\": [0, 0, 0] },\n"
+        "  \"objects\": [ { \"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 1, 0],\n"
+        "                   \"materials\": [ { \"type\": \"diffuse\", \"color\": [1, 1, 1] } ] }";
+    strText += strBlocker;
+    strText += " ],\n"
+        "  \"lights\": [ { \"type\": \"rectangleLight\", \"position\": [0, 4, 0], \"color\": [1, 1, 1],\n"
+        "                  \"edge1\": [2, 0, 0], \"edge2\": [0, 0, 2], \"samples\": 64 } ] }\n";
+
+    CScene  oScene;
+    CRay    oRay;
+    CColor  oColor( 0, 0, 0 );
+
+    Check( oScene.FromJson( strText ) == 0, "a scene under a rectangle light loads" );
+    oRay.Set( 0.0, 1.0, -3.0, 0.0, -1.0 / sqrt( 10.0 ), 3.0 / sqrt( 10.0 ), 1e100, 1.0, 0, 0 );
+    oScene.TraceRay( oRay, oColor, NULL );
+    return oColor;
+}
+
+static void SoftChecks( void )
+{
+        // The new fields read, save and read back the same.
+    const char *strSoft =
+        "{ \"format\": \"Ray scene\", \"version\": 3,\n"
+        "  \"camera\": { \"position\": [0, 0, -10], \"lookAt\": [0, 0, 0] },\n"
+        "  \"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1, \"materials\": [\n"
+        "      { \"type\": \"transparent\", \"indexOfRefraction\": 1.5, \"roughness\": 0.2 },\n"
+        "      { \"type\": \"reflective\", \"roughness\": 0.05 } ] } ],\n"
+        "  \"lights\": [ { \"type\": \"sphereLight\", \"position\": [5, 5, -5], \"color\": [1, 1, 1], \"radius\": 0.5, \"samples\": 3 },\n"
+        "              { \"type\": \"rectangleLight\", \"position\": [0, 5, 0], \"color\": [1, 1, 1],\n"
+        "                \"edge1\": [1, 0, 0], \"edge2\": [0, 0, -1] } ] }\n";
+    CScene  oScene;
+
+    Check( oScene.FromJson( strSoft ) == 0, "a scene with rough materials and area lights loads" );
+
+    std::string strSaved = oScene.ToJson();
+    CScene      oReread;
+
+    Check( oReread.FromJson( strSaved ) == 0 && oReread.ToJson() == strSaved, "rough materials and area lights read back the same" );
+    Check( strSaved.find( "\"roughness\": 0.2" ) != std::string::npos && strSaved.find( "\"roughness\": 0.05" ) != std::string::npos,
+           "roughness is saved" );
+    Check( strSaved.find( "\"sphereLight\"" ) != std::string::npos && strSaved.find( "\"radius\": 0.5" ) != std::string::npos &&
+           strSaved.find( "\"samples\": 3" ) != std::string::npos, "a sphere light is saved" );
+    Check( strSaved.find( "\"rectangleLight\"" ) != std::string::npos && strSaved.find( "\"edge2\": [0.0, 0.0, -1.0]" ) != std::string::npos &&
+           strSaved.find( "\"samples\": 1" ) != std::string::npos, "a rectangle light is saved, with one sample by default" );
+
+        // Smooth materials don't write a roughness, so old scenes save as before.
+    CScene oSmooth;
+
+    Check( oSmooth.FromJson( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\" }, "
+                                                      "{ \"type\": \"reflective\" } ]" ) ) == 0 &&
+           oSmooth.ToJson().find( "roughness" ) == std::string::npos, "smooth materials save no roughness" );
+
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"roughness\": 1.5 } ]" ),
+                 BAD_FILE, "roughness must be between 0 and 1" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"reflective\", \"roughness\": -0.1 } ]" ),
+                 BAD_FILE, "roughness must be between 0 and 1" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"sphereLight\", \"radius\": 0" ), BAD_FILE, "radius must be more than 0" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"sphereLight\", \"samples\": 0" ), BAD_FILE, "samples must be a whole number" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"rectangleLight\", \"edge1\": [1, 0, 0], \"edge2\": [2, 0, 0]" ),
+                 BAD_FILE, "edge1 and edge2 must be sides of a rectangle" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"rectangleLight\", \"edge1\": [1, 0, 0]" ), BAD_FILE, "edge2" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"sphereLight\", \"size\": 1" ), BAD_FILE, "size" );
+
+        // GGX: tan theta = alpha sqrt( u / ( 1 - u ) ), so half the
+        // microfacets tilt less than atan( alpha ), and a tiny alpha leaves
+        // the normal as it is.
+    CVector oUp( 0.0, 1.0, 0.0 );
+    int     nWithin = 0;
+    int     nCount = 1000;
+
+    for ( int nIndex = 0; nIndex < nCount; nIndex++ )
+    {
+        CVector oMicro = RaySampling::Microfacet( oUp, 0.3, ( nIndex + 0.5 ) / nCount, 0.37 );
+
+        if ( oMicro.Dot( oUp ) >= cos( atan( 0.3 ) ) )
+            nWithin++;
+    }
+    Check( nWithin == nCount / 2, "half of GGX microfacets of roughness 0.3 tilt less than atan( 0.3 )" );
+
+    CVector oFlat = RaySampling::Microfacet( oUp, 1e-9, 0.9, 0.2 );
+
+    Check( ABS( oFlat.Dot( oUp ) - 1.0 ) < 1e-12, "a microfacet of tiny roughness is the normal" );
+
+        // A sphere light's points lie on the disc it shows a viewer: at
+        // right angles to the line of sight, within its radius.
+    CScene          oBallScene;
+
+    Check( oBallScene.FromJson( Minimal( "\"type\": \"point\"", "\"type\": \"sphereLight\", \"radius\": 0.5" ) ) == 0,
+           "a sphere light loads" );
+
+    CLight *pBall = oBallScene.GetLight( 0 );
+    bool    bOnDisc = pBall != NULL && pBall->GetSampleCount() == 1;
+    CVector oCenter( 5.0, 5.0, -5.0 );
+    CVector oViewer( 0.0, 0.0, 0.0 );
+
+    for ( int nIndex = 0; bOnDisc && nIndex < 100; nIndex++ )
+    {
+        CVector oPoint;
+
+        pBall->SampleAt( oViewer, ( nIndex % 10 + 0.5 ) / 10.0, ( nIndex / 10 + 0.5 ) / 10.0, oPoint );
+
+        CVector oOffset( oPoint - oCenter );
+        CVector oSight( oCenter - oViewer );
+
+        oSight.Normalize();
+        bOnDisc = ABS( oOffset.Dot( oSight ) ) < 1e-12 && oOffset.Magnitude() <= 0.5 + 1e-12;
+    }
+    Check( bOnDisc, "a sphere light's points lie on the disc it shows the viewer" );
+
+        // A rectangle light shines only to the side edge1 x edge2 points to.
+    CScene oPanelScene;
+
+    Check( oPanelScene.FromJson( Minimal( "\"type\": \"point\"",
+                                          "\"type\": \"rectangleLight\", \"edge1\": [1, 0, 0], \"edge2\": [0, 0, 1]" ) ) == 0,
+           "a rectangle light loads" );
+
+    CLight *pPanel = oPanelScene.GetLight( 0 );
+    CVector oPoint;
+    CVector oBelow( 5.0, 0.0, -5.0 );
+    CVector oAbove( 5.0, 10.0, -5.0 );
+
+        // [1, 0, 0] x [0, 0, 1] is [0, -1, 0]: it shines down.
+    Check( pPanel != NULL && pPanel->SampleAt( oBelow, 0.5, 0.5, oPoint ) && ! pPanel->SampleAt( oAbove, 0.5, 0.5, oPoint ),
+           "a rectangle light shines only to its front" );
+
+        // Half the panel hidden, half the light: a blocker above x < 0, its
+        // edge straight over the point seen, hides the panel's x < 0 half.
+    CColor oOpen = UnderPanel( "" );
+    CColor oHalf = UnderPanel( ", { \"type\": \"box\", \"center\": [-5, 2, 0], \"size\": [10, 0.2, 10] }" );
+
+    Check( oOpen.GetR() > 0.5, "the floor under a rectangle light is lit" );
+    Check( ABS( oHalf.GetR() / oOpen.GetR() - 0.5 ) < 0.02, "half a rectangle light hidden gives half its light" );
+
+        // The same ray always brings back the same color through rough
+        // glass, and rays with other sample points see it differently.
+    std::string strFrosted = Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", "
+                                      "\"color\": [1, 1, 1], \"indexOfRefraction\": 1.5, \"roughness\": 0.3 } ]" );
+
+    strFrosted.replace( strFrosted.find( "\"objects\": [" ) + 12, 0,
+                        "{ \"type\": \"plane\", \"position\": [0, 0, 3], \"normal\": [0, 0, -1], \"materials\": [ { \"type\": \"ambient\", "
+                        "\"texture\": { \"type\": \"checker\", \"colors\": [[0, 0, 0], [1, 1, 1]], \"size\": 0.1 } } ] }, " );
+
+    CScene oFrosted;
+
+    Check( oFrosted.FromJson( strFrosted ) == 0, "a frosted ball scene loads" );
+
+    std::vector<double> anSeen;
+    bool                bRepeats = true;
+
+    oFrosted.GetSettings().SetImageWidth( 64 );
+    oFrosted.GetSettings().SetImageHeight( 64 );
+    for ( int nIndex = 0; nIndex < 16; nIndex++ )
+    {
+        CRay    oFirst;
+        CRay    oSecond;
+        CColor  oFirstColor;
+        CColor  oSecondColor;
+        FLT     nAt = 32.0 + ( nIndex + 0.5 ) / 16.0;
+
+        oFirst.CreateRayAt( oFrosted, nAt, 32.3, 0, 0 );
+        oSecond.CreateRayAt( oFrosted, nAt, 32.3, 0, 0 );
+        oFrosted.TraceRay( oFirst, oFirstColor, NULL );
+        oFrosted.TraceRay( oSecond, oSecondColor, NULL );
+        bRepeats = bRepeats && oFirstColor.GetR() == oSecondColor.GetR();
+        anSeen.push_back( oFirstColor.GetR() );
+    }
+    std::sort( anSeen.begin(), anSeen.end() );
+    Check( bRepeats, "rough glass is the same every time for the same ray" );
+    Check( anSeen.back() - anSeen.front() > 0.2, "rough glass scatters a pixel's rays over what is behind it" );
+}
+
 static void MaterialChecks( void )
 {
     CVector oNormal( 0.0, 1.0, 0.0 );
@@ -1201,6 +1382,7 @@ int main( int argc, char **argv )
         LensChecks();
         UVMapChecks();
         MaterialChecks();
+        SoftChecks();
         PrimitiveChecks();
         HdrChecks();
     }

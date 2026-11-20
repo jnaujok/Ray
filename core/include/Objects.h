@@ -91,6 +91,9 @@ class CObjects
 #endif
     protected:
         CColor              BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal );
+            // Adds what an area light (nLight in the scene) gives the point.
+        void                AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CLight *pLight,
+                                            int nLight, CColor &oReturn );
 };      
 
 

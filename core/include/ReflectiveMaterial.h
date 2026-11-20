@@ -10,6 +10,9 @@ class CReflectiveMaterial : public CMaterial
         CColor              m_oColor;
         FLT                 m_nDiffuseReflectivity;
         BOOL                m_bFilterReflection;
+            // GGX roughness: 0 is a perfect mirror; more blurs the
+            // reflection, as of brushed or satin metal.
+        FLT                 m_nRoughness;
 
     public:
                             DEFINE_MATERIAL( CReflectiveMaterial );

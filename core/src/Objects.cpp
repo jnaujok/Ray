@@ -15,6 +15,7 @@
 
 #include "Scene.h"
 #include "Light.h"
+#include "Sampling.h"
 
 #include <string.h>
 
@@ -125,6 +126,14 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
 
     while ( pLight )
     {
+        if ( pLight->GetSampleCount() > 0 )
+        {
+            AreaLightShade( oScene, oRay, oIntersect, oNormal, pLight, nLight, oReturn );
+            nLight++;
+            pLight = oScene.GetLight( nLight );
+            continue;
+        }
+
         oToLight = pLight->GetPosition() - oIntersect;
         oLightRay.CreateRay( oToLight, oIntersect, 1.0, -1, -1 );
         if ( ! oScene.Intersect( oLightRay, this ) )
@@ -182,6 +191,56 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
     }
 
     return oReturn;
+}
+
+void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CLight *pLight, int nLight,
+                               CColor &oReturn )
+{
+        // An area light is shaded from several of its points, each with its
+        // own shadow ray and an even share of its light. The points spread
+        // from the one the ray's sample point picks, so over a pixel's rays
+        // they cover the light evenly.
+    int     nSamples = pLight->GetSampleCount();
+    FLT     nShare = 1.0 / (FLT)nSamples;
+    FLT     nFirstU;
+    FLT     nFirstV;
+
+    oRay.SamplePoint( (uint64_t)RaySampling::PURPOSE_LIGHT + (uint64_t)nLight, nFirstU, nFirstV );
+
+    for ( int nSample = 0; nSample < nSamples; nSample++ )
+    {
+        FLT     nU;
+        FLT     nV;
+        CVector oPoint;
+        CVector oFrom( oIntersect );
+        CRay    oLightRay;
+
+        RaySampling::Spread( nFirstU, nFirstV, nSample, nU, nV );
+        if ( ! pLight->SampleAt( oFrom, nU, nV, oPoint ) )
+            continue;
+
+        CVector oToLight( oPoint - oIntersect );
+
+        oLightRay.CreateRay( oToLight, oIntersect, 1.0, -1, -1 );
+        if ( oScene.Intersect( oLightRay, this ) )
+            continue;
+
+        CColor  oLight( pLight->GetShade( oToLight ) * nShare );
+
+        for ( int nMaterial = 0; nMaterial < m_oMaterials.GetSize(); nMaterial++ )
+        {
+            if ( m_oMaterials.GetInfluence( nMaterial ) == 0.0 )
+                continue;
+
+            CVector oMaterialNormal( oNormal );
+            CVector oMaterialToLight( oToLight );
+            CVector oMaterialPoint( oIntersect );
+            CColor  oColor = m_oMaterials[ nMaterial ]->GetColor( oScene, oRay, oLight, oMaterialToLight, oMaterialPoint,
+                                                                  oMaterialNormal, this );
+
+            oReturn = oReturn + ( oColor * m_oMaterials.GetInfluence( nMaterial ) );
+        }
+    }
 }
 
 CDynObject::CDynObject( CObjects *(CFUNC *lpCreateEmpty)(void), LPCSTR strKey, LPCSTR strJsonType )

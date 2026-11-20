@@ -7,6 +7,7 @@
 #include "ReflectiveMaterial.h"
 #include "Scene.h"
 #include "SceneJson.h"
+#include "Sampling.h"
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -23,6 +24,7 @@ m_oColor( 0.5, 0.5, 0.5 )
 {
     m_nDiffuseReflectivity = 0.00;
     m_bFilterReflection = FALSE;
+    m_nRoughness = 0.0;
 }
 
 CReflectiveMaterial::CReflectiveMaterial( CColor oColor, FLT nReflect ) :
@@ -30,6 +32,7 @@ m_oColor( oColor )
 {
     m_nDiffuseReflectivity = nReflect;
     m_bFilterReflection = FALSE;
+    m_nRoughness = 0.0;
 }
 
 CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
@@ -58,7 +61,29 @@ CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVect
     o2N = oNormal * ( 2.0 * oNormal.Dot( oView ) );
     oReflection = oView - o2N;
 
+        // A rough mirror reflects about a microfacet normal drawn from
+        // around the surface's; one that would send the ray into the
+        // surface is passed over for the mirror direction.
+    if ( m_nRoughness > 0.0 )
+    {
+        FLT     nU;
+        FLT     nV;
+        CVector oFacing( oNormal );
+
+        if ( oFacing.Dot( oView ) > 0.0 )
+            oFacing = oFacing * -1.0;
+        oViewIncident.SamplePoint( RaySampling::PURPOSE_REFLECT, nU, nV );
+
+        CVector oMicro = RaySampling::Microfacet( oFacing, m_nRoughness, nU, nV );
+        CVector oStep = oMicro * ( 2.0 * oMicro.Dot( oView ) );
+        CVector oRough = oView - oStep;
+
+        if ( oRough.Dot( oFacing ) > 0.0 )
+            oReflection = oRough;
+    }
+
     oReflect.CreateRay( oReflection, oIntersect, oViewIncident.GetInfluence(), oViewIncident.GetPixelX(), oViewIncident.GetPixelY() );
+    oReflect.InheritSample( oViewIncident, RaySampling::PURPOSE_REFLECT );
 
         // The above function is tailored for Shadow rays, so we need to stretch
         // out the valid intersection range.
@@ -132,14 +157,22 @@ void CReflectiveMaterial::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutColor( oNode, "color", m_oColor );
     RayJson::PutNumber( oNode, "diffuseReflectivity", m_nDiffuseReflectivity );
     RayJson::PutBool( oNode, "filterReflection", m_bFilterReflection );
+    if ( m_nRoughness > 0.0 )
+        RayJson::PutNumber( oNode, "roughness", m_nRoughness );
 }
 
 BOOL CReflectiveMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "influence", "texture", "color", "diffuseReflectivity", "filterReflection", NULL };
+    static const char *const astrFields[] = { "influence", "texture", "color", "diffuseReflectivity", "filterReflection",
+                                              "roughness", NULL };
 
-    return RayJson::OnlyFields( oNode, astrFields ) &&
-           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
-           RayJson::GetNumber( oNode, "diffuseReflectivity", m_nDiffuseReflectivity, FALSE ) &&
-           RayJson::GetBool( oNode, "filterReflection", m_bFilterReflection, FALSE );
+    if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+         ! RayJson::GetColor( oNode, "color", m_oColor, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "diffuseReflectivity", m_nDiffuseReflectivity, FALSE ) ||
+         ! RayJson::GetBool( oNode, "filterReflection", m_bFilterReflection, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "roughness", m_nRoughness, FALSE ) )
+        return FALSE;
+    if ( ( m_nRoughness < 0.0 ) || ( m_nRoughness > 1.0 ) )
+        return RayJson::Fail( "roughness must be between 0 and 1" );
+    return TRUE;
 }

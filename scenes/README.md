@@ -22,8 +22,9 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (a mirror-tinted copper glaze) among a mirror sphere, a glass sphere, a textured sphere, a solid-checker column, an open gold tube, a cone, a textured truncated cone, a green glass cube, a textured box and a textured triangle, on a reflective checkered floor before a mirror wall in a black frame, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed-gold tube, a cone, a textured truncated cone, a green glass cube that absorbs by thickness, a textured box and a textured triangle, on a reflective checkered floor before a mirror wall in a wooden frame, lit by a sphere light, a point light and a rectangle light, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
+| `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
@@ -181,8 +182,8 @@ make the shape smooth (`"smooth": false` with them is an error).
 | `ambient` | none |
 | `diffuse` | `diffuseCast` (default `false`) |
 | `specular` | A Cook–Torrance highlight. `power` (default `1`) is the surface's Beckmann roughness: smaller is a smaller, sharper highlight (0.1–0.3 is glossy; 1 is very rough). `indexOfRefraction` (default `1.5`) sets the Fresnel reflection, stronger at grazing angles; `materialHighlight` (default `false`) |
-| `reflective` | A mirror reflection, tinted by `color` with `filterReflection` (default `false`); `diffuseReflectivity` (default `0`) |
-| `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` at each surface it crosses. `attenuationColor` (default `[1, 1, 1]`, each 0 to 1) and `attenuationDistance` (default `0`, off) absorb light by how far it goes inside: after `attenuationDistance` it is `attenuationColor`, after twice that the color squared (Beer–Lambert) |
+| `reflective` | A mirror reflection, tinted by `color` with `filterReflection` (default `false`); `diffuseReflectivity` (default `0`). `roughness` (default `0`, a perfect mirror; up to `1`) blurs the reflection, as of brushed or satin metal: each ray reflects about a microfacet normal drawn from a GGX distribution of that roughness (0.05 is satin, 0.3 very rough) |
+| `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` at each surface it crosses. `attenuationColor` (default `[1, 1, 1]`, each 0 to 1) and `attenuationDistance` (default `0`, off) absorb light by how far it goes inside: after `attenuationDistance` it is `attenuationColor`, after twice that the color squared (Beer–Lambert). `roughness` (default `0`, clear; up to `1`) frosts the glass: each ray bends through a microfacet normal drawn from a GGX distribution of that roughness, so what is behind is blurred (0.05 lightly frosted, 0.3 heavily) |
 
 Absorption is measured from where a ray goes into an object through its transparent material to
 where it next meets that object, so the object should be closed (a sphere, a capped cylinder or
@@ -237,7 +238,22 @@ blended bilinearly. When a scene is copied to a task its images travel inside it
 
 | `type` | Fields |
 |--------|--------|
-| `point` | `position` (required), `color` (required) |
+| `point` | `position` (required), `color` (required). A point: sharp shadows |
+| `sphereLight` | `position` (required): its center; `color` (required); `radius` (default `1`); `samples` (default `1`, up to 256). A glowing ball: soft shadows |
+| `rectangleLight` | `position` (required): its center; `color` (required); `edge1` and `edge2` (required): its sides, as vectors; `samples` (default `1`, up to 256). A glowing panel, shining only to the side `edge1` × `edge2` points to: soft shadows |
+
+An area light (`sphereLight`, `rectangleLight`) shades each point from `samples` of its points,
+each with its own shadow ray and an even share of its `color`; a sphere light's points are on the
+disc it shows the point. Like a point light, it gives the same light at every distance and the
+camera doesn't see it. Glass casts shadows as if it were opaque, as before.
+
+**Rough surfaces and area lights need many rays a pixel.** Each ray picks one direction through a
+rough surface, and one point on each area light (or `samples` points), from where it falls in its
+pixel, so a sampler that spreads many rays evenly over each pixel (`"stratified"` or `"adaptive"`)
+spreads them evenly over the blur and the light too; with one ray a pixel they come out grainy. A
+ray made at a rough surface picks again from a point hashed from its parent's, so the bounces
+after the first are independent of it. None of this is random: the same scene always gives the
+same image, and networked engines give exactly the same as threads.
 
 ## Format history
 
