@@ -13,6 +13,8 @@ class CDiffuseMaterial : public CMaterial
     public:
                             DEFINE_MATERIAL( CDiffuseMaterial );
 
+        virtual BOOL        LitBySky( void ) { return TRUE; }
+
                             CDiffuseMaterial( CColor &oColor );
 
 

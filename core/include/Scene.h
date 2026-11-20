@@ -15,9 +15,11 @@
 #include "Light.h"
 #include "Camera.h"
 #include "RaySettings.h"
+#include "Environment.h"
 #include "ObjectsArray.h"
 #include "LightArray.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -39,6 +41,9 @@ class CScene
         CSettings           m_oSettings;
         CCamera             m_oCamera;
         CColor              m_oBackgroundColor;
+            // What rays that leave the scene see, instead of the background
+            // color; NULL for none.
+        std::shared_ptr<const CEnvironment> m_pEnvironment;
         std::string         m_strLoadError;
 
             // A bounding volume hierarchy over the objects, built when a ray
@@ -128,6 +133,11 @@ class CScene
             /// The scene's nIndex'th object (not light), or NULL.
         CObjects           *GetObjectAt( int nIndex ) { return ( nIndex >= 0 && nIndex < m_oObjects.GetSize() ) ? m_oObjects[ nIndex ] : NULL; }
         CColor             &GetBackground( void ) { return m_oBackgroundColor; }
+            /// The environment, or NULL if the scene has none.
+        const CEnvironment *GetEnvironment( void ) const { return m_pEnvironment.get(); }
+            /// What a ray leaving the scene along oDirection sees: the
+            /// environment, or the background color.
+        CColor              Escaped( CVector &oDirection );
         CSettings          &GetSettings( void) { return m_oSettings; }
 
         CCamera            &GetCamera( void ) { return m_oCamera; }

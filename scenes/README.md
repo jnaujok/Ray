@@ -22,9 +22,11 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map) and a textured triangle, on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light and a rectangle light, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map) and a textured triangle, on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
+| `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
+| `environment_test.ray` | | An environment map: the HDR sky `textures/sky.hdr` behind the scene, in a mirror ball and through a glass one, lighting a white ball, a small red one and a checkered floor (`samples` 8, so the floor darkens under the balls), with a sun whose direction matches the sky's, with a 4×4 stratified sampler |
 | `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -57,7 +59,8 @@ places.
 | `format` | required | `"Ray scene"` |
 | `version` | required | `3` |
 | `settings` | | Render settings, below |
-| `background` | `[1, 1, 1]` | The color of rays that hit nothing |
+| `background` | `[1, 1, 1]` | The color of rays that hit nothing, unless there is an `environment` |
+| `environment` | none | What rays that leave the scene see instead: a sky gradient or an HDR image of the surroundings, which can also light the scene. Below |
 | `camera` | required | Below |
 | `objects` | `[]` | Spheres, planes, cylinders, cones, boxes, triangles, and meshes, below |
 | `lights` | `[]` | Lights, below |
@@ -240,7 +243,7 @@ PNG images can be any kind the standard allows: grayscale, RGB, palette, graysca
 RGBA, at 1, 2, 4, 8 or 16 bits a channel, interlaced or not. Low bit depths are scaled up to the
 full range, 16-bit channels are rounded to 8 bits, and alpha is ignored (the color is used as it
 is). Ray reads them with its own decoder, so nothing else is needed; a damaged file is reported
-when the scene loads. `tools/make_textures.py` makes the brick images in `textures/`.
+when the scene loads. `tools/make_textures.py` makes the brick images and the sky in `textures/`.
 
 **Bump and normal maps.** An object's `bump` tilts the normal it is shaded with, so light and
 highlights fall as if the surface were dented, grooved or rough, while rays still hit the smooth
@@ -272,14 +275,47 @@ from behind.
 | `point` | `position` (required), `color` (required). A point: sharp shadows |
 | `sphereLight` | `position` (required): its center; `color` (required); `radius` (default `1`); `samples` (default `1`, up to 256). A glowing ball: soft shadows |
 | `rectangleLight` | `position` (required): its center; `color` (required); `edge1` and `edge2` (required): its sides, as vectors; `samples` (default `1`, up to 256). A glowing panel, shining only to the side `edge1` × `edge2` points to: soft shadows |
+| `spot` | `position` (required); `direction` (required): which way it points; `color` (required); `angle` (default `30`): degrees from its axis to the edge of its cone, more than 0 and less than 90; `falloff` (default `5`): degrees inside the edge over which it fades (a smoothstep), from 0 (a hard edge) to the angle; `radius` (default `0`) and `samples` (default `1`, up to 256). A light in a cone; with a radius it is a disc (seen from each point as a sphere light is), with soft shadows |
+| `directional` | `direction` (required): the way the light travels; `color` (required); `angle` (default `0`): its angular diameter in degrees, less than 90 (the sun is about 0.53); `samples` (default `1`, up to 256). Sunlight: the same light from the same direction everywhere, its shadows the size of what casts them; with an angle, soft shadows that blur the farther they fall. It has no position |
 
-An area light (`sphereLight`, `rectangleLight`) shades each point from `samples` of its points,
-each with its own shadow ray and an even share of its `color`; a sphere light's points are on the
-disc it shows the point. Like a point light, it gives the same light at every distance and the
-camera doesn't see it. Glass casts shadows as if it were opaque, as before.
+An area light (`sphereLight`, `rectangleLight`, and a `spot` with a radius or a `directional` with
+an angle) shades each point from `samples` of its points, each with its own shadow ray and an even
+share of its `color`; a sphere light's and a spot's points are on the disc it shows the point, and
+a sun's on its disc in the sky. Like a point light, every light gives the same light at every
+distance and the camera doesn't see it. A shadow ray toward the sun (or the sky) goes 10⁶ scene
+units. Glass casts shadows as if it were opaque, as before.
 
-**Rough surfaces and area lights need many rays a pixel.** Each ray picks one direction through a
-rough surface, and one point on each area light (or `samples` points), from where it falls in its
+**`environment`.** What a ray that leaves the scene sees, instead of the flat `background`: camera
+rays that miss everything, and reflected and refracted rays that escape, so it shows behind the
+scene, in mirrors and through glass. Up is +y.
+
+| Field | Default | |
+|-------|---------|-|
+| `type` | required | `"sky"` or `"image"` |
+| `zenith`, `horizon`, `ground` | `[0.25, 0.45, 0.85]`, `[0.85, 0.9, 1]`, `[0.3, 0.28, 0.25]` | Sky only: the colors overhead, at the horizon and below it |
+| `exponent` | `0.5` | Sky only: the colors blend by the height of the direction (its y, from −1 to 1) to this power; smaller keeps the horizon's color in a thinner band |
+| `file` | required | Image only: an equirectangular (latitude-longitude) picture of the whole surroundings, twice as wide as it is tall: a Radiance HDR (`.hdr`, RGBE, flat or run-length encoded, stored `-Y height +X width`), PNG, PPM or Ray raw image. Its top row is straight up, its bottom straight down, its middle lies along +z, and +x is a quarter of the way to its right |
+| `rotation` | `0` | Image only: degrees to turn it about +y (toward +x) |
+| `srgb` | `false` | Image only: decode an 8-bit image's bytes from the sRGB curve (HDR colors are always linear, and may be brighter than 1) |
+| `intensity` | `1` | Scales its colors |
+| `samples` | `0` | How many shadow rays a point sends toward the sky; 0 (the default): the environment is only seen, and lights nothing |
+
+With `samples`, the environment also lights diffuse surfaces (image-based lighting). The light a
+surface would get from the whole sky in front of it, for every way it could face, is worked out
+once when the scene loads (into a 32 × 16 map), so it is smooth, without grain, even from a sky
+whose sun is far brighter than white. Then each point a ray hits sends `samples` shadow rays toward
+the sky, spread by the cosine, and the share that get out scales that light, so corners, crevices
+and the ground under things are darker. Shiny materials (specular, reflective, transparent) see the
+sky in their reflections instead. It costs `samples` shadow rays at every point a ray hits, and like
+area lights it needs many rays a pixel (a stratified sampler) to come out smooth. A sun in the image
+is light too, but a small one adds little: give the scene a `directional` light along it for its
+sunlight and sharp shadows (the sun in `textures/sky.hdr`, made by `tools/make_textures.py`, is 38°
+up, turned 50° from +z toward −x, before any rotation). The image travels inside a scene copy sent to a task
+(as base64 `data`, the file's bytes), so networked engines need no files; a saved scene carries it
+in its archive.
+
+**Rough surfaces, area lights and the sky's light need many rays a pixel.** Each ray picks one
+direction through a rough surface, and one point on each area light (or `samples` points), from where it falls in its
 pixel, so a sampler that spreads many rays evenly over each pixel (`"stratified"` or `"adaptive"`)
 spreads them evenly over the blur and the light too; with one ray a pixel they come out grainy. A
 ray made at a rough surface picks again from a point hashed from its parent's, so the bounces
@@ -298,7 +334,8 @@ same image, and networked engines give exactly the same as threads.
   and boxes; triangles no
   longer store normals. The binary versions are no longer read. Later additions are optional
   fields that older readers would refuse but that change nothing when left out, such as an
-  object's `bump` (2026-alpha-0.8).
+  object's `bump` (2026-alpha-0.8), and the `environment` and the `spot` and `directional` lights
+  (2026-alpha-0.9).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

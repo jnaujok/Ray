@@ -27,6 +27,7 @@
 
 class CBumpMap;
 class CLight;
+class CEnvironment;
 class CScene;
 
 namespace IASLib
@@ -104,6 +105,10 @@ class CObjects
             // Adds what an area light (nLight in the scene) gives the point.
         void                AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CLight *pLight,
                                             int nLight, CColor &oReturn );
+            // Adds the light the environment gives the point (when it has
+            // samples), from directions over the half of the sky above it.
+        void                EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal,
+                                              const CEnvironment &oEnvironment, CColor &oReturn );
 };      
 
 

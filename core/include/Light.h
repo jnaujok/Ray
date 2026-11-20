@@ -12,6 +12,10 @@
 
 #include "Objects.h"
 
+    // How far a shadow ray toward sunlight (or the sky) goes, in scene units:
+    // far past anything in a scene.
+#define RAY_FAR_AWAY    1.0e6
+
 class CLight : public CObjects
 {
     protected:
@@ -25,6 +29,10 @@ class CLight : public CObjects
         virtual CVector GetPosition( void ) { return m_oPosition; }
         virtual CColor  GetColor( void ) { return m_oColor; }
         virtual CColor  GetShade( CVector oDirection ) = 0;
+            /// The vector from oFrom to the light, which a shadow ray follows
+            /// (its length is how far the ray goes): to the light's position,
+            /// or, for sunlight, RAY_FAR_AWAY back along its direction.
+        virtual CVector ToLight( CVector &oFrom ) { return m_oPosition - oFrom; }
             /// How many points of the light a surface is shaded from: 0 for a
             /// point light (its position), or an area light's samples.
         virtual int     GetSampleCount( void ) { return 0; }
