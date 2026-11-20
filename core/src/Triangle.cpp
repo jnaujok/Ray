@@ -40,6 +40,7 @@ CTriangle::CTriangle( void )
     m_bDoubleSided = FALSE;
     m_bSmooth = FALSE;
     m_bGivenNormals = FALSE;
+    m_bHasUVs = FALSE;
     CalcNormal();
 }
 
@@ -50,7 +51,8 @@ CTriangle::CTriangle( const CVector &oCorner1, const CVector &oCorner2, const CV
     m_oCorner3( oCorner3 ),
     m_bDoubleSided( bDoubleSided ),
     m_bSmooth( bSmooth ),
-    m_bGivenNormals( FALSE )
+    m_bGivenNormals( FALSE ),
+    m_bHasUVs( FALSE )
 {
     m_oColor.Set( 0.5, 0.5, 0.5 );
     if ( pMaterials )
@@ -201,30 +203,57 @@ CColor CTriangle::Shade( CLight *pLight, CVector &oIntersect ) // CArray <CLight
     return oColor;
 }
 
+    // Barycentric weights of a point: the share of the triangle facing each
+    // corner. On an edge the far corner's weight is 0, so faces that share the
+    // edge agree along it.
+BOOL CTriangle::Weights( CVector &oPoint, FLT &nWeight1, FLT &nWeight2, FLT &nWeight3 )
+{
+    CVector oEdge1 = m_oCorner2 - m_oCorner1;
+    CVector oEdge2 = m_oCorner3 - m_oCorner1;
+    CVector oToHit = oPoint - m_oCorner1;
+    FLT     n11 = oEdge1.Dot( oEdge1 );
+    FLT     n12 = oEdge1.Dot( oEdge2 );
+    FLT     n22 = oEdge2.Dot( oEdge2 );
+    FLT     nH1 = oToHit.Dot( oEdge1 );
+    FLT     nH2 = oToHit.Dot( oEdge2 );
+    FLT     nDenom = ( n11 * n22 ) - ( n12 * n12 );
+
+    if ( nDenom == 0.0 )
+        return FALSE;
+    nWeight2 = ( ( n22 * nH1 ) - ( n12 * nH2 ) ) / nDenom;
+    nWeight3 = ( ( n11 * nH2 ) - ( n12 * nH1 ) ) / nDenom;
+    nWeight1 = 1.0 - nWeight2 - nWeight3;
+    return TRUE;
+}
+
+BOOL CTriangle::SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV )
+{
+    FLT nWeight1, nWeight2, nWeight3;
+
+    nU = nV = 0.0;
+    if ( ! m_bHasUVs || ! Weights( oPoint, nWeight1, nWeight2, nWeight3 ) )
+        return FALSE;
+    nU = ( nWeight1 * m_anUVs[ 0 ] ) + ( nWeight2 * m_anUVs[ 2 ] ) + ( nWeight3 * m_anUVs[ 4 ] );
+    nV = ( nWeight1 * m_anUVs[ 1 ] ) + ( nWeight2 * m_anUVs[ 3 ] ) + ( nWeight3 * m_anUVs[ 5 ] );
+    return TRUE;
+}
+
+void CTriangle::SetCornerUVs( const FLT anUVs[ 6 ] )
+{
+    for ( int nIndex = 0; nIndex < 6; nIndex++ )
+        m_anUVs[ nIndex ] = anUVs[ nIndex ];
+    m_bHasUVs = TRUE;
+}
+
 CVector CTriangle::NormalAt( CVector &oPoint )
 {
     CVector oNormal( m_oSurfaceNormal );
+    FLT     nWeight1, nWeight2, nWeight3;
 
     if ( m_bSmooth )
     {
-            // Barycentric weights of the point: the share of the triangle
-            // facing each corner. On an edge the far corner's weight is 0, so
-            // faces that share the edge get the same normal along it.
-        CVector oEdge1 = m_oCorner2 - m_oCorner1;
-        CVector oEdge2 = m_oCorner3 - m_oCorner1;
-        CVector oToHit = oPoint - m_oCorner1;
-        FLT     n11 = oEdge1.Dot( oEdge1 );
-        FLT     n12 = oEdge1.Dot( oEdge2 );
-        FLT     n22 = oEdge2.Dot( oEdge2 );
-        FLT     nH1 = oToHit.Dot( oEdge1 );
-        FLT     nH2 = oToHit.Dot( oEdge2 );
-        FLT     nDenom = ( n11 * n22 ) - ( n12 * n12 );
-
-        if ( nDenom != 0.0 )
+        if ( Weights( oPoint, nWeight1, nWeight2, nWeight3 ) )
         {
-            FLT     nWeight2 = ( ( n22 * nH1 ) - ( n12 * nH2 ) ) / nDenom;
-            FLT     nWeight3 = ( ( n11 * nH2 ) - ( n12 * nH1 ) ) / nDenom;
-            FLT     nWeight1 = 1.0 - nWeight2 - nWeight3;
             CVector oPart1 = m_oNormal1 * nWeight1;
             CVector oPart2 = m_oNormal2 * nWeight2;
             CVector oPart3 = m_oNormal3 * nWeight3;
@@ -295,13 +324,20 @@ void CTriangle::ToJson( IASLib::CObjectNode &oNode )
         RayJson::AddVector( *pNormals, m_oNormal2 );
         RayJson::AddVector( *pNormals, m_oNormal3 );
     }
+    if ( m_bHasUVs )
+    {
+        IASLib::CArrayNode *pUVs = oNode.putArray( "uvs" );
+
+        for ( int nCorner = 0; nCorner < 3; nCorner++ )
+            pUVs->addArray()->add( (double)m_anUVs[ nCorner * 2 ] )->add( (double)m_anUVs[ ( nCorner * 2 ) + 1 ] );
+    }
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
 }
 
 BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "corners", "doubleSided", "smooth", "normals", "color", "materials", NULL };
+    static const char *const astrFields[] = { "corners", "doubleSided", "smooth", "normals", "uvs", "color", "materials", NULL };
     BOOL    bNormals = oNode.isObject() && ( oNode.get( "normals" ) != NULL );
 
         // Given corner normals are what smooth shading blends, so they make
@@ -322,6 +358,30 @@ BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
     m_bGivenNormals = bNormals;
     if ( bNormals && ! ReadThree( oNode, "normals", m_oNormal1, m_oNormal2, m_oNormal3, TRUE ) )
         return FALSE;
+
+    const IASLib::CJsonNode *pUVs = oNode.get( "uvs" );
+
+    m_bHasUVs = FALSE;
+    if ( pUVs )
+    {
+        RayJson::CWhere oWhere( "uvs" );
+
+        if ( ! pUVs->isArray() || pUVs->size() != 3 )
+            return RayJson::Fail( "must be an array of three [u, v] pairs, one for each corner" );
+        for ( int nCorner = 0; nCorner < 3; nCorner++ )
+        {
+            const IASLib::CJsonNode *pPair = pUVs->get( nCorner );
+
+            if ( ! pPair->isArray() || pPair->size() != 2 || ! pPair->get( 0 )->isNumber() || ! pPair->get( 1 )->isNumber() )
+            {
+                RayJson::CWhere oElement( "", nCorner );
+                return RayJson::Fail( "must be a [u, v] pair" );
+            }
+            m_anUVs[ nCorner * 2 ] = (FLT)pPair->get( 0 )->doubleValue();
+            m_anUVs[ ( nCorner * 2 ) + 1 ] = (FLT)pPair->get( 1 )->doubleValue();
+        }
+        m_bHasUVs = TRUE;
+    }
 
     return RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            m_oMaterials.FromJson( oNode, "materials" );

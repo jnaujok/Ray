@@ -64,7 +64,7 @@ CColor CDiffuseMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor &
         if ( nIncidentCos >= 0.0 )
         {
             oLt = oLt * nIncidentCos;
-            oDiffuse = oLt * m_oColor;
+            oDiffuse = oLt * ColorAt( m_oColor, oIntersect, pIntersect );
         }
     }
     return oDiffuse;
@@ -126,7 +126,7 @@ void CDiffuseMaterial::ToJson( IASLib::CObjectNode &oNode )
 
 BOOL CDiffuseMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "influence", "color", "diffuseCast", NULL };
+    static const char *const astrFields[] = { "influence", "texture", "color", "diffuseCast", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&

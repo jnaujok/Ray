@@ -196,3 +196,27 @@ BOOL CPlane::FromJson( const IASLib::CJsonNode &oNode )
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            m_oMaterials.FromJson( oNode, "materials" );
 }
+
+BOOL CPlane::SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV )
+{
+    CVector oNormal( m_oNormal );
+    CVector oReference;
+
+    oNormal.Normalize();
+
+        // Two axes across the plane: u = normal x reference, v = u x normal,
+        // with the reference +y, or +z for a plane facing (nearly) up or down.
+    if ( ABS( oNormal.GetY() ) < 0.999 )
+        oReference.Set( 0.0, 1.0, 0.0 );
+    else
+        oReference.Set( 0.0, 0.0, 1.0 );
+
+    CVector oAxisU = oNormal.Cross( oReference );
+    oAxisU.Normalize();
+    CVector oAxisV = oAxisU.Cross( oNormal );
+    CVector oOffset = oPoint - m_oPosition;
+
+    nU = oOffset.Dot( oAxisU );
+    nV = oOffset.Dot( oAxisV );
+    return TRUE;
+}

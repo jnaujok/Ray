@@ -92,6 +92,10 @@ ctest --test-dir build --output-on-failure
 - **New ways of turning pixel colors into bytes** (gamma, tone mapping, and the like) are
   `CColorModel` subclasses attached to the camera, listed in the table in
   `core/src/ColorModel.cpp`. Samplers hand linear, unclipped colors to the `CPixelWriter`.
+- **New textures** are `CTexture` subclasses listed in the table in `core/src/Texture.cpp`.
+  Materials read their color through `CMaterial::ColorAt`, so a texture applies to any of them.
+  Anything a texture reads from a file must also be written into the scene when
+  `RayJson::EmbeddingData()` is set, since engines may not have the file.
 - **New object, light, or material classes** register a JSON `type` name in
   `DYNAMIC_IMPLEMENTS( CClass, "name" )` or `IMPLEMENT_MATERIAL( CClass, Name, "name" )`, and the
   macros make them implement `ToJson` and `FromJson`.

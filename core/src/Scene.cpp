@@ -353,7 +353,14 @@ DWORD CScene::Load( const char *strFileName )
                                          strData[ nStart ] == '\r' || strData[ nStart ] == '\n' ) )
         nStart++;
     if ( nStart < strData.size() && strData[ nStart ] == '{' )
+    {
+            // Files the scene names are relative to the scene file.
+        std::string             strName( strFileName );
+        size_t                  nSlash = strName.find_last_of( "/\\" );
+        RayJson::CBaseDirectory oBase( ( nSlash == std::string::npos ) ? std::string() : strName.substr( 0, nSlash ) );
+
         return FromJson( strData.substr( nStart ) );
+    }
 
     if ( strData.compare( 0, 4, MAGIC_NUMBER, 4 ) == 0 )
         m_strLoadError = "it is a binary scene from 1996-1999, which is no longer read; "
@@ -365,7 +372,11 @@ DWORD CScene::Load( const char *strFileName )
 
 DWORD CScene::Save( const char *strFileName )
 {
-    std::string strData = ToJson( FALSE );
+        // Files the scene names are written relative to where it is saved.
+    std::string             strName( strFileName );
+    size_t                  nSlash = strName.find_last_of( "/\\" );
+    RayJson::CSaveDirectory oSave( ( nSlash == std::string::npos ) ? std::string() : strName.substr( 0, nSlash ) );
+    std::string             strData = ToJson( FALSE );
 
     FILE *pFile = fopen( strFileName, "wb" );
     if ( pFile == NULL )
@@ -380,7 +391,10 @@ DWORD CScene::Save( const char *strFileName )
 
 std::string CScene::ToJson( BOOL bCompact )
 {
-    std::unique_ptr<IASLib::CObjectNode> pRoot( ToJsonTree() );
+        // A compact copy goes to a task, which may not have the scene's
+        // files, so it carries their data.
+    std::unique_ptr<RayJson::CEmbedData>    pEmbed( bCompact ? new RayJson::CEmbedData : NULL );
+    std::unique_ptr<IASLib::CObjectNode>    pRoot( ToJsonTree() );
 
     return bCompact ? pRoot->toJson( -1 ) : RayJson::Write( *pRoot );
 }

@@ -7,6 +7,9 @@
 
 #include "Color.h"
 #include "Rays.h"
+#include "Texture.h"
+
+#include <memory>
 
 class CScene;
 class CLight;
@@ -20,8 +23,22 @@ namespace IASLib
 
 class CMaterial
 {
+    protected:
+            // A texture to use in place of the material's own color, or NULL.
+        std::unique_ptr<CTexture>   m_pTexture;
+
+            // The color at a point: the texture's there, if there is one,
+            // else oColor. pObject gives the point's surface coordinates.
+        CColor              ColorAt( const CColor &oColor, CVector &oPoint, CObjects *pObject );
+
    public:
         virtual            ~CMaterial( void ) {}
+
+            // The texture, as JSON: TextureToJson adds a "texture" field to
+            // oNode if there is a texture; TextureFromJson reads oNode's
+            // "texture" field, if it has one.
+        void                TextureToJson( IASLib::CObjectNode &oNode ) const;
+        BOOL                TextureFromJson( const IASLib::CJsonNode &oNode );
 
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect ) = 0;
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect ) = 0;

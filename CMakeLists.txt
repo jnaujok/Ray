@@ -52,6 +52,7 @@ set(RAY_CORE_SOURCES
     core/src/AmbientMaterial.cpp
     core/src/BoxSampler.cpp
     core/src/Camera.cpp
+    core/src/CheckerTexture.cpp
     core/src/CenterSampler.cpp
     core/src/ClipColorModel.cpp
     core/src/Color.cpp
@@ -61,6 +62,7 @@ set(RAY_CORE_SOURCES
     core/src/DiffuseMaterial.cpp
     core/src/GammaColorModel.cpp
     core/src/ImageFile.cpp
+    core/src/ImageTexture.cpp
     core/src/Lens.cpp
     core/src/Light.cpp
     core/src/LightArray.cpp
@@ -89,6 +91,7 @@ set(RAY_CORE_SOURCES
     core/src/Sphere.cpp
     core/src/SrgbColorModel.cpp
     core/src/StratifiedSampler.cpp
+    core/src/Texture.cpp
     core/src/TaskMaster.cpp
     core/src/TaskSlave.cpp
     core/src/ThreadTaskMaster.cpp

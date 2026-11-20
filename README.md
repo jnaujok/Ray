@@ -66,6 +66,14 @@ The ray tracing itself is the 1997 code.
   that miss its bounding box.
 - **Lights:** point lights.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by influence.
+- **Textures:** any material's color can come from a texture instead: a checkerboard, on the
+  surface or solid (carved from a checkered block), or an image file (PPM or Ray raw) laid over the
+  surface. Spheres and planes have surface coordinates of their own; triangles and meshes take
+  `uvs`, and a mesh without them can use a UV map (planar, cylindrical, spherical, or box
+  projection) to work them out. Networked engines get the images inside the scene, so they need no
+  files.
+
+  <img src="docs/images/textures.png" alt="A checkered floor, an image texture on a wall and a sphere, and a solid checker sphere" width="320"> <img src="docs/images/teapot_textured.png" alt="The Utah teapot with an image texture, spherically UV-mapped" width="320">
 - **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler: `corners`
   (five rays per pixel, four of them corners shared with the neighbors, about two rays a pixel),
   `box` (four rays halfway from the center to each corner), `random` (a center ray worth half
@@ -255,11 +263,12 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests render every sample scene and compare it with a reference render (four of them again with
-corner anti-aliasing, one with each other sampler and color model, the teapot, and two real lenses).
+corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
+and textures).
 They also check that a lens has the focal length, f-number, focus and color dispersion its
 prescription should, that
 networked engines produce exactly the same bytes as threads and that rays and colors cross the wire
-exactly, that scene files survive a load and save, that mistakes in JSON scenes are reported where
+exactly (including texture images embedded in the scene), that scene files survive a load and save, that mistakes in JSON scenes are reported where
 they are, and triangle sidedness and that smooth mesh faces agree along shared edges. CI runs them
 on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -281,7 +290,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/reflect_test3.png" alt="render_reflect_test3" width="260"><br><code>render_reflect_test3</code></td><td align="center"><img src="docs/images/tests/reflection_test.png" alt="render_reflection_test" width="260"><br><code>render_reflection_test</code></td><td align="center"><img src="docs/images/tests/scan_test.png" alt="render_scan_test" width="260"><br><code>render_scan_test</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/ser_test.png" alt="render_ser_test" width="260"><br><code>render_ser_test</code></td><td align="center"><img src="docs/images/tests/ser_test2.png" alt="render_ser_test2 (blank by design)" width="260"><br><code>render_ser_test2 (blank by design)</code></td><td align="center"><img src="docs/images/tests/spec_test.png" alt="render_spec_test" width="260"><br><code>render_spec_test</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td><td align="center"><img src="docs/images/tests/texture_test.png" alt="render_texture" width="260"><br><code>render_texture</code></td><td align="center"><img src="docs/images/tests/teapot_textured.png" alt="render_teapot_textured (120x90)" width="120"><br><code>render_teapot_textured (120x90)</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random` and
@@ -311,7 +320,7 @@ encoding, so `gamma` and `srgb` look washed out; `reinhard` brings back clipped 
 | [`src/`](src), [`include/`](include) | MFC scene editor |
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
-| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and the Utah teapot |
+| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures); `scenes/textures/` holds texture images |
 | [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |

@@ -39,6 +39,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     come from a hash of the pixel, ray number and `seed`, so images are reproducible and threads and
     engines agree.
   - `CPixelAccumulator`: the weighted, fixed-point, order-independent averaging the samplers share.
+- **Texture mapping** (`CTexture`): any material can have a `texture` that gives its color at each
+  point. Textures: `checker` (two colors, in surface coordinates or `solid` in the scene) and
+  `image` (PPM P6/P3 or Ray raw files, bilinear, with `scale`, `offset`, `repeat` and `srgb`).
+  Objects give surface coordinates (`CObjects::SurfaceCoords`): spheres by longitude and latitude,
+  planes along two axes across them, triangles and meshes from new optional `uvs`. Image pixels
+  travel inside the scene when it is copied to a task (`RayJson::CEmbedData`, base64 `pixels`),
+  so networked engines need no files and still match threads exactly. Image files are read
+  relative to the scene file, and saved relative to wherever the scene is saved (absolute when
+  the two share only the root). New `scenes/texture_test.ray` and `scenes/textures/uv_grid.ppm`.
+  - UV mapper: a mesh without `uvs` can have a `uvMap` (`planar`, `cylindrical`, `spherical` or
+    `box`, about an `axis`, with an optional `center` and `scale`) that works out each face's
+    corner coordinates when the mesh is built. Faces across a cylindrical or spherical seam are
+    unwrapped, and pole corners take their face's angle. New `scenes/teapot_textured.ray`.
 - **Real camera lenses** (`CLens`): a camera can have a lens prescription, spherical glass surfaces
   listed front to back as in lens patents, and rays are traced from the sensor back through each
   surface out into the scene. Rays the barrel or the aperture stop blocks go dark, so depth of
@@ -100,7 +113,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`docs/images/tests/`) from `tests/reference/renders.tar.gz`.
 - `CRay::CreateRayAt`, which casts a primary ray through any point on the image,
   `CImageFile::PutRGB`, `CVector::Cross`, and `CScene::GetObjectAt`.
-- Tests: lens and chromatic renders (and a networked chromatic render, which must match threads),
+- Tests: UV mapper checks (each projection, seam unwrapping, poles, errors) and a textured teapot
+  render; a texture render and a networked one (the image must reach the engines), texture checks
+  (embedding, loading a copy without the files, errors); lens and chromatic renders (and a networked chromatic render, which must match threads),
   checks of each lens's color focus shifts, a lens render and lens checks (the double Gauss's focal length, f-number and focus, and
   the errors for unusable lenses), the stratified sampler, four scenes rendered with corner
   anti-aliasing, one with `box` and with `random` at 2, 4

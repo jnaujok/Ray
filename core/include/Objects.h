@@ -56,6 +56,9 @@ class CObjects
         virtual BOOL        IsALight( void ) { return FALSE; }
         virtual BOOL        IsCamera( void ) { return FALSE; }
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect ) {return FALSE;}
+            // The surface coordinates (u, v) of a point on the object, for
+            // textures. FALSE if the object has none.
+        virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV ) { (void)oPoint; nU = nV = 0.0; return FALSE; }
             // Intersect, unless this is pIgnore: the object a shadow or
             // reflected ray leaves from. An object made of parts (a mesh)
             // skips only the part pIgnore names, so it can shadow itself.

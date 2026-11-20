@@ -15,6 +15,8 @@
 #endif
 
 #include "Material.h"
+#include "Objects.h"
+#include "SceneJson.h"
 
 #include <string.h>
 
@@ -132,3 +134,50 @@ void CDynMaterialList::LoadAddList( CListCtrl &oList )
     }
 }
 #endif
+
+CColor CMaterial::ColorAt( const CColor &oColor, CVector &oPoint, CObjects *pObject )
+{
+    if ( ! m_pTexture )
+        return oColor;
+
+    STexturePoint oAt;
+
+    oAt.oPoint = oPoint;
+    oAt.nU = oAt.nV = 0.0;
+    oAt.bHasUV = ( pObject && pObject->SurfaceCoords( oPoint, oAt.nU, oAt.nV ) ) ? TRUE : FALSE;
+    return m_pTexture->ColorAt( oAt );
+}
+
+void CMaterial::TextureToJson( IASLib::CObjectNode &oNode ) const
+{
+    if ( ! m_pTexture )
+        return;
+
+    IASLib::CObjectNode *pTexture = oNode.putObject( "texture" );
+
+    pTexture->put( "type", m_pTexture->GetName() );
+    m_pTexture->ToJson( *pTexture );
+}
+
+BOOL CMaterial::TextureFromJson( const IASLib::CJsonNode &oNode )
+{
+    const IASLib::CJsonNode *pTexture = oNode.isObject() ? oNode.get( "texture" ) : NULL;
+    std::string              strType;
+
+    if ( pTexture == NULL )
+        return TRUE;
+
+    RayJson::CWhere oWhere( "texture" );
+
+    if ( ! RayJson::GetString( *pTexture, "type", strType, TRUE ) )
+        return FALSE;
+
+    std::unique_ptr<CTexture> pNew( CTexture::Create( strType.c_str() ) );
+
+    if ( ! pNew )
+        return RayJson::Fail( "unknown texture type \"" + strType + "\"" );
+    if ( ! pNew->FromJson( *pTexture ) )
+        return FALSE;
+    m_pTexture.reset( pNew.release() );
+    return TRUE;
+}

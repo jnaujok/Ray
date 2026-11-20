@@ -73,7 +73,7 @@ CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVect
 
     if ( m_bFilterReflection )
     {
-        oReflective = oReflective * m_oColor;
+        oReflective = oReflective * ColorAt( m_oColor, oIntersect, pIntersect );
     }
 
     return oReflective;
@@ -139,7 +139,7 @@ void CReflectiveMaterial::ToJson( IASLib::CObjectNode &oNode )
 
 BOOL CReflectiveMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "influence", "color", "diffuseReflectivity", "filterReflection", NULL };
+    static const char *const astrFields[] = { "influence", "texture", "color", "diffuseReflectivity", "filterReflection", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&

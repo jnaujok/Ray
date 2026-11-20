@@ -21,6 +21,10 @@ class CPlane : public CObjects
         virtual    ~CPlane( void );
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
+            // Distances from the plane's position along two axes across it,
+            // in scene units: on a floor, u along +x and v along +z; on a
+            // wall facing -z, u along +x and v up.
+        virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV );
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect );
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 

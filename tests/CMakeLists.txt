@@ -112,6 +112,31 @@ add_test(NAME render_chromatic
 set_tests_properties(render_chromatic PROPERTIES FIXTURES_SETUP render_chromatic TIMEOUT 600)
 add_test(NAME roundtrip_chromatic_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/chromatic_test.ray ${RENDER_DIR})
 
+# Textures: a checkered floor, an image on a wall and a sphere, and a solid
+# checker. The image's pixels must reach networked engines in the scene.
+add_test(NAME render_texture
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/texture_test.ray
+                 -DOUTPUT=${RENDER_DIR}/texture_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/texture_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_texture PROPERTIES FIXTURES_SETUP render_texture TIMEOUT 300)
+add_test(NAME roundtrip_texture_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/texture_test.ray ${RENDER_DIR})
+add_test(NAME render_teapot_textured
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/teapot_textured.ray
+                 -DOUTPUT=${RENDER_DIR}/teapot_textured.raw
+                 -DREFERENCE=${REFERENCE_DIR}/teapot_textured.raw
+                 -DSIZE=120x90
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_teapot_textured PROPERTIES TIMEOUT 600)
+add_test(NAME roundtrip_teapot_textured COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/teapot_textured.ray ${RENDER_DIR})
+add_test(NAME texture_checks COMMAND format_test --textures ${PROJECT_SOURCE_DIR}/scenes)
+
 add_test(NAME render_sampler_stratified
          COMMAND ${CMAKE_COMMAND}
                  -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -217,6 +242,20 @@ add_test(NAME network_chromatic
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_chromatic PROPERTIES FIXTURES_REQUIRED render_chromatic
                                                   RESOURCE_LOCK ray_network TIMEOUT 600)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_texture
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/texture_test.ray
+                 -DOUTPUT=${RENDER_DIR}/texture_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/texture_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_texture PROPERTIES FIXTURES_REQUIRED render_texture
+                                                RESOURCE_LOCK ray_network TIMEOUT 300)
 
 # raythrower --spawn starts the rayengine next to it.
 add_dependencies(raythrower rayengine)

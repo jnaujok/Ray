@@ -13,6 +13,7 @@
 #include <math.h>
 #include <stdio.h>
 
+#include <filesystem>
 #include <vector>
 
 namespace
@@ -20,6 +21,9 @@ namespace
         // Errors are per thread: engines decode scenes on their own threads.
     thread_local std::vector<std::string>   t_astrWhere;
     thread_local std::string                t_strError;
+    thread_local int                        t_nEmbedData = 0;
+    thread_local std::string                t_strBaseDirectory;
+    thread_local std::string                t_strSaveDirectory;
 
     std::string Where( void )
     {
@@ -206,6 +210,80 @@ namespace RayJson
     CWhere::~CWhere( void )
     {
         t_astrWhere.pop_back();
+    }
+
+    CEmbedData::CEmbedData( void )
+    {
+        t_nEmbedData++;
+    }
+
+    CEmbedData::~CEmbedData( void )
+    {
+        t_nEmbedData--;
+    }
+
+    BOOL EmbeddingData( void )
+    {
+        return ( t_nEmbedData > 0 ) ? TRUE : FALSE;
+    }
+
+    CBaseDirectory::CBaseDirectory( const std::string &strDirectory ) :
+        m_strPrevious( t_strBaseDirectory )
+    {
+        t_strBaseDirectory = strDirectory;
+    }
+
+    CBaseDirectory::~CBaseDirectory( void )
+    {
+        t_strBaseDirectory = m_strPrevious;
+    }
+
+    std::string ResolvePath( const std::string &strPath )
+    {
+        std::filesystem::path oPath( strPath );
+
+        if ( oPath.is_relative() && ! t_strBaseDirectory.empty() )
+            oPath = std::filesystem::path( t_strBaseDirectory ) / oPath;
+        return std::filesystem::absolute( oPath ).lexically_normal().string();
+    }
+
+    CSaveDirectory::CSaveDirectory( const std::string &strDirectory ) :
+        m_strPrevious( t_strSaveDirectory )
+    {
+        t_strSaveDirectory = std::filesystem::absolute( std::filesystem::path( strDirectory.empty() ? "." : strDirectory ) )
+                                 .lexically_normal().string();
+    }
+
+    CSaveDirectory::~CSaveDirectory( void )
+    {
+        t_strSaveDirectory = m_strPrevious;
+    }
+
+    std::string PathForSave( const std::string &strAbsolute, const std::string &strFallback )
+    {
+        if ( t_strSaveDirectory.empty() || strAbsolute.empty() )
+            return strFallback;
+
+        std::filesystem::path oFile( strAbsolute );
+        std::filesystem::path oSaveDirectory( t_strSaveDirectory );
+        std::filesystem::path oRelative = oFile.lexically_relative( oSaveDirectory );
+
+            // Sharing no more than the root (or another drive): a relative
+            // path would only climb to the root, so give the absolute one.
+        auto itFile = oFile.begin();
+        auto itSave = oSaveDirectory.begin();
+        int  nShared = 0;
+
+        while ( itFile != oFile.end() && itSave != oSaveDirectory.end() && *itFile == *itSave )
+        {
+            ++itFile;
+            ++itSave;
+            nShared++;
+        }
+        if ( oRelative.empty() || nShared <= ( oFile.has_root_directory() ? 1 : 0 ) + ( oFile.has_root_name() ? 1 : 0 ) )
+            return oFile.generic_string();
+            // Forward slashes, so the scene works on every platform.
+        return oRelative.generic_string();
     }
 
     BOOL Fail( const std::string &strMessage )

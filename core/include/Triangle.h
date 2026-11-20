@@ -42,6 +42,12 @@ class CTriangle : public CObjects
         BOOL                m_bDoubleSided;
         BOOL                m_bSmooth;
         BOOL                m_bGivenNormals;    // the corner normals came from the scene file
+        FLT                 m_anUVs[ 6 ];       // the corners' surface coordinates (u, v), if m_bHasUVs
+        BOOL                m_bHasUVs;
+
+            // The barycentric weights of a point on the triangle; FALSE if
+            // the triangle has no area.
+        BOOL                Weights( CVector &oPoint, FLT &nWeight1, FLT &nWeight2, FLT &nWeight3 );
 
         CColor              m_oColor;
 
@@ -68,6 +74,10 @@ class CTriangle : public CObjects
         CVector             NormalAt( CVector &oPoint );
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
+            // The corners' surface coordinates blended by barycentric
+            // weights; FALSE if the triangle has none.
+        virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV );
+        void                SetCornerUVs( const FLT anUVs[ 6 ] );
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect );
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 

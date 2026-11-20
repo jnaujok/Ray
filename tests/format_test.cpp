@@ -398,6 +398,101 @@ static void LensChecks( void )
                  "camera.lens.surfaces[0]: the surface is wider than its sphere" );
 }
 
+static void TextureChecks( const char *strScenes )
+{
+    CScene      oScene;
+    std::string strFile = std::string( strScenes ) + "/texture_test.ray";
+
+    Check( oScene.Load( strFile.c_str() ) == 0, "the texture test scene loads, with its image" );
+
+        // A saved scene names the image; a copy for a task carries its pixels,
+        // and loads with no file to read.
+    std::string strSaved = oScene.ToJson( FALSE );
+    std::string strCopy = oScene.ToJson( TRUE );
+    Check( strSaved.find( "\"pixels\"" ) == std::string::npos && strSaved.find( "textures/uv_grid.ppm" ) != std::string::npos,
+           "a saved scene names its texture images" );
+    Check( strCopy.find( "\"pixels\"" ) != std::string::npos, "a copy for a task carries its texture images" );
+
+    CScene oCopy;
+    Check( oCopy.FromJson( strCopy ) == 0, "a copy with embedded images loads without the files" );
+    Check( oCopy.ToJson( TRUE ) == strCopy, "an embedded image reads back exactly" );
+
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"marble\" } } ]" ),
+                 BAD_FILE, "objects[0].materials[0].texture: unknown texture type \"marble\"" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"image\", \"file\": \"no/such.ppm\" } } ]" ),
+                 BAD_FILE, "objects[0].materials[0].texture: can't open the image \"no/such.ppm\"" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"image\", "
+                          "\"width\": 2, \"height\": 2, \"pixels\": \"AAAA\" } } ]" ),
+                 BAD_FILE, "pixels must be width x height RGB bytes" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"checker\", \"size\": 0 } } ]" ),
+                 BAD_FILE, "objects[0].materials[0].texture: size must be positive" );
+}
+
+    // The surface coordinates of face nFace of a scene's first object (a mesh)
+    // at a point.
+static bool MeshCoords( CScene &oScene, int nFace, double dX, double dY, double dZ, FLT &nU, FLT &nV )
+{
+    CMesh *pMesh = dynamic_cast<CMesh *>( oScene.GetObjectAt( 0 ) );
+
+    return pMesh && nFace < pMesh->GetFaceCount() && pMesh->FaceCoordsAt( nFace, CVector( dX, dY, dZ ), nU, nV );
+}
+
+static void UVMapChecks( void )
+{
+    CScene  oScene;
+    FLT     nU, nV;
+
+        // Planar along y: x and z across the bounding box, 0 to 1.
+    Check( oScene.FromJson( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+           "\"type\": \"mesh\", \"vertices\": [[-2, 0, -1], [2, 0, -1], [2, 0, 1], [-2, 0, 1]], \"faces\": [[0, 1, 2], [0, 2, 3]], "
+           "\"uvMap\": { \"type\": \"planar\", \"axis\": \"y\" }" ) ) == 0, "a mesh with a planar UV map loads" );
+    Check( MeshCoords( oScene, 0, 2.0, 0.0, -1.0, nU, nV ) && ABS( nU - 1.0 ) < 1e-9 && ABS( nV - 0.0 ) < 1e-9,
+           "a planar map along y runs u along x and v along z, 0 to 1 across the bounding box" );
+
+        // Cylindrical about y: a face across the seam (u near 1 and near 0)
+        // runs on past 1 rather than back across the texture.
+    Check( oScene.FromJson( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+           "\"type\": \"mesh\", \"vertices\": [[-1, 0, -0.1], [-1, 0, 0.1], [-1, 1, 0], [1, 0, 0], [1, 1, 0]], \"faces\": [[0, 1, 2], [3, 4, 2]], "
+           "\"uvMap\": { \"type\": \"cylindrical\", \"axis\": \"y\", \"center\": [0, 0, 0] }" ) ) == 0,
+           "a mesh with a cylindrical UV map loads" );
+    {
+        FLT nU0, nV0, nU1, nV1;
+        bool bOk = MeshCoords( oScene, 0, -1.0, 0.0, -0.1, nU0, nV0 ) && MeshCoords( oScene, 0, -1.0, 0.0, 0.1, nU1, nV1 );
+        Check( bOk && ABS( nU0 - nU1 ) < 0.1, "a face across the seam is unwrapped" );
+    }
+
+        // Spherical: a corner on the pole takes its neighbors' angle.
+    Check( oScene.FromJson( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+           "\"type\": \"mesh\", \"vertices\": [[0, 1, 0], [1, 0, 0.2], [1, 0, -0.2]], \"faces\": [[0, 1, 2]], "
+           "\"uvMap\": { \"type\": \"spherical\", \"center\": [0, 0, 0] }" ) ) == 0, "a mesh with a spherical UV map loads" );
+    {
+        FLT nUPole, nVPole;
+        bool bOk = MeshCoords( oScene, 0, 0.0, 1.0, 0.0, nUPole, nVPole );
+        Check( bOk && ABS( nUPole - 0.5 ) < 1e-6 && ABS( nVPole - 1.0 ) < 1e-6, "a pole corner has v 1 and its neighbors' u" );
+    }
+
+        // Box: each face is projected along the axis it faces most.
+    Check( oScene.FromJson( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+           "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 0, 1]], \"faces\": [[0, 2, 1], [0, 1, 3]], "
+           "\"uvMap\": { \"type\": \"box\" }" ) ) == 0, "a mesh with a box UV map loads" );
+    Check( MeshCoords( oScene, 0, 1.0, 1.0, 0.0, nU, nV ) && ABS( nU - 1.0 ) < 1e-6 && ABS( nV - 1.0 ) < 1e-6 &&
+           MeshCoords( oScene, 1, 0.0, 0.0, 1.0, nU, nV ) && ABS( nU - 0.0 ) < 1e-6 && ABS( nV - 1.0 ) < 1e-6,
+           "a box map projects each face along its own axis" );
+
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 1, 2]], "
+                          "\"uvs\": [[0, 0], [1, 0], [0, 1]], \"uvMap\": { \"type\": \"planar\" }" ),
+                 BAD_FILE, "objects[0].uvMap: a mesh takes \"uvs\" or a \"uvMap\", not both" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 1, 2]], "
+                          "\"uvMap\": { \"type\": \"conical\" }" ),
+                 BAD_FILE, "objects[0].uvMap: unknown uvMap type \"conical\"" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 1, 2]], "
+                          "\"uvMap\": { \"type\": \"planar\", \"axis\": \"w\" }" ),
+                 BAD_FILE, "objects[0].uvMap: axis must be" );
+}
+
 static void RoundTrip( const char *strScene, const char *strDir )
 {
     std::string strBase = std::string( strDir ) + "/roundtrip_";
@@ -424,7 +519,9 @@ static void RoundTrip( const char *strScene, const char *strDir )
 
 int main( int argc, char **argv )
 {
-    if ( argc >= 3 )
+    if ( argc >= 3 && strcmp( argv[ 1 ], "--textures" ) == 0 )
+        TextureChecks( argv[ 2 ] );
+    else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
     else
     {
@@ -432,6 +529,7 @@ int main( int argc, char **argv )
         JsonChecks();
         TriangleChecks();
         LensChecks();
+        UVMapChecks();
     }
 
     if ( g_nFailures == 0 )

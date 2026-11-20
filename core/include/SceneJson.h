@@ -44,6 +44,52 @@ namespace RayJson
             CWhere     &operator =( const CWhere & );
     };
 
+        /// While one exists (on this thread), scenes written as JSON carry
+        /// the data of the files they use, such as texture images, so a copy
+        /// sent to a task needs no files. Scene files leave them out.
+    class CEmbedData
+    {
+        public:
+                        CEmbedData( void );
+                       ~CEmbedData( void );
+        private:
+                        CEmbedData( const CEmbedData & );
+            CEmbedData &operator =( const CEmbedData & );
+    };
+    BOOL            EmbeddingData( void );
+
+        /// While one exists, relative file names in a scene being read are
+        /// taken from this directory (the scene file's).
+    class CBaseDirectory
+    {
+        public:
+            explicit    CBaseDirectory( const std::string &strDirectory );
+                       ~CBaseDirectory( void );
+        private:
+            std::string m_strPrevious;
+                        CBaseDirectory( const CBaseDirectory & );
+            CBaseDirectory &operator =( const CBaseDirectory & );
+    };
+        /// A file name from a scene, relative to the scene file's
+        /// directory, as an absolute path.
+    std::string     ResolvePath( const std::string &strPath );
+
+        /// While one exists, file names written into a scene are made
+        /// relative to this directory (the one the scene is being saved to).
+    class CSaveDirectory
+    {
+        public:
+            explicit    CSaveDirectory( const std::string &strDirectory );
+                       ~CSaveDirectory( void );
+        private:
+            std::string m_strPrevious;
+                        CSaveDirectory( const CSaveDirectory & );
+            CSaveDirectory &operator =( const CSaveDirectory & );
+    };
+        /// How to write an absolute path into the scene being saved: relative
+        /// to its directory, or strFallback when no scene is being saved.
+    std::string     PathForSave( const std::string &strAbsolute, const std::string &strFallback );
+
         /// Records an error at the current place and returns FALSE.
     BOOL            Fail( const std::string &strMessage );
         /// The last error recorded, with its place.

@@ -1,0 +1,142 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 320,
+        "imageHeight": 240,
+        "imageFile": "texture_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 16,
+        "depthThreshold": 0.01
+    },
+    "background": [0.6, 0.75, 0.95],
+    "camera": {
+        "position": [0.0, 2.5, -9.0],
+        "lookAt": [0.0, 0.9, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 35.0,
+        "horizontalAngle": 40.0,
+        "aspectRatio": 1.333333,
+        "sampler": "corners",
+        "colorModel": "clip"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.1, 0.1]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "checker",
+                        "colors": [
+                            [0.15, 0.15, 0.15],
+                            [0.85, 0.85, 0.85]
+                        ],
+                        "size": 1.0,
+                        "solid": false
+                    }
+                }
+            ]
+        },
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 6.0],
+            "normal": [0.0, 0.0, -1.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.1, 0.1]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/uv_grid.ppm",
+                        "scale": [0.125, 0.25],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": false
+                    }
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-1.3, 1.0, 0.0],
+            "radius": 1.0,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.1, 0.1]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/uv_grid.ppm",
+                        "scale": [1.0, 1.0],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": false
+                    }
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [1.3, 1.0, 0.0],
+            "radius": 1.0,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.05, 0.05]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "checker",
+                        "colors": [
+                            [0.8, 0.1, 0.1],
+                            [0.95, 0.95, 0.95]
+                        ],
+                        "size": 0.4,
+                        "solid": true
+                    }
+                }
+            ]
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "position": [-5.0, 8.0, -6.0],
+            "color": [1.0, 1.0, 1.0]
+        }
+    ]
+}

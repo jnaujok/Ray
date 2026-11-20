@@ -77,6 +77,7 @@ void CMaterialList::ToJson( IASLib::CArrayNode &oArray )
         pNode->put( "type", strType ? strType : pMaterial->ClassType() );
         RayJson::PutNumber( *pNode, "influence", GetInfluence( nIndex ) );
         pMaterial->ToJson( *pNode );
+        pMaterial->TextureToJson( *pNode );
     }
 }
 
@@ -116,7 +117,7 @@ BOOL CMaterialList::FromJson( const IASLib::CJsonNode &oNode, const char *strKey
         else
         {
             oRead.Add( pMaterial, nInfluence );
-            bRetVal = pMaterial->FromJson( oMaterial );
+            bRetVal = pMaterial->FromJson( oMaterial ) && pMaterial->TextureFromJson( oMaterial );
         }
     }
 

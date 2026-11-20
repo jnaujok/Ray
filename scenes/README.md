@@ -20,6 +20,8 @@ when the binary format was dropped; they are in the repository's history.
 | `huh.ray` | transitional | Version-2 header with legacy numbers; renders blank |
 | `lens_test.ray` | | `scan_test` through a real lens: the built-in double Gauss wide open (f/2), focused on the glass sphere, with 1 scene unit = 10 cm and a 5×5 stratified sampler |
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
+| `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
+| `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
 Two 1997 files, `yyy.ray` (saved by an in-between build that wrote an extra, undefined field) and
@@ -118,8 +120,8 @@ color, not used in shading), and `materials` (default: one diffuse material).
 |--------|--------|
 | `sphere` | `center` (required), `radius` (required) |
 | `plane` | `position` (required): a point on the plane; `normal` (required) |
-| `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each corner |
-| `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex |
+| `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each corner; `uvs`: a `[u, v]` for each corner |
+| `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex; `uvs`: one for each vertex, or `uvMap` (below) |
 
 A triangle's normal is worked out from its corners by the edge traversal (V2 − V1) × (V3 − V2), so
 the order of the corners decides which side is the front. It is the rule OBJ and most other model
@@ -145,6 +147,34 @@ make the shape smooth (`"smooth": false` with them is an error).
 | `specular` | `power` (default `1`), `indexOfRefraction` (default `1`), `materialHighlight` (default `false`) |
 | `reflective` | `diffuseReflectivity` (default `0`), `filterReflection` (default `false`) |
 | `transparent` | `indexOfRefraction` (default `1`) |
+
+**Textures.** Any material can have a `texture` that gives its color at each point instead of its
+`color`. A texture is an object with a `type`:
+
+| `type` | Fields |
+|--------|--------|
+| `checker` | `colors` (two colors, default black and white), `size` (default `1`), `solid` (default `false`: squares in surface coordinates; `true`: cubes in the scene, which needs no surface coordinates) |
+| `image` | `file` (required: a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
+
+Surface coordinates: on a sphere, u is longitude (once around, left to right as seen from −z) and v
+latitude (0 at the bottom, 1 at the top). On a plane, u and v are distances in scene units along
+two axes across it (on a floor, +x and +z; on a wall facing −z, +x and up). Triangles take `uvs`
+(a `[u, v]` for each corner) and meshes `uvs` (one for each vertex); without them only solid
+textures apply, unless a mesh has a `uvMap`, which works out each face's coordinates by projecting
+it about an axis:
+
+| `uvMap` field | Default | |
+|---------------|---------|-|
+| `type` | required | `planar` (along the axis, 0 to 1 across the bounding box), `cylindrical` (u the angle about the axis, v the height along it), `spherical` (u longitude, v latitude about the center), or `box` (each face planar along the axis it faces most) |
+| `axis` | `"y"` | `"x"`, `"y"` or `"z"`. Along y, u follows x and v follows z; along z, x and y; along x, z and y. Angles run as on a sphere |
+| `center` | the bounding box's center | For cylindrical and spherical maps |
+| `scale` | `[1, 1]` | Repeats in u and v |
+
+Faces across a cylindrical or spherical map's seam are unwrapped rather than smeared across the
+whole texture, and a corner on the axis (a pole) takes its face's other corners' angle. An image's (0, 0) is its bottom left corner and (1, 1) its top right; pixels are
+blended bilinearly. When a scene is copied to a task its images travel inside it (as base64
+`pixels`), so networked engines need no files; saved files name the image, relative to wherever
+the scene is saved.
 
 **Lights.**
 

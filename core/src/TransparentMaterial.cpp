@@ -84,7 +84,7 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
 
     oScene.TraceRay( oTransmitted, oTransparent, NULL );
 
-    oTransparent = oTransparent * m_oColor;
+    oTransparent = oTransparent * ColorAt( m_oColor, oIntersect, pIntersect );
 
     return oTransparent;
 }
@@ -146,7 +146,7 @@ void CTransparentMaterial::ToJson( IASLib::CObjectNode &oNode )
 
 BOOL CTransparentMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "influence", "color", "indexOfRefraction", NULL };
+    static const char *const astrFields[] = { "influence", "texture", "color", "indexOfRefraction", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&

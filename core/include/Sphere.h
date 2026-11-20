@@ -27,6 +27,9 @@ class CSphere : public CObjects
         virtual            ~CSphere( void );
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
+            // Longitude and latitude: u runs once around, left to right as
+            // seen from -z, and v from 0 at the bottom to 1 at the top.
+        virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV );
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect );
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 

@@ -6,6 +6,7 @@
 #include "Scene.h"
 #include "RayArray.h"
 #include "ColorArray.h"
+#include "SceneJson.h"
 
 #include "Exceptions/StreamException.h"
 #include "JSON/ArrayNode.h"
@@ -124,6 +125,7 @@ namespace RayWire
 
     std::string CEncoder::Scene( CScene &oScene )
     {
+        RayJson::CEmbedData                     oEmbed;     // engines may not have the scene's files
         std::unique_ptr<IASLib::CObjectNode>    pScene( oScene.ToJsonTree() );
         std::string                             strPacket;
 

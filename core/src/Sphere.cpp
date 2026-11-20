@@ -19,6 +19,8 @@
 #include "Light.h"
 #include "SceneJson.h"
 
+#include <math.h>
+
 #ifdef RAY_GUI
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -220,4 +222,21 @@ BOOL CSphere::FromJson( const IASLib::CJsonNode &oNode )
            RayJson::GetNumber( oNode, "radius", m_nRadius, TRUE ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            m_oMaterials.FromJson( oNode, "materials" );
+}
+
+BOOL CSphere::SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV )
+{
+    CVector oFromCenter = oPoint - m_oCenter;
+
+    oFromCenter.Normalize();
+
+    FLT nY = oFromCenter.GetY();
+
+    if ( nY > 1.0 )
+        nY = 1.0;
+    else if ( nY < -1.0 )
+        nY = -1.0;
+    nU = 0.5 + ( (FLT)atan2( (double)oFromCenter.GetZ(), (double)oFromCenter.GetX() ) / ( 2.0 * PI ) );
+    nV = 0.5 + ( ASIN( nY ) / PI );
+    return TRUE;
 }

@@ -145,7 +145,7 @@ CColor CSpecularMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor 
 
         oLt = oLt * ( nNDotL * nRs );
 
-        oSpecular = oLt * m_oColor;
+        oSpecular = oLt * ColorAt( m_oColor, oIntersect, pIntersect );
     }
     return oSpecular;
 }
@@ -210,7 +210,7 @@ void CSpecularMaterial::ToJson( IASLib::CObjectNode &oNode )
 
 BOOL CSpecularMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "influence", "color", "power", "indexOfRefraction", "materialHighlight", NULL };
+    static const char *const astrFields[] = { "influence", "texture", "color", "power", "indexOfRefraction", "materialHighlight", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
