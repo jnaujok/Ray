@@ -27,22 +27,24 @@ if(wxWidgets_FOUND)
 else()
     message(STATUS "ray-editor: fetching wxWidgets ${RAY_WXWIDGETS_VERSION}")
 
-    # Only what the editor uses: static base, core, gl and propgrid.
+    # Only what the editor uses: static base, core, gl and propgrid. The help
+    # string is one word because wxWidgets passes it on unquoted when it
+    # forces an option itself (wx_option_force_value).
     foreach(wxOption
             wxBUILD_SAMPLES wxBUILD_TESTS wxBUILD_DEMOS wxBUILD_BENCHMARKS wxBUILD_INSTALL
             wxUSE_WEBVIEW wxUSE_MEDIACTRL wxUSE_STC wxUSE_RIBBON wxUSE_RICHTEXT wxUSE_XRC
             wxUSE_AUI wxUSE_HTML wxUSE_WXHTML_HELP wxUSE_WEBREQUEST wxUSE_LIBTIFF wxUSE_SECRETSTORE wxUSE_LIBSDL
             wxUSE_LIBMSPACK wxUSE_XML wxUSE_GLCANVAS_EGL wxUSE_SOUND wxUSE_PRIVATE_FONTS
             wxUSE_LIBNOTIFY wxUSE_LIBGNOMEVFS wxUSE_SPELLCHECK)
-        set(${wxOption} OFF CACHE BOOL "" FORCE)
+        set(${wxOption} OFF CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
     endforeach()
-    set(wxBUILD_SHARED OFF CACHE BOOL "" FORCE)
-    set(wxBUILD_PRECOMP OFF CACHE STRING "" FORCE)
-    set(wxUSE_OPENGL ON CACHE BOOL "" FORCE)
-    set(wxUSE_PROPGRID ON CACHE BOOL "" FORCE)
+    set(wxBUILD_SHARED OFF CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
+    set(wxBUILD_PRECOMP OFF CACHE STRING "Set-by-the-Ray-editor-build" FORCE)
+    set(wxUSE_OPENGL ON CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
+    set(wxUSE_PROPGRID ON CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
     if(MSVC)
         # Match the rest of the build's runtime library.
-        set(wxBUILD_USE_STATIC_RUNTIME OFF CACHE BOOL "" FORCE)
+        set(wxBUILD_USE_STATIC_RUNTIME OFF CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
     endif()
 
     # wxWidgets 3.2's CMakeLists asks for a CMake older than 3.5, which CMake 4
