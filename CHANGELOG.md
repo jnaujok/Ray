@@ -10,6 +10,33 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.4.1] - 2026-11-20
+
+Real lenses cast blocked rays again, so lens renders have almost no grain from the lens.
+
+### Changed
+
+- **A real lens casts a blocked ray again instead of letting it go black, so lens renders have
+  almost no grain from the lens.** Whether a ray gets through the lens depends only on the lens
+  and where it starts on the sensor, never on the scene. So the lens now works out, once, the share
+  of rays aimed at its rear element that get through, at each ring of the sensor and in each color.
+  A ray the lens blocks is cast again at another point in the exit pupil (up to 64 times, at
+  points hashed from the first, so every run and every task makes the same ones) until one gets
+  through, and that ray counts for the share. Brightness and vignetting are as before, but how
+  many of a pixel's rays happened to be blocked no longer shows as grain.
+  - On a plain grey background through the double Gauss, the difference between neighboring
+    pixels falls from 0.022 (2026-alpha-0.4) and 0.038 (2026-alpha-0.3) to 0.002. Brightness
+    matches a 1,024-ray render of the old sampling within 0.3% (1.2% in the corners, within that
+    render's own noise).
+  - The share is measured on the same grid as the exposure, so the center of the image is exactly
+    as bright as through a pinhole.
+  - The `lens_test` and `torture_test` references are regenerated, with their previews in the
+    README; `chromatic_test`, whose lens blocks nothing in its frame, is unchanged, as is every
+    render without a lens. What grain is left comes from the scene: out-of-focus edges and
+    textures blending.
+
+    ![Before and after casting blocked rays again: lens_test, the torture test, and a full-size crop of it](docs/images/changelog/recast.png)
+
 ## [2026-alpha-0.4] - 2026-11-19
 
 New shapes and a new way to share out the work: cylinders, cones and boxes; meshes with a bounding
@@ -470,7 +497,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4.1...HEAD
+[2026-alpha-0.4.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4...2026-alpha-0.4.1
 [2026-alpha-0.4]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.3...2026-alpha-0.4
 [2026-alpha-0.3]: https://github.com/jnaujok/Ray/compare/v0.2.0...2026-alpha-0.3
 [0.2.0]: https://github.com/jnaujok/Ray/compare/v0.1.0...v0.2.0

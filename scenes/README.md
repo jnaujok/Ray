@@ -102,7 +102,10 @@ each ray takes a different path through the lens. Rays are aimed only at the exi
 ring of the sensor out from the center, the lens works out (the first time a ray needs it) an
 ellipse on its rear element around everywhere light gets through, and each ray counts for that
 ellipse's share of the element, so brightness is the same as aiming at all of it but far fewer rays
-are blocked. With `raythrower`, the lens is described before
+are blocked. A ray the lens does block is cast again at another point (up to 64 times) until one gets
+through, and it counts for the share of rays that get through from that point of the sensor, which
+the lens measures once: brightness and vignetting stay as they are, without grain from blocked
+rays. With `raythrower`, the lens is described before
 tracing.
 
 | Field | Default | |

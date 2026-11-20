@@ -32,6 +32,9 @@
 #define PUPIL_REACH         2.0
 #define PUPIL_GRID          64
 #define PUPIL_RADII         3
+    // A ray the lens blocks is cast again, at another point in the exit
+    // pupil, up to this many times in all.
+#define PUPIL_TRIES         64
 
     // The Fraunhofer lines, in micrometers: the channels' wavelengths.
 #define WAVELENGTH_C        0.65627     // red
@@ -65,6 +68,33 @@ namespace
         { "double-gauss-50mm", "50 mm f/2 double Gauss (US 2,673,491, Tronnier), a classic standard lens",
           s_aoDoubleGauss50, (int)( sizeof( s_aoDoubleGauss50 ) / sizeof( s_aoDoubleGauss50[ 0 ] ) ) },
     };
+
+        // Another point in the unit square for a ray's nTry-th cast, from
+        // its first point: a hash of the two, so it is the same on every run
+        // and in every task.
+    void RetryPoint( FLT nU, FLT nV, int nTry, FLT &nNextU, FLT &nNextV )
+    {
+        double      dU = (double)nU;
+        double      dV = (double)nV;
+        uint64_t    nBitsU, nBitsV;
+
+        memcpy( &nBitsU, &dU, sizeof( nBitsU ) );
+        memcpy( &nBitsV, &dV, sizeof( nBitsV ) );
+
+        uint64_t nKey = nBitsU ^ ( nBitsV * 0x9E3779B97F4A7C15ull ) ^ ( (uint64_t)nTry << 56 );
+
+        for ( int nRound = 0; nRound < 2; nRound++ )
+        {
+            nKey += 0x9E3779B97F4A7C15ull;
+
+            uint64_t nMix = nKey;
+
+            nMix = ( nMix ^ ( nMix >> 30 ) ) * 0xBF58476D1CE4E5B9ull;
+            nMix = ( nMix ^ ( nMix >> 27 ) ) * 0x94D049BB133111EBull;
+            nMix ^= nMix >> 31;
+            ( nRound == 0 ? nNextU : nNextV ) = (FLT)( (double)( nMix >> 11 ) / 9007199254740992.0 );
+        }
+    }
 
         // Shirley and Chiu's concentric map from the unit square to the unit
         // disc, which keeps an even spread even.
@@ -598,10 +628,21 @@ struct CLens::SPupilTable
     std::atomic<bool>                       abDone[ PUPIL_RINGS ];
     IASLib::CMutex                          amutexRings[ PUPIL_RINGS ];
 
+        // The share of rays that get through, at each ring's inner edge
+        // (and the last ring's outer edge), for each channel.
+    FLT                                     anPass[ 4 ][ PUPIL_RINGS + 1 ];
+    std::atomic<bool>                       abPassDone[ 4 ][ PUPIL_RINGS + 1 ];
+    IASLib::CMutex                          amutexPass[ 4 ][ PUPIL_RINGS + 1 ];
+
     SPupilTable( void )
     {
         for ( int nRing = 0; nRing < PUPIL_RINGS; nRing++ )
             abDone[ nRing ] = false;
+        for ( int nChannel = 0; nChannel < 4; nChannel++ )
+        {
+            for ( int nKnot = 0; nKnot <= PUPIL_RINGS; nKnot++ )
+                abPassDone[ nChannel ][ nKnot ] = false;
+        }
     }
 };
 
@@ -668,6 +709,54 @@ const CLens::SPupil &CLens::PupilFor( int nRing ) const
     return oTable.aoRings[ nRing ];
 }
 
+FLT CLens::PassFor( int nKnot, int nChannel ) const
+{
+    SPupilTable &oTable = *m_pPupil;
+
+    if ( ! oTable.abPassDone[ nChannel ][ nKnot ].load( std::memory_order_acquire ) )
+    {
+        IASLib::CMutexLock oLock( oTable.amutexPass[ nChannel ][ nKnot ] );
+
+        if ( ! oTable.abPassDone[ nChannel ][ nKnot ].load( std::memory_order_relaxed ) )
+        {
+            oTable.anPass[ nChannel ][ nKnot ] = FindPass( nKnot, nChannel );
+            oTable.abPassDone[ nChannel ][ nKnot ].store( true, std::memory_order_release );
+        }
+    }
+    return oTable.anPass[ nChannel ][ nKnot ];
+}
+
+FLT CLens::FindPass( int nKnot, int nChannel ) const
+{
+    FLT nRear = m_aoSurfaces.back().nAperture;
+    FLT nSensorX = ( (FLT)nKnot / PUPIL_RINGS ) * m_nPupilReach;
+    int nTried = 0;
+    int nPassed = 0;
+
+        // The same grid the exposure is measured on, so at the center this
+        // is exactly the share the exposure makes up for.
+    for ( int nRow = 0; nRow < EXPOSURE_GRID; nRow++ )
+    {
+        for ( int nColumn = 0; nColumn < EXPOSURE_GRID; nColumn++ )
+        {
+            FLT nX = ( ( ( nColumn + 0.5 ) / EXPOSURE_GRID ) * 2.0 - 1.0 ) * nRear;
+            FLT nY = ( ( ( nRow + 0.5 ) / EXPOSURE_GRID ) * 2.0 - 1.0 ) * nRear;
+
+            if ( ( nX * nX ) + ( nY * nY ) > nRear * nRear )
+                continue;
+
+            FLT anOrigin[ 3 ] = { nSensorX, 0.0, m_nSensorZ };
+            FLT anDirection[ 3 ] = { nX - nSensorX, nY, m_anVertexZ.back() - m_nSensorZ };
+
+            Normalize( anDirection );
+            nTried++;
+            if ( Trace( anOrigin, anDirection, FALSE, m_nStopRadius, nChannel ) )
+                nPassed++;
+        }
+    }
+    return nTried ? (FLT)nPassed / (FLT)nTried : 0.0;
+}
+
 BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLensV, FLT anOrigin[ 3 ], FLT anDirection[ 3 ],
                     int nChannel, FLT *pnWeight ) const
 {
@@ -702,29 +791,60 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
     else
     {
             // Inside the exit pupil's ellipse for this ring, found for a
-            // point on the +x axis, turned to where this point is. Each ray
-            // counts for the ellipse's share of the rear element, so the
-            // image is as bright as aiming at all of it.
+            // point on the +x axis, turned to where this point is. A ray the
+            // lens blocks is cast again at another point, until one gets
+            // through; it counts for the share of rays aimed anywhere on the
+            // rear element that would have, so the image is exactly as bright
+            // (and vignetted) as before, without the noise of blocked rays.
         const SPupil &oPupil = PupilFor( nRing );
 
         if ( ! oPupil.bOpen )
             return FALSE;
 
-        FLT nDiscX, nDiscY;
+        FLT     nCos = ( nFromCenter > 0.0 ) ? anOrigin[ 0 ] / nFromCenter : 1.0;
+        FLT     nSin = ( nFromCenter > 0.0 ) ? anOrigin[ 1 ] / nFromCenter : 0.0;
+        FLT     nU = nLensU;
+        FLT     nV = nLensV;
+        FLT     anStart[ 3 ] = { anOrigin[ 0 ], anOrigin[ 1 ], anOrigin[ 2 ] };
 
-        ConcentricDisc( nLensU, nLensV, nDiscX, nDiscY );
+        for ( int nTry = 0; nTry < PUPIL_TRIES; nTry++ )
+        {
+            FLT nDiscX, nDiscY;
 
-        FLT nPupilX = oPupil.nCenterX + ( nDiscX * oPupil.nHalfX );
-        FLT nPupilY = oPupil.nCenterY + ( nDiscY * oPupil.nHalfY );
-        FLT nCos = ( nFromCenter > 0.0 ) ? anOrigin[ 0 ] / nFromCenter : 1.0;
-        FLT nSin = ( nFromCenter > 0.0 ) ? anOrigin[ 1 ] / nFromCenter : 0.0;
+            if ( nTry > 0 )
+                RetryPoint( nLensU, nLensV, nTry, nU, nV );
+            ConcentricDisc( nU, nV, nDiscX, nDiscY );
 
-        nX = ( nPupilX * nCos ) - ( nPupilY * nSin );
-        nY = ( nPupilX * nSin ) + ( nPupilY * nCos );
-        if ( pnWeight )
-            *pnWeight = ( oPupil.nHalfX * oPupil.nHalfY ) / ( nRear * nRear );
-        if ( ( nX * nX ) + ( nY * nY ) > nRear * nRear )
-            return FALSE;       // off the rear element
+            FLT nPupilX = oPupil.nCenterX + ( nDiscX * oPupil.nHalfX );
+            FLT nPupilY = oPupil.nCenterY + ( nDiscY * oPupil.nHalfY );
+
+            nX = ( nPupilX * nCos ) - ( nPupilY * nSin );
+            nY = ( nPupilX * nSin ) + ( nPupilY * nCos );
+            if ( ( nX * nX ) + ( nY * nY ) > nRear * nRear )
+                continue;       // off the rear element
+
+            anOrigin[ 0 ] = anStart[ 0 ];
+            anOrigin[ 1 ] = anStart[ 1 ];
+            anOrigin[ 2 ] = anStart[ 2 ];
+            anDirection[ 0 ] = nX - anOrigin[ 0 ];
+            anDirection[ 1 ] = nY - anOrigin[ 1 ];
+            anDirection[ 2 ] = m_anVertexZ.back() - anOrigin[ 2 ];
+            Normalize( anDirection );
+            if ( Trace( anOrigin, anDirection, FALSE, m_nStopRadius, nChannel ) )
+            {
+                if ( pnWeight )
+                {
+                        // The share that gets through, between this ring's
+                        // edges.
+                    FLT nAcross = ( ( nFromCenter / m_nPupilReach ) * PUPIL_RINGS ) - nRing;
+                    int nSlot = ( nChannel >= CHANNEL_RED && nChannel <= CHANNEL_BLUE ) ? nChannel : CHANNEL_ALL;
+
+                    *pnWeight = ( PassFor( nRing, nSlot ) * ( 1.0 - nAcross ) ) + ( PassFor( nRing + 1, nSlot ) * nAcross );
+                }
+                return TRUE;
+            }
+        }
+        return FALSE;       // nothing got through: black
     }
 
     anDirection[ 0 ] = nX - anOrigin[ 0 ];
