@@ -19,13 +19,15 @@ raythrower <FileToTrace> [options]
 | `-N<count>`, `--tasks <count>` | Number of tracing tasks (default: one per CPU) |
 | `-o`, `--output <file>` | Image file to write (default: the one named in the scene) |
 | `--ppm <file>` | Also write the image as a PPM file |
+| `--png <file>` | Also write the image as a PNG file |
+| `--hdr <file>` | Also write the linear, unclipped colors as a Radiance HDR (`.hdr`) file, for high dynamic range |
 | `--listen [port]` | Trace with engines that connect on this port (default 7997; 0 picks a free port) |
 | `--spawn` | With `--listen`, start the engines on this machine |
 | `--engine <path>` | The `rayengine` to start (default: next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for each engine to connect (default 60) |
-| `--batch <rays>` | Rays per batch (default 127) |
+| `--tile <pixels>` | Size of the square tiles tasks ask for (default 32). With `--listen`, `-N` engines must connect before tracing starts; more can join at any time |
 | `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`, with any settings after a colon (`random:samples=9,seed=2`, `stratified:grid=8`) |
-| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`, with settings as for `--aa` (`reinhard:exposure=1.5`) |
+| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, `reinhard`, or `hdr`, with settings as for `--aa` (`reinhard:exposure=1.5`, `hdr:exposure=2`) |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene, with any `--aa`, `--color` or `--size` applied, as a scene archive (with its texture images inside), and exit without tracing |
 | `--save-json <file>` | Save it as plain JSON for editing by hand, writing the files it uses beside it, and exit |
@@ -57,7 +59,10 @@ length in red, green and blue. Such a lens traces three rays per sample.
 
 `--color` picks how pixel colors become bytes. `clip`, the default, is the 1997 look. `gamma` and
 `srgb` encode for today's displays, which makes the 1997 scenes, lit for a screen without gamma
-encoding, look washed out. `reinhard` tone maps, bringing back highlights that `clip` turns white.
+encoding, look washed out. `reinhard` tone maps, bringing back highlights that `clip` turns white. `hdr`
+scales colors by its `exposure` and keeps them unclipped for `--hdr`, which writes a Radiance HDR
+file of the linear colors (8-bit files get them clipped and sRGB-encoded). `--png` and `--hdr` can
+be given together, and with `--ppm`; the raw image is always written too.
 Settings such as a Reinhard exposure are given in the scene file (see
 [`scenes/README.md`](../scenes/README.md)). `--help` lists every sampler and color model.
 
@@ -65,7 +70,10 @@ Settings such as a Reinhard exposure are given in the scene file (see
 
 ```sh
 # Threads on this machine
-raythrower scenes/scan_test.ray -o scan.raw --ppm scan.ppm
+raythrower scenes/scan_test.ray -o scan.raw --png scan.png
+
+# High dynamic range: the unclipped colors as a Radiance HDR file
+raythrower scenes/scan_test.ray --color hdr:exposure=1.5 --png scan.png --hdr scan.hdr
 
 # The same, anti-aliased and tone mapped
 raythrower scenes/scan_test.ray --aa corners --color reinhard -o scan.raw --ppm scan.ppm

@@ -21,6 +21,8 @@ when the binary format was dropped; they are in the repository's history.
 | `lens_test.ray` | | `scan_test` through a real lens: the built-in double Gauss wide open (f/2), focused on the glass sphere, with 1 scene unit = 10 cm and a 5×5 stratified sampler |
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
+| `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (a mirror-tinted copper glaze) among a mirror sphere, a glass sphere, a textured sphere, a solid-checker column, an open gold tube, a cone, a textured truncated cone, a green glass cube, a textured box and a textured triangle, on a reflective checkered floor before a mirror wall in a black frame, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
@@ -54,7 +56,7 @@ places.
 | `settings` | | Render settings, below |
 | `background` | `[1, 1, 1]` | The color of rays that hit nothing |
 | `camera` | required | Below |
-| `objects` | `[]` | Spheres, planes, and triangles, below |
+| `objects` | `[]` | Spheres, planes, cylinders, cones, boxes, triangles, and meshes, below |
 | `lights` | `[]` | Lights, below |
 
 **`settings`**
@@ -79,14 +81,16 @@ places.
 | `horizontalAngle`, `aspectRatio` | `40`, `1.333…` | Kept from 1997; not used for rendering |
 | `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half), or `"stratified"` (an n×n grid of equally weighted rays, each at a random point in its cell) |
 | `lens` | none | A real lens, below; without one the camera is a pinhole |
-| `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, or `"reinhard"` |
+| `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, `"reinhard"`, or `"hdr"` |
 
 A sampler or color model is a name, or an object with a `type` and its settings:
 `{ "type": "random", "samples": 9, "seed": 0 }` (N from 1 to 1024, default 4; the same seed always
 gives the same image), `{ "type": "stratified", "grid": 5 }` (n from 1 to 32, default 4), `{ "type": "gamma", "gamma": 2.2 }`, or
 `{ "type": "reinhard", "exposure": 1, "white": 4 }`
 (`exposure` scales the colors first; with a `white` luminance, that and anything brighter maps to
-white).
+white), or `{ "type": "hdr", "exposure": 1 }` (high dynamic range: the colors scaled by
+`exposure` go unclipped into `raythrower --hdr` files; 8-bit files get them clipped and
+sRGB-encoded).
 
 **`lens`.** With a lens the camera is a real camera: rays start on the sensor and are traced back
 through each glass surface out into the scene, and rays that hit the barrel or the aperture stop go
@@ -94,7 +98,11 @@ dark. Depth of field, vignetting, and the lens's aberrations and distortion all 
 field of view comes from the focal length and `sensorWidth` (`verticalAngle` is not used), the
 sensor is placed to focus at `focusDistance`, and exposure is set so the center of the image is as
 bright as through a pinhole. Use a sampler with many evenly weighted rays (`stratified`), since
-each ray takes a different path through the lens. With `raythrower`, the lens is described before
+each ray takes a different path through the lens. Rays are aimed only at the exit pupil: for each
+ring of the sensor out from the center, the lens works out (the first time a ray needs it) an
+ellipse on its rear element around everywhere light gets through, and each ray counts for that
+ellipse's share of the element, so brightness is the same as aiming at all of it but far fewer rays
+are blocked. With `raythrower`, the lens is described before
 tracing.
 
 | Field | Default | |
@@ -130,8 +138,17 @@ color, not used in shading), and `materials` (default: one diffuse material).
 |--------|--------|
 | `sphere` | `center` (required), `radius` (required) |
 | `plane` | `position` (required): a point on the plane; `normal` (required) |
+| `cylinder` | `base` and `top` (required): the centers of its ends; `radius` (required, more than 0); `capped` (default `true`) |
+| `cone` | `base` and `top` (required): the centers of its ends; `baseRadius` (required); `topRadius` (default `0`, a point; more makes a truncated cone); `capped` (default `true`) |
+| `box` | `center` (required); `size` (required): one number for a cube, or `[x, y, z]`, each more than 0; `rotation` (default `[0, 0, 0]`): degrees about x, then y, then z |
 | `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each corner; `uvs`: a `[u, v]` for each corner |
 | `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex; `uvs`: one for each vertex, or `uvMap` (below) |
+
+A cylinder or cone points from `base` to `top`, any way. Capped, its ends are closed with flat discs
+and it is a solid; with `"capped": false` it is an open shell, seen into from its ends, and it
+shadows and reflects itself inside. A cone's radii can't be negative or both 0, and `base` and
+`top` can't be the same point. A box is centered on `center`, `size` long along its own axes, which
+`rotation` turns from the scene's x, y and z.
 
 A triangle's normal is worked out from its corners by the edge traversal (V2 − V1) × (V3 − V2), so
 the order of the corners decides which side is the front. It is the rule OBJ and most other model
@@ -167,7 +184,11 @@ make the shape smooth (`"smooth": false` with them is an error).
 | `image` | `file` (required: a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
 
 Surface coordinates: on a sphere, u is longitude (once around, left to right as seen from −z) and v
-latitude (0 at the bottom, 1 at the top). On a plane, u and v are distances in scene units along
+latitude (0 at the bottom, 1 at the top). On the side of a cylinder or cone, u is the angle about
+its axis (running as on a sphere when it stands on +y) and v goes from 0 at the base to 1 at the
+top; each cap holds the unit square, as seen from outside it. Each face of a box holds the unit
+square, upright as seen from outside: the sides with v up, the top seen from above with +z up and
+the bottom seen from below with −z up (all before `rotation`). On a plane, u and v are distances in scene units along
 two axes across it (on a floor, +x and +z; on a wall facing −z, +x and up). Triangles take `uvs`
 (a `[u, v]` for each corner) and meshes `uvs` (one for each vertex); without them only solid
 textures apply, unless a mesh has a `uvMap`, which works out each face's coordinates by projecting
@@ -199,7 +220,8 @@ blended bilinearly. When a scene is copied to a task its images travel inside it
   wrote an object count. For a few weeks files had the version-2 header but still used the old
   numbers; `CScene::Load` tries both.
 - **Version 3** (2026) is JSON, with the same file extension. It adds the background color, the
-  camera's sampler and color model, triangle sidedness and smoothing, and meshes; triangles no
+  camera's sampler and color model, triangle sidedness and smoothing, meshes, and cylinders, cones
+  and boxes; triangles no
   longer store normals. The binary versions are no longer read.
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time

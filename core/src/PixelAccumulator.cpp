@@ -15,14 +15,18 @@
 #define SAMPLE_MAXIMUM     65536.0
 
 CPixelAccumulator::CPixelAccumulator( void ) :
+    m_nLeft( 0 ),
+    m_nTop( 0 ),
     m_nWidth( 0 ),
     m_nHeight( 0 ),
     m_nTotalWeight( 1 )
 {
 }
 
-void CPixelAccumulator::Begin( int nWidth, int nHeight, uint32_t nTotalWeight )
+void CPixelAccumulator::Begin( int nLeft, int nTop, int nWidth, int nHeight, uint32_t nTotalWeight )
 {
+    m_nLeft = nLeft;
+    m_nTop = nTop;
     m_nWidth = ( nWidth > 0 ) ? nWidth : 0;
     m_nHeight = ( nHeight > 0 ) ? nHeight : 0;
     m_nTotalWeight = ( nTotalWeight > 0 ) ? nTotalWeight : 1;
@@ -31,7 +35,10 @@ void CPixelAccumulator::Begin( int nWidth, int nHeight, uint32_t nTotalWeight )
 
 void CPixelAccumulator::Add( CPixelWriter &oWriter, int nX, int nY, const CColor &oColor, uint32_t nWeight )
 {
-    if ( ( nX < 0 ) || ( nY < 0 ) || ( nX >= m_nWidth ) || ( nY >= m_nHeight ) )
+    int nColumn = nX - m_nLeft;
+    int nRow = nY - m_nTop;
+
+    if ( ( nColumn < 0 ) || ( nRow < 0 ) || ( nColumn >= m_nWidth ) || ( nRow >= m_nHeight ) )
         return;
 
     CColor      oSample( oColor );
@@ -49,7 +56,7 @@ void CPixelAccumulator::Add( CPixelWriter &oWriter, int nX, int nY, const CColor
         anColor[ nCount ] = (uint64_t)( ( nValue * SAMPLE_SCALE ) + 0.5 );
     }
 
-    SPixelSum &oSum = m_aoSums[ ( (size_t)nY * (size_t)m_nWidth ) + (size_t)nX ];
+    SPixelSum &oSum = m_aoSums[ ( (size_t)nRow * (size_t)m_nWidth ) + (size_t)nColumn ];
 
     oSum.nRed += anColor[ 0 ] * nWeight;
     oSum.nGreen += anColor[ 1 ] * nWeight;

@@ -13,6 +13,8 @@
 #define PIXEL_SAMPLES      5
 
 CCornerSampler::CCornerSampler( void ) :
+    m_nLeft( 0 ),
+    m_nTop( 0 ),
     m_nWidth( 0 ),
     m_nHeight( 0 ),
     m_nGridX( 0 ),
@@ -20,12 +22,14 @@ CCornerSampler::CCornerSampler( void ) :
 {
 }
 
-long long CCornerSampler::Begin( int nWidth, int nHeight )
+long long CCornerSampler::Begin( int nLeft, int nTop, int nWidth, int nHeight )
 {
+    m_nLeft = nLeft;
+    m_nTop = nTop;
     m_nWidth = ( nWidth > 0 ) ? nWidth : 0;
     m_nHeight = ( nHeight > 0 ) ? nHeight : 0;
-    m_nGridX = 0;
-    m_nGridY = 0;
+    m_nGridX = 2 * nLeft;
+    m_nGridY = 2 * nTop;
 
     if ( ( m_nWidth == 0 ) || ( m_nHeight == 0 ) )
     {
@@ -33,7 +37,7 @@ long long CCornerSampler::Begin( int nWidth, int nHeight )
         return 0;
     }
 
-    m_oSums.Begin( m_nWidth, m_nHeight, PIXEL_SAMPLES );
+    m_oSums.Begin( m_nLeft, m_nTop, m_nWidth, m_nHeight, PIXEL_SAMPLES );
 
         // Every corner, plus every center.
     return ( (long long)( m_nWidth + 1 ) * (long long)( m_nHeight + 1 ) ) +
@@ -42,18 +46,18 @@ long long CCornerSampler::Begin( int nWidth, int nHeight )
 
 BOOL CCornerSampler::NextRay( CScene &oScene, CRay &oRay )
 {
-    if ( ( m_nWidth == 0 ) || ( m_nGridY > 2 * m_nHeight ) )
+    if ( ( m_nWidth == 0 ) || ( m_nGridY > 2 * ( m_nTop + m_nHeight ) ) )
         return FALSE;
 
     oRay.CreateRayAt( oScene, m_nGridX / 2.0, m_nGridY / 2.0, m_nGridX, m_nGridY );
 
-        // Corner rows (even) run 0, 2, ... 2 * width; center rows (odd)
-        // run 1, 3, ... 2 * width - 1.
+        // Across the tile, corner rows (even) run 2 * left, ... 2 * right;
+        // center rows (odd) run 2 * left + 1, ... 2 * right - 1.
     m_nGridX += 2;
-    if ( m_nGridX > 2 * m_nWidth )
+    if ( m_nGridX > 2 * ( m_nLeft + m_nWidth ) )
     {
         m_nGridY++;
-        m_nGridX = ( m_nGridY & 1 ) ? 1 : 0;
+        m_nGridX = ( 2 * m_nLeft ) + ( ( m_nGridY & 1 ) ? 1 : 0 );
     }
     return TRUE;
 }

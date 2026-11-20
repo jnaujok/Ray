@@ -14,6 +14,8 @@
 class CCenterSampler : public CPixelSampler
 {
     protected:
+        int                     m_nLeft;            // The tile being sampled.
+        int                     m_nTop;
         int                     m_nWidth;
         int                     m_nHeight;
         int                     m_nX;
@@ -25,7 +27,7 @@ class CCenterSampler : public CPixelSampler
         virtual CPixelSampler  *Clone( void ) const { return new CCenterSampler; }
         virtual const char     *GetName( void ) const { return "none"; }
 
-        virtual long long       Begin( int nWidth, int nHeight );
+        virtual long long       Begin( int nLeft, int nTop, int nWidth, int nHeight );
         virtual BOOL            NextRay( CScene &oScene, CRay &oRay );
         virtual void            PutSample( CPixelWriter &oWriter, int nTagX, int nTagY, const CColor &oColor );
 };

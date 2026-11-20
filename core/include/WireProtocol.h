@@ -9,22 +9,27 @@
 *                                                                        *
 *   A connection opens with MESSAGE_HELLO from the engine: 8 raw bytes,  *
 *   RAY_WIRE_MAGIC and RAY_WIRE_VERSION, so an engine of another version *
-*   is turned away. Then:                                                *
+*   is turned away. The engine pulls its work:                           *
 *                                                                        *
-*       MESSAGE_SCENE   the scene as an SJSON packet (IASLib's compact   *
-*                       binary JSON) of the scene file's JSON, unrounded *
-*       MESSAGE_RAYS    72 bytes a ray: x, y, z, i, j, k, t, influence   *
-*                       as IEEE-754 doubles, then the two 32-bit pixel   *
-*                       tags, all big-endian; no rays tells the engine   *
-*                       to stop                                          *
-*       MESSAGE_COLOR   32 bytes a color: the two 32-bit pixel tags,     *
-*                       then r, g, b as doubles                          *
+*       MESSAGE_SCENE   master: the scene as an SJSON packet (IASLib's   *
+*                       compact binary JSON) of the scene file's JSON,   *
+*                       unrounded. The engine answers with a request.    *
+*       MESSAGE_REQUEST engine: ready for a tile (no payload)            *
+*       MESSAGE_TILE    master: a tile to trace: the trace number, then  *
+*                       left, top, width and height, 32-bit each         *
+*       MESSAGE_PIXELS  engine: the traced tile: the same five numbers,  *
+*                       the primary rays traced (64-bit), then red,      *
+*                       green, blue for each pixel, row by row, as       *
+*                       IEEE-754 doubles. A request follows.             *
+*       MESSAGE_STOP    master: the engine stops (no payload)            *
 *                                                                        *
-*   Batches are fixed binary because they are sent constantly: SJSON     *
-*   costs tens of microseconds a ray to encode, more than tracing it.    *
-*   Numbers are carried exactly either way, so networked engines give    *
-*   the same image as threads. ToReadable turns a batch into JSON for    *
-*   reading. The master sends SJSON as sender 1, an engine as sender 2.  *
+*   All numbers are big-endian. Pixels are doubles, carried exactly, so  *
+*   networked engines give the same image as threads. When the master    *
+*   has no tile for a request it leaves it unanswered until it has one   *
+*   (a lost engine's tile) or a new scene comes. The trace number tells  *
+*   a new trace's pixels from a stopped one's. ToReadable turns a tile   *
+*   or pixels message into JSON for reading. The master sends SJSON as   *
+*   sender 1, an engine as sender 2.                                     *
 *                                                                        *
 *************************************************************************/
 #ifndef __WIREPROTOCOL_H__
@@ -40,7 +45,7 @@
 #include <string>
 
 #define RAY_WIRE_MAGIC          ((uint32_t)0x52415931)     // "RAY1"
-#define RAY_WIRE_VERSION        ((uint32_t)3)     // 2: JSON scene; 3: SJSON scene, plain binary batches
+#define RAY_WIRE_VERSION        ((uint32_t)4)     // 2: JSON scene; 3: SJSON scene, binary batches; 4: tiles
 #define RAY_WIRE_DEFAULT_PORT   7997
 #define RAY_WIRE_MAX_PAYLOAD    ((uint32_t)( 256u * 1024u * 1024u ))
 
@@ -48,9 +53,11 @@
 #define RAY_WIRE_MASTER_ID      1u
 #define RAY_WIRE_ENGINE_ID      2u
 
+#include "TileTracer.h"
+
+#include <vector>
+
 class CScene;
-class CRayArray;
-class CColorArray;
 
 namespace IASLib
 {
@@ -67,10 +74,16 @@ namespace RayWire
     bool        ReceiveFrame( IASLib::CStream &oStream, uint8_t &nTag, std::string &strPayload );
 
     std::string EncodeHello( void );
-        /// A batch of rays or colors as indented JSON, for reading; empty if
-        /// the payload isn't a valid batch.
-    std::string ToReadable( uint8_t nTag, const std::string &strPayload );
     bool        DecodeHello( const std::string &strPayload );
+    std::string EncodeTile( uint32_t nTrace, const STile &oTile );
+    bool        DecodeTile( const std::string &strPayload, uint32_t &nTrace, STile &oTile );
+    std::string EncodePixels( uint32_t nTrace, const STile &oTile, uint64_t nRays, const std::vector<double> &anColors );
+        /// False if the payload isn't a whole tile of pixels.
+    bool        DecodePixels( const std::string &strPayload, uint32_t &nTrace, STile &oTile, uint64_t &nRays,
+                              std::vector<double> &anColors );
+        /// A tile or pixels message as indented JSON, for reading; empty if
+        /// the payload isn't a valid one.
+    std::string ToReadable( uint8_t nTag, const std::string &strPayload );
 
         /// One direction of a connection, sending. The scene is an SJSON
         /// stream packet, which depends on the packets before it on the same
@@ -81,8 +94,6 @@ namespace RayWire
             explicit            CEncoder( unsigned nSenderId );
 
             std::string         Scene( CScene &oScene );
-            std::string         Rays( CRayArray &oRays );
-            std::string         Colors( CColorArray &oColors );
                 /// Any JSON document. Returns false if it can't be encoded.
             bool                Encode( const IASLib::CJsonNode &oDocument, std::string &strPacket );
 
@@ -101,8 +112,6 @@ namespace RayWire
                                 CDecoder( unsigned nOwnId, unsigned nPeerId );
 
             bool                Scene( const std::string &strPacket, CScene &oScene );
-            bool                Rays( const std::string &strPacket, CRayArray &oRays );
-            bool                Colors( const std::string &strPacket, CColorArray &oColors );
                 /// Any SJSON packet as a JSON tree, which the caller owns; NULL
                 /// on error. Readable with toPrettyString().
             IASLib::CJsonNode  *Decode( const std::string &strPacket );

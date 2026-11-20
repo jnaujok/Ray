@@ -9,6 +9,8 @@
 #include "GammaColorModel.h"
 #include "SrgbColorModel.h"
 #include "ReinhardColorModel.h"
+#include "HdrColorModel.h"
+#include "Color.h"
 
 #include "SceneJson.h"
 
@@ -20,6 +22,7 @@ namespace
     CColorModel *CreateGamma( void )    { return new CGammaColorModel; }
     CColorModel *CreateSrgb( void )     { return new CSrgbColorModel; }
     CColorModel *CreateReinhard( void ) { return new CReinhardColorModel; }
+    CColorModel *CreateHdr( void )      { return new CHdrColorModel; }
 
         // Every color model that can be chosen by name. The first is the default.
     const CColorModel::SType s_aoTypes[] =
@@ -29,6 +32,8 @@ namespace
         { "srgb",     "clip, then encode with the sRGB curve",                       CreateSrgb },
         { "reinhard", "tone map highlights instead of clipping them, then sRGB "
                       "(settings: exposure, default 1; white, default none)",        CreateReinhard },
+        { "hdr",      "high dynamic range: scale by exposure (default 1) and keep "
+                      "every brightness for --hdr files; 8-bit files clip, then sRGB", CreateHdr },
     };
 }
 
@@ -66,6 +71,11 @@ FLT CColorModel::Clamp( FLT nValue )
 BYTE CColorModel::ToByte( FLT nValue )
 {
     return (BYTE)( ( Clamp( nValue ) * 255.0 ) + 0.5 );
+}
+
+CColor CColorModel::ToLinear( const CColor &oColor ) const
+{
+    return oColor;
 }
 
 BOOL CColorModel::FromJson( const IASLib::CJsonNode &oNode )

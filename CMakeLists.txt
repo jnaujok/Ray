@@ -50,18 +50,23 @@ FetchContent_MakeAvailable(IASLib)
 # ---------------------------------------------------------------------------
 set(RAY_CORE_SOURCES
     core/src/AmbientMaterial.cpp
+    core/src/Box.cpp
     core/src/BoxSampler.cpp
     core/src/Camera.cpp
     core/src/CheckerTexture.cpp
     core/src/CenterSampler.cpp
     core/src/ClipColorModel.cpp
     core/src/Color.cpp
-    core/src/ColorArray.cpp
+    core/src/Cone.cpp
     core/src/ColorModel.cpp
     core/src/CornerSampler.cpp
+    core/src/Cylinder.cpp
     core/src/DiffuseMaterial.cpp
     core/src/GammaColorModel.cpp
+    core/src/HdrColorModel.cpp
+    core/src/ImageExport.cpp
     core/src/ImageFile.cpp
+    core/src/ImageWriter.cpp
     core/src/ImageTexture.cpp
     core/src/Lens.cpp
     core/src/Light.cpp
@@ -74,10 +79,8 @@ set(RAY_CORE_SOURCES
     core/src/ObjectsArray.cpp
     core/src/PixelAccumulator.cpp
     core/src/PixelSampler.cpp
-    core/src/PixelWriter.cpp
     core/src/Plane.cpp
     core/src/PtLight.cpp
-    core/src/RayArray.cpp
     core/src/Rays.cpp
     core/src/RandomSampler.cpp
     core/src/RaySettings.cpp
@@ -95,6 +98,7 @@ set(RAY_CORE_SOURCES
     core/src/TaskMaster.cpp
     core/src/TaskSlave.cpp
     core/src/ThreadTaskMaster.cpp
+    core/src/TileTracer.cpp
     core/src/Transform.cpp
     core/src/TransparentMaterial.cpp
     core/src/Triangle.cpp

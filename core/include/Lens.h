@@ -58,6 +58,7 @@
 #include "Globals.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -113,6 +114,32 @@ class CLens
         FLT                     m_nExposure;
         BOOL                    m_bPrepared;
 
+            // The exit pupil: for sensor points in each ring out from the
+            // center, an ellipse on the rear element (in mm, for a point on
+            // the +x axis) around everywhere rays get through. Rays are aimed
+            // only inside it.
+        struct SPupil
+        {
+            FLT                 nCenterX;
+            FLT                 nCenterY;
+            FLT                 nHalfX;             // the ellipse's half widths
+            FLT                 nHalfY;
+            BOOL                bOpen;              // FALSE: no light gets through at all
+        };
+            // The rings, worked out as rays first need them, and shared by
+            // every lens in the program with the same prescription, focus
+            // and aperture (the threads' copies of a scene, for one).
+        struct SPupilTable;
+        std::shared_ptr<SPupilTable> m_pPupil;
+        FLT                     m_nPupilReach;      // the sensor radius the rings cover, in mm
+
+            /// The exit pupil for a ring, worked out if it hasn't been yet.
+        const SPupil           &PupilFor( int nRing ) const;
+            /// Works out one ring's exit pupil.
+        void                    FindPupil( int nRing, SPupil &oPupil ) const;
+            /// The table for a lens set up like oLens, made if there is none.
+        static std::shared_ptr<SPupilTable> SharedPupilTable( const CLens &oLens );
+
             // Traces a ray through the surfaces, forward (toward the
             // sensor) or backward. The ray is changed in place; FALSE if it
             // is blocked or totally internally reflected.
@@ -146,10 +173,15 @@ class CLens
             /// top; nAspect is width over height), in the lens frame and in
             /// millimeters, leaving the front of the lens toward the scene.
             /// nLensU and nLensV, from 0 to 1, pick the point on the rear
-            /// element (an even spread of them covers it evenly). FALSE if
-            /// the lens blocks the ray.
+            /// element: an even spread of them covers, evenly, the part of it
+            /// light gets through to that point of the sensor (the exit
+            /// pupil). pnWeight, if given, gets the factor the ray's color
+            /// counts for: the share of the rear element that part is, so the
+            /// image is as bright as sampling all of it. FALSE if the lens
+            /// blocks the ray.
         BOOL                    RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLensV,
-                                        FLT anOrigin[ 3 ], FLT anDirection[ 3 ], int nChannel = CHANNEL_ALL ) const;
+                                        FLT anOrigin[ 3 ], FLT anDirection[ 3 ], int nChannel = CHANNEL_ALL,
+                                        FLT *pnWeight = NULL ) const;
             /// Whether the channels are traced apart: some glass has an Abbe
             /// number, and chromatic aberration isn't turned off.
         BOOL                    IsChromatic( void ) const;

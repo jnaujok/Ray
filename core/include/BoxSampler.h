@@ -20,6 +20,8 @@
 class CBoxSampler : public CPixelSampler
 {
     protected:
+        int                     m_nLeft;            // The tile being sampled.
+        int                     m_nTop;
         int                     m_nWidth;
         int                     m_nHeight;
         int                     m_nPixel;           // The next pixel, in reading order.
@@ -32,7 +34,7 @@ class CBoxSampler : public CPixelSampler
         virtual CPixelSampler  *Clone( void ) const { return new CBoxSampler; }
         virtual const char     *GetName( void ) const { return "box"; }
 
-        virtual long long       Begin( int nWidth, int nHeight );
+        virtual long long       Begin( int nLeft, int nTop, int nWidth, int nHeight );
         virtual BOOL            NextRay( CScene &oScene, CRay &oRay );
         virtual void            PutSample( CPixelWriter &oWriter, int nTagX, int nTagY, const CColor &oColor );
         virtual void            End( void );

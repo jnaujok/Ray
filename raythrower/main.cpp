@@ -10,6 +10,7 @@
 #include "Globals.h"
 #include "Scene.h"
 #include "ImageFile.h"
+#include "ImageExport.h"
 #include "Color.h"
 #include "ThreadTaskMaster.h"
 #include "SocketTaskMaster.h"
@@ -44,6 +45,8 @@ namespace
         std::string strScene;
         std::string strOutput;
         std::string strPpm;
+        std::string strPng;
+        std::string strHdr;
         std::string strEngine;
         std::string strSampler;         // Empty: what the scene says.
         std::string strColorModel;      // Empty: what the scene says.
@@ -52,7 +55,7 @@ namespace
         int         nTasks = 0;
         int         nPort = RAY_WIRE_DEFAULT_PORT;
         int         nTimeout = 60;
-        int         nBatch = 0;
+        int         nTile = 0;          // 0: the default tile size
         int         nWidth = 0;         // 0: the scene's size
         int         nHeight = 0;
         bool        bListen = false;
@@ -67,13 +70,16 @@ namespace
         printf( "  -N<count>, --tasks <count>  Number of tracing tasks (default: one per CPU)\n" );
         printf( "  -o, --output <file>         Image file to write (default: the one named in the scene)\n" );
         printf( "  --ppm <file>                Also write the image as a PPM file\n" );
+        printf( "  --png <file>                Also write the image as a PNG file\n" );
+        printf( "  --hdr <file>                Also write the linear, unclipped colors as a Radiance\n" );
+        printf( "                              HDR (.hdr) file (with --color hdr, scaled by its exposure)\n" );
         printf( "  --listen [port]             Trace with rayengine processes that connect on\n" );
         printf( "                              this port (default %d; 0 for any free port)\n", RAY_WIRE_DEFAULT_PORT );
         printf( "                              instead of threads\n" );
         printf( "  --spawn                     With --listen, start the rayengines on this machine\n" );
         printf( "  --engine <path>             The rayengine to start (default: next to raythrower)\n" );
         printf( "  --timeout <seconds>         How long to wait for engines to connect (default 60)\n" );
-        printf( "  --batch <rays>              Rays per batch sent to a task (default 127)\n" );
+        printf( "  --tile <pixels>             Size of the square tiles the tasks ask for (default %d)\n", RAY_DEFAULT_TILE_SIZE );
         printf( "  --size <width>x<height>     Image size, instead of the scene's\n" );
         printf( "  --aa <sampler>              How each pixel is sampled (anti-aliasing), instead\n" );
         printf( "                              of what the scene says. Settings follow a colon:\n" );
@@ -238,10 +244,10 @@ namespace
                 oOptions.nHeight = nHeight;
                 nCount++;
             }
-            else if ( strArg == "--tasks" || strArg == "--timeout" || strArg == "--batch" )
+            else if ( strArg == "--tasks" || strArg == "--timeout" || strArg == "--tile" )
             {
                 int &nTarget = ( strArg == "--tasks" ) ? oOptions.nTasks :
-                               ( strArg == "--timeout" ) ? oOptions.nTimeout : oOptions.nBatch;
+                               ( strArg == "--timeout" ) ? oOptions.nTimeout : oOptions.nTile;
                 if ( ! ParseInt( strNext, nTarget ) )
                 {
                     fprintf( stderr, "%s needs a number\n", strArg.c_str() );
@@ -249,7 +255,8 @@ namespace
                 }
                 nCount++;
             }
-            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--engine" || strArg == "--save" ||
+            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--png" ||
+                      strArg == "--hdr" || strArg == "--engine" || strArg == "--save" ||
                       strArg == "--save-json" )
             {
                 if ( strNext == NULL )
@@ -258,6 +265,8 @@ namespace
                     return false;
                 }
                 std::string &strTarget = ( strArg == "--ppm" ) ? oOptions.strPpm :
+                                         ( strArg == "--png" ) ? oOptions.strPng :
+                                         ( strArg == "--hdr" ) ? oOptions.strHdr :
                                          ( strArg == "--save" ) ? oOptions.strSave :
                                          ( strArg == "--save-json" ) ? oOptions.strSaveJson :
                                          ( strArg == "--engine" ) ? oOptions.strEngine : oOptions.strOutput;
@@ -538,11 +547,12 @@ int main( int argc, char **argv )
         pMaster->SpawnTasks( oOptions.nTasks );
     }
 
-    if ( oOptions.nBatch > 0 )
-        pMaster->SetRaysPerPacket( oOptions.nBatch );
+    if ( oOptions.nTile > 0 )
+        pMaster->SetTileSize( oOptions.nTile );
 
         // Trace.
     BOOL bTraced;
+    bool bHdrFailed = false;
     auto tStart = std::chrono::steady_clock::now();
     {
         CImageFile oImage( strImage.c_str(), oSettings.GetImageWidth(), oSettings.GetImageHeight(), FALSE );
@@ -563,14 +573,22 @@ int main( int argc, char **argv )
                     oScene.GetCamera().GetSampler().GetName(), oScene.GetCamera().GetColorModel().GetName(),
                     strImage.c_str() );
 
+        if ( ! oOptions.strHdr.empty() )
+            oImage.KeepLinear();
+
         bTraced = pMaster->TraceScene( oScene, oImage );
+
+        if ( bTraced && ! oOptions.strHdr.empty() &&
+             ! CImageExport::WriteHdr( oOptions.strHdr, (int)oImage.GetWidth(), (int)oImage.GetHeight(), oImage.GetLinear() ) )
+        {
+            fprintf( stderr, "Couldn't write %s\n", oOptions.strHdr.c_str() );
+            bHdrFailed = true;
+        }
     }
     auto tEnd = std::chrono::steady_clock::now();
 
     long long nRays = pMaster->GetRaysTraced();
-    IASLib::CString strError;
-    if ( oOptions.bListen )
-        strError = static_cast<CSocketTaskMaster *>( pMaster.get() )->GetLastError();
+    std::string strError = pMaster->GetLastError();
 
     pMaster->EndTasks();
     pMaster.reset();
@@ -578,7 +596,7 @@ int main( int argc, char **argv )
 
     if ( ! bTraced )
     {
-        fprintf( stderr, "The trace did not finish%s%s\n", strError.GetLength() ? ": " : "", (const char *)strError );
+        fprintf( stderr, "The trace did not finish%s%s\n", strError.empty() ? "" : ": ", strError.c_str() );
         return 1;
     }
 
@@ -587,6 +605,21 @@ int main( int argc, char **argv )
         fprintf( stderr, "Couldn't write %s\n", oOptions.strPpm.c_str() );
         return 1;
     }
+
+    if ( ! oOptions.strPng.empty() )
+    {
+        int                 nWidth, nHeight;
+        std::vector<BYTE>   anPixels;
+
+        if ( ! CImageExport::ReadRaw( strImage, nWidth, nHeight, anPixels ) ||
+             ! CImageExport::WritePng( oOptions.strPng, nWidth, nHeight, anPixels ) )
+        {
+            fprintf( stderr, "Couldn't write %s\n", oOptions.strPng.c_str() );
+            return 1;
+        }
+    }
+    if ( bHdrFailed )
+        return 1;
 
     if ( ! oOptions.bQuiet )
     {

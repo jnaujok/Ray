@@ -6,6 +6,10 @@
 
 #include "Lens.h"
 #include "SceneJson.h"
+#include "Threading/Mutex.h"
+
+#include <atomic>
+#include <map>
 
 #include <math.h>
 #include <stdio.h>
@@ -19,6 +23,15 @@
 
     // Rays across the rear element, each way, to measure the exposure.
 #define EXPOSURE_GRID       128
+
+    // The exit pupil is found for this many rings of the sensor, out to
+    // PUPIL_REACH times its half width, by tracing a grid of PUPIL_GRID by
+    // PUPIL_GRID points on the rear element from PUPIL_RADII points across
+    // each ring.
+#define PUPIL_RINGS         64
+#define PUPIL_REACH         2.0
+#define PUPIL_GRID          64
+#define PUPIL_RADII         3
 
     // The Fraunhofer lines, in micrometers: the channels' wavelengths.
 #define WAVELENGTH_C        0.65627     // red
@@ -53,6 +66,32 @@ namespace
           s_aoDoubleGauss50, (int)( sizeof( s_aoDoubleGauss50 ) / sizeof( s_aoDoubleGauss50[ 0 ] ) ) },
     };
 
+        // Shirley and Chiu's concentric map from the unit square to the unit
+        // disc, which keeps an even spread even.
+    void ConcentricDisc( FLT nU, FLT nV, FLT &nX, FLT &nY )
+    {
+        FLT nA = ( 2.0 * nU ) - 1.0;
+        FLT nB = ( 2.0 * nV ) - 1.0;
+        FLT nRadius = 0.0;
+        FLT nAngle = 0.0;
+
+        if ( nA != 0.0 || nB != 0.0 )
+        {
+            if ( ( nA * nA ) > ( nB * nB ) )
+            {
+                nRadius = nA;
+                nAngle = ( PI / 4.0 ) * ( nB / nA );
+            }
+            else
+            {
+                nRadius = nB;
+                nAngle = ( PI / 2.0 ) - ( ( PI / 4.0 ) * ( nA / nB ) );
+            }
+        }
+        nX = nRadius * COS( nAngle );
+        nY = nRadius * SIN( nAngle );
+    }
+
     void Normalize( FLT anVector[ 3 ] )
     {
         FLT nLength = SQRT( ( anVector[ 0 ] * anVector[ 0 ] ) + ( anVector[ 1 ] * anVector[ 1 ] ) + ( anVector[ 2 ] * anVector[ 2 ] ) );
@@ -85,7 +124,8 @@ CLens::CLens( void ) :
     m_nSensorZ( 0.0 ),
     m_nFocusedAt( 0.0 ),
     m_nExposure( 1.0 ),
-    m_bPrepared( FALSE )
+    m_bPrepared( FALSE ),
+    m_nPupilReach( 0.0 )
 {
 }
 
@@ -444,49 +484,251 @@ BOOL CLens::Prepare( FLT nDefaultFocus, std::string &strError )
         m_nExposure = (FLT)nTried / (FLT)nPassed;
     }
 
+        // The exit pupil's table, shared with any lens set up the same way.
+    m_nPupilReach = ( m_nSensorWidth / 2.0 ) * PUPIL_REACH;
+    m_pPupil = SharedPupilTable( *this );
     m_bPrepared = TRUE;
     return TRUE;
 }
 
-BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLensV, FLT anOrigin[ 3 ], FLT anDirection[ 3 ],
-                    int nChannel ) const
+void CLens::FindPupil( int nRing, SPupil &oPupil ) const
 {
+    FLT                 nRear = m_aoSurfaces.back().nAperture;
+    FLT                 nCell = ( 2.0 * nRear ) / PUPIL_GRID;
+    int                 anChannels[ 3 ] = { CHANNEL_ALL, CHANNEL_ALL, CHANNEL_ALL };
+    int                 nChannels = 1;
+    std::vector<FLT>    anPassed;       // x, y of each grid point that got through
+
+        // A chromatic lens's pupil is where any of its colors gets through.
+    if ( IsChromatic() )
+    {
+        anChannels[ 0 ] = CHANNEL_RED;
+        anChannels[ 1 ] = CHANNEL_GREEN;
+        anChannels[ 2 ] = CHANNEL_BLUE;
+        nChannels = 3;
+    }
+
+    {
+        FLT     nMinX = 1e300, nMaxX = -1e300, nMinY = 1e300, nMaxY = -1e300;
+
+        anPassed.clear();
+        for ( int nRow = 0; nRow < PUPIL_GRID; nRow++ )
+        {
+            for ( int nColumn = 0; nColumn < PUPIL_GRID; nColumn++ )
+            {
+                FLT nX = ( ( nColumn + 0.5 ) * nCell ) - nRear;
+                FLT nY = ( ( nRow + 0.5 ) * nCell ) - nRear;
+                BOOL bPassed = FALSE;
+
+                if ( ( nX * nX ) + ( nY * nY ) > nRear * nRear )
+                    continue;
+
+                    // From points across the ring, in any channel.
+                for ( int nRadius = 0; ! bPassed && nRadius < PUPIL_RADII; nRadius++ )
+                {
+                    FLT nSensorX = ( ( nRing + ( (FLT)nRadius / ( PUPIL_RADII - 1 ) ) ) / PUPIL_RINGS ) * m_nPupilReach;
+
+                    for ( int nChannel = 0; ! bPassed && nChannel < nChannels; nChannel++ )
+                    {
+                        FLT anOrigin[ 3 ] = { nSensorX, 0.0, m_nSensorZ };
+                        FLT anDirection[ 3 ] = { nX - nSensorX, nY, m_anVertexZ.back() - m_nSensorZ };
+
+                        Normalize( anDirection );
+                        bPassed = Trace( anOrigin, anDirection, FALSE, m_nStopRadius, anChannels[ nChannel ] );
+                    }
+                }
+                if ( bPassed )
+                {
+                    anPassed.push_back( nX );
+                    anPassed.push_back( nY );
+                    nMinX = ( nX < nMinX ) ? nX : nMinX;
+                    nMaxX = ( nX > nMaxX ) ? nX : nMaxX;
+                    nMinY = ( nY < nMinY ) ? nY : nMinY;
+                    nMaxY = ( nY > nMaxY ) ? nY : nMaxY;
+                }
+            }
+        }
+
+        oPupil.bOpen = anPassed.empty() ? FALSE : TRUE;
+        if ( ! oPupil.bOpen )
+            return;
+
+            // An ellipse in the passing points' bounding box, grown until it
+            // holds the whole cell around every one of them, and a little
+            // more, so nothing that gets through is left out.
+        oPupil.nCenterX = ( nMinX + nMaxX ) / 2.0;
+        oPupil.nCenterY = ( nMinY + nMaxY ) / 2.0;
+        oPupil.nHalfX = ( ( nMaxX - nMinX ) / 2.0 ) + ( nCell / 2.0 );
+        oPupil.nHalfY = ( ( nMaxY - nMinY ) / 2.0 ) + ( nCell / 2.0 );
+
+        FLT nFarthest = 0.0;
+
+        for ( size_t nAt = 0; nAt < anPassed.size(); nAt += 2 )
+        {
+            FLT nDX = anPassed[ nAt ] - oPupil.nCenterX;
+            FLT nDY = anPassed[ nAt + 1 ] - oPupil.nCenterY;
+
+                // The cell's corner farthest from the center.
+            nDX = ( nDX >= 0.0 ) ? nDX + ( nCell / 2.0 ) : nDX - ( nCell / 2.0 );
+            nDY = ( nDY >= 0.0 ) ? nDY + ( nCell / 2.0 ) : nDY - ( nCell / 2.0 );
+
+            FLT nReach = ( ( nDX * nDX ) / ( oPupil.nHalfX * oPupil.nHalfX ) ) + ( ( nDY * nDY ) / ( oPupil.nHalfY * oPupil.nHalfY ) );
+
+            nFarthest = ( nReach > nFarthest ) ? nReach : nFarthest;
+        }
+
+        FLT nGrow = ( nFarthest > 1.0 ) ? SQRT( nFarthest ) : 1.0;
+
+        oPupil.nHalfX *= nGrow * 1.01;
+        oPupil.nHalfY *= nGrow * 1.01;
+
+            // No smaller than the whole rear element (light gets through all
+            // of it, as when the stop is the last surface): aim at that.
+        if ( oPupil.nHalfX * oPupil.nHalfY >= nRear * nRear )
+        {
+            oPupil.nCenterX = oPupil.nCenterY = 0.0;
+            oPupil.nHalfX = oPupil.nHalfY = nRear;
+        }
+    }
+}
+
+struct CLens::SPupilTable
+{
+    SPupil                                  aoRings[ PUPIL_RINGS ];
+    std::atomic<bool>                       abDone[ PUPIL_RINGS ];
+    IASLib::CMutex                          amutexRings[ PUPIL_RINGS ];
+
+    SPupilTable( void )
+    {
+        for ( int nRing = 0; nRing < PUPIL_RINGS; nRing++ )
+            abDone[ nRing ] = false;
+    }
+};
+
+namespace
+{
+        // What a lens's exit pupil depends on, as bytes.
+    std::string PupilKey( const std::vector<CLens::SSurface> &aoSurfaces, const std::vector<FLT> &anVertexZ, FLT nStopRadius,
+                          FLT nSensorZ, FLT nSensorWidth, BOOL bChromatic )
+    {
+        std::string strKey;
+        auto        Add = [ &strKey ]( FLT nValue ) { strKey.append( (const char *)&nValue, sizeof( nValue ) ); };
+
+        for ( size_t nIndex = 0; nIndex < aoSurfaces.size(); nIndex++ )
+        {
+            Add( aoSurfaces[ nIndex ].nRadius );
+            Add( aoSurfaces[ nIndex ].nThickness );
+            Add( aoSurfaces[ nIndex ].nIor );
+            Add( aoSurfaces[ nIndex ].nAperture );
+            Add( aoSurfaces[ nIndex ].bStop ? 1.0 : 0.0 );
+            Add( aoSurfaces[ nIndex ].nAbbe );
+        }
+        for ( size_t nIndex = 0; nIndex < anVertexZ.size(); nIndex++ )
+            Add( anVertexZ[ nIndex ] );
+        Add( nStopRadius );
+        Add( nSensorZ );
+        Add( nSensorWidth );
+        Add( bChromatic ? 1.0 : 0.0 );
+        return strKey;
+    }
+}
+
+std::shared_ptr<CLens::SPupilTable> CLens::SharedPupilTable( const CLens &oLens )
+{
+    static IASLib::CMutex                                       s_mutex;
+    static std::map<std::string, std::weak_ptr<SPupilTable>>    s_mapTables;
+
+    std::string                     strKey = PupilKey( oLens.m_aoSurfaces, oLens.m_anVertexZ, oLens.m_nStopRadius, oLens.m_nSensorZ,
+                                                       oLens.m_nSensorWidth, oLens.IsChromatic() );
+    IASLib::CMutexLock              oLock( s_mutex );
+    std::shared_ptr<SPupilTable>    pTable = s_mapTables[ strKey ].lock();
+
+    if ( ! pTable )
+    {
+        pTable = std::make_shared<SPupilTable>();
+        s_mapTables[ strKey ] = pTable;
+    }
+    return pTable;
+}
+
+const CLens::SPupil &CLens::PupilFor( int nRing ) const
+{
+    SPupilTable &oTable = *m_pPupil;
+
+    if ( ! oTable.abDone[ nRing ].load( std::memory_order_acquire ) )
+    {
+        IASLib::CMutexLock oLock( oTable.amutexRings[ nRing ] );
+
+        if ( ! oTable.abDone[ nRing ].load( std::memory_order_relaxed ) )
+        {
+            FindPupil( nRing, oTable.aoRings[ nRing ] );
+            oTable.abDone[ nRing ].store( true, std::memory_order_release );
+        }
+    }
+    return oTable.aoRings[ nRing ];
+}
+
+BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLensV, FLT anOrigin[ 3 ], FLT anDirection[ 3 ],
+                    int nChannel, FLT *pnWeight ) const
+{
+    if ( pnWeight )
+        *pnWeight = 1.0;
     if ( ! m_bPrepared || ! ( nAspect > 0.0 ) )
         return FALSE;
 
     FLT nHalfWidth = m_nSensorWidth / 2.0;
     FLT nHalfHeight = nHalfWidth / nAspect;
     FLT nRear = m_aoSurfaces.back().nAperture;
+    FLT nX = 0.0;
+    FLT nY = 0.0;
 
         // The image lands upside down and mirrored on the sensor.
     anOrigin[ 0 ] = -nScreenX * nHalfWidth;
     anOrigin[ 1 ] = -nScreenY * nHalfHeight;
     anOrigin[ 2 ] = m_nSensorZ;
 
-        // A point on the rear element: Shirley and Chiu's concentric map
-        // from the unit square to the disc, which keeps an even spread even.
-    FLT nA = ( 2.0 * nLensU ) - 1.0;
-    FLT nB = ( 2.0 * nLensV ) - 1.0;
-    FLT nRadius = 0.0;
-    FLT nAngle = 0.0;
+    FLT nFromCenter = SQRT( ( anOrigin[ 0 ] * anOrigin[ 0 ] ) + ( anOrigin[ 1 ] * anOrigin[ 1 ] ) );
+    int nRing = ( m_nPupilReach > 0.0 ) ? (int)( ( nFromCenter / m_nPupilReach ) * PUPIL_RINGS ) : PUPIL_RINGS;
 
-    if ( nA != 0.0 || nB != 0.0 )
+    if ( nRing < 0 || nRing >= PUPIL_RINGS || ! m_pPupil )
     {
-        if ( ( nA * nA ) > ( nB * nB ) )
-        {
-            nRadius = nA;
-            nAngle = ( PI / 4.0 ) * ( nB / nA );
-        }
-        else
-        {
-            nRadius = nB;
-            nAngle = ( PI / 2.0 ) - ( ( PI / 4.0 ) * ( nA / nB ) );
-        }
+            // Beyond the rings: anywhere on the rear element, by Shirley and
+            // Chiu's concentric map from the unit square to the disc, which
+            // keeps an even spread even.
+        ConcentricDisc( nLensU, nLensV, nX, nY );
+        nX *= nRear;
+        nY *= nRear;
     }
-    nRadius *= nRear;
+    else
+    {
+            // Inside the exit pupil's ellipse for this ring, found for a
+            // point on the +x axis, turned to where this point is. Each ray
+            // counts for the ellipse's share of the rear element, so the
+            // image is as bright as aiming at all of it.
+        const SPupil &oPupil = PupilFor( nRing );
 
-    anDirection[ 0 ] = ( nRadius * COS( nAngle ) ) - anOrigin[ 0 ];
-    anDirection[ 1 ] = ( nRadius * SIN( nAngle ) ) - anOrigin[ 1 ];
+        if ( ! oPupil.bOpen )
+            return FALSE;
+
+        FLT nDiscX, nDiscY;
+
+        ConcentricDisc( nLensU, nLensV, nDiscX, nDiscY );
+
+        FLT nPupilX = oPupil.nCenterX + ( nDiscX * oPupil.nHalfX );
+        FLT nPupilY = oPupil.nCenterY + ( nDiscY * oPupil.nHalfY );
+        FLT nCos = ( nFromCenter > 0.0 ) ? anOrigin[ 0 ] / nFromCenter : 1.0;
+        FLT nSin = ( nFromCenter > 0.0 ) ? anOrigin[ 1 ] / nFromCenter : 0.0;
+
+        nX = ( nPupilX * nCos ) - ( nPupilY * nSin );
+        nY = ( nPupilX * nSin ) + ( nPupilY * nCos );
+        if ( pnWeight )
+            *pnWeight = ( oPupil.nHalfX * oPupil.nHalfY ) / ( nRear * nRear );
+        if ( ( nX * nX ) + ( nY * nY ) > nRear * nRear )
+            return FALSE;       // off the rear element
+    }
+
+    anDirection[ 0 ] = nX - anOrigin[ 0 ];
+    anDirection[ 1 ] = nY - anOrigin[ 1 ];
     anDirection[ 2 ] = m_anVertexZ.back() - anOrigin[ 2 ];
     Normalize( anDirection );
 

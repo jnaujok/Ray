@@ -59,16 +59,21 @@ The ray tracing itself is the 1997 code.
 
 ## Features
 
-- **Primitives:** spheres, planes, triangles, and triangle meshes. A triangle's normal comes from
+- **Primitives:** spheres, planes, cylinders, cones, boxes, triangles, and triangle meshes.
+  Cylinders and cones run between any two points, capped or open (an open one can be seen into and
+  shadows itself inside); a cone can be cut off flat at the top, and a box can be any size along
+  each axis and turned any way. A triangle's normal comes from
   its corner order; it can be single- or double-sided, and flat or smooth, with corner normals that
   can be given to override the computed ones. A mesh shares vertices
-  between faces, gives each vertex the sum of its faces' normals, and skips all its faces for rays
-  that miss its bounding box.
+  between faces, gives each vertex the sum of its faces' normals, and keeps its faces in a bounding
+  volume hierarchy, so a ray tests only the few faces near its path.
+
+  <img src="docs/images/tests/primitives_test.png" alt="A capped cylinder, an open tube, a cone, a textured truncated cone, a textured cube, and a glass box on a checkered floor" width="320">
 - **Lights:** point lights.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by influence.
 - **Textures:** any material's color can come from a texture instead: a checkerboard, on the
   surface or solid (carved from a checkered block), or an image file (PPM or Ray raw) laid over the
-  surface. Spheres and planes have surface coordinates of their own; triangles and meshes take
+  surface. Spheres, planes, cylinders, cones, and boxes have surface coordinates of their own; triangles and meshes take
   `uvs`, and a mesh without them can use a UV map (planar, cylindrical, spherical, or box
   projection) to work them out. Networked engines get the images inside the scene, so they need no
   files.
@@ -87,18 +92,28 @@ The ray tracing itself is the 1997 code.
   aperture stop blocks go dark, so depth of field, vignetting, and the lens's own aberrations and
   distortion come out of the optics. Give the glasses Abbe numbers and red, green and blue are
   traced at their own wavelengths, for chromatic aberration. Focus and exposure are worked out
-  automatically; a 50 mm f/2 double Gauss is built in.
+  automatically; a 50 mm f/2 double Gauss is built in. Rays are aimed only at the part of the
+  rear element light gets through to each point of the sensor (the exit pupil), so few are wasted
+  on the aperture stop and the image is less grainy for the same number of rays.
 
   <img src="docs/images/lens.png" alt="scan_test through a pinhole, and through the double Gauss at f/2 focused on the glass sphere" width="650">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
-  look, and the default), `gamma`, `srgb`, and `reinhard` tone mapping.
+  look, and the default), `gamma`, `srgb`, `reinhard` tone mapping, and `hdr`.
+- **Image output:** PNG (`--png`) and PPM (`--ppm`) beside the original raw format, and high
+  dynamic range: `--hdr` writes every pixel's linear color, unclipped, as a Radiance HDR file
+  that image editors, Blender and HDR viewers open. With the `hdr` color model, its `exposure`
+  scales the colors first.
 - **Readable scene files:** scenes are JSON that you can write and edit by hand, with clear errors
   that say where a mistake is.
 - **Scene editor:** MFC MDI application with a scene tree, property dialogs for every object type,
   and a material editor.
-- **Distributed rendering:** a master hands out batches of rays to `rayengine` processes over TCP and
-  collects the traced colors. Engines can run anywhere that can reach the master.
-- **Local rendering:** the same master can trace with one thread per CPU instead.
+- **Distributed rendering:** `rayengine` processes connect to the master over TCP and pull tiles of
+  the image from its queue, trace them (camera rays, lens and sampling included) and send back the
+  pixels; faster machines simply take more tiles. Engines can run anywhere that can reach the
+  master, can join in the middle of a render, and if one drops out its unfinished tiles go to the
+  others.
+- **Local rendering:** the same master can trace with one thread per CPU instead, pulling tiles the
+  same way.
 - **Models:** [`tools/obj_to_ray.py`](tools/obj_to_ray.py) turns Wavefront OBJ models into meshes;
   the sample scenes include the Utah teapot.
 
@@ -121,30 +136,35 @@ flowchart LR
     UI --> TM
     CLI --> TM
     TM -- "1. scene" --> E1 & E2 & E3
-    TM -- "2. batches of rays" --> E1 & E2 & E3
-    E1 & E2 & E3 -- "3. traced colors" --> TM
+    E1 & E2 & E3 -- "2. request" --> TM
+    TM -- "3. a tile" --> E1 & E2 & E3
+    E1 & E2 & E3 -- "4. its pixels" --> TM
     TM -- pixels --> IMG[(Image file)]
 ```
 
-1. The master sends each task its own copy of the scene, as JSON.
-2. It walks the image, builds batches of primary rays (`CRayArray`), and deals them out in turn.
-3. Each task traces its batch and sends back the colors. The camera's pixel sampler turns them
-   into pixels, and its color model turns the pixels into the image's bytes.
-4. An empty batch tells a task to stop.
+1. The master splits the image into tiles (32×32 pixels; `--tile` changes it) and sends each task
+   its own copy of the scene, as JSON.
+2. Each task asks for work, and the master hands it the next tile.
+3. The task traces the tile with `CTileTracer`: the camera's pixel sampler picks the rays, the
+   camera (and its lens) makes them, and the sampler turns their colors into the tile's pixels,
+   which go back to the master as linear colors. The task asks for another tile.
+4. The master writes each tile's pixels through the camera's color model into the image. A task
+   that goes away has its unfinished tiles handed to the others; when the image is done the master
+   tells the tasks to stop.
 
 Which primary rays are made for each pixel, and how their colors become the pixel, is up to the
 camera's pixel sampler ([`core/include/PixelSampler.h`](core/include/PixelSampler.h)). The default
 casts one ray through each pixel's center; `--aa corners` attaches the anti-aliasing sampler.
 The color model ([`core/include/ColorModel.h`](core/include/ColorModel.h)) then turns each pixel's
-linear color into bytes. Both are set in the scene's camera, or with `--aa` and `--color`, and the
-engines never need to know which are in use.
+linear color into bytes. Both are set in the scene's camera, or with `--aa` and `--color`. The
+sampler runs in the tasks, one tile at a time; the color model runs on the master.
 
 Over TCP every message is framed as a tag, a length, and a payload. The scene is sent as an SJSON
-packet (IASLib's compact binary JSON) of the scene file's JSON. The batches of rays and colors,
-which are sent constantly, are fixed-layout IEEE-754 doubles, because SJSON costs far more per ray
-to encode than tracing the ray does; `RayWire::ToReadable` turns a batch into JSON for reading.
-Numbers cross exactly either way. See [`core/include/WireProtocol.h`](core/include/WireProtocol.h).
-An engine opens the connection with a hello carrying the protocol version (3).
+packet (IASLib's compact binary JSON) of the scene file's JSON. Requests, tiles and pixels are
+small fixed-layout binary messages, the pixels as IEEE-754 doubles, so they cross exactly and
+networked engines make the same image as threads; `RayWire::ToReadable` turns a tile or its pixels
+into JSON for reading. See [`core/include/WireProtocol.h`](core/include/WireProtocol.h). An engine
+opens the connection with a hello carrying the protocol version (4).
 
 ## Platforms
 
@@ -186,7 +206,13 @@ cmake --build build --config Release --target Ray
 **Trace with threads on this machine:**
 
 ```sh
-raythrower scenes/scan_test.ray -o scan_test.raw --ppm scan_test.ppm
+raythrower scenes/scan_test.ray -o scan_test.raw --png scan_test.png
+```
+
+**Keep the highlights** in a high dynamic range file, as well as a PNG:
+
+```sh
+raythrower scenes/scan_test.ray --color hdr:exposure=1.5 --png scan_test.png --hdr scan_test.hdr
 ```
 
 **Smooth the edges** with five rays per pixel:
@@ -208,12 +234,21 @@ raythrower scenes/scan_test.ray --color reinhard --ppm scan_test.ppm
 raythrower scenes/lens_test.ray --aa stratified:grid=8 --ppm lens.ppm
 ```
 
-**Render the Utah teapot** (6,320 triangles; every ray inside its bounding box tests every face,
-so it takes a while):
+**Render the Utah teapot** (6,320 triangles):
 
 ```sh
 raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
+
+**Render the torture test**, every kind of object (the teapot too), mirrors, glass and textures
+through the double Gauss lens at 25 rays a pixel, at its full 1024×768 (about 4 minutes on a
+16-core machine):
+
+```sh
+raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
+```
+
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: the teapot among mirrors, glass, textured shapes and a mirror wall, through a real lens" width="720">
 
 **Bring in an OBJ model** as a mesh (`--weld` joins repeated vertices so the surface is smooth
 across seams):
@@ -240,19 +275,24 @@ rayengine master.example.com 7997                       # on each of three machi
 | `-N<count>`, `--tasks <count>` | Number of tracing tasks (default: one per CPU) |
 | `-o`, `--output <file>` | Image file (default: the one named in the scene) |
 | `--ppm <file>` | Also write the image as a PPM file |
+| `--png <file>` | Also write the image as a PNG file |
+| `--hdr <file>` | Also write the linear, unclipped colors as a Radiance HDR (`.hdr`) file, for high dynamic range |
 | `--listen [port]` | Use engines over TCP on this port (default 7997; 0 picks a free one) |
 | `--spawn` | Start the engines on this machine |
 | `--engine <path>` | The `rayengine` to start (default: the one next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for engines to connect (default 60) |
-| `--batch <rays>` | Rays per batch (default 127) |
+| `--tile <pixels>` | Size of the square tiles tasks ask for (default 32) |
 | `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`; settings after a colon, as in `random:samples=9` |
-| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`; settings as for `--aa`, as in `reinhard:exposure=1.5` |
+| `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, `reinhard`, or `hdr`; settings as for `--aa`, as in `reinhard:exposure=1.5` |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene (with any `--aa`/`--color`/`--size`) as a scene archive, textures inside, and exit |
 | `--save-json <file>` | Save it as plain JSON, with the files it uses beside it, and exit |
 
 Images are written in the original raw format: a 2-byte width, a 2-byte height (both big-endian),
-then RGB bytes. `--ppm` gives a copy any image viewer can open.
+then RGB bytes. `--png` and `--ppm` give copies any image viewer can open. `--hdr` keeps what the
+8-bit formats lose: colors brighter than white, at floating-point precision (Radiance RGBE: a byte
+each for red, green and blue and a shared exponent). It holds the color model's linear colors:
+the traced colors as they are, or scaled by the `hdr` or `reinhard` model's `exposure`.
 
 **Scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
 menu, and choose *Render*.
@@ -265,12 +305,16 @@ ctest --test-dir build --output-on-failure
 
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
-and textures).
+textures, cylinders, cones, and boxes, and a torture test of all of them through a real lens).
 They also check that a lens has the focal length, f-number, focus and color dispersion its
 prescription should, that
-networked engines produce exactly the same bytes as threads and that rays and colors cross the wire
+networked engines produce exactly the same bytes as threads (even when an engine drops out mid-render
+and another joins), and that tiles and pixels cross the wire
 exactly (including texture images embedded in the scene), that scene files survive a load and save, that mistakes in JSON scenes are reported where
-they are, and triangle sidedness and that smooth mesh faces agree along shared edges. CI runs them
+they are, triangle sidedness and that smooth mesh faces agree along shared edges, where rays hit
+cylinders, cones, and boxes and the normals there, and that a mesh's bounding volume hierarchy finds
+exactly the hits testing every face does. With Python 3 installed, they also decode the PNG and
+HDR output (with Python's own zlib) and check it against the raw image. CI runs them
 on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 ### Expected output
@@ -292,6 +336,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/ser_test.png" alt="render_ser_test" width="260"><br><code>render_ser_test</code></td><td align="center"><img src="docs/images/tests/ser_test2.png" alt="render_ser_test2 (blank by design)" width="260"><br><code>render_ser_test2 (blank by design)</code></td><td align="center"><img src="docs/images/tests/spec_test.png" alt="render_spec_test" width="260"><br><code>render_spec_test</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td><td align="center"><img src="docs/images/tests/texture_test.png" alt="render_texture" width="260"><br><code>render_texture</code></td><td align="center"><img src="docs/images/tests/teapot_textured.png" alt="render_teapot_textured (120x90)" width="120"><br><code>render_teapot_textured (120x90)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random` and
@@ -304,11 +349,13 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 </table>
 
 **Color models** (`--color`) on `scan_test`. The 1997 scenes were lit for screens without gamma
-encoding, so `gamma` and `srgb` look washed out; `reinhard` brings back clipped highlights.
+encoding, so `gamma` and `srgb` look washed out; `reinhard` brings back clipped highlights. `hdr`
+at its default exposure looks like `srgb` here: what it adds is the `--hdr` file.
 
 <table>
 <tr><td align="center"><img src="docs/images/tests/scan_test.png" alt="clip (the default)" width="260"><br><code>clip (the default)</code></td><td align="center"><img src="docs/images/tests/scan_test_gamma.png" alt="render_color_gamma" width="260"><br><code>render_color_gamma</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/scan_test_srgb.png" alt="render_color_srgb" width="260"><br><code>render_color_srgb</code></td><td align="center"><img src="docs/images/tests/scan_test_reinhard.png" alt="render_color_reinhard" width="260"><br><code>render_color_reinhard</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/scan_test_hdr.png" alt="render_color_hdr" width="260"><br><code>render_color_hdr</code></td></tr>
 </table>
 
 ## Repository layout
@@ -322,7 +369,7 @@ encoding, so `gamma` and `srgb` look washed out; `reinhard` brings back clipped 
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
 | [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures); `scenes/textures/` holds texture images |
-| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |
 | [`docs/`](docs) | MFC AppWizard notes, README images, and the changelog's before and after images |
@@ -371,8 +418,9 @@ the format's history.
 ## Project status
 
 The code builds and runs on current compilers, and work on the ray tracing has resumed: a corrected
-camera, anti-aliasing, color models, meshes, and JSON scenes so far. Next up are faster mesh
-intersection and choices for sampling and color in the scene editor.
+camera, anti-aliasing, color models, meshes (with a bounding volume hierarchy), cylinders, cones
+and boxes, and JSON scenes so far. Next up are choices for sampling and color, and the new shapes,
+in the scene editor.
 
 ## Changelog
 

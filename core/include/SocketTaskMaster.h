@@ -6,38 +6,55 @@
 *   master: instead of pvm_spawn, the engines are started separately     *
 *   (raythrower --spawn starts local ones) and connect to the port.      *
 *                                                                        *
+*   SpawnTasks waits for the first engines; after that the master keeps  *
+*   listening, and an engine that connects later gets the scene and      *
+*   starts asking for tiles, even in the middle of a trace. An engine    *
+*   that drops out has its unfinished tiles handed to the others.        *
+*                                                                        *
 *************************************************************************/
+
 #ifndef __SOCKETTASKMASTER_H__
 #define __SOCKETTASKMASTER_H__
 
 #include "TaskMaster.h"
-#include "WorkQueue.h"
 #include "WireProtocol.h"
+#include "Threading/Mutex.h"
 
 #include <atomic>
 #include <string>
 #include <vector>
 
-class CColorArray;
-
 namespace IASLib
 {
     class CServerSocket;
+    class CSocket;
 }
 
 class CSocketTaskMaster : public CTaskMaster
 {
     public:
         class CConnection;
+        class CAcceptor;
 
     protected:
         int                         m_nPort;
         int                         m_nAcceptTimeoutMs;
         IASLib::CServerSocket      *m_pServer;
-        std::vector<CConnection *>  m_apConnections;
-        TWorkQueue<CColorArray *>   m_oResults;     // NULL: an engine went away.
+        IASLib::CMutex              m_mutexConnections;
+        std::vector<CConnection *>  m_apConnections;    // by task; only ever added to during a run
+        CAcceptor                  *m_pAcceptor;
         std::atomic<bool>           m_bClosing;
-        IASLib::CString             m_strLastError;
+
+            /// Reads a new engine's hello and adds it. Returns its task
+            /// number, or -1 if it isn't a rayengine of this version.
+        int             AddConnection( IASLib::CSocket *pSocket );
+        CConnection    *GetConnection( int nTask );
+
+        virtual BOOL    SceneToTask( int nTask, CScene &oScene );
+        virtual BOOL    TileToTask( int nTask, uint32_t nTrace, const STile &oTile );
+            /// Engines can join late, so a trace waits for one as long as
+            /// SpawnTasks waits for each.
+        virtual int     JoinWaitMs( void ) const { return m_nAcceptTimeoutMs; }
 
     public:
             /// nPort 0 picks any free port (GetPort() says which once
@@ -50,15 +67,11 @@ class CSocketTaskMaster : public CTaskMaster
             /// call it first to start engines only once the port is open.
         BOOL            Listen( void );
         int             GetPort( void ) const { return m_nPort; }
-        const char     *GetLastError( void ) const { return (const char *)m_strLastError; }
 
-            /// Waits for nTasksToSpawn engines to connect and say hello.
+            /// Waits for nTasksToSpawn engines to connect and say hello, then
+            /// keeps accepting more in the background.
         virtual BOOL    SpawnTasks( int nTasksToSpawn );
         virtual BOOL    EndTasks( void );
-
-        virtual BOOL    SceneToTasks( CScene &oScene );
-        virtual BOOL    RaysToTask( CRayArray &oRays, int nTask );
-        virtual int     ColorsFromTasks( BOOL bWait );
 
     private:
                         CSocketTaskMaster( const CSocketTaskMaster & );

@@ -10,6 +10,8 @@
 #include "PixelWriter.h"
 
 CCenterSampler::CCenterSampler( void ) :
+    m_nLeft( 0 ),
+    m_nTop( 0 ),
     m_nWidth( 0 ),
     m_nHeight( 0 ),
     m_nX( 0 ),
@@ -17,8 +19,10 @@ CCenterSampler::CCenterSampler( void ) :
 {
 }
 
-long long CCenterSampler::Begin( int nWidth, int nHeight )
+long long CCenterSampler::Begin( int nLeft, int nTop, int nWidth, int nHeight )
 {
+    m_nLeft = nLeft;
+    m_nTop = nTop;
     m_nWidth = ( nWidth > 0 ) ? nWidth : 0;
     m_nHeight = ( nHeight > 0 ) ? nHeight : 0;
     m_nX = 0;
@@ -32,7 +36,7 @@ BOOL CCenterSampler::NextRay( CScene &oScene, CRay &oRay )
     if ( ( m_nY >= m_nHeight ) || ( m_nWidth == 0 ) )
         return FALSE;
 
-    oRay.CreateRay( oScene, m_nX, m_nY );
+    oRay.CreateRay( oScene, m_nLeft + m_nX, m_nTop + m_nY );
 
     if ( ++m_nX >= m_nWidth )
     {

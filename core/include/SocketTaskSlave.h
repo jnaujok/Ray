@@ -24,10 +24,8 @@ class CSocketTaskSlave : public CTaskSlave
 {
     protected:
         IASLib::CSocketStream  *m_pStream;
-        RayWire::CEncoder       m_oEncoder;     // colors to the master
-        RayWire::CDecoder       m_oDecoder;     // the scene and rays from it
+        RayWire::CDecoder       m_oDecoder;     // the scene from the master
         IASLib::CString         m_strLastError;
-        unsigned long           m_nRaysTraced;
 
     public:
                             CSocketTaskSlave( void );
@@ -37,15 +35,14 @@ class CSocketTaskSlave : public CTaskSlave
             /// keeps trying that long for the master to start listening.
         BOOL                Connect( const char *strHost, int nPort, int nRetrySeconds = 0 );
 
-        virtual BOOL        SceneFromMaster( CScene &oScene );
-        virtual BOOL        RaysFromMaster( CRayArray &oRays );
-        virtual BOOL        ColorsToMaster( CColorArray &oColors );
+        virtual EMessage    FromMaster( std::unique_ptr<CScene> &pScene, STile &oTile, uint32_t &nTrace );
+        virtual BOOL        RequestWork( void );
+        virtual BOOL        PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors );
 
         const char         *GetLastError( void ) const { return (const char *)m_strLastError; }
-        unsigned long       GetRaysTraced( void ) const { return m_nRaysTraced; }
 
     private:
-        BOOL                Receive( uint8_t nExpected, std::string &strPayload );
+        BOOL                Send( uint8_t nTag, const std::string &strPayload );
 
                             CSocketTaskSlave( const CSocketTaskSlave & );
         CSocketTaskSlave   &operator =( const CSocketTaskSlave & );

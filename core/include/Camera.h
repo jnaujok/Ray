@@ -103,9 +103,10 @@ class CCamera : public CObjects
 
             // The primary ray for a point on the image (as for RayDirection;
             // nImageX and nImageY, the point in pixels, pick where a ray
-            // crosses the lens). FALSE if the lens blocks it.
+            // crosses the lens). FALSE if the lens blocks it. pnWeight, if
+            // given, gets the factor the ray's color is multiplied by.
         BOOL        PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, FLT nImageY,
-                                CVector &oOrigin, CVector &oDirection, int nChannel = 0 );
+                                CVector &oOrigin, CVector &oDirection, int nChannel = 0, FLT *pnWeight = NULL );
             // How many channels each sample is traced in: 3 for a lens with
             // chromatic aberration (red, green and blue apart), else 1.
         int         GetChannels( void ) const { return ( m_pLens && m_pLens->IsChromatic() ) ? 3 : 1; }

@@ -8,13 +8,19 @@
 *   and of any brightness; the camera's color model turns them into      *
 *   bytes when the sampler hands them to the CPixelWriter.               *
 *                                                                        *
-*   A trace runs a sampler like this:                                    *
+*   The image is traced in tiles, each by one task, which runs the      *
+*   camera's sampler for its tile like this:                             *
 *                                                                        *
-*       nRays = Begin( width, height );                                  *
-*       while ( NextRay( scene, ray ) )   send the ray off to be traced  *
+*       nRays = Begin( x, y, width, height );   the tile, in pixels      *
+*       while ( NextRay( scene, ray ) )   trace the ray                  *
 *       PutSample( writer, ... )          once for every traced ray,     *
 *                                         in any order                   *
 *       End();                                                           *
+*                                                                        *
+*   Rays, tags and pixels are in image coordinates. A sampler only       *
+*   writes pixels inside its tile; a ray it shares with pixels outside   *
+*   (a corner) is traced again by the neighboring tile, and comes out    *
+*   the same, so tiles meet without a seam.                              *
 *                                                                        *
 *   NextRay labels each ray with a tag (CRay::GetPixelX/GetPixelY),      *
 *   which comes back with its color in PutSample. The tag can mean       *
@@ -61,9 +67,11 @@ class CPixelSampler
             /// The name it is chosen by, such as "corners".
         virtual const char     *GetName( void ) const = 0;
 
-            /// Starts sampling an image of this size. Returns the number of
-            /// rays NextRay will make.
-        virtual long long       Begin( int nWidth, int nHeight ) = 0;
+            /// Starts sampling a tile of the image: nWidth by nHeight pixels
+            /// from (nLeft, nTop). Returns the number of rays NextRay will make.
+        virtual long long       Begin( int nLeft, int nTop, int nWidth, int nHeight ) = 0;
+            /// Starts sampling a whole image as one tile.
+        long long               BeginImage( int nWidth, int nHeight ) { return Begin( 0, 0, nWidth, nHeight ); }
             /// Makes the next primary ray. Returns FALSE when there are no more.
         virtual BOOL            NextRay( CScene &oScene, CRay &oRay ) = 0;
             /// Takes the color traced for the ray tagged (nTagX, nTagY), and

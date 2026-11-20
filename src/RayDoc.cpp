@@ -11,8 +11,6 @@
 #include "AddPlaneDlg.h"
 #include "MainFrm.h"
 #include "ImageFile.h"
-#include "RayArray.h"
-#include "ColorArray.h"
 #include "ThreadTaskMaster.h"
 #include "Triangle.h"
 

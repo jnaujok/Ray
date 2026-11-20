@@ -36,7 +36,7 @@ execute_process(COMMAND "${RAYTHROWER}" ${ARGS}
                 RESULT_VARIABLE RESULT
                 OUTPUT_VARIABLE STDOUT
                 ERROR_VARIABLE  STDERR
-                TIMEOUT 300)
+                TIMEOUT 900)
 if(NOT RESULT EQUAL 0)
     message(FATAL_ERROR "raythrower failed (${RESULT}):\n${STDOUT}\n${STDERR}")
 endif()

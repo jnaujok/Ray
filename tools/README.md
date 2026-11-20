@@ -1,5 +1,18 @@
 # Tools
 
+## `check_image.py`
+
+Checks `raythrower`'s PNG and Radiance HDR output against the raw image it wrote: the PNG must
+decode (with Python's own zlib) to exactly the raw pixels, and the HDR file must have the same size
+and, with `--clip`, colors that clipped at 1 match the raw bytes (the `clip` color model) within
+RGBE's precision, with some brighter than 1. The `image_output` test runs it.
+
+```sh
+raythrower scenes/scan_test.ray -o scan.raw --png scan.png --hdr scan.hdr
+tools/check_image.py scan.raw --png scan.png
+tools/check_image.py scan.raw --hdr scan.hdr --clip
+```
+
 ## `render_previews.py`
 
 Writes a PNG preview of every reference render in `tests/reference/renders.tar.gz` to

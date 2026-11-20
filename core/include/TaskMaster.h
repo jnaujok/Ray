@@ -1,87 +1,112 @@
 /*************************************************************************
 *   CTaskMaster                                                          *
 *                                                                        *
-*   Splits an image into batches of primary rays, deals them out to a    *
-*   set of tracing tasks, and collects the colors they send back. The    *
-*   tasks themselves (threads or networked rayengine processes) are      *
-*   provided by a subclass.                                              *
+*   Splits an image into tiles and hands them to tracing tasks as they   *
+*   ask for work: each task gets the scene, asks for a tile, traces it   *
+*   (camera rays, sampling and all), sends the pixels back and asks for  *
+*   the next. Faster tasks simply do more tiles. A task that goes away   *
+*   has its unfinished tiles handed to the others, and a task can join   *
+*   in the middle of a trace. The tasks themselves (threads, or          *
+*   networked rayengine processes) are provided by a subclass.           *
+*                                                                        *
+*   Everything here runs on the thread that calls TraceScene; the tasks  *
+*   reach it through PostEvent.                                          *
 *                                                                        *
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
+
 #ifndef __TASKMASTER_H__
 #define __TASKMASTER_H__
 
 #include "Globals.h"
+#include "TileTracer.h"
+#include "WorkQueue.h"
 
 #include <atomic>
-#include <unordered_map>
+#include <stdint.h>
+#include <string>
+#include <vector>
 
 class CScene;
 class CImageFile;
-class CRayArray;
-class CRay;
-class CColor;
-class CPixelSampler;
-class CPixelWriter;
+
+    // Tiles are this many pixels square, unless set otherwise.
+#define RAY_DEFAULT_TILE_SIZE   32
 
 class CTaskMaster
 {
-    protected:
-        int                 m_nTasks;
-        int                 m_nRaysPerPacket;
-        std::atomic<bool>   m_bTracing;
-        std::atomic<bool>   m_bStop;
-        std::atomic<int>    m_nStatus;      // Fraction of the image traced, 0 to 10000.
-        long long           m_nRaysTraced;
-        long long           m_nRaysToTrace;
-        CPixelSampler      *m_pSampler;     // The camera's sampler, during a trace.
-        CPixelWriter       *m_pWriter;      // The image and color model, during a trace.
-        int                 m_nChannels;    // 3: each sample is traced in red, green and blue apart.
-
-            // With channels apart, the parts of each sample that have come
-            // back, by tag, until all three are in.
-        struct SChannelParts
+    public:
+            // What a task tells the master.
+        struct SEvent
         {
-            FLT             anColor[ 3 ];
-            int             nParts;
+            enum EKind
+            {
+                EVENT_REQUEST,      // ready for a tile
+                EVENT_PIXELS,       // a traced tile
+                EVENT_LOST,         // the task went away
+                EVENT_JOINED,       // a new task is ready for the scene
+                EVENT_WAKE          // nothing; makes the master look at m_bStop
+            };
+
+            EKind               nKind;
+            int                 nTask;
+            uint32_t            nTrace;
+            STile               oTile;
+            long long           nRays;
+            std::vector<double> anColors;
         };
-        std::unordered_map<uint64_t, SChannelParts> m_mapParts;
 
-            /// Hands a traced color to the camera's sampler, which puts it in
-            /// the image. (nX, nY) is the tag the sampler gave the ray.
-        void                PutSample( int nX, int nY, const CColor &oColor );
+    protected:
+        int                     m_nTasks;           // tasks started (some may be gone)
+        int                     m_nTileSize;
+        std::atomic<bool>       m_bTracing;
+        std::atomic<bool>       m_bStop;
+        std::atomic<int>        m_nStatus;          // fraction of the image traced, 0 to 10000
+        long long               m_nRaysTraced;
+        uint32_t                m_nTrace;           // which trace this is, from 1
+        std::string             m_strLastError;
+        TWorkQueue<SEvent>      m_oEvents;
+        std::vector<char>       m_abLive;           // by task
+        std::vector<uint32_t>   m_anSceneTrace;     // the trace whose scene each task has
 
-    private:
-        BOOL                QueueRay( CRay &oRay, CRayArray &oRays, int &nCurrentTask );
-        BOOL                CollectColors( BOOL bWait );
+            /// For the tasks' threads: tells the master something.
+        void                    PostEvent( SEvent &&oEvent ) { m_oEvents.Push( std::move( oEvent ) ); }
+            /// For subclasses, on the master's thread: task nTask is ready.
+        void                    TaskStarted( int nTask );
+            /// For subclasses' EndTasks: forgets every task and anything
+            /// they sent.
+        void                    ForgetTasks( void );
+
+            /// Sends the scene to a task. FALSE if it can't be reached.
+        virtual BOOL            SceneToTask( int nTask, CScene &oScene ) = 0;
+            /// Sends a tile to a task. FALSE if it can't be reached.
+        virtual BOOL            TileToTask( int nTask, uint32_t nTrace, const STile &oTile ) = 0;
+            /// How long a trace with no tasks left waits for a new one to
+            /// join before it fails; 0 (the default) fails at once.
+        virtual int             JoinWaitMs( void ) const { return 0; }
 
     public:
-                            CTaskMaster( void );
-        virtual            ~CTaskMaster( void ) {}
+                                CTaskMaster( void );
+        virtual                ~CTaskMaster( void ) {}
 
-        virtual BOOL        SpawnTasks( int nTasksToSpawn ) = 0;
-        virtual BOOL        EndTasks( void ) = 0;
+        virtual BOOL            SpawnTasks( int nTasksToSpawn ) = 0;
+        virtual BOOL            EndTasks( void ) = 0;
 
-            /// Traces the whole scene into the image, with the primary rays
-            /// the camera's sampler makes. Returns FALSE if the trace was
-            /// stopped or a task failed.
-        virtual BOOL        TraceScene( CScene &oScene, CImageFile &oImageFile );
+            /// Traces the whole scene into the image. Returns FALSE if the
+            /// trace was stopped or every task was lost (GetLastError says).
+        virtual BOOL            TraceScene( CScene &oScene, CImageFile &oImageFile );
 
-        virtual BOOL        SceneToTasks( CScene &oScene ) = 0;
-        virtual BOOL        RaysToTask( CRayArray &oRays, int nTask ) = 0;
-            /// Puts the colors the tasks have finished into the image, through
-            /// PutSample. With bWait, blocks until at least one batch arrives.
-            /// Returns the number of colors received, or -1 if a task failed.
-        virtual int         ColorsFromTasks( BOOL bWait ) = 0;
-
-        int                 GetTaskCount( void ) const { return m_nTasks; }
-        void                SetRaysPerPacket( int nRays ) { if ( nRays > 0 ) m_nRaysPerPacket = nRays; }
+            /// The tasks that are still there.
+        int                     GetTaskCount( void ) const;
+        void                    SetTileSize( int nPixels ) { if ( nPixels > 0 ) m_nTileSize = nPixels; }
+        int                     GetTileSize( void ) const { return m_nTileSize; }
             /// The number of rays cast from the camera by the last trace.
-        long long           GetRaysTraced( void ) const { return m_nRaysTraced; }
+        long long               GetRaysTraced( void ) const { return m_nRaysTraced; }
+        const char             *GetLastError( void ) const { return m_strLastError.c_str(); }
 
-        virtual int         Status( void ) { return m_nStatus; }
-        virtual BOOL        IsTracing( void ) { return m_bTracing ? TRUE : FALSE; }
-        virtual BOOL        EndTrace( void );
+        virtual int             Status( void ) { return m_nStatus; }
+        virtual BOOL            IsTracing( void ) { return m_bTracing ? TRUE : FALSE; }
+        virtual BOOL            EndTrace( void );
 };
 
 #endif

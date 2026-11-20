@@ -6,188 +6,257 @@
 
 #include "Scene.h"
 #include "ImageFile.h"
-#include "RayArray.h"
+#include "ImageWriter.h"
 #include "TaskMaster.h"
-#include "Rays.h"
 #include "Color.h"
-#include "PixelSampler.h"
-#include "PixelWriter.h"
-
 #include "Threading/Thread.h"
 
-#define RAYS_PER_PACKET    127
+#include <algorithm>
+#include <deque>
 
 CTaskMaster::CTaskMaster( void ) :
     m_nTasks( 0 ),
-    m_nRaysPerPacket( RAYS_PER_PACKET ),
+    m_nTileSize( RAY_DEFAULT_TILE_SIZE ),
     m_bTracing( false ),
     m_bStop( false ),
     m_nStatus( 0 ),
     m_nRaysTraced( 0 ),
-    m_nRaysToTrace( 0 ),
-    m_pSampler( NULL ),
-    m_pWriter( NULL ),
-    m_nChannels( 1 )
+    m_nTrace( 0 )
 {
+}
+
+void CTaskMaster::TaskStarted( int nTask )
+{
+    if ( nTask < 0 )
+        return;
+    if ( (size_t)nTask >= m_abLive.size() )
+    {
+        m_abLive.resize( (size_t)nTask + 1, 0 );
+        m_anSceneTrace.resize( (size_t)nTask + 1, 0 );
+    }
+    m_abLive[ (size_t)nTask ] = 1;
+    m_anSceneTrace[ (size_t)nTask ] = 0;
+    if ( nTask >= m_nTasks )
+        m_nTasks = nTask + 1;
+}
+
+void CTaskMaster::ForgetTasks( void )
+{
+    SEvent oEvent;
+
+    m_abLive.clear();
+    m_anSceneTrace.clear();
+    m_nTasks = 0;
+    while ( m_oEvents.TryPop( oEvent ) )
+        ;
+}
+
+int CTaskMaster::GetTaskCount( void ) const
+{
+    return (int)std::count( m_abLive.begin(), m_abLive.end(), (char)1 );
 }
 
 BOOL CTaskMaster::EndTrace( void )
 {
     int     nCount = 0;
+    SEvent  oWake;
 
     m_bStop = true;
+    oWake.nKind = SEvent::EVENT_WAKE;
+    oWake.nTask = -1;
+    PostEvent( std::move( oWake ) );
 
     while ( ( m_bTracing ) && ( nCount < 100 ) )
     {
         nCount++;
         IASLib::CThread::Millisleep( 100 );
     }
-
     EndTasks();
     m_bTracing = false;
-
     return ( nCount < 100 );
-}
-
-    // With channels apart, a ray's channel is in the top two bits of its
-    // tag's y, which samplers never use.
-#define CHANNEL_SHIFT       30
-#define CHANNEL_TAG_MASK    0x3FFFFFFFu
-
-void CTaskMaster::PutSample( int nX, int nY, const CColor &oColor )
-{
-    if ( ! m_pSampler || ! m_pWriter )
-        return;
-
-    if ( m_nChannels == 1 )
-    {
-        m_pSampler->PutSample( *m_pWriter, nX, nY, oColor );
-        return;
-    }
-
-        // Keep the channel the ray was traced for; once a sample's three
-        // channels are in, hand the whole color to the sampler.
-    uint32_t        nTagY = (uint32_t)nY;
-    int             nChannel = (int)( nTagY >> CHANNEL_SHIFT );
-    int             nPlainY = (int)( nTagY & CHANNEL_TAG_MASK );
-    uint64_t        nKey = ( (uint64_t)(uint32_t)nX << 32 ) | (uint32_t)nPlainY;
-    CColor          oPart( oColor );
-    SChannelParts  &oParts = m_mapParts[ nKey ];
-
-    if ( nChannel < 1 || nChannel > 3 )
-        return;
-    oParts.anColor[ nChannel - 1 ] = ( nChannel == 1 ) ? oPart.GetR() : ( nChannel == 2 ) ? oPart.GetG() : oPart.GetB();
-    if ( ++oParts.nParts == 3 )
-    {
-        CColor oWhole( oParts.anColor[ 0 ], oParts.anColor[ 1 ], oParts.anColor[ 2 ] );
-
-        m_mapParts.erase( nKey );
-        m_pSampler->PutSample( *m_pWriter, nX, nPlainY, oWhole );
-    }
-}
-
-    // Collects whatever colors the tasks have finished. Returns FALSE if a
-    // task failed.
-BOOL CTaskMaster::CollectColors( BOOL bWait )
-{
-    int nColors = ColorsFromTasks( bWait );
-
-    if ( nColors < 0 )
-        return FALSE;
-
-    m_nRaysTraced += nColors;
-    if ( m_nRaysToTrace > 0 )
-        m_nStatus = (int)( ( m_nRaysTraced * 10000 ) / m_nRaysToTrace );
-    return TRUE;
-}
-
-    // Adds a ray to the batch being built, and sends the batch off when it is
-    // full. Returns FALSE if the trace was stopped or a task failed.
-BOOL CTaskMaster::QueueRay( CRay &oRay, CRayArray &oRays, int &nCurrentTask )
-{
-    if ( m_bStop )
-        return FALSE;
-
-    oRays.Add( oRay );
-
-    if ( oRays.GetSize() > m_nRaysPerPacket )
-    {
-        if ( RaysToTask( oRays, nCurrentTask ) == FALSE )
-            return FALSE;
-
-        if ( ! CollectColors( FALSE ) )
-            return FALSE;
-
-        nCurrentTask++;
-        nCurrentTask = nCurrentTask % m_nTasks;
-        oRays.RemoveAll();
-    }
-    return TRUE;
 }
 
 BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
 {
-    CSettings      &oSettings = oScene.GetSettings();
-    CPixelSampler  &oSampler = oScene.GetCamera().GetSampler();
-    CPixelWriter    oWriter( oImageFile, oScene.GetCamera().GetColorModel(), oScene.GetCamera().GetExposure() );
-    CRayArray       oRays;
-    CRay            oRay;
-    int             nCurrentTask = 0;
-    BOOL            bRetVal = TRUE;
+    CSettings                       &oSettings = oScene.GetSettings();
+    int                             nWidth = oSettings.GetImageWidth();
+    int                             nHeight = oSettings.GetImageHeight();
+    CImageWriter                    oWriter( oImageFile, oScene.GetCamera().GetColorModel(), oScene.GetCamera().GetExposure() );
+    std::deque<STile>               aoTiles;            // not handed out yet
+    std::vector<std::vector<STile>> aaoOut;             // handed out, by task
+    std::deque<int>                 anIdle;             // tasks waiting for a tile
+    long long                       nPixelsLeft = (long long)nWidth * (long long)nHeight;
+    long long                       nPixels = nPixelsLeft;
+    uint32_t                        nTrace = ++m_nTrace;
+    BOOL                            bRetVal = TRUE;
 
     m_nRaysTraced = 0;
-
-    if ( ( m_nTasks <= 0 ) || ( oSettings.GetImageWidth() <= 0 ) || ( oSettings.GetImageHeight() <= 0 ) )
+    m_strLastError.clear();
+    if ( ( GetTaskCount() <= 0 ) || ( nWidth <= 0 ) || ( nHeight <= 0 ) )
+    {
+        m_strLastError = ( GetTaskCount() <= 0 ) ? "There are no tasks to trace with" : "The image has no pixels";
         return FALSE;
+    }
 
-    m_pSampler = &oSampler;
-    m_pWriter = &oWriter;
-    m_nChannels = oScene.GetCamera().GetChannels();
-    m_mapParts.clear();
-    m_nRaysToTrace = oSampler.Begin( oSettings.GetImageWidth(), oSettings.GetImageHeight() ) * m_nChannels;
+        // Tiles in reading order, so the image fills from the top.
+    for ( int nTop = 0; nTop < nHeight; nTop += m_nTileSize )
+    {
+        for ( int nLeft = 0; nLeft < nWidth; nLeft += m_nTileSize )
+        {
+            STile oTile = { nLeft, nTop, (std::min)( m_nTileSize, nWidth - nLeft ), (std::min)( m_nTileSize, nHeight - nTop ) };
+
+            aoTiles.push_back( oTile );
+        }
+    }
 
     m_bTracing = true;
     m_bStop = false;
     m_nStatus = 0;
 
-    if ( ! SceneToTasks( oScene ) )
-        bRetVal = FALSE;
-
-    while ( bRetVal && oSampler.NextRay( oScene, oRay ) )
+    auto Grow = [ & ]( int nTask )
     {
-        if ( m_nChannels == 1 )
-            bRetVal = QueueRay( oRay, oRays, nCurrentTask );
-        else
-        {
-                // A chromatic lens sends each wavelength its own way: remake
-                // the sampler's ray once for each channel.
-            CRay oChannelRay;
+        if ( nTask >= 0 && (size_t)nTask >= aaoOut.size() )
+            aaoOut.resize( (size_t)nTask + 1 );
+    };
 
-            for ( int nChannel = 1; bRetVal && nChannel <= 3; nChannel++ )
+        // A task is gone: its unfinished tiles go back at the front.
+    auto Lose = [ & ]( int nTask )
+    {
+        if ( nTask < 0 || (size_t)nTask >= m_abLive.size() || ! m_abLive[ (size_t)nTask ] )
+            return;
+        Grow( nTask );
+        m_abLive[ (size_t)nTask ] = 0;
+        std::vector<STile> &aoOut = aaoOut[ (size_t)nTask ];
+        for ( size_t nIndex = aoOut.size(); nIndex > 0; nIndex-- )
+            aoTiles.push_front( aoOut[ nIndex - 1 ] );
+        aoOut.clear();
+        anIdle.erase( std::remove( anIdle.begin(), anIdle.end(), nTask ), anIdle.end() );
+    };
+
+        // Gives a task the next tile, or lets it wait for one.
+    auto Give = [ & ]( int nTask )
+    {
+        if ( nTask < 0 || (size_t)nTask >= m_abLive.size() || ! m_abLive[ (size_t)nTask ] )
+            return;
+        if ( aoTiles.empty() )
+        {
+            anIdle.push_back( nTask );
+            return;
+        }
+
+        STile oTile = aoTiles.front();
+
+        aoTiles.pop_front();
+        Grow( nTask );
+        aaoOut[ (size_t)nTask ].push_back( oTile );
+        if ( ! TileToTask( nTask, nTrace, oTile ) )
+            Lose( nTask );
+    };
+
+    auto SendScene = [ & ]( int nTask )
+    {
+        if ( m_anSceneTrace[ (size_t)nTask ] == nTrace )
+            return;
+        if ( SceneToTask( nTask, oScene ) )
+            m_anSceneTrace[ (size_t)nTask ] = nTrace;
+        else
+            Lose( nTask );
+    };
+
+    for ( int nTask = 0; nTask < (int)m_abLive.size(); nTask++ )
+    {
+        if ( m_abLive[ (size_t)nTask ] )
+            SendScene( nTask );
+    }
+
+    while ( nPixelsLeft > 0 )
+    {
+        if ( m_bStop )
+        {
+            m_strLastError = "The trace was stopped";
+            bRetVal = FALSE;
+            break;
+        }
+        if ( GetTaskCount() == 0 && JoinWaitMs() <= 0 )
+        {
+            m_strLastError = "Every task was lost";
+            bRetVal = FALSE;
+            break;
+        }
+
+        while ( ! anIdle.empty() && ! aoTiles.empty() )
+        {
+            int nTask = anIdle.front();
+
+            anIdle.pop_front();
+            Give( nTask );
+        }
+
+        SEvent oEvent;
+
+        if ( GetTaskCount() > 0 )
+            oEvent = m_oEvents.Pop();
+        else if ( ! m_oEvents.PopFor( oEvent, JoinWaitMs() ) )
+        {
+            m_strLastError = "Every task was lost, and none joined in time";
+            bRetVal = FALSE;
+            break;
+        }
+
+        switch ( oEvent.nKind )
+        {
+            case SEvent::EVENT_REQUEST:
+                Give( oEvent.nTask );
+                break;
+
+            case SEvent::EVENT_PIXELS:
             {
-                oChannelRay.CreateRayAt( oScene, oRay.GetImageX(), oRay.GetImageY(), oRay.GetPixelX(),
-                                         (int)( (uint32_t)oRay.GetPixelY() | ( (uint32_t)nChannel << CHANNEL_SHIFT ) ),
-                                         1.0, nChannel );
-                bRetVal = QueueRay( oChannelRay, oRays, nCurrentTask );
+                if ( oEvent.nTrace != nTrace || oEvent.nTask < 0 || (size_t)oEvent.nTask >= aaoOut.size() )
+                    break;      // from a stopped trace
+
+                std::vector<STile> &aoOut = aaoOut[ (size_t)oEvent.nTask ];
+                auto itTile = std::find_if( aoOut.begin(), aoOut.end(), [ & ]( const STile &oTile )
+                {
+                    return oTile.nLeft == oEvent.oTile.nLeft && oTile.nTop == oEvent.oTile.nTop &&
+                           oTile.nWidth == oEvent.oTile.nWidth && oTile.nHeight == oEvent.oTile.nHeight;
+                } );
+
+                if ( itTile == aoOut.end() ||
+                     oEvent.anColors.size() != (size_t)oEvent.oTile.nWidth * (size_t)oEvent.oTile.nHeight * 3 )
+                    break;
+                aoOut.erase( itTile );
+
+                const STile &oTile = oEvent.oTile;
+                size_t       nAt = 0;
+
+                for ( int nRow = 0; nRow < oTile.nHeight; nRow++ )
+                {
+                    for ( int nColumn = 0; nColumn < oTile.nWidth; nColumn++, nAt += 3 )
+                        oWriter.PutPixel( oTile.nLeft + nColumn, oTile.nTop + nRow,
+                                          CColor( (FLT)oEvent.anColors[ nAt ], (FLT)oEvent.anColors[ nAt + 1 ],
+                                                  (FLT)oEvent.anColors[ nAt + 2 ] ) );
+                }
+                nPixelsLeft -= (long long)oTile.nWidth * (long long)oTile.nHeight;
+                m_nRaysTraced += oEvent.nRays;
+                m_nStatus = (int)( ( ( nPixels - nPixelsLeft ) * 10000 ) / nPixels );
+                break;
             }
+
+            case SEvent::EVENT_LOST:
+                Lose( oEvent.nTask );
+                break;
+
+            case SEvent::EVENT_JOINED:
+                TaskStarted( oEvent.nTask );
+                Grow( oEvent.nTask );
+                SendScene( oEvent.nTask );
+                break;
+
+            default:
+                break;
         }
     }
 
-    if ( bRetVal && oRays.GetSize() )
-        bRetVal = RaysToTask( oRays, nCurrentTask );
-
-    while ( bRetVal && ( m_nRaysTraced < m_nRaysToTrace ) )
-    {
-        if ( m_bStop )
-            bRetVal = FALSE;
-        else
-            bRetVal = CollectColors( TRUE );
-    }
-
-    oSampler.End();
-    m_mapParts.clear();
-    m_pSampler = NULL;
-    m_pWriter = NULL;
     m_bTracing = false;
     return bRetVal;
 }

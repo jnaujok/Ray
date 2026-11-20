@@ -5,9 +5,6 @@
 #endif
 
 #include "Scene.h"
-#include "ImageFile.h"
-#include "RayArray.h"
-#include "ColorArray.h"
 #include "SocketTaskMaster.h"
 #include "WireProtocol.h"
 
@@ -17,37 +14,43 @@
 #include "Streams/SocketStream.h"
 #include "Threading/Thread.h"
 
+#include <stdio.h>
+
+    // How often the background acceptor looks up from waiting to see if it
+    // should stop.
+#define ACCEPT_POLL_MS      250
+
     // One connected rayengine. The master thread writes to it; a reader
-    // thread takes the colors it sends back and queues them. Each direction
-    // is its own SJSON stream, so each has its own encoder or decoder, used
-    // by one thread only.
+    // thread takes what it sends back (requests and pixels) and posts it to
+    // the master. Each direction is its own SJSON stream, so each has its
+    // own encoder or decoder, used by one thread only.
 class CSocketTaskMaster::CConnection : public IASLib::CThread
 {
     protected:
+        CSocketTaskMaster          &m_oMaster;
+        int                         m_nTask;
         IASLib::CSocket            *m_pSocket;
         IASLib::CSocketStream       m_oOut;     // owns the socket
         IASLib::CSocketStream       m_oIn;      // shares it
-        TWorkQueue<CColorArray *>  &m_oResults;
-        std::atomic<bool>          &m_bClosing;
         RayWire::CEncoder           m_oEncoder;     // the master thread's
-        RayWire::CDecoder           m_oDecoder;     // the reader thread's
 
     public:
-        CConnection( IASLib::CSocket *pSocket, TWorkQueue<CColorArray *> &oResults, std::atomic<bool> &bClosing ) :
+        CConnection( CSocketTaskMaster &oMaster, IASLib::CSocket *pSocket ) :
             IASLib::CThread( "rayengine connection", true ),
+            m_oMaster( oMaster ),
+            m_nTask( -1 ),
             m_pSocket( pSocket ),
             m_oOut( pSocket ),
             m_oIn( pSocket ),
-            m_oResults( oResults ),
-            m_bClosing( bClosing ),
-            m_oEncoder( RAY_WIRE_MASTER_ID ),
-            m_oDecoder( RAY_WIRE_MASTER_ID, RAY_WIRE_ENGINE_ID )
+            m_oEncoder( RAY_WIRE_MASTER_ID )
         {
             m_oIn.SetNoDelete();
             SetNoDelete( true );
         }
 
         virtual ~CConnection( void ) {}
+
+        void SetTask( int nTask ) { m_nTask = nTask; }
 
             /// Reads the engine's hello. Call before Start().
         bool Handshake( void )
@@ -65,10 +68,14 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
             RayWire::SendFrame( m_oOut, MESSAGE_SCENE, m_oEncoder.Scene( oScene ) );
         }
 
-            /// An empty batch tells the engine to stop.
-        void SendRays( CRayArray &oRays )
+        void SendTile( uint32_t nTrace, const STile &oTile )
         {
-            RayWire::SendFrame( m_oOut, MESSAGE_RAYS, m_oEncoder.Rays( oRays ) );
+            RayWire::SendFrame( m_oOut, MESSAGE_TILE, RayWire::EncodeTile( nTrace, oTile ) );
+        }
+
+        void SendStop( void )
+        {
+            RayWire::SendFrame( m_oOut, MESSAGE_STOP, std::string() );
         }
 
             /// Stops the reader by closing the connection under it.
@@ -87,25 +94,75 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
             {
                 while ( RayWire::ReceiveFrame( m_oIn, nTag, strPayload ) )
                 {
-                    if ( nTag == MESSAGE_COLOR )
-                    {
-                        CColorArray *pColors = new CColorArray;
+                    CTaskMaster::SEvent oEvent;
 
-                        if ( ! m_oDecoder.Colors( strPayload, *pColors ) )
-                        {
-                            delete pColors;
+                    oEvent.nTask = m_nTask;
+                    if ( nTag == MESSAGE_REQUEST )
+                        oEvent.nKind = CTaskMaster::SEvent::EVENT_REQUEST;
+                    else if ( nTag == MESSAGE_PIXELS )
+                    {
+                        uint64_t nRays = 0;
+
+                        oEvent.nKind = CTaskMaster::SEvent::EVENT_PIXELS;
+                        if ( ! RayWire::DecodePixels( strPayload, oEvent.nTrace, oEvent.oTile, nRays, oEvent.anColors ) )
                             break;      // A damaged stream can't be followed.
-                        }
-                        m_oResults.Push( pColors );
+                        oEvent.nRays = (long long)nRays;
                     }
+                    else
+                        continue;
+                    m_oMaster.PostEvent( std::move( oEvent ) );
                 }
             }
             catch ( ... )
             {
             }
 
-            if ( ! m_bClosing )
-                m_oResults.Push( NULL );    // The engine went away during a trace.
+            if ( ! m_oMaster.m_bClosing )
+            {
+                CTaskMaster::SEvent oLost;
+
+                oLost.nKind = CTaskMaster::SEvent::EVENT_LOST;
+                oLost.nTask = m_nTask;
+                m_oMaster.PostEvent( std::move( oLost ) );
+            }
+            return NULL;
+        }
+};
+
+    // Accepts engines that connect after SpawnTasks, and tells the master.
+class CSocketTaskMaster::CAcceptor : public IASLib::CThread
+{
+    protected:
+        CSocketTaskMaster  &m_oMaster;
+
+    public:
+        explicit CAcceptor( CSocketTaskMaster &oMaster ) :
+            IASLib::CThread( "rayengine acceptor", true ),
+            m_oMaster( oMaster )
+        {
+            SetNoDelete( true );
+        }
+
+        virtual void *Run( void )
+        {
+            while ( ! m_oMaster.m_bClosing )
+            {
+                IASLib::CSocket *pSocket = m_oMaster.m_pServer->Accept( ACCEPT_POLL_MS );
+
+                if ( pSocket == NULL )
+                    continue;
+
+                int nTask = m_oMaster.AddConnection( pSocket );
+
+                if ( nTask >= 0 )
+                {
+                    CTaskMaster::SEvent oJoined;
+
+                    oJoined.nKind = CTaskMaster::SEvent::EVENT_JOINED;
+                    oJoined.nTask = nTask;
+                    m_oMaster.PostEvent( std::move( oJoined ) );
+                }
+            }
             return NULL;
         }
 };
@@ -114,6 +171,7 @@ CSocketTaskMaster::CSocketTaskMaster( int nPort, int nAcceptTimeoutSeconds ) :
     m_nPort( ( nPort > 0 ) ? nPort : 0 ),
     m_nAcceptTimeoutMs( nAcceptTimeoutSeconds * 1000 ),
     m_pServer( NULL ),
+    m_pAcceptor( NULL ),
     m_bClosing( false )
 {
 }
@@ -137,7 +195,7 @@ BOOL CSocketTaskMaster::Listen( void )
     }
     catch ( IASLib::CException &oException )
     {
-        m_strLastError = oException.GetMessage();
+        m_strLastError = (const char *)oException.GetMessage();
         delete m_pServer;
         m_pServer = NULL;
         return FALSE;
@@ -145,16 +203,56 @@ BOOL CSocketTaskMaster::Listen( void )
     return TRUE;
 }
 
+int CSocketTaskMaster::AddConnection( IASLib::CSocket *pSocket )
+{
+    CConnection *pConnection = new CConnection( *this, pSocket );
+    bool         bAccepted = false;
+
+    try
+    {
+        bAccepted = pConnection->Handshake();
+    }
+    catch ( IASLib::CException & )
+    {
+    }
+
+    if ( ! bAccepted )
+    {
+            // Not a rayengine (or a different version of one): drop it.
+        delete pConnection;
+        return -1;
+    }
+
+    int nTask;
+
+    {
+        IASLib::CMutexLock oLock( m_mutexConnections );
+
+        nTask = (int)m_apConnections.size();
+        m_apConnections.push_back( pConnection );
+    }
+    pConnection->SetTask( nTask );
+    pConnection->Start();
+    return nTask;
+}
+
+CSocketTaskMaster::CConnection *CSocketTaskMaster::GetConnection( int nTask )
+{
+    IASLib::CMutexLock oLock( m_mutexConnections );
+
+    if ( ( nTask < 0 ) || ( nTask >= (int)m_apConnections.size() ) )
+        return NULL;
+    return m_apConnections[ (size_t)nTask ];
+}
+
 BOOL CSocketTaskMaster::SpawnTasks( int nTasksToSpawn )
 {
     EndTasks();
-
     if ( ! Listen() )
         return FALSE;
 
     m_bClosing = false;
-
-    while ( (int)m_apConnections.size() < nTasksToSpawn )
+    while ( GetTaskCount() < nTasksToSpawn )
     {
         IASLib::CSocket *pSocket = NULL;
 
@@ -164,140 +262,103 @@ BOOL CSocketTaskMaster::SpawnTasks( int nTasksToSpawn )
         }
         catch ( IASLib::CException &oException )
         {
-            m_strLastError = oException.GetMessage();
+            m_strLastError = (const char *)oException.GetMessage();
             return FALSE;
         }
 
         if ( pSocket == NULL )
         {
-            m_strLastError.Format( "Timed out waiting for engine %d of %d to connect",
-                                   (int)m_apConnections.size() + 1, nTasksToSpawn );
+            char achMessage[ 128 ];
+
+            snprintf( achMessage, sizeof( achMessage ), "Timed out waiting for engine %d of %d to connect",
+                      GetTaskCount() + 1, nTasksToSpawn );
+            m_strLastError = achMessage;
             return FALSE;
         }
 
-        CConnection *pConnection = new CConnection( pSocket, m_oResults, m_bClosing );
-        bool         bAccepted = false;
+        int nTask = AddConnection( pSocket );
 
-        try
-        {
-            bAccepted = pConnection->Handshake();
-        }
-        catch ( IASLib::CException & )
-        {
-        }
-
-        if ( ! bAccepted )
-        {
-                // Not a rayengine (or a different version of one): drop it.
-            delete pConnection;
-            continue;
-        }
-
-        pConnection->Start();
-        m_apConnections.push_back( pConnection );
+        if ( nTask >= 0 )
+            TaskStarted( nTask );
     }
 
-    m_nTasks = (int)m_apConnections.size();
+        // Engines that come later join as they connect.
+    m_pAcceptor = new CAcceptor( *this );
+    m_pAcceptor->Start();
     return TRUE;
 }
 
 BOOL CSocketTaskMaster::EndTasks( void )
 {
-    CRayArray       oStop;
-    CColorArray    *pColors;
+    std::vector<CConnection *> apConnections;
 
     m_bClosing = true;
+    if ( m_pAcceptor )
+    {
+        m_pAcceptor->Join();
+        delete m_pAcceptor;
+        m_pAcceptor = NULL;
+    }
 
-    for ( size_t nCount = 0; nCount < m_apConnections.size(); nCount++ )
+    {
+        IASLib::CMutexLock oLock( m_mutexConnections );
+
+        apConnections.swap( m_apConnections );
+    }
+    for ( size_t nCount = 0; nCount < apConnections.size(); nCount++ )
     {
         try
         {
-            m_apConnections[ nCount ]->SendRays( oStop );
+            apConnections[ nCount ]->SendStop();
         }
         catch ( IASLib::CException & )
         {
         }
-        m_apConnections[ nCount ]->Shutdown();
+        apConnections[ nCount ]->Shutdown();
     }
-
-    for ( size_t nCount = 0; nCount < m_apConnections.size(); nCount++ )
+    for ( size_t nCount = 0; nCount < apConnections.size(); nCount++ )
     {
-        m_apConnections[ nCount ]->Join();
-        delete m_apConnections[ nCount ];
+        apConnections[ nCount ]->Join();
+        delete apConnections[ nCount ];
     }
-    m_apConnections.clear();
-    m_nTasks = 0;
-
-    while ( m_oResults.TryPop( pColors ) )
-        delete pColors;
-
+    ForgetTasks();
     return TRUE;
 }
 
-BOOL CSocketTaskMaster::SceneToTasks( CScene &oScene )
+BOOL CSocketTaskMaster::SceneToTask( int nTask, CScene &oScene )
 {
+    CConnection *pConnection = GetConnection( nTask );
+
+    if ( pConnection == NULL )
+        return FALSE;
     try
     {
             // Each connection has its own SJSON stream, so the scene is
             // encoded for each.
-        for ( size_t nCount = 0; nCount < m_apConnections.size(); nCount++ )
-            m_apConnections[ nCount ]->SendScene( oScene );
+        pConnection->SendScene( oScene );
     }
     catch ( IASLib::CException &oException )
     {
-        m_strLastError = oException.GetMessage();
+        m_strLastError = (const char *)oException.GetMessage();
         return FALSE;
     }
     return TRUE;
 }
 
-BOOL CSocketTaskMaster::RaysToTask( CRayArray &oRays, int nTask )
+BOOL CSocketTaskMaster::TileToTask( int nTask, uint32_t nTrace, const STile &oTile )
 {
-    if ( ( nTask < 0 ) || ( nTask >= (int)m_apConnections.size() ) )
-        return FALSE;
+    CConnection *pConnection = GetConnection( nTask );
 
+    if ( pConnection == NULL )
+        return FALSE;
     try
     {
-        m_apConnections[ (size_t)nTask ]->SendRays( oRays );
+        pConnection->SendTile( nTrace, oTile );
     }
     catch ( IASLib::CException &oException )
     {
-        m_strLastError = oException.GetMessage();
+        m_strLastError = (const char *)oException.GetMessage();
         return FALSE;
     }
     return TRUE;
-}
-
-int CSocketTaskMaster::ColorsFromTasks( BOOL bWait )
-{
-    CColorArray    *pColors;
-    int             nPixels = 0;
-    bool            bHaveOne;
-
-    if ( bWait )
-    {
-        pColors = m_oResults.Pop();
-        bHaveOne = true;
-    }
-    else
-        bHaveOne = m_oResults.TryPop( pColors );
-
-    while ( bHaveOne )
-    {
-        if ( pColors == NULL )
-        {
-            m_strLastError = "A rayengine disconnected during the trace";
-            return -1;
-        }
-
-        for ( int nCount = 0; nCount < pColors->GetSize(); nCount++ )
-            PutSample( pColors->GetX( nCount ), pColors->GetY( nCount ), (*pColors)[ nCount ] );
-
-        nPixels += pColors->GetSize();
-        delete pColors;
-
-        bHaveOne = m_oResults.TryPop( pColors );
-    }
-
-    return nPixels;
 }

@@ -13,7 +13,8 @@
 *   ("uvs"), or works them out for each face with a UV map: planar,      *
 *   cylindrical, spherical or box projection about an axis.              *
 *                                                                        *
-*   A ray that misses the mesh's bounding box skips all its faces. Rays  *
+*   The faces are kept in a bounding volume hierarchy, a tree of boxes,  *
+*   so a ray tests only the faces in boxes it passes through. Rays       *
 *   leaving one face (shadows, reflections) skip only that face, so a    *
 *   mesh shadows and reflects itself.                                    *
 *                                                                        *
@@ -61,8 +62,27 @@ class CMesh : public CObjects
         CVector                 m_oMaximum;
         CTriangle              *m_pHitFace;         // the face Intersect hit last
 
+            // The bounding volume hierarchy: each node a box around its
+            // faces, either two child nodes or (a leaf) a run of m_anOrder.
+        struct SNode
+        {
+            FLT                 anMin[ 3 ];
+            FLT                 anMax[ 3 ];
+            int                 nLeft;              // child nodes, if nCount is 0
+            int                 nRight;
+            int                 nFirst;             // the leaf's faces in m_anOrder
+            int                 nCount;
+        };
+        std::vector<SNode>      m_aoNodes;          // the root first
+        std::vector<int>        m_anOrder;          // face indices, grouped by leaf
+
         void                    DeleteFaces( void );
         BOOL                    HitsBox( CRay &oRay );
+            // Builds the tree, each box nMargin larger than its faces.
+        void                    BuildTree( FLT nMargin );
+        int                     BuildNode( int nFirst, int nCount, const std::vector<FLT> &anCenters, FLT nMargin );
+            // Whether the ray passes through a node's box before nLimit.
+        static BOOL             HitsNode( const SNode &oNode, const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit );
 
     public:
                                 DYNAMIC_OBJECTS( CMesh );
@@ -91,6 +111,9 @@ class CMesh : public CObjects
 
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect );
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore );
+            /// Intersect without the tree: every face, in order. The tree
+            /// must find exactly what this does; the tests hold it to that.
+        BOOL                    IntersectEachFace( CRay &oRay, CVector &oIntersect );
         virtual CColor          Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 
 #ifdef RAY_GUI
