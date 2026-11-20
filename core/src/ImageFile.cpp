@@ -72,6 +72,14 @@ CImageFile::CImageFile( LPCSTR strFilename, int nWidth, int nHeight, BOOL bRead 
     }
 }
 
+CImageFile::CImageFile( int nWidth, int nHeight )
+{
+    m_nWidth = (DWORD)( ( nWidth > 0 ) ? nWidth : 0 );
+    m_nHeight = (DWORD)( ( nHeight > 0 ) ? nHeight : 0 );
+    m_pFile = NULL;
+    m_abMemory.assign( (size_t)m_nWidth * (size_t)m_nHeight * 3, 0 );
+}
+
 CImageFile::~CImageFile( void )
 {
     if ( m_pFile )
@@ -90,6 +98,14 @@ CColor CImageFile::GetPoint( int nX, int nY )
 
     if ( ( nX < 0 ) || ( nY < 0 ) || ( (DWORD)nX >= m_nWidth ) || ( (DWORD)nY >= m_nHeight ) )
         return oColor;
+
+    if ( ! m_abMemory.empty() )
+    {
+        size_t  nAt = ( ( (size_t)m_nWidth * (size_t)nY ) + (size_t)nX ) * 3;
+
+        oColor.Set( (FLT)m_abMemory[ nAt ] / 255.0, (FLT)m_abMemory[ nAt + 1 ] / 255.0, (FLT)m_abMemory[ nAt + 2 ] / 255.0 );
+        return oColor;
+    }
 
     if ( m_pFile )
     {
@@ -149,6 +165,16 @@ BOOL CImageFile::PutRGB( int nX, int nY, BYTE nRed, BYTE nGreen, BYTE nBlue )
 
     if ( ( nX < 0 ) || ( nY < 0 ) || ( (DWORD)nX >= m_nWidth ) || ( (DWORD)nY >= m_nHeight ) )
         return FALSE;
+
+    if ( ! m_abMemory.empty() )
+    {
+        size_t  nAt = ( ( (size_t)m_nWidth * (size_t)nY ) + (size_t)nX ) * 3;
+
+        m_abMemory[ nAt ] = nRed;
+        m_abMemory[ nAt + 1 ] = nGreen;
+        m_abMemory[ nAt + 2 ] = nBlue;
+        return TRUE;
+    }
 
     if ( m_pFile )
     {

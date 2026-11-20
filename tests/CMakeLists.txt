@@ -7,6 +7,10 @@ add_executable(compare_images compare_images.cpp)
 add_executable(format_test format_test.cpp)
 target_link_libraries(format_test PRIVATE ray_core)
 
+# The scene editor's logic, without a display.
+add_executable(editor_test editor_test.cpp)
+target_link_libraries(editor_test PRIVATE ray_editor_logic ray_core)
+
 set(REFERENCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/reference")
 file(ARCHIVE_EXTRACT INPUT "${CMAKE_CURRENT_SOURCE_DIR}/reference/renders.tar.gz"
                      DESTINATION "${REFERENCE_DIR}")
@@ -589,6 +593,12 @@ if(Python3_Interpreter_FOUND)
 else()
     message(STATUS "Python 3 not found: the image_output test is skipped")
 endif()
+
+# The scene editor's logic: editing, undo, tessellation, the view's camera
+# against the tracer's, picking, model import, saving and the progressive
+# render (no display needed).
+add_test(NAME editor_logic COMMAND editor_test ${PROJECT_SOURCE_DIR}/scenes ${RENDER_DIR})
+set_tests_properties(editor_logic PROPERTIES TIMEOUT 300)
 
 # raythrower --spawn starts the rayengine next to it.
 add_dependencies(raythrower rayengine)
