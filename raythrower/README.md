@@ -24,7 +24,7 @@ raythrower <FileToTrace> [options]
 | `--engine <path>` | The `rayengine` to start (default: next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for each engine to connect (default 60) |
 | `--batch <rays>` | Rays per batch (default 127) |
-| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, or `random`, with any settings after a colon (`random:samples=9,seed=2`) |
+| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`, with any settings after a colon (`random:samples=9,seed=2`, `stratified:grid=8`) |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`, with settings as for `--aa` (`reinhard:exposure=1.5`) |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene, with any `--aa`, `--color` or `--size` applied, and exit without tracing |
@@ -45,6 +45,13 @@ and averages them equally.
 rays at random points in the pixel, which share the other half: N + 1 rays a pixel (N from 1 to
 1024, default 4). The points come from a hash of the pixel, the ray's number and `seed` (default 0),
 so the same scene always gives the same image, however the work is split between tasks.
+
+`--aa stratified:grid=n` cuts each pixel into an n×n grid and traces one ray at a random point in
+each cell, all weighted equally (n from 1 to 32, default 4). It is the sampler to use with a real
+lens, where every ray takes its own path through the glass.
+
+When the scene's camera has a lens, `raythrower` prints its focal length, f-number, focus distance
+and where the sensor sits before it traces.
 
 `--color` picks how pixel colors become bytes. `clip`, the default, is the 1997 look. `gamma` and
 `srgb` encode for today's displays, which makes the 1997 scenes, lit for a screen without gamma

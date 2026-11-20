@@ -21,9 +21,12 @@ class CPixelWriter
     protected:
         CImageFile         &m_oImageFile;
         const CColorModel  &m_oColorModel;
+        FLT                 m_nExposure;
 
     public:
-                            CPixelWriter( CImageFile &oImageFile, const CColorModel &oColorModel );
+            /// nExposure scales every color before the color model (a real
+            /// lens lets less light through than a pinhole).
+                            CPixelWriter( CImageFile &oImageFile, const CColorModel &oColorModel, FLT nExposure = 1.0 );
 
             /// Writes pixel (nX, nY) with this linear color. Returns FALSE if
             /// the pixel is outside the image or couldn't be written.

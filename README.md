@@ -68,10 +68,19 @@ The ray tracing itself is the 1997 code.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by influence.
 - **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler: `corners`
   (five rays per pixel, four of them corners shared with the neighbors, about two rays a pixel),
-  `box` (four rays halfway from the center to each corner), or `random` (a center ray worth half
-  the pixel plus N random rays; reproducible, so every run gives the same image).
+  `box` (four rays halfway from the center to each corner), `random` (a center ray worth half
+  the pixel plus N random rays), or `stratified` (an n×n grid of equally weighted rays, each at a
+  random point in its cell; best for real lenses). Random points are reproducible, so every run
+  gives the same image.
 - **Camera:** pinhole camera with position, look-at point, up vector, and vertical field of view;
   square pixels at any image size.
+- **Real lenses:** give the camera a lens prescription (spherical glass surfaces, front to back, as
+  in lens patents) and rays are traced from the sensor back through each element. Rays the barrel or
+  aperture stop blocks go dark, so depth of field, vignetting, and the lens's own aberrations and
+  distortion come out of the optics. Focus and exposure are worked out automatically; a 50 mm f/2
+  double Gauss is built in.
+
+  <img src="docs/images/lens.png" alt="scan_test through a pinhole, and through the double Gauss at f/2 focused on the glass sphere" width="650">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
   look, and the default), `gamma`, `srgb`, and `reinhard` tone mapping.
 - **Readable scene files:** scenes are JSON that you can write and edit by hand, with clear errors
@@ -183,6 +192,13 @@ raythrower scenes/scan_test.ray --aa corners --ppm scan_test.ppm
 raythrower scenes/scan_test.ray --color reinhard --ppm scan_test.ppm
 ```
 
+**Shoot through a real lens** (the camera's `lens` in the scene; see
+[`scenes/lens_test.ray`](scenes/lens_test.ray)):
+
+```sh
+raythrower scenes/lens_test.ray --aa stratified:grid=8 --ppm lens.ppm
+```
+
 **Render the Utah teapot** (6,320 triangles; every ray inside its bounding box tests every face,
 so it takes a while):
 
@@ -220,7 +236,7 @@ rayengine master.example.com 7997                       # on each of three machi
 | `--engine <path>` | The `rayengine` to start (default: the one next to `raythrower`) |
 | `--timeout <seconds>` | How long to wait for engines to connect (default 60) |
 | `--batch <rays>` | Rays per batch (default 127) |
-| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, or `random`; settings after a colon, as in `random:samples=9` |
+| `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`; settings after a colon, as in `random:samples=9` |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`; settings as for `--aa`, as in `reinhard:exposure=1.5` |
 | `--size <w>x<h>` | Image size, instead of the scene's |
 | `--save <file>` | Save the scene (with any `--aa`/`--color`/`--size`) and exit |
@@ -237,12 +253,13 @@ menu, and choose *Render*.
 ctest --test-dir build --output-on-failure
 ```
 
-The tests render every sample scene and compare it with a reference render (four of them again
-with corner anti-aliasing, one with each other sampler and color model, and the teapot), check that networked engines
-produce exactly the same bytes as threads and that rays and colors cross the wire exactly, check
-that scene files survive a load and save, check that mistakes in JSON scenes are reported where
-they are, and check triangle sidedness and that smooth mesh faces agree along shared edges. CI runs them on every platform, and again on Linux under
-AddressSanitizer and UndefinedBehaviorSanitizer.
+The tests render every sample scene and compare it with a reference render (four of them again with
+corner anti-aliasing, one with each other sampler and color model, the teapot, and a real lens).
+They also check that a lens has the focal length, f-number and focus its prescription should, that
+networked engines produce exactly the same bytes as threads and that rays and colors cross the wire
+exactly, that scene files survive a load and save, that mistakes in JSON scenes are reported where
+they are, and triangle sidedness and that smooth mesh faces agree along shared edges. CI runs them
+on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 ### Expected output
 
@@ -262,16 +279,16 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/reflect_test3.png" alt="render_reflect_test3" width="260"><br><code>render_reflect_test3</code></td><td align="center"><img src="docs/images/tests/reflection_test.png" alt="render_reflection_test" width="260"><br><code>render_reflection_test</code></td><td align="center"><img src="docs/images/tests/scan_test.png" alt="render_scan_test" width="260"><br><code>render_scan_test</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/ser_test.png" alt="render_ser_test" width="260"><br><code>render_ser_test</code></td><td align="center"><img src="docs/images/tests/ser_test2.png" alt="render_ser_test2 (blank by design)" width="260"><br><code>render_ser_test2 (blank by design)</code></td><td align="center"><img src="docs/images/tests/spec_test.png" alt="render_spec_test" width="260"><br><code>render_spec_test</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"></td></tr>
+<tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td></tr>
 </table>
 
-**Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box` and `random` samplers on
-`scan_test` (compare with `render_scan_test` above).
+**Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random` and
+`stratified` (3×3) samplers on `scan_test` (compare with `render_scan_test` above).
 
 <table>
 <tr><td align="center"><img src="docs/images/tests/scan_test_aa.png" alt="render_aa_scan_test (corners)" width="260"><br><code>render_aa_scan_test (corners)</code></td><td align="center"><img src="docs/images/tests/axis_test_aa.png" alt="render_aa_axis_test (corners)" width="260"><br><code>render_aa_axis_test (corners)</code></td><td align="center"><img src="docs/images/tests/triangle_aa.png" alt="render_aa_triangle (corners)" width="260"><br><code>render_aa_triangle (corners)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/xxx_aa.png" alt="render_aa_xxx (corners)" width="260"><br><code>render_aa_xxx (corners)</code></td><td align="center"><img src="docs/images/tests/scan_test_box.png" alt="render_sampler_box" width="260"><br><code>render_sampler_box</code></td><td align="center"><img src="docs/images/tests/scan_test_random2.png" alt="render_sampler_random2" width="260"><br><code>render_sampler_random2</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/scan_test_random4.png" alt="render_sampler_random4" width="260"><br><code>render_sampler_random4</code></td><td align="center"><img src="docs/images/tests/scan_test_random9.png" alt="render_sampler_random9" width="260"><br><code>render_sampler_random9</code></td><td align="center"></td></tr>
+<tr><td align="center"><img src="docs/images/tests/scan_test_random4.png" alt="render_sampler_random4" width="260"><br><code>render_sampler_random4</code></td><td align="center"><img src="docs/images/tests/scan_test_random9.png" alt="render_sampler_random9" width="260"><br><code>render_sampler_random9</code></td><td align="center"><img src="docs/images/tests/scan_test_stratified.png" alt="render_sampler_stratified" width="260"><br><code>render_sampler_stratified</code></td></tr>
 </table>
 
 **Color models** (`--color`) on `scan_test`. The 1997 scenes were lit for screens without gamma

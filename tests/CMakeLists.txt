@@ -85,6 +85,29 @@ add_test(NAME render_teapot
                  -DSIZE=160x120
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(render_teapot PROPERTIES TIMEOUT 600)
+# A real lens: scan_test through the double Gauss, focused on the glass
+# sphere, with a stratified sampler. Small, since it traces 25 rays a pixel.
+add_test(NAME render_lens
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/lens_test.ray
+                 -DOUTPUT=${RENDER_DIR}/lens_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/lens_test.raw
+                 -DSIZE=160x120
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_lens PROPERTIES TIMEOUT 600)
+add_test(NAME roundtrip_lens_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/lens_test.ray ${RENDER_DIR})
+add_test(NAME render_sampler_stratified
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray
+                 -DOUTPUT=${RENDER_DIR}/${RAY_SAMPLER_SCENE}_stratified.raw
+                 -DREFERENCE=${REFERENCE_DIR}/${RAY_SAMPLER_SCENE}_stratified.raw
+                 -DAA=stratified:grid=3
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+
 add_test(NAME roundtrip_teapot COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/teapot.ray ${RENDER_DIR})
 
 foreach(model IN LISTS RAY_COLOR_MODELS)

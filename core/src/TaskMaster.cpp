@@ -97,7 +97,7 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
 {
     CSettings      &oSettings = oScene.GetSettings();
     CPixelSampler  &oSampler = oScene.GetCamera().GetSampler();
-    CPixelWriter    oWriter( oImageFile, oScene.GetCamera().GetColorModel() );
+    CPixelWriter    oWriter( oImageFile, oScene.GetCamera().GetColorModel(), oScene.GetCamera().GetExposure() );
     CRayArray       oRays;
     CRay            oRay;
     int             nCurrentTask = 0;

@@ -18,6 +18,7 @@ when the binary format was dropped; they are in the repository's history.
 | `triangle.ray`, `triangle2.ray` | version 2 | Triangle primitives. `triangle2` gives its corners tilted normals, which fake a curve (and are what light it: its lights lie in the triangle's plane) |
 | `xxx.ray` | version 1 | Read with the legacy number format |
 | `huh.ray` | transitional | Version-2 header with legacy numbers; renders blank |
+| `lens_test.ray` | | `scan_test` through a real lens: the built-in double Gauss wide open (f/2), focused on the glass sphere, with 1 scene unit = 10 cm and a 5×5 stratified sampler |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
 Two 1997 files, `yyy.ray` (saved by an in-between build that wrote an extra, undefined field) and
@@ -63,15 +64,41 @@ places.
 | `up` | `[0, 1, 0]` | Which way is up; the image's top edge faces this way |
 | `verticalAngle` | `30` | Vertical field of view in degrees. The horizontal one follows from the image's shape, so pixels are square. |
 | `horizontalAngle`, `aspectRatio` | `40`, `1.333…` | Kept from 1997; not used for rendering |
-| `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half) |
+| `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half), or `"stratified"` (an n×n grid of equally weighted rays, each at a random point in its cell) |
+| `lens` | none | A real lens, below; without one the camera is a pinhole |
 | `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, or `"reinhard"` |
 
 A sampler or color model is a name, or an object with a `type` and its settings:
 `{ "type": "random", "samples": 9, "seed": 0 }` (N from 1 to 1024, default 4; the same seed always
-gives the same image), `{ "type": "gamma", "gamma": 2.2 }`, or
+gives the same image), `{ "type": "stratified", "grid": 5 }` (n from 1 to 32, default 4), `{ "type": "gamma", "gamma": 2.2 }`, or
 `{ "type": "reinhard", "exposure": 1, "white": 4 }`
 (`exposure` scales the colors first; with a `white` luminance, that and anything brighter maps to
 white).
+
+**`lens`.** With a lens the camera is a real camera: rays start on the sensor and are traced back
+through each glass surface out into the scene, and rays that hit the barrel or the aperture stop go
+dark. Depth of field, vignetting, and the lens's aberrations and distortion all come from that. The
+field of view comes from the focal length and `sensorWidth` (`verticalAngle` is not used), the
+sensor is placed to focus at `focusDistance`, and exposure is set so the center of the image is as
+bright as through a pinhole. Use a sampler with many evenly weighted rays (`stratified`), since
+each ray takes a different path through the lens. With `raythrower`, the lens is described before
+tracing.
+
+| Field | Default | |
+|-------|---------|-|
+| `prescription` | | A built-in lens: `"double-gauss-50mm"` (50 mm f/2, US patent 2,673,491, as tabulated by Kolb et al., 1995) |
+| `surfaces` | | Or the lens's own surfaces, front (scene side) to back; give one or the other |
+| `fNumber` | wide open | The aperture; can't be wider than the lens opens |
+| `focusDistance` | the look-at point | Where it focuses, in scene units from the front of the lens |
+| `sensorWidth` | `36` | In mm (36 is full frame); the height follows from the image's shape |
+| `millimetersPerUnit` | `1000` | How big a scene unit is (1000: scene units are meters) |
+| `seed` | `0` | Picks the points rays cross the lens at |
+
+Each surface: `radius` of curvature in mm (positive when its center of curvature is toward the
+sensor; `0` for flat), `thickness` to the next surface in mm (the last one's is ignored: focusing
+places the sensor), `ior` of what follows it (default `1`, air), `aperture`, its semi-aperture
+(radius) in mm, and `stop: true` for the aperture stop, which must be flat. A prescription that
+doesn't converge light, or can't focus at the distance asked, is reported when the scene loads.
 
 **Objects.** Each has a `type`, a `color` (default `[0.5, 0.5, 0.5]`; the 1997 editor's base
 color, not used in shading), and `materials` (default: one diffuse material).

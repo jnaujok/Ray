@@ -316,6 +316,59 @@ static void TriangleChecks( void )
     }
 }
 
+    // s_strMinimal's camera with this lens.
+static std::string WithLens( const char *strLens )
+{
+    return Minimal( "\"lookAt\": [0, 0, 0]", ( std::string( "\"lookAt\": [0, 0, 0], \"lens\": " ) + strLens ).c_str() );
+}
+
+static void LensChecks( void )
+{
+    CScene  oScene;
+
+        // The double Gauss, focused at infinity: a 50 mm f/2 lens whose back
+        // focal distance is about 36 mm.
+    Check( oScene.FromJson( WithLens( "{ \"prescription\": \"double-gauss-50mm\", \"focusDistance\": 1e9 }" ) ) == 0,
+           "the double Gauss loads" );
+    CLens *pLens = oScene.GetCamera().GetLens();
+    Check( pLens && ABS( pLens->GetFocalLength() - 50.358 ) < 0.01, "the double Gauss is a 50 mm lens" );
+    Check( pLens && ABS( pLens->GetWideOpen() - 2.02 ) < 0.01, "the double Gauss opens to f/2" );
+    Check( pLens && ABS( pLens->GetFilmDistance() - 36.106 ) < 0.01, "focused at infinity, the sensor is 36.1 mm behind it" );
+    Check( oScene.GetCamera().GetExposure() >= 1.0, "a lens lets through no more light than a pinhole" );
+
+        // Focusing closer moves the sensor back.
+    Check( oScene.FromJson( WithLens( "{ \"prescription\": \"double-gauss-50mm\", \"focusDistance\": 1.0 }" ) ) == 0 &&
+           oScene.GetCamera().GetLens()->GetFilmDistance() > 36.2, "focusing at 1 m moves the sensor back" );
+
+        // A lens can be given surface by surface, and saves that way.
+    const char *strSingle = "{ \"surfaces\": [ { \"radius\": 50, \"thickness\": 5, \"ior\": 1.5, \"aperture\": 10 }, "
+                            "{ \"radius\": 0, \"thickness\": 2, \"aperture\": 6, \"stop\": true }, "
+                            "{ \"radius\": -50, \"thickness\": 0, \"aperture\": 10 } ], \"focusDistance\": 5 }";
+    Check( oScene.FromJson( WithLens( strSingle ) ) == 0, "a lens given surface by surface loads" );
+    Check( oScene.ToJson().find( "\"surfaces\"" ) != std::string::npos && oScene.ToJson().find( "\"stop\": true" ) != std::string::npos,
+           "a lens given surface by surface saves its surfaces" );
+
+        // The blueprint's "simplified double Gauss" diverges: it can't form an image.
+    ExpectError( WithLens( "{ \"surfaces\": [ { \"radius\": 38.94, \"thickness\": 5.12, \"ior\": 1.658, \"aperture\": 16.3 }, "
+                           "{ \"radius\": 101.44, \"thickness\": 4.11, \"aperture\": 15.1 }, "
+                           "{ \"radius\": 24.9, \"thickness\": 3.76, \"ior\": 1.643, \"aperture\": 12.3 }, "
+                           "{ \"radius\": 15.54, \"thickness\": 4.9, \"aperture\": 11.2 }, "
+                           "{ \"radius\": 0, \"thickness\": 3.23, \"aperture\": 10.5, \"stop\": true }, "
+                           "{ \"radius\": -14.65, \"thickness\": 1.25, \"ior\": 1.613, \"aperture\": 10.3 }, "
+                           "{ \"radius\": -29.81, \"thickness\": 5.18, \"ior\": 1.62, \"aperture\": 11.7 }, "
+                           "{ \"radius\": 21.84, \"thickness\": 15.35, \"aperture\": 12.3 } ] }" ),
+                 BAD_FILE, "camera.lens: the lens doesn't bring light to a focus" );
+    ExpectError( WithLens( "{ \"prescription\": \"double-gauss-50mm\", \"fNumber\": 1.4 }" ), BAD_FILE,
+                 "camera.lens: the lens opens only to f/2.02" );
+    ExpectError( WithLens( "{ \"prescription\": \"double-gauss-50mm\", \"focusDistance\": 0.01 }" ), BAD_FILE,
+                 "camera.lens: the lens can't focus at 0.01 scene units" );
+    ExpectError( WithLens( "{ \"prescription\": \"zoom-24-70mm\" }" ), BAD_FILE, "camera.lens: unknown lens prescription" );
+    ExpectError( WithLens( "{ \"prescription\": \"double-gauss-50mm\", \"surfaces\": [] }" ), BAD_FILE,
+                 "camera.lens: a lens needs a \"prescription\"" );
+    ExpectError( WithLens( "{ \"surfaces\": [ { \"radius\": 5, \"thickness\": 1, \"aperture\": 10 } ] }" ), BAD_FILE,
+                 "camera.lens.surfaces[0]: the surface is wider than its sphere" );
+}
+
 static void RoundTrip( const char *strScene, const char *strDir )
 {
     std::string strBase = std::string( strDir ) + "/roundtrip_";
@@ -349,6 +402,7 @@ int main( int argc, char **argv )
         WireChecks();
         JsonChecks();
         TriangleChecks();
+        LensChecks();
     }
 
     if ( g_nFailures == 0 )

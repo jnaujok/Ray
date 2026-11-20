@@ -11,6 +11,8 @@
 #include "ClipColorModel.h"
 #include "SceneJson.h"
 
+#include <math.h>
+
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -58,6 +60,7 @@ CCamera::CCamera( const CCamera &oSource )
     m_nAspectRatio = oSource.m_nAspectRatio;
     m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
     m_pColorModel.reset( oSource.m_pColorModel ? oSource.m_pColorModel->Clone() : NULL );
+    m_pLens.reset( oSource.m_pLens ? oSource.m_pLens->Clone() : NULL );
     CalcRotate();
 }
 
@@ -73,6 +76,7 @@ CCamera &CCamera::operator =( const CCamera &oSource )
     {
         m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
         m_pColorModel.reset( oSource.m_pColorModel ? oSource.m_pColorModel->Clone() : NULL );
+        m_pLens.reset( oSource.m_pLens ? oSource.m_pLens->Clone() : NULL );
     }
     CalcRotate();
     return *this;
@@ -105,6 +109,79 @@ CColorModel &CCamera::GetColorModel( void )
 void CCamera::SetColorModel( CColorModel *pColorModel )
 {
     m_pColorModel.reset( pColorModel );
+}
+
+BOOL CCamera::SetLens( CLens *pLens )
+{
+    m_pLens.reset( pLens );
+    CalcRotate();
+    return m_strLensError.empty();
+}
+
+    // SplitMix64's finalizer, and a number from 0 up to 1 from its top bits.
+static uint64_t LensMix( uint64_t nValue )
+{
+    nValue += 0x9E3779B97F4A7C15ULL;
+    nValue = ( nValue ^ ( nValue >> 30 ) ) * 0xBF58476D1CE4E5B9ULL;
+    nValue = ( nValue ^ ( nValue >> 27 ) ) * 0x94D049BB133111EBULL;
+    return nValue ^ ( nValue >> 31 );
+}
+
+static FLT LensUnit( uint64_t nValue )
+{
+    return (FLT)( (double)( nValue >> 11 ) * ( 1.0 / 9007199254740992.0 ) );
+}
+
+BOOL CCamera::PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, FLT nImageY, CVector &oOrigin, CVector &oDirection )
+{
+    if ( ! m_pLens )
+    {
+        oOrigin = m_oPosition;
+        oDirection = RayDirection( nScreenX, nScreenY, nAspect );
+        return TRUE;
+    }
+
+        // Where the ray falls in its pixel picks where it crosses the rear
+        // element, so rays spread evenly over a pixel spread evenly over the
+        // lens. A shift for each pixel (wrapping round) keeps neighboring
+        // pixels from using the same points, which would show in the blur.
+    FLT         nPixelX = (FLT)floor( (double)nImageX );
+    FLT         nPixelY = (FLT)floor( (double)nImageY );
+    uint64_t    nHash = LensMix( LensMix( LensMix( (uint64_t)(uint32_t)m_pLens->GetSeed() ) ^ (uint64_t)(int64_t)nPixelX ) ^
+                                 (uint64_t)(int64_t)nPixelY );
+    FLT         nLensU = ( nImageX - nPixelX ) + LensUnit( nHash );
+    FLT         nLensV = ( nImageY - nPixelY ) + LensUnit( LensMix( nHash ) );
+    FLT         anOrigin[ 3 ];
+    FLT         anDirection[ 3 ];
+
+    nLensU -= (FLT)floor( (double)nLensU );
+    nLensV -= (FLT)floor( (double)nLensV );
+    if ( ! m_pLens->RayFor( nScreenX, nScreenY, nAspect, nLensU, nLensV, anOrigin, anDirection ) )
+    {
+        oOrigin = m_oPosition;
+        oDirection = m_oForward;
+        return FALSE;
+    }
+
+        // From the lens frame (mm, light toward +z) to the scene: +z is
+        // backward, x right and y up.
+    FLT     nScale = 1.0 / m_pLens->GetMillimetersPerUnit();
+    CVector oRight( m_oRight * ( anOrigin[ 0 ] * nScale ) );
+    CVector oTop( m_oTop * ( anOrigin[ 1 ] * nScale ) );
+    CVector oBack( m_oForward * ( -anOrigin[ 2 ] * nScale ) );
+
+    oOrigin = m_oPosition + oRight;
+    oOrigin = oOrigin + oTop;
+    oOrigin = oOrigin + oBack;
+
+    CVector oDirRight( m_oRight * anDirection[ 0 ] );
+    CVector oDirTop( m_oTop * anDirection[ 1 ] );
+    CVector oDirBack( m_oForward * -anDirection[ 2 ] );
+
+    oDirection = oDirRight + oDirTop;
+    oDirection = oDirection + oDirBack;
+    oDirection.Normalize();
+    return TRUE;
 }
 
 DYNAMIC_IMPLEMENTS( CCamera, "camera" );
@@ -169,6 +246,15 @@ void CCamera::CalcRotate( void )
     m_oRight.Normalize();
     m_oTop = m_oForward.Cross( m_oRight );
     m_oTop.Normalize();
+
+        // A lens focuses at the look-at point unless it says otherwise.
+    m_strLensError.clear();
+    if ( m_pLens )
+    {
+        CVector oToLookAt( m_oPointAt - m_oPosition );
+
+        m_pLens->Prepare( oToLookAt.Magnitude(), m_strLensError );
+    }
 }
 
 CVector CCamera::RayDirection( FLT nScreenX, FLT nScreenY, FLT nAspect )
@@ -239,13 +325,15 @@ void CCamera::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutNumber( oNode, "aspectRatio", m_nAspectRatio );
     PutModel( oNode, "sampler", GetSampler() );
     PutModel( oNode, "colorModel", GetColorModel() );
+    if ( m_pLens )
+        m_pLens->ToJson( *oNode.putObject( "lens" ) );
 }
 
 BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "position", "lookAt", "up", "verticalAngle",
                                               "horizontalAngle", "aspectRatio",
-                                              "sampler", "colorModel", NULL };
+                                              "sampler", "colorModel", "lens", NULL };
     CPixelSampler  *pSampler;
     CColorModel    *pColorModel;
 
@@ -271,6 +359,25 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
     if ( pColorModel )
         SetColorModel( pColorModel );
 
+    const IASLib::CJsonNode *pLens = oNode.get( "lens" );
+
+    if ( pLens )
+    {
+        RayJson::CWhere         oWhere( "lens" );
+        std::unique_ptr<CLens>  pNewLens( new CLens );
+
+        if ( ! pNewLens->FromJson( *pLens ) )
+            return FALSE;
+        m_pLens.reset( pNewLens.release() );
+    }
+    else
+        m_pLens.reset();
+
     CalcRotate();
+    if ( ! m_strLensError.empty() )
+    {
+        RayJson::CWhere oWhere( "lens" );
+        return RayJson::Fail( m_strLensError );
+    }
     return TRUE;
 }

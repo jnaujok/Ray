@@ -54,7 +54,8 @@ ctest --test-dir build --output-on-failure
 ## Rules for the code
 
 - **Don't change the ray tracing logic** (intersection, shading, primary ray generation in
-  `CRay::CreateRay`, `CCamera::RayDirection`, and the pixel samplers) without being asked to.
+  `CRay::CreateRay`, `CCamera::RayDirection`, `CCamera::PrimaryRay`, `CLens`, and the pixel
+  samplers) without being asked to. A camera without a lens must stay an exact pinhole.
   Fixing crashes and undefined behavior is fine.
 - **Scene files are JSON** (`.ray`, version 3; documented in `scenes/README.md`). Each scene class
   reads and writes its own fields in `ToJson`/`FromJson`, through the `RayJson` helpers in

@@ -39,6 +39,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     come from a hash of the pixel, ray number and `seed`, so images are reproducible and threads and
     engines agree.
   - `CPixelAccumulator`: the weighted, fixed-point, order-independent averaging the samplers share.
+- **Real camera lenses** (`CLens`): a camera can have a lens prescription, spherical glass surfaces
+  listed front to back as in lens patents, and rays are traced from the sensor back through each
+  surface out into the scene. Rays the barrel or the aperture stop blocks go dark, so depth of
+  field, vignetting, and the lens's aberrations and distortion come from the optics. The lens's
+  focal length and widest f-number are worked out, the sensor is placed to focus at
+  `focusDistance` (default: the look-at point), and exposure is set so the image center is as bright
+  as through a pinhole (`CPixelWriter` now takes an exposure). The ray's position in its pixel picks
+  where it crosses the lens, with a per-pixel shift, so evenly spread rays sample the lens evenly.
+  Built in: `double-gauss-50mm` (50 mm f/2, US 2,673,491, as tabulated by Kolb et al. 1995). The
+  example prescription in the design brief this started from turned out to be a diverging lens
+  (focal length −16 mm), which can't form an image; such lenses are rejected with that message.
+  A camera without a lens is the same pinhole as before, byte for byte. New `scenes/lens_test.ray`.
+  - `stratified` sampler (`CStratifiedSampler`): an n×n grid of equally weighted rays per pixel,
+    each at a random point in its cell (`grid`, n, default 4; `seed`). Equal weights matter with a
+    lens, where the `random` sampler's half-weight center ray makes every blocked ray a dark speck.
 - **Triangles work out their own normals** from their corners, instead of storing them, by the
   edge traversal in the 1997 code (which had been commented out) with its order reversed:
   (V2 − V1) × (V3 − V2). The 1997 order made faces of standard models such as OBJ files face
@@ -74,7 +89,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`docs/images/tests/`) from `tests/reference/renders.tar.gz`.
 - `CRay::CreateRayAt`, which casts a primary ray through any point on the image,
   `CImageFile::PutRGB`, `CVector::Cross`, and `CScene::GetObjectAt`.
-- Tests: four scenes rendered with corner anti-aliasing, one with `box` and with `random` at 2, 4
+- Tests: a lens render and lens checks (the double Gauss's focal length, f-number and focus, and
+  the errors for unusable lenses), the stratified sampler, four scenes rendered with corner
+  anti-aliasing, one with `box` and with `random` at 2, 4
   and 9 rays (and networked `random`, which must match threads exactly), one with each color
   model, and the teapot
   (new references in `tests/reference/renders.tar.gz`); networked engines must match threads with

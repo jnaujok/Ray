@@ -9,6 +9,7 @@
 #include "CornerSampler.h"
 #include "BoxSampler.h"
 #include "RandomSampler.h"
+#include "StratifiedSampler.h"
 
 #include "SceneJson.h"
 
@@ -20,6 +21,7 @@ namespace
     CPixelSampler *CreateCorner( void ) { return new CCornerSampler; }
     CPixelSampler *CreateBox( void )    { return new CBoxSampler; }
     CPixelSampler *CreateRandom( void ) { return new CRandomSampler; }
+    CPixelSampler *CreateStratified( void ) { return new CStratifiedSampler; }
 
         // Every sampler that can be chosen by name. The first is the default.
     const CPixelSampler::SType s_aoTypes[] =
@@ -29,6 +31,8 @@ namespace
         { "box",     "four rays per pixel, halfway from its center to each corner",            CreateBox },
         { "random",  "a center ray worth half the pixel, and N random rays sharing the other "
                      "half (settings: samples, N, default 4; seed, default 0)",                  CreateRandom },
+        { "stratified", "an n x n grid of equally weighted rays, each at a random point in its "
+                        "cell; best for a real lens (settings: grid, n, default 4; seed)",      CreateStratified },
     };
 }
 

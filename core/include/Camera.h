@@ -15,6 +15,7 @@
 #include "Matrix.h"
 #include "PixelSampler.h"
 #include "ColorModel.h"
+#include "Lens.h"
 
 #include <memory>
 
@@ -45,6 +46,9 @@ class CCamera : public CObjects
             // How the camera turns pixel colors into bytes; NULL means the
             // default, as for the sampler.
         std::unique_ptr<CColorModel>    m_pColorModel;
+            // A real lens, or NULL for a pinhole camera.
+        std::unique_ptr<CLens>          m_pLens;
+        std::string                     m_strLensError;     // why the lens couldn't be prepared
     public:
                     CCamera( void );
                     CCamera( CVector oPosition, CVector oPointAt, FLT nVerticalAngle, FLT nHorizontalAngle, FLT nAspectRatio = 0.0, CVector *poUp = NULL );
@@ -86,6 +90,24 @@ class CCamera : public CObjects
             // its color model.
         CColorModel    &GetColorModel( void );
         void        SetColorModel( CColorModel *pColorModel );
+
+            // The camera's lens: NULL for a pinhole camera (the default),
+            // which sees with the vertical angle; with a lens the field of
+            // view comes from its focal length and the sensor. SetLens takes
+            // ownership and prepares the lens to focus at its focus distance,
+            // or at the look-at point; it returns FALSE, with the reason in
+            // GetLensError, if the lens can't be used.
+        CLens      *GetLens( void ) { return m_pLens.get(); }
+        BOOL        SetLens( CLens *pLens );
+        const char *GetLensError( void ) const { return m_strLensError.c_str(); }
+
+            // The primary ray for a point on the image (as for RayDirection;
+            // nImageX and nImageY, the point in pixels, pick where a ray
+            // crosses the lens). FALSE if the lens blocks it.
+        BOOL        PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, FLT nImageY,
+                                CVector &oOrigin, CVector &oDirection );
+            // What every pixel is scaled by: 1 for a pinhole.
+        FLT         GetExposure( void ) const { return m_pLens ? m_pLens->GetExposure() : 1.0; }
         FLT         GetXRotate( void ) { return m_nXRotate; }
         FLT         GetYRotate( void ) { return m_nYRotate; }
 

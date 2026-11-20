@@ -537,6 +537,8 @@ int main( int argc, char **argv )
             return 1;
         }
 
+        if ( ! oOptions.bQuiet && oScene.GetCamera().GetLens() )
+            printf( "Lens: %s\n", oScene.GetCamera().GetLens()->Describe().c_str() );
         if ( ! oOptions.bQuiet )
             printf( "Tracing %dx%d with %d task(s), sampling %s, color model %s, into %s\n",
                     oSettings.GetImageWidth(), oSettings.GetImageHeight(), pMaster->GetTaskCount(),

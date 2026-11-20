@@ -116,15 +116,17 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
     CSettings      &oSettings = oScene.GetSettings();
     FLT             nWidth = (FLT)oSettings.GetImageWidth();
     FLT             nHeight = (FLT)oSettings.GetImageHeight();
-    CVector         oStartPos = oCamera.GetPosition();
+    CVector         oStartPos;
     CVector         oDirection;
 
     if ( ( nWidth <= 0.0 ) || ( nHeight <= 0.0 ) )
         nWidth = nHeight = 1.0;
 
-    oDirection = oCamera.RayDirection( ( ( nImageX * 2.0 ) / nWidth ) - 1.0,
-                                       1.0 - ( ( nImageY * 2.0 ) / nHeight ),
-                                       nWidth / nHeight );
+        // A ray the camera's lens blocks gets no influence, so it traces as
+        // black.
+    if ( ! oCamera.PrimaryRay( ( ( nImageX * 2.0 ) / nWidth ) - 1.0, 1.0 - ( ( nImageY * 2.0 ) / nHeight ),
+                               nWidth / nHeight, nImageX, nImageY, oStartPos, oDirection ) )
+        nInfluence = 0.0;
 
     m_nX = oStartPos.GetX();
     m_nY = oStartPos.GetY();

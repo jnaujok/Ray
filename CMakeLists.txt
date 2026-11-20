@@ -61,6 +61,7 @@ set(RAY_CORE_SOURCES
     core/src/DiffuseMaterial.cpp
     core/src/GammaColorModel.cpp
     core/src/ImageFile.cpp
+    core/src/Lens.cpp
     core/src/Light.cpp
     core/src/LightArray.cpp
     core/src/Material.cpp
@@ -87,6 +88,7 @@ set(RAY_CORE_SOURCES
     core/src/SpecularMaterial.cpp
     core/src/Sphere.cpp
     core/src/SrgbColorModel.cpp
+    core/src/StratifiedSampler.cpp
     core/src/TaskMaster.cpp
     core/src/TaskSlave.cpp
     core/src/ThreadTaskMaster.cpp
