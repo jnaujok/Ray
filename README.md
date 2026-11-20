@@ -44,8 +44,9 @@
 ## About
 
 Ray is a ray tracer written in 1996–1997 that splits rendering across a network of machines.
-You build and edit scenes in a Windows MFC application, and the image is traced in parallel by
-engine processes on any number of machines, or by worker threads on one.
+You build and edit scenes in a scene editor (the cross-platform `ray-editor`, or the original
+Windows MFC application), and the image is traced in parallel by engine processes on any number of
+machines, or by worker threads on one.
 
 It was originally written for [PVM](https://www.netlib.org/pvm3/) (Parallel Virtual Machine) on
 a cluster of Unix workstations. The cross-platform library written for it grew into
@@ -167,7 +168,12 @@ The ray tracing itself is the 1997 code.
   scales the colors first.
 - **Readable scene files:** scenes are JSON that you can write and edit by hand, with clear errors
   that say where a mistake is.
-- **Scene editor:** MFC MDI application with a scene tree, property dialogs for spheres, planes,
+- **Cross-platform scene editor:** `ray-editor`, built on wxWidgets for Windows, Linux and macOS:
+  a scene tree, a property grid (and the JSON text) for every part of the scene, checked by the
+  scene's own reader, a shaded OpenGL view with a wireframe overlay that you orbit, pan, zoom and
+  click to select in, a *Render* button that ray-traces the view progressively over it, undo and
+  redo, and STL and OBJ import. See [`editor/README.md`](editor/README.md).
+- **Windows scene editor:** MFC MDI application with a scene tree, property dialogs for spheres, planes,
   point lights, the camera and the materials, and a material editor. Anything else, from any shape
   or light to the camera's sampler, color model and lens and the environment, can be edited, added
   or deleted as JSON from the tree's right-click menu, and *Import Model* brings in an STL or OBJ
@@ -188,7 +194,7 @@ The ray tracing itself is the 1997 code.
 ```mermaid
 flowchart LR
     subgraph Front["Front end"]
-        UI["Ray.exe<br/>MFC scene editor"]
+        UI["ray-editor or Ray.exe<br/>scene editors"]
         CLI["raythrower<br/>command line"]
     end
     subgraph Master["Task master"]
@@ -237,7 +243,8 @@ opens the connection with a hello carrying the protocol version (4).
 | Part | Linux | macOS | Windows |
 |------|:-----:|:-----:|:-------:|
 | `raythrower`, `rayengine`, core | ✅ GCC, Clang | ✅ Apple Clang | ✅ MSVC |
-| `Ray.exe` scene editor | | | ✅ MSVC with MFC |
+| `ray-editor` scene editor (wxWidgets) | ✅ GTK 3 | ✅ Cocoa | ✅ MSVC |
+| `Ray.exe` scene editor (MFC) | | | ✅ MSVC with MFC |
 
 All of them are built by CI on every push.
 
@@ -253,8 +260,18 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
-This builds `raythrower` and `rayengine`. To build the scene editor, use Visual Studio with the
-*C++ MFC* component, which includes the MBCS libraries the code needs:
+This builds `raythrower` and `rayengine`. To build the cross-platform scene editor too, turn on
+`RAY_BUILD_EDITOR`. CMake uses an installed wxWidgets if it finds one, and otherwise downloads
+wxWidgets 3.2.9 and builds it (a few minutes, the first time). On Linux install the GTK 3 and
+OpenGL development packages first (`sudo apt-get install libgtk-3-dev libgl1-mesa-dev`):
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON
+cmake --build build --target ray-editor --parallel
+```
+
+To build the Windows MFC scene editor, use Visual Studio with the *C++ MFC* component, which
+includes the MBCS libraries the code needs:
 
 ```sh
 cmake -S . -B build -DRAY_BUILD_GUI=ON
@@ -263,6 +280,8 @@ cmake --build build --config Release --target Ray
 
 | Option | Default | What it does |
 |--------|:-------:|--------------|
+| `RAY_BUILD_EDITOR` | `OFF` | Build `ray-editor`, the cross-platform scene editor (wxWidgets) |
+| `RAY_USE_SYSTEM_WXWIDGETS` | `ON` | Use an installed wxWidgets if CMake finds one, instead of downloading it |
 | `RAY_BUILD_GUI` | `OFF` | Build the MFC scene editor (MSVC only) |
 | `RAY_BUILD_TESTS` | `ON` | Build the regression tests |
 | `FETCHCONTENT_SOURCE_DIR_IASLIB` | | Use a local IASLib checkout instead of downloading it |
@@ -373,7 +392,16 @@ then RGB bytes. `--png` and `--ppm` give copies any image viewer can open. `--hd
 each for red, green and blue and a shared exponent). It holds the color model's linear colors:
 the traced colors as they are, or scaled by the `hdr` or `reinhard` model's `exposure`.
 
-**Scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
+**Cross-platform scene editor:** run `ray-editor` (or `ray-editor scenes/torture_test.ray`). The
+tree on the left lists the settings, camera, environment, objects (with their materials) and
+lights; the panel on the right edits the selected one as a property grid or as JSON; the view in
+the middle shows the scene shaded with OpenGL. Drag to orbit, right-drag to pan, use the wheel to
+zoom and click an object to select it. *View > Wireframe Overlay* draws the triangles' edges,
+*View > Look Through Scene Camera* shows what the camera sees, and *Render > Render View* (F5)
+ray-traces the view over it, a quick pass first. *Edit* adds objects, lights and a sky, and
+*File > Import Model* brings in an STL or OBJ file. See [`editor/README.md`](editor/README.md).
+
+**Windows scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
 menu, and choose *Render*. Right-click the scene's name in the tree to edit its settings, camera or
 environment as JSON, add any object or light as JSON, or import a model; right-click an object or
 light to edit it as JSON or delete it.
@@ -393,7 +421,10 @@ corner anti-aliasing, one with each other sampler and color model, the teapot, t
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
 3DBenchy with printed layer lines, and a torture test of all of them through a real lens).
-They also check that a lens has the focal length, f-number, focus and color dispersion its
+They also check the scene editor's logic without a display (`editor_logic`): editing parts as
+JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
+the tracer's camera does, picking, model import, saving, and the progressive render.
+They check that a lens has the focal length, f-number, focus and color dispersion its
 prescription should, that
 networked engines produce exactly the same bytes as threads (even when an engine drops out mid-render
 and another joins), and that tiles and pixels cross the wire
@@ -476,13 +507,14 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`core/`](core) | The ray tracer: scene, objects, materials, serialization, task masters, TCP transport |
 | [`raythrower/`](raythrower) | Command-line master |
 | [`rayengine/`](rayengine) | Networked tracing task |
+| [`editor/`](editor) | `ray-editor`, the cross-platform scene editor: `logic/` (no toolkit: the document, tessellation, the view's camera, the progressive render) and `gui/` (wxWidgets) |
 | [`src/`](src), [`include/`](include) | MFC scene editor |
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
 | [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images and `scenes/models/` model files, among them 3DBenchy (CC0, see [NOTICE](NOTICE)) |
 | [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files |
 | [`tests/`](tests) | Regression tests and reference renders |
-| [`cmake/`](cmake) | The scene editor's build |
+| [`cmake/`](cmake) | The scene editors' builds: `RayEditor.cmake` (wxWidgets) and `RayGui.cmake` (MFC) |
 | [`docs/`](docs) | MFC AppWizard notes, README images, and the changelog's before and after images |
 | [`legacy/`](legacy) | Visual C++ 4, 5, and 6 project files, kept for history |
 
@@ -534,8 +566,9 @@ and boxes, solid marble, wood and stone textures, glass that absorbs by thicknes
 and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG textures, spot and
 directional lights, environment maps with image-based lighting, constructive solid geometry,
 dispersive glass with spectral dispersion, STL and OBJ model files with printed layer lines and
-lean, shared meshes, and JSON scenes so far. The
-scene editor reaches all of it through JSON editing; next up is a cross-platform scene editor.
+lean, shared meshes, and JSON scenes so far, and a cross-platform scene editor with a shaded
+OpenGL view and progressive rendering. Both editors reach every feature through JSON editing; next
+up is light bouncing between surfaces and atmospheric haze.
 
 ## Changelog
 

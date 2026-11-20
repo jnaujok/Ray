@@ -1,0 +1,3 @@
+// Windows resources for ray-editor: wxWidgets' own (the manifest that turns on
+// the modern common controls, and the standard cursors and icons).
+#include "wx/msw/wx.rc"

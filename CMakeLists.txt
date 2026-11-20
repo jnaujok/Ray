@@ -11,6 +11,7 @@ endif()
 
 option(RAY_BUILD_GUI   "Build the Windows MFC scene editor (MSVC only)" OFF)
 option(RAY_BUILD_TESTS "Build the regression tests" ON)
+option(RAY_BUILD_EDITOR "Build the cross-platform wxWidgets scene editor (ray-editor)" OFF)
 
 # ---------------------------------------------------------------------------
 # IASLib: strings, files, threads, sockets, JSON (scene files) and SJSON (the
@@ -154,6 +155,12 @@ if(RAY_BUILD_GUI)
     endif()
     include(cmake/RayGui.cmake)
 endif()
+
+# ---------------------------------------------------------------------------
+# Cross-platform scene editor (wxWidgets): its logic always, the program with
+# RAY_BUILD_EDITOR
+# ---------------------------------------------------------------------------
+add_subdirectory(editor)
 
 # ---------------------------------------------------------------------------
 # Tests

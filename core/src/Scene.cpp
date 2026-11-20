@@ -617,6 +617,7 @@ DWORD CScene::Load( const char *strFileName )
 {
     std::string strData;
 
+    try
     {
             // Binary: in text mode Windows would translate line breaks and
             // stop at the first 0x1A byte.
@@ -631,6 +632,12 @@ DWORD CScene::Load( const char *strFileName )
         }
         while ( ( nRead = oFile.GetBuffer( achBuffer, (int)sizeof( achBuffer ) ) ) > 0 )
             strData.append( achBuffer, (size_t)nRead );
+    }
+    catch ( IASLib::CException & )
+    {
+            // IASLib's CFile throws when the file isn't there.
+        m_strLoadError = "the file can't be opened";
+        return BAD_FILE;
     }
 
         // A JSON scene starts with "{", perhaps after white space or a UTF-8
