@@ -52,6 +52,11 @@ class CRay
         FLT             m_nSampleU;
         FLT             m_nSampleV;
         uint64_t        m_nSampleKey;
+            // The wavelength the ray is traced at (CLens::EChannel): 0, every
+            // channel at once, or one of red, green and blue. A chromatic
+            // lens makes rays in one channel; dispersive glass splits a ray
+            // in every channel into three. Rays made from it keep it.
+        int             m_nChannel;
     public:
                         CRay( void );
                         CRay( const CRay &oSource );
@@ -88,6 +93,8 @@ class CRay
         virtual void    SetDepth( int nDepth ) { m_nDepth = nDepth; }
         const CObjects *GetInside( void ) const { return m_pInside; }
         void            SetInside( const CObjects *pInside ) { m_pInside = pInside; }
+        int             GetChannel( void ) const { return m_nChannel; }
+        void            SetChannel( int nChannel ) { m_nChannel = nChannel; }
             /// A ray made from another at a surface (reflected or refracted)
             /// takes a sample point hashed from its parent's (independent of
             /// it) and a key for the branch.

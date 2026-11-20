@@ -116,6 +116,10 @@ class CMesh : public CObjects
             /// Stops at the first face the ray hits.
         virtual BOOL            Occludes( CRay &oRay, CObjects *pIgnore );
         virtual BOOL            GetBounds( CVector &oMinimum, CVector &oMaximum );
+            // The face its last Intersect hit. A mesh is taken to be closed
+            // (a csg needs it to be; a mesh with holes gives wrong results).
+        virtual CObjects       *HitPart( BOOL &bFlip ) { bFlip = FALSE; return m_pHitFace ? (CObjects *)m_pHitFace : (CObjects *)this; }
+        virtual BOOL            IsClosed( void ) { return TRUE; }
             /// Intersect without the tree: every face, in order. The tree
             /// must find exactly what this does; the tests hold it to that.
         BOOL                    IntersectEachFace( CRay &oRay, CVector &oIntersect );

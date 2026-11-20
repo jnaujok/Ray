@@ -49,6 +49,9 @@ class CCamera : public CObjects
             // A real lens, or NULL for a pinhole camera.
         std::unique_ptr<CLens>          m_pLens;
         BOOL                            m_bAimOnly = FALSE;     // see SetAimOnly
+            // The brightest any one sample's red, green or blue may be before
+            // the sampler averages it in; 0 doesn't clamp.
+        FLT                             m_nClamp = 0.0;
         std::string                     m_strLensError;     // why the lens couldn't be prepared
     public:
                     CCamera( void );
@@ -118,6 +121,17 @@ class CCamera : public CObjects
         int         GetChannels( void ) const { return ( m_pLens && m_pLens->IsChromatic() ) ? 3 : 1; }
             // What every pixel is scaled by: 1 for a pinhole.
         FLT         GetExposure( void ) const { return m_pLens ? m_pLens->GetExposure() : 1.0; }
+            // The sample clamp ("clamp" in JSON): 0 for none. A rare ray that
+            // finds a light through rough glass, a rough mirror or an area
+            // light can be far brighter than its pixel's others and show as
+            // a lone bright speck ("firefly"); clamping each sample at, say,
+            // 2 keeps it to its share, at the cost of a little of the
+            // brightest highlights.
+        FLT         GetClamp( void ) const { return m_nClamp; }
+        void        SetClamp( FLT nClamp ) { m_nClamp = nClamp; }
+            // A sample's color with each channel clamped (unchanged if the
+            // camera doesn't clamp).
+        CColor      ClampSample( const CColor &oColor ) const;
         FLT         GetXRotate( void ) { return m_nXRotate; }
         FLT         GetYRotate( void ) { return m_nYRotate; }
 

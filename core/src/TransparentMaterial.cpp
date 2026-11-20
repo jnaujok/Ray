@@ -8,6 +8,7 @@
 #include "Scene.h"
 #include "SceneJson.h"
 #include "Sampling.h"
+#include "Lens.h"
 
 #include <math.h>
 
@@ -29,7 +30,8 @@ CTransparentMaterial::CTransparentMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 ),
 m_oAttenuationColor( 1.0, 1.0, 1.0 ),
 m_nAttenuationDistance( 0.0 ),
-m_nRoughness( 0.0 )
+m_nRoughness( 0.0 ),
+m_nAbbe( 0.0 )
 {
     m_nIndexOfRefraction = 1.0;
 }
@@ -38,7 +40,8 @@ CTransparentMaterial::CTransparentMaterial( CColor oColor, FLT nRefract ) :
 m_oColor( oColor ),
 m_oAttenuationColor( 1.0, 1.0, 1.0 ),
 m_nAttenuationDistance( 0.0 ),
-m_nRoughness( 0.0 )
+m_nRoughness( 0.0 ),
+m_nAbbe( 0.0 )
 {
     m_nIndexOfRefraction = nRefract;
 }
@@ -106,8 +109,40 @@ CColor CTransparentMaterial::Attenuation( FLT nDistance ) const
                    (FLT)pow( (double)oLeft.GetB(), (double)nPower ) );
 }
 
+FLT CTransparentMaterial::IndexFor( int nChannel ) const
+{
+    if ( ! ( m_nAbbe > 0.0 ) )
+        return m_nIndexOfRefraction;
+    return CLens::DispersedIndex( m_nIndexOfRefraction, m_nAbbe, nChannel );
+}
+
 CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect )
 {
+        // Dispersive glass bends each wavelength its own way: a ray in every
+        // channel goes on as three, red, green and blue, each keeping only
+        // its own channel of what it sees. From here on each stays in its
+        // channel, so further glass bends it by that channel's index too.
+    if ( ( m_nAbbe > 0.0 ) && ( oViewIncident.GetChannel() == CLens::CHANNEL_ALL ) )
+    {
+        FLT anChannel[ 3 ];
+
+        for ( int nChannel = CLens::CHANNEL_RED; nChannel <= CLens::CHANNEL_BLUE; nChannel++ )
+        {
+            CRay    oChannelRay( oViewIncident );
+            CVector oPoint( oIntersect );
+            CVector oChannelNormal( oNormal );
+
+            oChannelRay.SetChannel( nChannel );
+
+            CColor  oSeen = GetColor( oScene, oChannelRay, oPoint, oChannelNormal, pIntersect );
+
+            anChannel[ nChannel - 1 ] = ( nChannel == CLens::CHANNEL_RED ) ? oSeen.GetR() :
+                                        ( nChannel == CLens::CHANNEL_GREEN ) ? oSeen.GetG() : oSeen.GetB();
+        }
+        return CColor( anChannel[ 0 ], anChannel[ 1 ], anChannel[ 2 ] );
+    }
+
+    FLT         nIndex = IndexFor( oViewIncident.GetChannel() );
     CColor      oTransparent;
     CVector     oView( oIntersect.GetX() - oViewIncident.GetX(),
                        oIntersect.GetY() - oViewIncident.GetY(),
@@ -124,7 +159,7 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
         // Whether the ray reached this surface from inside the object: it
         // went in through this material (or was turned back inside by it).
     BOOL        bLeaving = ( oViewIncident.GetInside() == pIntersect ) ? TRUE : FALSE;
-    BOOL        bPasses = Refract( oView, oNormal, m_nIndexOfRefraction, oTransmit );
+    BOOL        bPasses = Refract( oView, oNormal, nIndex, oTransmit );
 
         // Rough (frosted) glass bends the ray through a microfacet normal
         // drawn from around the surface's. One tilted past the ray, or that
@@ -143,7 +178,7 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
 
         if ( ( oMicro.Dot( oView ) > 0.0 ) == ( nSide > 0.0 ) )
         {
-            BOOL    bRoughPasses = Refract( oView, oMicro, m_nIndexOfRefraction, oRough );
+            BOOL    bRoughPasses = Refract( oView, oMicro, nIndex, oRough );
             FLT     nOut = oNormal.Dot( oRough );
 
                 // Through the surface the ray keeps going the way it was;
@@ -250,22 +285,29 @@ void CTransparentMaterial::ToJson( IASLib::CObjectNode &oNode )
     }
     if ( m_nRoughness > 0.0 )
         RayJson::PutNumber( oNode, "roughness", m_nRoughness );
+    if ( m_nAbbe > 0.0 )
+        RayJson::PutNumber( oNode, "abbe", m_nAbbe );
 }
 
 BOOL CTransparentMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "influence", "texture", "color", "indexOfRefraction",
-                                              "attenuationColor", "attenuationDistance", "roughness", NULL };
+                                              "attenuationColor", "attenuationDistance", "roughness", "abbe", NULL };
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
          ! RayJson::GetColor( oNode, "color", m_oColor, FALSE ) ||
          ! RayJson::GetNumber( oNode, "indexOfRefraction", m_nIndexOfRefraction, FALSE ) ||
          ! RayJson::GetColor( oNode, "attenuationColor", m_oAttenuationColor, FALSE ) ||
          ! RayJson::GetNumber( oNode, "attenuationDistance", m_nAttenuationDistance, FALSE ) ||
-         ! RayJson::GetNumber( oNode, "roughness", m_nRoughness, FALSE ) )
+         ! RayJson::GetNumber( oNode, "roughness", m_nRoughness, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "abbe", m_nAbbe, FALSE ) )
         return FALSE;
     if ( ( m_nRoughness < 0.0 ) || ( m_nRoughness > 1.0 ) )
         return RayJson::Fail( "roughness must be between 0 and 1" );
+    if ( m_nAbbe < 0.0 )
+        return RayJson::Fail( "abbe can't be negative (0 doesn't disperse)" );
+    if ( ( m_nAbbe > 0.0 ) && ( m_nAbbe < 5.0 ) )
+        return RayJson::Fail( "abbe must be 0 (no dispersion) or at least 5" );
     if ( m_nAttenuationDistance < 0.0 )
         return RayJson::Fail( "attenuationDistance can't be negative" );
 

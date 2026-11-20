@@ -222,6 +222,34 @@ add_test(NAME render_environment
 set_tests_properties(render_environment PROPERTIES FIXTURES_SETUP render_environment TIMEOUT 300)
 add_test(NAME roundtrip_environment_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/environment_test.ray ${RENDER_DIR})
 
+# Constructive solid geometry: a lens blank (two spheres' intersection), a
+# bowl (a shell cut by a turned box, shaded by its parts' materials), a die
+# (a rounded cube, itself a csg, with drilled pips painted black) and a
+# hammered capsule (a union).
+add_test(NAME render_csg
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/csg_test.ray
+                 -DOUTPUT=${RENDER_DIR}/csg_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/csg_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_csg PROPERTIES FIXTURES_SETUP render_csg TIMEOUT 300)
+add_test(NAME roundtrip_csg_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/csg_test.ray ${RENDER_DIR})
+
+# Dispersion: a flint glass prism (a csg) and ball before white bars, which
+# they split into red, green and blue.
+add_test(NAME render_prism
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/prism_test.ray
+                 -DOUTPUT=${RENDER_DIR}/prism_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/prism_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_prism PROPERTIES FIXTURES_SETUP render_prism TIMEOUT 900)
+add_test(NAME roundtrip_prism_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/prism_test.ray ${RENDER_DIR})
+
 # The torture test: every kind of object (the teapot too), reflection,
 # refraction and textures, through the double Gauss with a 5x5 stratified
 # sampler. Rendered small; the scene itself is 1024x768.
@@ -459,6 +487,34 @@ add_test(NAME network_environment
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_environment PROPERTIES FIXTURES_REQUIRED render_environment
                                              RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_csg
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/csg_test.ray
+                 -DOUTPUT=${RENDER_DIR}/csg_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/csg_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_csg PROPERTIES FIXTURES_REQUIRED render_csg
+                                     RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_prism
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/prism_test.ray
+                 -DOUTPUT=${RENDER_DIR}/prism_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/prism_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_prism PROPERTIES FIXTURES_REQUIRED render_prism
+                                       RESOURCE_LOCK ray_network TIMEOUT 900)
 
 # PNG and Radiance HDR output, checked with Python's own zlib.
 find_package(Python3 COMPONENTS Interpreter)

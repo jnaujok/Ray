@@ -49,6 +49,8 @@ class CBox : public CObjects
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
         virtual BOOL        GetBounds( CVector &oMinimum, CVector &oMaximum );
+        virtual BOOL        SurfaceNormal( CVector &oPoint, CVector &oNormal );
+        virtual BOOL        IsClosed( void ) { return TRUE; }
         virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV );
             // The outward normal at a point on the surface.
         CVector             NormalAt( CVector &oPoint );

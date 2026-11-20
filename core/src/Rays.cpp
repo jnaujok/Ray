@@ -52,6 +52,7 @@ CRay::CRay( void )
     m_nSampleU = 0.5;
     m_nSampleV = 0.5;
     m_nSampleKey = 0;
+    m_nChannel = 0;
 }
 
 CRay::CRay( const CRay &oRay )
@@ -74,6 +75,7 @@ CRay::CRay( const CRay &oRay )
     m_nSampleU = oRay.m_nSampleU;
     m_nSampleV = oRay.m_nSampleV;
     m_nSampleKey = oRay.m_nSampleKey;
+    m_nChannel = oRay.m_nChannel;
 }
 
 CRay::~CRay( void )
@@ -100,6 +102,7 @@ CRay &CRay::operator =( const CRay &oRay )
     m_nSampleU = oRay.m_nSampleU;
     m_nSampleV = oRay.m_nSampleV;
     m_nSampleKey = oRay.m_nSampleKey;
+    m_nChannel = oRay.m_nChannel;
 
     return *this;
 }
@@ -126,6 +129,7 @@ void CRay::CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX
     m_nSampleU = 0.5;
     m_nSampleV = 0.5;
     m_nSampleKey = 0;
+    m_nChannel = 0;
 }
 
     // The primary ray from the camera through the center of pixel (nX, nY),
@@ -184,6 +188,7 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
     m_nSampleU = nImageX - nPixelX;
     m_nSampleV = nImageY - nPixelY;
     m_nSampleKey = RaySampling::Mix( RaySampling::Mix( (uint64_t)(int64_t)nPixelX ) ^ (uint64_t)(int64_t)nPixelY );
+    m_nChannel = nChannel;
 }
 
 void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInfluence, int nPixelX, int nPixelY )
@@ -204,6 +209,7 @@ void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInf
     m_nSampleU = 0.5;
     m_nSampleV = 0.5;
     m_nSampleKey = 0;
+    m_nChannel = 0;
 }
 
 void CRay::SetT( FLT nNewT )
@@ -232,6 +238,8 @@ void CRay::InheritSample( const CRay &oParent, uint64_t nBranch )
 
     m_nSampleU = RaySampling::Unit( nHash );
     m_nSampleV = RaySampling::Unit( RaySampling::Mix( nHash ) );
+        // A ray made from another keeps its wavelength.
+    m_nChannel = oParent.m_nChannel;
 }
 
 void CRay::SamplePoint( uint64_t nPurpose, FLT &nU, FLT &nV ) const

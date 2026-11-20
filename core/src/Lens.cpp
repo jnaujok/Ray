@@ -207,15 +207,21 @@ FLT CLens::WorkOutIor( int nIndex, int nChannel ) const
 
     const SSurface &oSurface = m_aoSurfaces[ (size_t)nIndex ];
 
-    if ( nChannel == CHANNEL_ALL || nChannel == CHANNEL_GREEN || ! m_bChromatic ||
-         ! ( oSurface.nAbbe > 0.0 ) || oSurface.nIor == 1.0 )
+    if ( ! m_bChromatic )
         return oSurface.nIor;
+    return DispersedIndex( oSurface.nIor, oSurface.nAbbe, nChannel );
+}
+
+FLT CLens::DispersedIndex( FLT nIor, FLT nAbbe, int nChannel )
+{
+    if ( nChannel == CHANNEL_ALL || nChannel == CHANNEL_GREEN || ! ( nAbbe > 0.0 ) || nIor == 1.0 )
+        return nIor;
 
         // Cauchy's n = A + B / wavelength^2, through n at the d line and the
         // Abbe number V = ( n_d - 1 ) / ( n_F - n_C ).
-    FLT nB = ( oSurface.nIor - 1.0 ) /
-             ( oSurface.nAbbe * ( ( 1.0 / ( WAVELENGTH_F * WAVELENGTH_F ) ) - ( 1.0 / ( WAVELENGTH_C * WAVELENGTH_C ) ) ) );
-    FLT nA = oSurface.nIor - ( nB / ( WAVELENGTH_D * WAVELENGTH_D ) );
+    FLT nB = ( nIor - 1.0 ) /
+             ( nAbbe * ( ( 1.0 / ( WAVELENGTH_F * WAVELENGTH_F ) ) - ( 1.0 / ( WAVELENGTH_C * WAVELENGTH_C ) ) ) );
+    FLT nA = nIor - ( nB / ( WAVELENGTH_D * WAVELENGTH_D ) );
     FLT nWavelength = ( nChannel == CHANNEL_RED ) ? WAVELENGTH_C : WAVELENGTH_F;
 
     return nA + ( nB / ( nWavelength * nWavelength ) );

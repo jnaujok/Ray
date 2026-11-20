@@ -10,6 +10,85 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.10] - 2026-11-20
+
+Solids and spectra: constructive solid geometry, which makes lens blanks, bowls and drilled dice
+from spheres, boxes, cylinders, cones and meshes, and glass that splits light into colors by its
+Abbe number. Plus a sample clamp on the camera that takes the bright specks out of rough glass and
+area lights. Scenes without the new fields render byte for byte as before.
+
+### Added
+
+- **Constructive solid geometry** (`"type": "csg"`): a solid made from two or more closed shapes,
+  its `objects`, by `operation`: `"union"` (inside any of them), `"intersection"` (inside all of
+  them) or `"difference"` (inside the first and none of the rest). The shapes can be spheres, boxes,
+  capped cylinders and cones, meshes (which must be closed) and other csgs; planes, triangles and
+  open cylinders and cones are refused.
+  - Along a ray the csg asks each shape for every crossing, from just past the one before, so an
+    odd number ahead means the ray starts inside it. Walking the crossings in order, the first
+    where the solid's inside changes is the hit, and the normal there is the crossed shape's,
+    turned inside out on a subtracted shape. A shape's last hit part (a mesh's face, an inner
+    csg's shape) is kept with each crossing, so nested csgs and meshes shade with the right
+    normal.
+  - It shades as one object with its own `materials` and `bump`, so glass made of parts is entered
+    and left as one piece. With `"childMaterials": true` each surface is shaded with the materials
+    of the shape it comes from (`CObjects` gained a list of materials to shade with, used by the
+    csg only). Its surface coordinates are those of the shape each surface comes from, so image
+    textures and normal maps work on it.
+  - A ray leaving its surface (a shadow or a reflection) skips only that surface, so a bowl shades
+    and reflects its own inside. Its bounding box (all its shapes' for a union, their overlap for an
+    intersection, the first shape's for a difference) puts it in the scene's tree.
+  - Each object can now give its outward normal at a point (`CObjects::SurfaceNormal`), the part
+    its last hit was on (`HitPart`), and whether it is closed (`IsClosed`); shading is unchanged.
+- **Glass that splits light into colors.** A `transparent` material takes an `abbe` number
+  (default 0, no dispersion; otherwise at least 5). A ray traced in every color splits into three
+  where it first meets such glass, red, green and blue, each bent by its own index from the same
+  Cauchy curve the lens uses (now `CLens::DispersedIndex`, through `indexOfRefraction` at the
+  d line and the Abbe number), and each keeping only its own color of what it sees. After that each
+  stays in its color (rays now carry their channel, `CRay::GetChannel`, and rays made from them
+  keep it), so further glass bends it by that color's index, and rays from a chromatic lens, which
+  are already in one color, don't split again. A flint prism or ball fringes the edges of what is
+  seen through it with color. Ray traces from the eye, so a prism casts no rainbow on the floor.
+- **The sample clamp.** The camera's `clamp` (default 0, off) is the brightest any one sample's
+  red, green or blue may be before the sampler averages it in. A rare ray that finds a light
+  through rough glass, off a rough mirror or from an area light can be many times brighter than
+  its pixel's other rays and show as a lone speck (a "firefly"); a clamp of 1.5 to 2 removes them,
+  at the cost of a little of the brightest highlights.
+- **`scenes/csg_test.ray`:** a glass lens blank, a bowl (blue outside, white inside, clay at the
+  cut rim, by `childMaterials`), a die with drilled black pips (a rounded cube that is itself a
+  csg) and a hammered gold capsule. **`scenes/prism_test.ray`:** a flint glass prism (an
+  intersection of three turned boxes) and ball (index 1.62, Abbe number 20) before white bars.
+  New tests: `render_csg`, `render_prism` (with reference renders and README previews),
+  `roundtrip_csg_test`, `roundtrip_prism_test`, and `network_csg` and `network_prism`, which must
+  match threads byte for byte. `format_test` checks where rays hit a union, an intersection, a
+  difference and a nested csg, and the normals there, from outside, from inside and leaving the
+  surface while ignoring the csg; the bounding boxes; that `childMaterials` shades each surface with
+  its own shape's materials and that otherwise the csg's own shade it all; that a csg round-trips
+  with its bump map, and that bad operations, too few shapes, open shapes and unknown types are
+  reported. It checks that dispersed indices follow the Abbe number and match the lens's, that blue
+  bends more than red, that a ray in every color sees exactly, channel by channel, what rays traced
+  in each color alone see, that straight through the middle nothing changes, that glass without an
+  Abbe number treats every color alike, and that the clamp caps each channel, is saved, and is
+  copied with the camera.
+
+### Changed
+
+- **The torture test has a flint glass prism, a die with drilled pips, and a clamp.** A flint
+  glass prism (a csg, Abbe number 20) stands before the mirror ball and splits what is seen through
+  it into colors, a die (a csg with `childMaterials`) sits in front of the frosted ball, and each
+  sample is clamped at 1.5, which takes the bright specks out of the frosted ball and the brushed
+  tube. Its reference render, README preview and full-size image are regenerated. A full-size
+  Release render does about 16% more work than 0.9's (25.5 against 22.0 CPU minutes here), a
+  little under two minutes on an idle 16-core machine.
+
+  ![Before and after: the prism test without and with an Abbe number; below, two crops of the full-size torture test at 0.9 and 0.10](docs/images/changelog/csg-dispersion.png)
+
+  Top, the new prism test with its glass's Abbe number taken out, and as it is: the white bars seen
+  through the prism and the ball break into red, green and blue. Middle, the torture test before
+  and after: the new flint prism before the mirror ball, full of color. Bottom, the frosted ball
+  without and with the clamp: the white specks are gone, and the die with its drilled pips sits in
+  front.
+
 ## [2026-alpha-0.9] - 2026-11-20
 
 Light and sky: spot lights with soft edges, directional sunlight whose shadows blur with distance,
@@ -802,7 +881,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.9...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.10...HEAD
+[2026-alpha-0.10]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.9...2026-alpha-0.10
 [2026-alpha-0.9]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.8...2026-alpha-0.9
 [2026-alpha-0.8]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.7...2026-alpha-0.8
 [2026-alpha-0.7]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.6...2026-alpha-0.7

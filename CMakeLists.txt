@@ -60,6 +60,7 @@ set(RAY_CORE_SOURCES
     core/src/ClipColorModel.cpp
     core/src/Color.cpp
     core/src/Cone.cpp
+    core/src/Csg.cpp
     core/src/ColorModel.cpp
     core/src/CornerSampler.cpp
     core/src/Cylinder.cpp

@@ -69,6 +69,13 @@ The ray tracing itself is the 1997 code.
   volume hierarchy, so a ray tests only the few faces near its path. The scene keeps its objects
   in one too (planes, which are infinite, are tested every time), and shadow rays stop at the
   first thing in the way.
+- **Constructive solid geometry:** a `csg` object combines closed shapes (spheres, boxes, capped
+  cylinders and cones, closed meshes, and other csgs) by union, intersection or difference: a lens
+  blank from two balls, a bowl from a ball with a ball taken out, a die with drilled pips. It shades
+  as one object with its own materials, or with each shape's own (`childMaterials`), shadows and
+  reflects itself, and takes bump maps and textures like any object.
+
+  <img src="docs/images/tests/csg_test.png" alt="A glass lens blank, a bowl blue outside and white inside, a gold capsule and a die with drilled black pips, all made by constructive solid geometry" width="320">
 
   <img src="docs/images/tests/primitives_test.png" alt="A capped cylinder, an open tube, a cone, a textured truncated cone, a textured cube, and a glass box on a checkered floor" width="320">
 - **Lights:** point lights; spot lights, whose cone fades over a soft edge; directional lights
@@ -89,7 +96,12 @@ The ray tracing itself is the 1997 code.
   so thick glass is deeper in color than thin, and a glass ball darker through its middle than at
   its rim. Glass and mirrors can be rough: frosted glass blurs what is behind it, and a brushed or
   satin mirror blurs its reflection (GGX microfacets), best with a sampler that traces many rays
-  a pixel.
+  a pixel. Glass with an Abbe number disperses: a ray splits into red, green and blue at it, each
+  bent by its own index, so a flint glass prism or ball fringes what is seen through it with color.
+  An optional sample clamp on the camera keeps a rare very bright ray (a "firefly") from showing
+  as a lone speck.
+
+  <img src="docs/images/tests/prism_test.png" alt="A flint glass prism and ball before white bars on a black wall, splitting them into red, green and blue" width="320">
 
   <img src="docs/images/tests/soft_test.png" alt="Clear, lightly frosted and heavily frosted glass panes before a striped poster, a mirror ball and a brushed gold ball, and soft shadows from a rectangle light and a sphere light" width="320">
 - **Textures:** any material's color can come from a texture instead: a checkerboard, on the
@@ -274,16 +286,17 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
 **Render the torture test**, every kind of object (the teapot too, in marble), mirrors, glass
-(the cube absorbing by thickness, the ball frosted), textures (a wooden mirror frame), a brushed
+(the cube absorbing by thickness, the ball frosted, a flint prism splitting colors), a die with drilled
+pips (constructive solid geometry), textures (a wooden mirror frame), a brushed
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light and a low sun, and an
 HDR sky in the mirrors and glass that lights the scene too, through the double Gauss lens at 25
-rays a pixel, at its full 1024×768 (about a minute and a half on an idle 16-core machine, with a Release build):
+rays a pixel, each clamped at 1.5, at its full 1024×768 (about two minutes on an idle 16-core machine, with a Release build):
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
-<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, textured shapes and a wood-framed mirror wall under an HDR sky, through a real lens" width="720">
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, textured shapes and a wood-framed mirror wall under an HDR sky, through a real lens" width="720">
 
 **Bring in an OBJ model** as a mesh (`--weld` joins repeated vertices so the surface is smooth
 across seams):
@@ -341,7 +354,7 @@ ctest --test-dir build --output-on-failure
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
-directional lights, an HDR environment map, cylinders, cones, and boxes, and a torture test of all of them through a real lens).
+directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, and a torture test of all of them through a real lens).
 They also check that a lens has the focal length, f-number, focus and color dispersion its
 prescription should, that
 networked engines produce exactly the same bytes as threads (even when an engine drops out mid-render
@@ -361,7 +374,12 @@ and by the amount they should. They check that a spot light's cone fades along a
 sunlight is the same everywhere and casts shadows the size of what casts them (soft with an angle),
 that HDR images decode exactly, flat or run-length encoded, that an environment shows each pixel
 along its own direction and wraps around, and that the sky's light is right for a uniform sky, a
-half sky and the foot of a wall. With Python 3 installed, they also decode the PNG and
+half sky and the foot of a wall. They check where rays hit a union, an intersection, a difference
+and a nested csg and the normals there (inside out on a subtracted shape), from outside, inside and
+leaving the surface, that each surface takes its own shape's materials with `childMaterials`, that
+dispersive glass bends each color by the index a lens's glass would have, that a ray in every color
+splits into exactly what rays traced in each color alone see, and that the sample clamp caps each
+channel. With Python 3 installed, they also decode the PNG and
 HDR output (with Python's own zlib) and check it against the raw image. CI runs them
 on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -386,7 +404,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td><td align="center"><img src="docs/images/tests/texture_test.png" alt="render_texture" width="260"><br><code>render_texture</code></td><td align="center"><img src="docs/images/tests/teapot_textured.png" alt="render_teapot_textured (120x90)" width="120"><br><code>render_teapot_textured (120x90)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td><td align="center"><img src="docs/images/tests/solid_textures_test.png" alt="render_solid_textures" width="260"><br><code>render_solid_textures</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td><td align="center"><img src="docs/images/tests/bump_test.png" alt="render_bump" width="260"><br><code>render_bump</code></td><td align="center"><img src="docs/images/tests/lights_test.png" alt="render_lights" width="260"><br><code>render_lights</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment" width="260"><br><code>render_environment</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment" width="260"><br><code>render_environment</code></td><td align="center"><img src="docs/images/tests/csg_test.png" alt="render_csg" width="260"><br><code>render_csg</code></td><td align="center"><img src="docs/images/tests/prism_test.png" alt="render_prism" width="260"><br><code>render_prism</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -472,7 +490,8 @@ The code builds and runs on current compilers, and work on the ray tracing has r
 camera, anti-aliasing, color models, meshes (with a bounding volume hierarchy), cylinders, cones
 and boxes, solid marble, wood and stone textures, glass that absorbs by thickness, frosted glass
 and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG textures, spot and
-directional lights, environment maps with image-based lighting, and JSON scenes so far. Next up are choices for sampling and color, and the new shapes,
+directional lights, environment maps with image-based lighting, constructive solid geometry,
+dispersive glass, and JSON scenes so far. Next up are choices for sampling and color, and the new shapes,
 in the scene editor.
 
 ## Changelog

@@ -28,6 +28,8 @@ class CSphere : public CObjects
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
         virtual BOOL        GetBounds( CVector &oMinimum, CVector &oMaximum );
+        virtual BOOL        SurfaceNormal( CVector &oPoint, CVector &oNormal );
+        virtual BOOL        IsClosed( void ) { return TRUE; }
             // Longitude and latitude: u runs once around, left to right as
             // seen from -z, and v from 0 at the bottom to 1 at the top.
         virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV );
