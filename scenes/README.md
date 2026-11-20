@@ -22,12 +22,14 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map) and a textured triangle, on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue) |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue), each sample clamped at 1.5 |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
 | `environment_test.ray` | | An environment map: the HDR sky `textures/sky.hdr` behind the scene, in a mirror ball and through a glass one, lighting a white ball, a small red one and a checkered floor (`samples` 8, so the floor darkens under the balls), with a sun whose direction matches the sky's, with a 4×4 stratified sampler |
 | `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
+| `csg_test.ray` | | Constructive solid geometry: a glass lens blank (two balls' intersection), a bowl (a ball with a smaller one and a turned box taken out, blue outside, white inside and clay at the cut rim, by `childMaterials`), a die (a rounded cube, itself the intersection of a cube and a ball, with six pips drilled in and painted black) and a hammered gold capsule (a cylinder and two balls, with a bump map), with a 3×3 stratified sampler |
+| `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they split into red, green and blue, with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
@@ -88,6 +90,7 @@ places.
 | `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half), `"stratified"` (an n×n grid of equally weighted rays, each at a random point in its cell), or `"adaptive"` (more rays only where a pixel's rays disagree) |
 | `lens` | none | A real lens, below; without one the camera is a pinhole |
 | `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, `"reinhard"`, or `"hdr"` |
+| `clamp` | `0` (off) | The brightest any one sample's red, green or blue may be before the sampler averages it in. A rare ray that finds a light through rough glass, off a rough mirror or from an area light can be far brighter than its pixel's other rays and show as a lone bright speck (a "firefly"); a clamp of 1.5 to 2 removes them, at the cost of a little of the brightest highlights. Can't be negative |
 
 A sampler or color model is a name, or an object with a `type` and its settings:
 `{ "type": "random", "samples": 9, "seed": 0 }` (N from 1 to 1024, default 4; the same seed always
@@ -158,12 +161,33 @@ color, not used in shading), `materials` (default: one diffuse material), and op
 | `box` | `center` (required); `size` (required): one number for a cube, or `[x, y, z]`, each more than 0; `rotation` (default `[0, 0, 0]`): degrees about x, then y, then z |
 | `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each corner; `uvs`: a `[u, v]` for each corner |
 | `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex; `uvs`: one for each vertex, or `uvMap` (below) |
+| `csg` | `operation` (required): `"union"`, `"intersection"` or `"difference"`; `objects` (required): two or more closed shapes; `childMaterials` (default `false`) |
 
 A cylinder or cone points from `base` to `top`, any way. Capped, its ends are closed with flat discs
 and it is a solid; with `"capped": false` it is an open shell, seen into from its ends, and it
 shadows and reflects itself inside. A cone's radii can't be negative or both 0, and `base` and
 `top` can't be the same point. A box is centered on `center`, `size` long along its own axes, which
 `rotation` turns from the scene's x, y and z.
+
+**Constructive solid geometry.** A `csg` is a solid made from others: a `"union"` is inside any of
+them, an `"intersection"` inside all of them, and a `"difference"` inside the first and none of the
+rest. Its `objects` are written as in the scene's own list, and can be any closed shapes: spheres,
+boxes, capped cylinders and cones, meshes (which must be closed; a mesh with holes gives wrong
+results) and other csgs. Planes, triangles and open cylinders and cones are refused. A csg has
+its own `materials` and `bump`, and shades as one object, so glass made of parts is entered and
+left as one piece; its parts' materials and bump maps are ignored. With `"childMaterials": true`
+each surface is shaded with the materials of the shape it comes from instead (a nested csg's
+surfaces with those of its own shapes), so a die's drilled pips can be black on a white body. A
+csg shadows and reflects itself: a bowl's inside is shaded and reflects its own rim. Its surface
+coordinates are those of the shape each surface comes from. Each ray asks every shape for all its
+crossings, so a csg costs a few times what its shapes do. A shape's normal at the solid's surface
+is turned inside out where it is subtracted.
+
+```json
+{ "type": "csg", "operation": "difference", "childMaterials": true, "objects": [
+    { "type": "box", "center": [0, 0.5, 0], "size": 1, "materials": [ { "type": "diffuse", "color": [1, 1, 1] } ] },
+    { "type": "sphere", "center": [0, 1.03, 0], "radius": 0.09, "materials": [ { "type": "diffuse", "color": [0, 0, 0] } ] } ] }
+```
 
 A triangle's normal is worked out from its corners by the edge traversal (V2 − V1) × (V3 − V2), so
 the order of the corners decides which side is the front. It is the rule OBJ and most other model
@@ -188,7 +212,7 @@ make the shape smooth (`"smooth": false` with them is an error).
 | `diffuse` | `diffuseCast` (default `false`) |
 | `specular` | A Cook–Torrance highlight. `power` (default `1`) is the surface's Beckmann roughness: smaller is a smaller, sharper highlight (0.1–0.3 is glossy; 1 is very rough). `indexOfRefraction` (default `1.5`) sets the Fresnel reflection, stronger at grazing angles; `materialHighlight` (default `false`) |
 | `reflective` | A mirror reflection, tinted by `color` with `filterReflection` (default `false`); `diffuseReflectivity` (default `0`). `roughness` (default `0`, a perfect mirror; up to `1`) blurs the reflection, as of brushed or satin metal: each ray reflects about a microfacet normal drawn from a GGX distribution of that roughness (0.05 is satin, 0.3 very rough) |
-| `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` at each surface it crosses. `attenuationColor` (default `[1, 1, 1]`, each 0 to 1) and `attenuationDistance` (default `0`, off) absorb light by how far it goes inside: after `attenuationDistance` it is `attenuationColor`, after twice that the color squared (Beer–Lambert). `roughness` (default `0`, clear; up to `1`) frosts the glass: each ray bends through a microfacet normal drawn from a GGX distribution of that roughness, so what is behind is blurred (0.05 lightly frosted, 0.3 heavily) |
+| `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` at each surface it crosses. `attenuationColor` (default `[1, 1, 1]`, each 0 to 1) and `attenuationDistance` (default `0`, off) absorb light by how far it goes inside: after `attenuationDistance` it is `attenuationColor`, after twice that the color squared (Beer–Lambert). `roughness` (default `0`, clear; up to `1`) frosts the glass: each ray bends through a microfacet normal drawn from a GGX distribution of that roughness, so what is behind is blurred (0.05 lightly frosted, 0.3 heavily). `abbe` (default `0`, no dispersion; otherwise at least 5) is the glass's Abbe number: a ray splits into red, green and blue at the glass, each bent by its own index from a Cauchy curve through `indexOfRefraction` (green, the d line) and the Abbe number, as a real lens's glass is (crown glass is about 60, flint 30 to 40, very dense flint 20) |
 
 Absorption is measured from where a ray goes into an object through its transparent material to
 where it next meets that object, so the object should be closed (a sphere, a capped cylinder or
@@ -196,6 +220,15 @@ cone, a box, or a closed mesh). A ray turned back inside past the critical angle
 Glass inside other glass is not tracked: a ray coming out of the inner piece is taken to be
 outside both. Shadows are not tinted; glass shadows like any other object. For glass whose color
 deepens with thickness, set `color` to white and give the color with `attenuationColor`.
+
+**Dispersion.** Glass with an `abbe` number splits light into colors. A ray traced in every color
+splits into three where it first meets such glass, red at the C line (656 nm), green at the d line
+(588 nm) and blue at the F line (486 nm), each keeping only its own color of what it then sees;
+after that each stays in its color, and any further dispersive glass bends it by that color's
+index. Rays from a chromatic lens are already in one color and don't split again. Each split
+traces three times as many rays from there on. Ray traces from the eye, so a prism splits what is
+seen through it (edges fringe with color) but casts no rainbow on the floor: light reaching a
+surface through glass is not traced.
 
 **Textures.** Any material can have a `texture` that gives its color at each point instead of its
 `color`. A texture is an object with a `type`:
@@ -335,7 +368,8 @@ same image, and networked engines give exactly the same as threads.
   longer store normals. The binary versions are no longer read. Later additions are optional
   fields that older readers would refuse but that change nothing when left out, such as an
   object's `bump` (2026-alpha-0.8), and the `environment` and the `spot` and `directional` lights
-  (2026-alpha-0.9).
+  (2026-alpha-0.9), and `csg` objects, a transparent material's `abbe` and the camera's `clamp`
+  (2026-alpha-0.10).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

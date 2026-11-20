@@ -65,6 +65,8 @@ class CCone : public CObjects
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
         virtual BOOL        GetBounds( CVector &oMinimum, CVector &oMaximum );
+        virtual BOOL        SurfaceNormal( CVector &oPoint, CVector &oNormal ) { oNormal = NormalAt( oPoint ); return TRUE; }
+        virtual BOOL        IsClosed( void ) { return m_bCapped; }
             // A capped cone is convex, so a ray leaving it can't hit it
             // again where it is lit; an open one can (its inside), so it is
             // tested past the point the ray leaves from.

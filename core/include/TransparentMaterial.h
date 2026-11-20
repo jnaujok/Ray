@@ -17,6 +17,10 @@ class CTransparentMaterial : public CMaterial
             // GGX roughness: 0 is clear glass; more blurs what is seen
             // through it, as frosted glass does.
         FLT                 m_nRoughness;
+            // The glass's Abbe number: 0 doesn't disperse. Otherwise a ray in
+            // every channel splits into red, green and blue rays here, each
+            // bent by its own index (CLens::DispersedIndex).
+        FLT                 m_nAbbe;
 
     public:
                             DEFINE_MATERIAL( CTransparentMaterial );
@@ -36,6 +40,8 @@ class CTransparentMaterial : public CMaterial
             // object: m_oAttenuationColor to the power nDistance /
             // m_nAttenuationDistance, per channel.
         CColor              Attenuation( FLT nDistance ) const;
+            // The index a ray in nChannel (CLens::EChannel) is bent by.
+        FLT                 IndexFor( int nChannel ) const;
         static BOOL         Refract( CVector oView, CVector oNormal, FLT nIndex, CVector &oTransmit );
 #ifdef RAY_GUI
         virtual void        Properties( void );

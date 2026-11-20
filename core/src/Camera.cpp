@@ -58,6 +58,7 @@ CCamera::CCamera( const CCamera &oSource )
     m_nVerticalAngle = oSource.m_nVerticalAngle;
     m_nHorizontalAngle = oSource.m_nHorizontalAngle;
     m_nAspectRatio = oSource.m_nAspectRatio;
+    m_nClamp = oSource.m_nClamp;
     m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
     m_pColorModel.reset( oSource.m_pColorModel ? oSource.m_pColorModel->Clone() : NULL );
     m_pLens.reset( oSource.m_pLens ? oSource.m_pLens->Clone() : NULL );
@@ -72,6 +73,7 @@ CCamera &CCamera::operator =( const CCamera &oSource )
     m_nVerticalAngle = oSource.m_nVerticalAngle;
     m_nHorizontalAngle = oSource.m_nHorizontalAngle;
     m_nAspectRatio = oSource.m_nAspectRatio;
+    m_nClamp = oSource.m_nClamp;
     if ( this != &oSource )
     {
         m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
@@ -328,6 +330,8 @@ void CCamera::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutNumber( oNode, "aspectRatio", m_nAspectRatio );
     PutModel( oNode, "sampler", GetSampler() );
     PutModel( oNode, "colorModel", GetColorModel() );
+    if ( m_nClamp > 0.0 )
+        RayJson::PutNumber( oNode, "clamp", m_nClamp );
     if ( m_pLens )
         m_pLens->ToJson( *oNode.putObject( "lens" ) );
 }
@@ -336,11 +340,13 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "position", "lookAt", "up", "verticalAngle",
                                               "horizontalAngle", "aspectRatio",
-                                              "sampler", "colorModel", "lens", NULL };
+                                              "sampler", "colorModel", "clamp", "lens", NULL };
     CPixelSampler  *pSampler;
     CColorModel    *pColorModel;
+    FLT             nClamp = 0.0;
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+         ! RayJson::GetNumber( oNode, "clamp", nClamp, FALSE ) ||
          ! RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) ||
          ! RayJson::GetVector( oNode, "lookAt", m_oPointAt, TRUE ) ||
          ! RayJson::GetVector( oNode, "up", m_oUp, FALSE ) ||
@@ -351,6 +357,9 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
 
     if ( ! ( m_nVerticalAngle > 0.0 ) || ! ( m_nVerticalAngle < PI ) )
         return RayJson::Fail( "verticalAngle must be between 0 and 180 degrees" );
+    if ( nClamp < 0.0 || nClamp != nClamp )
+        return RayJson::Fail( "clamp can't be negative (0 doesn't clamp)" );
+    m_nClamp = nClamp;
 
     if ( ! GetModel( oNode, "sampler", pSampler, "sampler" ) )
         return FALSE;
@@ -383,4 +392,20 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
         return RayJson::Fail( m_strLensError );
     }
     return TRUE;
+}
+
+CColor CCamera::ClampSample( const CColor &oColor ) const
+{
+    if ( ! ( m_nClamp > 0.0 ) )
+        return oColor;
+
+    CColor  oCopy( oColor );
+    FLT     anChannel[ 3 ] = { oCopy.GetR(), oCopy.GetG(), oCopy.GetB() };
+
+    for ( int nIndex = 0; nIndex < 3; nIndex++ )
+    {
+        if ( anChannel[ nIndex ] > m_nClamp )
+            anChannel[ nIndex ] = m_nClamp;
+    }
+    return CColor( anChannel[ 0 ], anChannel[ 1 ], anChannel[ 2 ] );
 }

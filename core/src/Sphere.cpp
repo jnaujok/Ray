@@ -262,3 +262,11 @@ BOOL CSphere::GetBounds( CVector &oMinimum, CVector &oMaximum )
     PadBounds( anLow, anHigh, oMinimum, oMaximum );
     return TRUE;
 }
+
+BOOL CSphere::SurfaceNormal( CVector &oPoint, CVector &oNormal )
+{
+        // As Shade works it out.
+    oNormal = oPoint - m_oCenter;
+    oNormal.Normalize();
+    return TRUE;
+}

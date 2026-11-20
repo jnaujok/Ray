@@ -209,6 +209,12 @@ class CLens
         BOOL                    IsChromatic( void ) const;
             /// The focal length for a channel's wavelength (after Prepare).
         FLT                     FocalLengthIn( int nChannel ) const;
+            /// The index, in a channel, of a glass with index nIor at the d
+            /// line and Abbe number nAbbe (0: it doesn't disperse), from a
+            /// Cauchy curve through both: red at the C line, green at the d
+            /// line (nIor itself), blue at the F line. Dispersive transparent
+            /// materials use it too.
+        static FLT              DispersedIndex( FLT nIor, FLT nAbbe, int nChannel );
         int                     GetSeed( void ) const { return m_nSeed; }
 
         FLT                     GetFocalLength( void ) const { return m_nFocalLength; }

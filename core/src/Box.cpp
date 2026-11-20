@@ -300,3 +300,9 @@ BOOL CBox::GetBounds( CVector &oMinimum, CVector &oMaximum )
     PadBounds( anLow, anHigh, oMinimum, oMaximum );
     return TRUE;
 }
+
+BOOL CBox::SurfaceNormal( CVector &oPoint, CVector &oNormal )
+{
+    oNormal = NormalAt( oPoint );
+    return TRUE;
+}

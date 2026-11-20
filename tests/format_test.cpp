@@ -39,6 +39,7 @@
 #include "ImageTexture.h"
 #include "PngImage.h"
 #include "BumpMap.h"
+#include "Csg.h"
 
 
 #include <math.h>
@@ -2290,6 +2291,328 @@ static void SkyTextureChecks( const char *strScenes )
     Check( nBrightest > 10.0f, "textures/sky.hdr's sun is far brighter than white" );
 }
 
+// --------------------------------------------------------------------------
+// Constructive solid geometry, dispersive glass and the sample clamp
+// --------------------------------------------------------------------------
+
+    // The ray hits the csg at t = dT, where its outward normal (as Shade
+    // shades it) is (dNX, dNY, dNZ). pIgnore is passed on.
+static bool CsgHitsAt( CObjects &oObject, CRay oRay, double dT, double dNX, double dNY, double dNZ, CObjects *pIgnore = NULL )
+{
+    CVector oHit;
+    CVector oNormal;
+
+    if ( ! oObject.Intersect( oRay, oHit, pIgnore ) || ABS( oRay.GetT() - dT ) > 1e-9 || ! oObject.SurfaceNormal( oHit, oNormal ) )
+        return false;
+    return ABS( oNormal.GetX() - dNX ) < 1e-9 && ABS( oNormal.GetY() - dNY ) < 1e-9 && ABS( oNormal.GetZ() - dNZ ) < 1e-9;
+}
+
+    // A csg's JSON (an object of the "objects" array) with strParts.
+static std::string CsgOf( const char *strOperation, const char *strParts, const char *strMore = "" )
+{
+    return std::string( "{ \"type\": \"csg\", \"operation\": \"" ) + strOperation + "\", \"objects\": [ " + strParts + " ]" +
+           strMore + " }";
+}
+
+static void CsgChecks( void )
+{
+    CScene      oScene;
+    CObjects   *pObject;
+    CVector     oHit;
+
+        // A lens: where two unit spheres, at z = -0.5 and 0.5, overlap.
+    std::string strLens = CsgOf( "intersection", "{ \"type\": \"sphere\", \"center\": [0, 0, 0.5], \"radius\": 1 },"
+                                                 "{ \"type\": \"sphere\", \"center\": [0, 0, -0.5], \"radius\": 1 }" );
+
+    pObject = FirstObject( oScene, strLens.c_str() );
+    if ( pObject )
+    {
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 4.5, 0, 0, -1 ), "a ray hits an intersection where both shapes are" );
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, 0, 0, 0, 1 ), 0.5, 0, 0, 1 ), "a ray from inside an intersection hits its far side" );
+        Check( Misses( *pObject, RayFrom( 0, 0.95, -5, 0, 0, 1 ) ), "a ray through only one of an intersection's shapes misses it" );
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, -0.5, 0, 0, 1 ), 1.0, 0, 0, 1, pObject ),
+               "a ray leaving a csg's surface inward, ignoring the csg, hits its far side" );
+
+        CRay oOut = RayFrom( 0, 0, -0.5, 0, 0, -1 );
+        Check( ! pObject->Intersect( oOut, oHit, pObject ), "a ray leaving a csg's surface outward, ignoring the csg, misses it" );
+
+        CVector oLow, oHigh;
+        Check( pObject->GetBounds( oLow, oHigh ) && oLow.GetZ() > -0.6 && oHigh.GetZ() < 0.6 && oLow.GetX() < -0.99 && oHigh.GetX() > 0.99,
+               "an intersection's box is where its shapes' boxes overlap" );
+    }
+
+        // Two unit spheres at x = -0.5 and 0.5, as one: no surface inside.
+    pObject = FirstObject( oScene, CsgOf( "union", "{ \"type\": \"sphere\", \"center\": [-0.5, 0, 0], \"radius\": 1 },"
+                                                   "{ \"type\": \"sphere\", \"center\": [0.5, 0, 0], \"radius\": 1 }" ).c_str() );
+    if ( pObject )
+    {
+        double dZ = sqrt( 0.75 );
+
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 5.0 - dZ, 0.5, 0, -dZ ),
+               "a ray hits a union where its shapes meet (the first shape's surface)" );
+        Check( CsgHitsAt( *pObject, RayFrom( -0.5, 0, 0, 1, 0, 0 ), 2.0, 1, 0, 0 ),
+               "a ray inside a union passes the surfaces inside it and leaves by the far one" );
+        Check( Misses( *pObject, RayFrom( 0, 1.2, -5, 0, 0, 1 ) ), "a ray past a union misses it" );
+    }
+
+        // A cube of side 2 with a ball of radius 1.2 taken out: only its
+        // corners are left.
+    pObject = FirstObject( oScene, CsgOf( "difference", "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": 2 },"
+                                                        "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1.2 }" ).c_str() );
+    if ( pObject )
+    {
+        double dS = 1.0 / sqrt( 3.0 );
+
+        Check( Misses( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ) ), "a ray through the hole a difference takes out passes through" );
+        Check( CsgHitsAt( *pObject, RayFrom( 0.9, 0.9, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a ray hits what a difference leaves" );
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, 0, dS, dS, dS ), 1.2, -dS, -dS, -dS ),
+               "a difference's hollow is the taken-out shape turned inside out" );
+
+        CVector oLow, oHigh;
+        Check( pObject->GetBounds( oLow, oHigh ) && ABS( oHigh.GetX() - 1.0 ) < 1e-3, "a difference's box is its first shape's" );
+    }
+
+        // A hollow ball (a shell from radius 0.9 to 1): a ray leaving its
+        // inside surface, ignoring the csg, crosses the hollow to the far
+        // side, so a bowl shadows and reflects its own inside.
+    pObject = FirstObject( oScene, CsgOf( "difference", "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 },"
+                                                        "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 0.9 }" ).c_str() );
+    if ( pObject )
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, -0.9, 0, 0, 1 ), 1.8, 0, 0, -1, pObject ),
+               "a ray from a csg's inside surface, ignoring the csg, hits its own far side" );
+
+        // A die: a rounded cube (a csg) with a pip drilled in its front; the
+        // pip is black and the body white (childMaterials).
+    std::string strDie = CsgOf( "difference",
+        "{ \"type\": \"csg\", \"operation\": \"intersection\", \"objects\": ["
+        "  { \"type\": \"box\", \"center\": [0, 0, 0], \"size\": 2, \"materials\": [ { \"type\": \"ambient\", \"color\": [1, 1, 1] } ] },"
+        "  { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1.36, \"materials\": [ { \"type\": \"ambient\", \"color\": [1, 1, 1] } ] } ] },"
+        "{ \"type\": \"sphere\", \"center\": [0, 0, -1.05], \"radius\": 0.3, \"materials\": [ { \"type\": \"ambient\", \"color\": [0, 0, 0.5] } ] }",
+        ", \"childMaterials\": true" );
+
+    pObject = FirstObject( oScene, strDie.c_str() );
+    if ( pObject )
+    {
+        double dRound = sqrt( 1.36 * 1.36 - 1.28 );
+
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 4.25, 0, 0, -1 ), "a ray into a drilled pip hits its bottom" );
+        Check( CsgHitsAt( *pObject, RayFrom( 0.8, 0.8, -5, 0, 0, 1 ), 5.0 - dRound, 0.8 / 1.36, 0.8 / 1.36, -dRound / 1.36 ),
+               "a ray hits a nested csg's rounded corner" );
+        Check( CsgHitsAt( *pObject, RayFrom( 0.5, 0.2, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a ray hits a nested csg's flat face" );
+
+        CColor oPip = TraceFrom( oScene, CVector( 0, 0, -5 ), CVector( 0, 0, 1 ) );
+        CColor oBody = TraceFrom( oScene, CVector( 0.5, 0.2, -5 ), CVector( 0, 0, 1 ) );
+
+        Check( ABS( oPip.GetR() ) < 1e-12 && ABS( oPip.GetB() - 0.5 ) < 1e-12 && ABS( oBody.GetR() - 1.0 ) < 1e-12,
+               "with childMaterials each surface is shaded with its own shape's materials" );
+    }
+
+        // Without childMaterials the csg's own materials shade it all.
+    std::string strOwn = CsgOf( "difference",
+        "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": 2, \"materials\": [ { \"type\": \"ambient\", \"color\": [1, 0, 0] } ] },"
+        "{ \"type\": \"sphere\", \"center\": [0, 0, -1.05], \"radius\": 0.3, \"materials\": [ { \"type\": \"ambient\", \"color\": [0, 0, 1] } ] }",
+        ", \"materials\": [ { \"type\": \"ambient\", \"color\": [0, 1, 0] } ]" );
+
+    pObject = FirstObject( oScene, strOwn.c_str() );
+    if ( pObject )
+    {
+        CColor oPip = TraceFrom( oScene, CVector( 0, 0, -5 ), CVector( 0, 0, 1 ) );
+        CColor oFace = TraceFrom( oScene, CVector( 0.5, 0.5, -5 ), CVector( 0, 0, 1 ) );
+
+        Check( ABS( oPip.GetG() - 1.0 ) < 1e-12 && ABS( oFace.GetG() - 1.0 ) < 1e-12 && ABS( oPip.GetR() ) < 1e-12 && ABS( oPip.GetB() ) < 1e-12,
+               "a csg shades with its own materials" );
+    }
+
+        // A cylinder and two balls make a capsule, which round-trips, bump
+        // map and all.
+    std::string strCapsule = CsgOf( "union",
+        "{ \"type\": \"cylinder\", \"base\": [-1, 0, 0], \"top\": [1, 0, 0], \"radius\": 0.5 },"
+        "{ \"type\": \"sphere\", \"center\": [-1, 0, 0], \"radius\": 0.5 },"
+        "{ \"type\": \"sphere\", \"center\": [1, 0, 0], \"radius\": 0.5 }",
+        ", \"bump\": { \"texture\": { \"type\": \"noise\", \"scale\": 0.1 }, \"depth\": 0.01 }" );
+    CScene oAgain;
+
+    pObject = FirstObject( oScene, strCapsule.c_str() );
+    if ( pObject )
+    {
+        Check( CsgHitsAt( *pObject, RayFrom( 1.2, 0, -5, 0, 0, 1 ), 5.0 - sqrt( 0.25 - 0.04 ), 0.2 / 0.5, 0, -sqrt( 0.21 ) / 0.5 ),
+               "a three-part union's rounded end" );
+        Check( oAgain.FromJson( oScene.ToJson() ) == 0 && oAgain.ToJson() == oScene.ToJson() && oAgain.GetObjectAt( 0 ) &&
+               oAgain.GetObjectAt( 0 )->GetBump() != nullptr, "a csg round-trips through JSON" );
+    }
+
+    std::string strTwo = "\"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 } ]";
+
+    ExpectError( Minimal( strTwo.c_str(), ( "\"objects\": [ " + CsgOf( "xor", "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 },"
+                                                                               "{ \"type\": \"sphere\", \"center\": [1, 0, 0], \"radius\": 1 }" ) + " ]" ).c_str() ),
+                 BAD_FILE, "objects[0]: operation must be \"union\", \"intersection\" or \"difference\"" );
+    ExpectError( Minimal( strTwo.c_str(), ( "\"objects\": [ " + CsgOf( "union", "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }" ) + " ]" ).c_str() ),
+                 BAD_FILE, "objects[0].objects: must be an array of at least two objects" );
+    ExpectError( Minimal( strTwo.c_str(), ( "\"objects\": [ " + CsgOf( "union", "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 },"
+                                                                                 "{ \"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 1, 0] }" ) + " ]" ).c_str() ),
+                 BAD_FILE, "objects[0].objects[1]: a csg combines only closed shapes" );
+    ExpectError( Minimal( strTwo.c_str(), ( "\"objects\": [ " + CsgOf( "union", "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 },"
+                                                                                 "{ \"type\": \"cylinder\", \"base\": [0, 0, 0], \"top\": [0, 1, 0], \"radius\": 1, \"capped\": false }" ) + " ]" ).c_str() ),
+                 BAD_FILE, "objects[0].objects[1]: a csg combines only closed shapes" );
+    ExpectError( Minimal( strTwo.c_str(), ( "\"objects\": [ " + CsgOf( "union", "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 },"
+                                                                                 "{ \"type\": \"teapot\" }" ) + " ]" ).c_str() ),
+                 BAD_FILE, "objects[0].objects[1]: unknown object type \"teapot\"" );
+}
+
+    // A dispersive glass ball (index 1.5, Abbe number 20, unless strGlass
+    // says otherwise) before a checkered wall, and the scene's first object.
+static std::string GlassBallBeforeWall( const char *strGlass )
+{
+    std::string strText =
+        "{ \"format\": \"Ray scene\", \"version\": 3, \"background\": [0, 0, 0],\n"
+        "  \"camera\": { \"position\": [0, 0, -10], \"lookAt\": [0, 0, 0] },\n"
+        "  \"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1, \"materials\": [ { \"type\": \"transparent\", "
+        "\"color\": [1, 1, 1], ";
+
+    strText += strGlass;
+    strText +=
+        " } ] },\n"
+        "    { \"type\": \"plane\", \"position\": [0, 0, 3], \"normal\": [0, 0, -1], \"materials\": [ { \"type\": \"ambient\", \"color\": [1, 1, 1],"
+        "      \"texture\": { \"type\": \"checker\", \"colors\": [ [1, 1, 1], [0, 0, 0] ], \"size\": 0.05 } } ] } ],\n"
+        "  \"lights\": [ ] }\n";
+    return strText;
+}
+
+static CColor TraceChannel( CScene &oScene, double dX, double dY, int nChannel )
+{
+    CRay    oRay;
+    CColor  oColor( 0, 0, 0 );
+
+    oRay.Set( dX, dY, -5.0, 0.0, 0.0, 1.0, 1e100, 1.0, 0, 0 );
+    oRay.SetChannel( nChannel );
+    oScene.TraceRay( oRay, oColor, NULL );
+    return oColor;
+}
+
+static void DispersionChecks( void )
+{
+        // Cauchy through n_d and the Abbe number: n_F - n_C = ( n_d - 1 ) / V.
+    FLT nRed = CLens::DispersedIndex( 1.5, 20.0, CLens::CHANNEL_RED );
+    FLT nGreen = CLens::DispersedIndex( 1.5, 20.0, CLens::CHANNEL_GREEN );
+    FLT nBlue = CLens::DispersedIndex( 1.5, 20.0, CLens::CHANNEL_BLUE );
+
+    Check( nGreen == 1.5 && nRed < 1.5 && nBlue > 1.5 && ABS( ( nBlue - nRed ) - 0.5 / 20.0 ) < 1e-12,
+           "dispersed indices follow the Abbe number, green at the d line" );
+    Check( CLens::DispersedIndex( 1.5, 0.0, CLens::CHANNEL_RED ) == 1.5 && CLens::DispersedIndex( 1.5, 20.0, CLens::CHANNEL_ALL ) == 1.5,
+           "no Abbe number, or every channel at once, is the index as given" );
+
+    CScene oScene;
+
+    Check( oScene.FromJson( GlassBallBeforeWall( "\"indexOfRefraction\": 1.5, \"abbe\": 20" ) ) == 0, "a dispersive glass ball loads" );
+
+    CObjects               *pBall = oScene.GetObjectAt( 0 );
+    CTransparentMaterial   *pGlass = pBall ? dynamic_cast<CTransparentMaterial *>( pBall->GetMaterials()[ 0 ] ) : NULL;
+
+    Check( pGlass && pGlass->IndexFor( CLens::CHANNEL_RED ) == nRed && pGlass->IndexFor( CLens::CHANNEL_BLUE ) == nBlue &&
+           pGlass->IndexFor( CLens::CHANNEL_ALL ) == 1.5, "transparent materials disperse as lens glass does" );
+
+    if ( pGlass )
+    {
+            // Blue bends more than red, going in at 45 degrees.
+        CVector oView( 0.0, -1.0, 1.0 );
+        CVector oNormal( 0.0, 0.0, -1.0 );
+        CVector oRedWay, oBlueWay;
+
+        CTransparentMaterial::Refract( oView, oNormal, pGlass->IndexFor( CLens::CHANNEL_RED ), oRedWay );
+        CTransparentMaterial::Refract( oView, oNormal, pGlass->IndexFor( CLens::CHANNEL_BLUE ), oBlueWay );
+        Check( AngleFromNormal( oBlueWay, CVector( 0, 0, 1 ) ) < AngleFromNormal( oRedWay, CVector( 0, 0, 1 ) ) - 0.1,
+               "dispersive glass bends blue more than red" );
+    }
+
+        // A ray in every channel splits at the glass: each of its channels
+        // is what a ray traced in that channel alone sees.
+    bool bSplits = true;
+    bool bDiffers = false;
+
+    for ( int nStep = 0; nStep < 40; nStep++ )
+    {
+        double  dX = -0.9 + nStep * 0.045;
+        CColor  oWhite = TraceChannel( oScene, dX, 0.31, CLens::CHANNEL_ALL );
+        CColor  oRed = TraceChannel( oScene, dX, 0.31, CLens::CHANNEL_RED );
+        CColor  oGreen = TraceChannel( oScene, dX, 0.31, CLens::CHANNEL_GREEN );
+        CColor  oBlue = TraceChannel( oScene, dX, 0.31, CLens::CHANNEL_BLUE );
+
+        if ( oWhite.GetR() != oRed.GetR() || oWhite.GetG() != oGreen.GetG() || oWhite.GetB() != oBlue.GetB() )
+            bSplits = false;
+        if ( oRed.GetR() != oBlue.GetR() )
+            bDiffers = true;
+    }
+    Check( bSplits, "a ray in every channel splits into red, green and blue at dispersive glass" );
+    Check( bDiffers, "red and blue rays see different things through dispersive glass" );
+
+        // Through the middle nothing bends, in any channel.
+    CColor oMiddle = TraceChannel( oScene, 0.0, 0.0, CLens::CHANNEL_ALL );
+    CScene oClear;
+
+    Check( oClear.FromJson( GlassBallBeforeWall( "\"indexOfRefraction\": 1.5" ) ) == 0, "a clear glass ball loads" );
+
+    CColor oClearMiddle = TraceChannel( oClear, 0.0, 0.0, CLens::CHANNEL_ALL );
+
+    Check( ABS( oMiddle.GetR() - oClearMiddle.GetR() ) < 1e-12 && ABS( oMiddle.GetB() - oClearMiddle.GetB() ) < 1e-12,
+           "straight through the middle, dispersive glass sees what clear glass does" );
+
+        // Clear glass treats every channel alike.
+    bool bSame = true;
+
+    for ( int nStep = 0; nStep < 20; nStep++ )
+    {
+        double  dX = -0.9 + nStep * 0.09;
+        CColor  oRed = TraceChannel( oClear, dX, 0.31, CLens::CHANNEL_RED );
+        CColor  oBlue = TraceChannel( oClear, dX, 0.31, CLens::CHANNEL_BLUE );
+
+        if ( oRed.GetR() != oBlue.GetR() )
+            bSame = false;
+    }
+    Check( bSame, "glass without an Abbe number bends every channel alike" );
+
+    std::string strBall = "\"radius\": 1";
+
+    ExpectError( Minimal( strBall.c_str(), "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"abbe\": -3 } ]" ),
+                 BAD_FILE, "abbe can't be negative" );
+    ExpectError( Minimal( strBall.c_str(), "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"abbe\": 2 } ]" ),
+                 BAD_FILE, "abbe must be 0 (no dispersion) or at least 5" );
+
+    CScene oSaved;
+
+    Check( oSaved.FromJson( oScene.ToJson() ) == 0 && oSaved.ToJson() == oScene.ToJson() &&
+           oScene.ToJson().find( "\"abbe\": 20" ) != std::string::npos && oClear.ToJson().find( "abbe" ) == std::string::npos,
+           "an Abbe number round-trips, and none is written when there is none" );
+}
+
+static void ClampChecks( void )
+{
+    CScene oScene;
+
+    Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"clamp\": 2" ) ) == 0, "a camera with a clamp loads" );
+
+    CCamera &oCamera = oScene.GetCamera();
+    CColor   oBright( 5.0, 0.5, 2.0 );
+    CColor   oClamped = oCamera.ClampSample( oBright );
+
+    Check( oCamera.GetClamp() == 2.0 && oClamped.GetR() == 2.0 && oClamped.GetG() == 0.5 && oClamped.GetB() == 2.0,
+           "the sample clamp caps each channel" );
+    Check( oScene.ToJson().find( "\"clamp\": 2" ) != std::string::npos, "the clamp is saved" );
+
+    CScene oPlain;
+
+    Check( oPlain.FromJson( s_strMinimal ) == 0, "the minimal scene loads" );
+
+    CColor oKept = oPlain.GetCamera().ClampSample( oBright );
+
+    Check( oPlain.GetCamera().GetClamp() == 0.0 && oKept.GetR() == 5.0 && oPlain.ToJson().find( "clamp" ) == std::string::npos,
+           "without a clamp samples are left as they are, and none is saved" );
+
+    CCamera oCopy( oCamera );
+
+    Check( oCopy.GetClamp() == 2.0, "a copied camera keeps its clamp" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"clamp\": -1" ), BAD_FILE, "camera: clamp can't be negative" );
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -2321,6 +2644,9 @@ int main( int argc, char **argv )
         BumpChecks();
         LightChecks();
         EnvironmentChecks();
+        CsgChecks();
+        DispersionChecks();
+        ClampChecks();
     }
 
     if ( g_nFailures == 0 )

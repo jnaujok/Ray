@@ -78,6 +78,8 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
             }
             oColor.Set( anChannel[ 0 ], anChannel[ 1 ], anChannel[ 2 ] );
         }
+        if ( oCamera.GetClamp() > 0.0 )
+            oColor = oCamera.ClampSample( oColor );
         oSampler.PutSample( *this, oRay.GetPixelX(), oRay.GetPixelY(), oColor );
     }
     oSampler.End();

@@ -42,6 +42,9 @@ class CObjects
         CMaterialList       m_oMaterials;
         BOOL                m_bOwnsMaterials;   // FALSE for a mesh's faces, which share the mesh's
         std::shared_ptr<const CBumpMap> m_pBump;    // tilts the shading normal, if set (a mesh's faces share the mesh's)
+            // The materials BaseShade uses instead of the object's own, when
+            // set: a csg shading a surface with its part's materials.
+        CMaterialList      *m_pShadeMaterials;
 #ifdef RAY_GUI
         HTREEITEM           m_hObjectItem;
         HTREEITEM           m_hMaterialTree;
@@ -77,6 +80,18 @@ class CObjects
             // The object's bounding box, for the scene's tree. FALSE if it
             // has none (an infinite plane).
         virtual BOOL        GetBounds( CVector &oMinimum, CVector &oMaximum ) { (void)oMinimum; (void)oMaximum; return FALSE; }
+            // The outward normal of the surface at a point on it, as Shade
+            // shades it before any bump map. FALSE if the object can't say.
+        virtual BOOL        SurfaceNormal( CVector &oPoint, CVector &oNormal ) { (void)oPoint; (void)oNormal; return FALSE; }
+            // The part of the object its last Intersect hit (a mesh's face,
+            // a csg's shape), and whether that part's normal is turned
+            // inside out there (a csg's subtracted shape). Itself for a
+            // simple object.
+        virtual CObjects   *HitPart( BOOL &bFlip ) { bFlip = FALSE; return this; }
+            // Whether the object encloses a volume, every ray crossing in and
+            // out of it, so a csg can use it.
+        virtual BOOL        IsClosed( void ) { return FALSE; }
+        CMaterialList      &GetMaterials( void ) { return m_oMaterials; }
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
 #ifdef RAY_GUI
