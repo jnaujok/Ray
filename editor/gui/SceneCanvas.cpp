@@ -66,6 +66,9 @@ wxSize CSceneCanvas::PixelSize( void ) const
 
 void CSceneCanvas::SetScene( CScene &oScene, bool bFrame )
 {
+        // A render of the scene as it was is out of date.
+    if ( m_bShowRender || m_oJob.IsRunning() )
+        StopRender();
     m_pScene = &oScene;
     TessellateScene( oScene, m_oDrawing );
     m_bListsDirty = true;

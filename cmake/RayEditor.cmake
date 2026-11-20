@@ -45,6 +45,12 @@ else()
         set(wxBUILD_USE_STATIC_RUNTIME OFF CACHE BOOL "" FORCE)
     endif()
 
+    # wxWidgets 3.2's CMakeLists asks for a CMake older than 3.5, which CMake 4
+    # refuses unless told what policies to assume.
+    if(NOT DEFINED CMAKE_POLICY_VERSION_MINIMUM)
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    endif()
+
     FetchContent_Declare(wxWidgets
         URL      ${RAY_WXWIDGETS_URL}
         URL_HASH SHA256=${RAY_WXWIDGETS_SHA256}
