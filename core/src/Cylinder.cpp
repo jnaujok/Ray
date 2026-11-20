@@ -51,11 +51,12 @@ void CCylinder::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutBool( oNode, "capped", m_bCapped );
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+    BumpToJson( oNode );
 }
 
 BOOL CCylinder::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "base", "top", "radius", "capped", "color", "materials", NULL };
+    static const char *const astrFields[] = { "base", "top", "radius", "capped", "color", "materials", "bump", NULL };
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
          ! RayJson::GetNumber( oNode, "radius", m_nBaseRadius, TRUE ) )

@@ -79,6 +79,8 @@ BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vect
         CTriangle *pFace = new CTriangle( m_aoVertices[ m_anFaces[ nFace ] ], m_aoVertices[ m_anFaces[ nFace + 1 ] ],
                                           m_aoVertices[ m_anFaces[ nFace + 2 ] ], m_bDoubleSided, m_bSmooth, &m_oMaterials );
 
+        pFace->SetBump( m_pBump );
+
         if ( pFace->GetSurfaceNormal().Magnitude() == 0.0 )
         {
             delete pFace;       // its corners are in a line: it has no surface
@@ -626,6 +628,13 @@ CColor CMesh::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
     return pFace->Shade( oScene, oRay, oIntersect );
 }
 
+void CMesh::SetBump( const std::shared_ptr<const CBumpMap> &pBump )
+{
+    m_pBump = pBump;
+    for ( size_t nFace = 0; nFace < m_apFaces.size(); nFace++ )
+        m_apFaces[ nFace ]->SetBump( pBump );
+}
+
 #ifdef RAY_GUI
 void CMesh::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
 {
@@ -671,6 +680,7 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
     }
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+    BumpToJson( oNode );
 
     for ( size_t nIndex = 0; nIndex < m_aoVertices.size(); nIndex++ )
         RayJson::AddVector( *pVertices, m_aoVertices[ nIndex ] );
@@ -680,7 +690,7 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
 
 BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "vertices", "faces", "normals", "uvs", "uvMap", "smooth", "doubleSided", "color", "materials", NULL };
+    static const char *const astrFields[] = { "vertices", "faces", "normals", "uvs", "uvMap", "smooth", "doubleSided", "color", "materials", "bump", NULL };
     std::vector<CVector>    aoVertices;
     std::vector<int>        anFaces;
     std::vector<CVector>    aoNormals;
@@ -694,7 +704,8 @@ BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
          ! RayJson::GetBool( oNode, "smooth", bSmooth, FALSE ) ||
          ! RayJson::GetBool( oNode, "doubleSided", bDoubleSided, FALSE ) ||
          ! RayJson::GetColor( oNode, "color", m_oColor, FALSE ) ||
-         ! m_oMaterials.FromJson( oNode, "materials" ) )
+         ! m_oMaterials.FromJson( oNode, "materials" ) ||
+         ! BumpFromJson( oNode ) )
         return FALSE;
     if ( bGivenNormals && ! bSmooth )
         return RayJson::Fail( "normals are only used by smooth shading, so \"smooth\" can't be false with them" );

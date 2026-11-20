@@ -333,11 +333,12 @@ void CTriangle::ToJson( IASLib::CObjectNode &oNode )
     }
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+    BumpToJson( oNode );
 }
 
 BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "corners", "doubleSided", "smooth", "normals", "uvs", "color", "materials", NULL };
+    static const char *const astrFields[] = { "corners", "doubleSided", "smooth", "normals", "uvs", "color", "materials", "bump", NULL };
     BOOL    bNormals = oNode.isObject() && ( oNode.get( "normals" ) != NULL );
 
         // Given corner normals are what smooth shading blends, so they make
@@ -384,7 +385,8 @@ BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
     }
 
     return RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
-           m_oMaterials.FromJson( oNode, "materials" );
+           m_oMaterials.FromJson( oNode, "materials" ) &&
+           BumpFromJson( oNode );
 }
 
     // A box a little larger than [anLow, anHigh], so hits a hair outside the

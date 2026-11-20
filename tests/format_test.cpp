@@ -32,6 +32,9 @@
 #include "SceneJson.h"
 #include "Scene.h"
 #include "ReinhardColorModel.h"
+#include "ImageTexture.h"
+#include "PngImage.h"
+#include "BumpMap.h"
 
 
 #include <math.h>
@@ -1360,6 +1363,454 @@ static void ArchiveChecks( const char *strScenes, const char *strDir )
     remove( strArchive.c_str() );
 }
 
+// --------------------------------------------------------------------------
+// PNG
+// --------------------------------------------------------------------------
+
+static uint32_t TestCrc( const std::string &strData )
+{
+    uint32_t nCrc = 0xFFFFFFFFu;
+
+    for ( size_t nIndex = 0; nIndex < strData.size(); nIndex++ )
+    {
+        nCrc ^= (BYTE)strData[ nIndex ];
+        for ( int nBit = 0; nBit < 8; nBit++ )
+            nCrc = ( nCrc & 1u ) ? ( 0xEDB88320u ^ ( nCrc >> 1 ) ) : ( nCrc >> 1 );
+    }
+    return nCrc ^ 0xFFFFFFFFu;
+}
+
+static void PutBig( std::string &strOut, uint32_t nValue )
+{
+    for ( int nShift = 24; nShift >= 0; nShift -= 8 )
+        strOut += (char)( ( nValue >> nShift ) & 0xFF );
+}
+
+static std::string PngChunk( const char *strType, const std::string &strData )
+{
+    std::string strOut;
+    std::string strBody = std::string( strType, 4 ) + strData;
+
+    PutBig( strOut, (uint32_t)strData.size() );
+    strOut += strBody;
+    PutBig( strOut, TestCrc( strBody ) );
+    return strOut;
+}
+
+    // A PNG of the given kind, each channel's sample from pfnSample (in the
+    // image's own bit depth), rows filtered with each filter type in turn.
+static std::string MakePng( int nWidth, int nHeight, int nColorType, int nDepth, bool bInterlace, const std::string &strPalette,
+                            unsigned ( *pfnSample )( int nX, int nY, int nChannel ) )
+{
+    static const int anChannels[ 7 ] = { 1, 0, 3, 1, 2, 0, 4 };
+    static const int anPass[ 7 ][ 4 ] = { { 0, 0, 8, 8 }, { 4, 0, 8, 8 }, { 0, 4, 4, 8 }, { 2, 0, 4, 4 }, { 0, 2, 2, 4 }, { 1, 0, 2, 2 }, { 0, 1, 1, 2 } };
+    int              nChannels = anChannels[ nColorType ];
+    size_t           nStep = (size_t)( std::max )( 1, nChannels * nDepth / 8 );
+    std::vector<BYTE> anRaw;
+
+    for ( int nPass = 0; nPass < ( bInterlace ? 7 : 1 ); nPass++ )
+    {
+        int nX0 = bInterlace ? anPass[ nPass ][ 0 ] : 0, nY0 = bInterlace ? anPass[ nPass ][ 1 ] : 0;
+        int nDX = bInterlace ? anPass[ nPass ][ 2 ] : 1, nDY = bInterlace ? anPass[ nPass ][ 3 ] : 1;
+        std::vector<BYTE> anPrevious;
+        int nRow = 0;
+
+        for ( int nY = nY0; nY < nHeight; nY += nDY, nRow++ )
+        {
+            std::vector<BYTE> anRow;
+            int               nBits = 0;
+
+            for ( int nX = nX0; nX < nWidth; nX += nDX )
+            {
+                for ( int nChannel = 0; nChannel < nChannels; nChannel++ )
+                {
+                    unsigned nValue = pfnSample( nX, nY, nChannel );
+
+                    if ( nDepth == 16 )
+                    {
+                        anRow.push_back( (BYTE)( nValue >> 8 ) );
+                        anRow.push_back( (BYTE)nValue );
+                    }
+                    else if ( nDepth == 8 )
+                        anRow.push_back( (BYTE)nValue );
+                    else
+                    {
+                        if ( nBits % 8 == 0 )
+                            anRow.push_back( 0 );
+                        anRow.back() |= (BYTE)( nValue << ( 8 - nDepth - ( nBits % 8 ) ) );
+                        nBits += nDepth;
+                    }
+                }
+            }
+            if ( anRow.empty() )
+                break;
+            if ( anPrevious.empty() )
+                anPrevious.assign( anRow.size(), 0 );
+
+            int nFilter = nRow % 5;
+
+            anRaw.push_back( (BYTE)nFilter );
+            for ( size_t nIndex = 0; nIndex < anRow.size(); nIndex++ )
+            {
+                int nLeft = ( nIndex >= nStep ) ? anRow[ nIndex - nStep ] : 0;
+                int nUp = anPrevious[ nIndex ];
+                int nUpLeft = ( nIndex >= nStep ) ? anPrevious[ nIndex - nStep ] : 0;
+                int nPredict = 0;
+
+                if ( nFilter == 1 )
+                    nPredict = nLeft;
+                else if ( nFilter == 2 )
+                    nPredict = nUp;
+                else if ( nFilter == 3 )
+                    nPredict = ( nLeft + nUp ) / 2;
+                else if ( nFilter == 4 )
+                {
+                    int nGuess = nLeft + nUp - nUpLeft;
+                    int nA = abs( nGuess - nLeft ), nB = abs( nGuess - nUp ), nC = abs( nGuess - nUpLeft );
+
+                    nPredict = ( nA <= nB && nA <= nC ) ? nLeft : ( nB <= nC ) ? nUp : nUpLeft;
+                }
+                anRaw.push_back( (BYTE)( anRow[ nIndex ] - nPredict ) );
+            }
+            anPrevious = anRow;
+        }
+    }
+
+    std::string strHeader;
+    std::vector<BYTE> anCompressed = CImageExport::Deflate( anRaw );
+
+    PutBig( strHeader, (uint32_t)nWidth );
+    PutBig( strHeader, (uint32_t)nHeight );
+    strHeader += (char)nDepth;
+    strHeader += (char)nColorType;
+    strHeader += (char)0;
+    strHeader += (char)0;
+    strHeader += (char)( bInterlace ? 1 : 0 );
+
+    std::string strPng( "\x89PNG\r\n\x1a\n", 8 );
+
+    strPng += PngChunk( "IHDR", strHeader );
+    if ( ! strPalette.empty() )
+        strPng += PngChunk( "PLTE", strPalette );
+    strPng += PngChunk( "IDAT", std::string( anCompressed.begin(), anCompressed.end() ) );
+    strPng += PngChunk( "IEND", "" );
+    return strPng;
+}
+
+static unsigned SampleRgb8( int nX, int nY, int nChannel ) { return (unsigned)( ( nX * 37 + nY * 101 + nChannel * 59 ) & 0xFF ); }
+static unsigned SampleGray1( int nX, int nY, int ) { return (unsigned)( ( nX + nY * 3 ) % 2 ); }
+static unsigned SampleGray2( int nX, int nY, int ) { return (unsigned)( ( nX + nY ) % 4 ); }
+static unsigned SampleGray4( int nX, int nY, int ) { return (unsigned)( ( nX * 3 + nY ) % 16 ); }
+static unsigned SampleGray16( int nX, int nY, int ) { return 257u * (unsigned)( ( nX * 29 + nY * 13 ) & 0xFF ); }
+static unsigned SampleGrayAlpha( int nX, int nY, int nChannel ) { return nChannel ? 0x40u : (unsigned)( ( nX * 11 + nY * 7 ) & 0xFF ); }
+static unsigned SampleRgba16( int nX, int nY, int nChannel ) { return ( nChannel == 3 ) ? 0x1234u : 257u * SampleRgb8( nX, nY, nChannel ); }
+static unsigned SamplePalette4( int nX, int nY, int ) { return (unsigned)( ( nX + 2 * nY ) % 5 ); }
+static unsigned SamplePalette8( int nX, int nY, int ) { return (unsigned)( ( nX * 7 + nY ) % 5 ); }
+static unsigned SamplePastPalette( int nX, int, int ) { return (unsigned)( nX == 2 ? 9 : 1 ); }
+
+static bool Decodes( const std::string &strPng, int nWidth, int nHeight, BYTE ( *pfnExpected )( int nX, int nY, int nChannel ) )
+{
+    int               nReadWidth = 0;
+    int               nReadHeight = 0;
+    std::vector<BYTE> anPixels;
+    std::string       strError;
+
+    if ( ! CPngImage::Decode( strPng, nReadWidth, nReadHeight, anPixels, strError ) )
+    {
+        fprintf( stderr, "PNG decode failed: %s\n", strError.c_str() );
+        return false;
+    }
+    if ( nReadWidth != nWidth || nReadHeight != nHeight )
+        return false;
+    for ( int nY = 0; nY < nHeight; nY++ )
+        for ( int nX = 0; nX < nWidth; nX++ )
+            for ( int nChannel = 0; nChannel < 3; nChannel++ )
+                if ( anPixels[ ( (size_t)nY * nWidth + nX ) * 3 + nChannel ] != pfnExpected( nX, nY, nChannel ) )
+                    return false;
+    return true;
+}
+
+static const BYTE s_anPalette[ 15 ] = { 255, 0, 0, 0, 255, 0, 0, 0, 255, 10, 20, 30, 200, 100, 50 };
+
+static BYTE ExpectRgb8( int nX, int nY, int nChannel ) { return (BYTE)SampleRgb8( nX, nY, nChannel ); }
+static BYTE ExpectGray1( int nX, int nY, int ) { return SampleGray1( nX, nY, 0 ) ? 255 : 0; }
+static BYTE ExpectGray2( int nX, int nY, int ) { return (BYTE)( SampleGray2( nX, nY, 0 ) * 255 / 3 ); }
+static BYTE ExpectGray4( int nX, int nY, int ) { return (BYTE)( SampleGray4( nX, nY, 0 ) * 17 ); }
+static BYTE ExpectGray16( int nX, int nY, int ) { return (BYTE)( SampleGray16( nX, nY, 0 ) / 257 ); }
+static BYTE ExpectGrayAlpha( int nX, int nY, int ) { return (BYTE)SampleGrayAlpha( nX, nY, 0 ); }
+static BYTE ExpectPalette4( int nX, int nY, int nChannel ) { return s_anPalette[ SamplePalette4( nX, nY, 0 ) * 3 + nChannel ]; }
+static BYTE ExpectPalette8( int nX, int nY, int nChannel ) { return s_anPalette[ SamplePalette8( nX, nY, 0 ) * 3 + nChannel ]; }
+
+static void PngChecks( void )
+{
+    std::string strPalette( (const char *)s_anPalette, sizeof( s_anPalette ) );
+
+    Check( Decodes( MakePng( 7, 6, 2, 8, false, "", SampleRgb8 ), 7, 6, ExpectRgb8 ), "an 8-bit RGB PNG reads exactly, every filter type" );
+    Check( Decodes( MakePng( 11, 5, 0, 1, false, "", SampleGray1 ), 11, 5, ExpectGray1 ), "a 1-bit gray PNG reads as black and white" );
+    Check( Decodes( MakePng( 9, 4, 0, 2, false, "", SampleGray2 ), 9, 4, ExpectGray2 ), "a 2-bit gray PNG reads scaled to 0-255" );
+    Check( Decodes( MakePng( 5, 5, 0, 4, false, "", SampleGray4 ), 5, 5, ExpectGray4 ), "a 4-bit gray PNG reads scaled to 0-255" );
+    Check( Decodes( MakePng( 6, 3, 0, 16, false, "", SampleGray16 ), 6, 3, ExpectGray16 ), "a 16-bit gray PNG reads rounded to 8 bits" );
+    Check( Decodes( MakePng( 4, 4, 4, 8, false, "", SampleGrayAlpha ), 4, 4, ExpectGrayAlpha ), "gray with alpha reads its gray, alpha dropped" );
+    Check( Decodes( MakePng( 5, 3, 6, 16, false, "", SampleRgba16 ), 5, 3, ExpectRgb8 ), "16-bit RGBA reads its color, alpha dropped" );
+    Check( Decodes( MakePng( 7, 3, 3, 4, false, strPalette, SamplePalette4 ), 7, 3, ExpectPalette4 ), "a 4-bit palette PNG reads its colors" );
+    Check( Decodes( MakePng( 6, 6, 3, 8, false, strPalette, SamplePalette8 ), 6, 6, ExpectPalette8 ), "an 8-bit palette PNG reads its colors" );
+    Check( Decodes( MakePng( 13, 11, 2, 8, true, "", SampleRgb8 ), 13, 11, ExpectRgb8 ), "an interlaced (Adam7) PNG reads the same as a plain one" );
+    Check( Decodes( MakePng( 3, 2, 0, 1, true, "", SampleGray1 ), 3, 2, ExpectGray1 ), "a tiny interlaced 1-bit PNG, with empty passes, reads" );
+
+        // Damage is reported, never read past.
+    std::string strGood = MakePng( 7, 6, 2, 8, false, "", SampleRgb8 );
+    int         nW, nH;
+    std::vector<BYTE> anPixels;
+    std::string strError;
+
+    std::string strBadCrc = strGood;
+    strBadCrc[ 20 ] ^= 1;      // inside IHDR
+    Check( ! CPngImage::Decode( strBadCrc, nW, nH, anPixels, strError ) && strError.find( "CRC" ) != std::string::npos,
+           "a damaged chunk is caught by its CRC" );
+    bool bTruncations = true;
+    for ( size_t nLength = 0; nLength < strGood.size(); nLength += 3 )
+        if ( CPngImage::Decode( strGood.substr( 0, nLength ), nW, nH, anPixels, strError ) )
+            bTruncations = false;
+    Check( bTruncations, "every truncated PNG is refused" );
+    Check( ! CPngImage::Decode( "not a png at all", nW, nH, anPixels, strError ), "a file without the signature is refused" );
+    Check( ! CPngImage::Decode( MakePng( 4, 1, 3, 8, false, std::string( (const char *)s_anPalette, 6 ), SamplePastPalette ), nW, nH, anPixels, strError ) &&
+           strError.find( "palette" ) != std::string::npos, "a palette index past the palette is refused" );
+    Check( ! CPngImage::Decode( MakePng( 4, 1, 3, 8, false, "", SamplePalette8 ), nW, nH, anPixels, strError ),
+           "a palette PNG without a palette is refused" );
+    {
+        std::string strCritical = strGood;
+        size_t      nIdat = strCritical.find( "IDAT" ) - 4;
+
+        strCritical.insert( nIdat, PngChunk( "ZZZZ", "x" ) );
+        Check( ! CPngImage::Decode( strCritical, nW, nH, anPixels, strError ) && strError.find( "ZZZZ" ) != std::string::npos,
+               "an unknown critical chunk is refused" );
+
+        std::string strAncillary = strGood;
+        strAncillary.insert( nIdat, PngChunk( "tEXt", "Comment\0hi" ) );
+        Check( Decodes( strAncillary, 7, 6, ExpectRgb8 ), "an unknown ancillary chunk is skipped" );
+    }
+
+        // Inflate: a stored block, and a dynamic Huffman block (from zlib).
+    {
+        std::vector<BYTE> anStored = { 0x78, 0x01, 0x01, 0x03, 0x00, 0xFC, 0xFF, 'a', 'b', 'c', 0x02, 0x4D, 0x01, 0x27 };
+        std::vector<BYTE> anOut;
+
+        Check( CPngImage::Inflate( anStored.data(), anStored.size(), anOut, 100, strError ) && anOut.size() == 3 && anOut[ 0 ] == 'a' && anOut[ 2 ] == 'c',
+               "a stored block inflates" );
+        anStored.back() ^= 0xFF;
+        Check( ! CPngImage::Inflate( anStored.data(), anStored.size(), anOut, 100, strError ) && strError.find( "checksum" ) != std::string::npos,
+               "a wrong zlib checksum is caught" );
+
+        static const BYTE anDynamic[] = {
+            0x78, 0xDA, 0xED, 0x8F, 0x59, 0x0E, 0x83, 0x30, 0x0C, 0x05, 0xAF, 0xF2, 0xAE, 0xE6, 0x2C, 0x4D, 0x10, 0x26, 0x96, 0xEC,
+            0x54, 0x88, 0xDB, 0x77, 0x09, 0xD0, 0xC0, 0x15, 0x9A, 0xFF, 0xD1, 0x68, 0x46, 0x69, 0xC3, 0x83, 0x98, 0x0D, 0x55, 0xC9,
+            0xC7, 0x00, 0xAB, 0x52, 0x22, 0x5C, 0x2C, 0xC1, 0xB0, 0x8A, 0x04, 0x24, 0x26, 0x33, 0x38, 0x9D, 0xFC, 0x0C, 0x2A, 0xE1,
+            0xE0, 0xA4, 0x80, 0xA7, 0x94, 0x6B, 0x83, 0x6A, 0x56, 0x79, 0xA6, 0x8C, 0x85, 0xD4, 0x71, 0xFC, 0x72, 0x7A, 0x9A, 0x1B,
+            0xD7, 0x8B, 0x77, 0xAC, 0x57, 0x5F, 0x22, 0xDE, 0xF2, 0xAE, 0xE0, 0x90, 0xFF, 0x1A, 0x3E, 0xEE, 0x33, 0xA0, 0x89, 0x6F,
+            0x05, 0x4D, 0xAD, 0xE3, 0x6E, 0xDC, 0x8D, 0xBB, 0x3F, 0xBF, 0x7B, 0x01, 0x8A, 0x9B, 0xCB, 0x24 };
+        static const char *const astrWords[] = { "ray", "traced", "light", "bends", "through", "glass", "and", "falls", "on",
+                                                 "stone", "wood", "marble", "brick" };
+        std::string strExpected;
+
+        for ( int nIndex = 0; nIndex < 220; nIndex++ )
+        {
+            if ( nIndex > 0 )
+                strExpected += ' ';
+            strExpected += astrWords[ ( nIndex * 7 + nIndex / 3 ) % 13 ];
+        }
+        Check( CPngImage::Inflate( anDynamic, sizeof( anDynamic ), anOut, 100000, strError ) &&
+               std::string( anOut.begin(), anOut.end() ) == strExpected, "a dynamic Huffman block (from zlib) inflates exactly" );
+        Check( ! CPngImage::Inflate( anDynamic, sizeof( anDynamic ), anOut, 100, strError ), "inflating past the limit is refused" );
+
+        bool bDamage = true;
+        for ( size_t nByte = 2; nByte < sizeof( anDynamic ) - 4; nByte++ )
+        {
+            std::vector<BYTE> anDamaged( anDynamic, anDynamic + sizeof( anDynamic ) );
+
+            anDamaged[ nByte ] ^= 0x5A;
+            if ( CPngImage::Inflate( anDamaged.data(), anDamaged.size(), anOut, 100000, strError ) &&
+                 std::string( anOut.begin(), anOut.end() ) != strExpected )
+                bDamage = false;
+        }
+        Check( bDamage, "damaged compressed data is refused (by its codes or its checksum)" );
+    }
+
+        // An image texture reads a PNG, and a scene copy carries its pixels.
+    CImageTexture::SImage oImage;
+    Check( CImageTexture::ParseImage( strGood, "test.png", oImage, strError ) && oImage.nWidth == 7 && oImage.anPixels[ 0 ] == ExpectRgb8( 0, 0, 0 ),
+           "an image texture reads a PNG" );
+    Check( ! CImageTexture::ParseImage( strBadCrc, "bad.png", oImage, strError ) && strError.find( "\"bad.png\"" ) != std::string::npos,
+           "a damaged PNG texture is reported by name" );
+}
+
+    // The brick PNGs in scenes/textures: each kind reads, and the normal map
+    // (interlaced) holds unit normals pointing out of the surface.
+static void BrickTextureChecks( const char *strScenes )
+{
+    const char *astrFiles[] = { "bricks.png", "bricks_normal.png", "bricks_height.png" };
+
+    for ( int nFile = 0; nFile < 3; nFile++ )
+    {
+        std::string       strData = ReadFile( std::string( strScenes ) + "/textures/" + astrFiles[ nFile ] );
+        int               nWidth = 0, nHeight = 0;
+        std::vector<BYTE> anPixels;
+        std::string       strError;
+
+        Check( CPngImage::Decode( strData, nWidth, nHeight, anPixels, strError ) && nWidth == 256 && nHeight == 256,
+               "a brick texture PNG reads" );
+        if ( nFile == 1 && anPixels.size() == 256 * 256 * 3 )
+        {
+            bool bUnit = true;
+
+            for ( size_t nPixel = 0; nPixel < anPixels.size(); nPixel += 3 )
+            {
+                double dX = anPixels[ nPixel ] / 127.5 - 1.0, dY = anPixels[ nPixel + 1 ] / 127.5 - 1.0, dZ = anPixels[ nPixel + 2 ] / 127.5 - 1.0;
+                double dLength = sqrt( dX * dX + dY * dY + dZ * dZ );
+
+                if ( ABS( dLength - 1.0 ) > 0.03 || dZ <= 0.0 )
+                    bUnit = false;
+            }
+            Check( bUnit, "the interlaced normal map reads as unit normals facing out" );
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+// Bump and normal maps
+// --------------------------------------------------------------------------
+
+    // A plane at z = 0 facing -z (u along +x, v along +y) with a bump map.
+static std::string PlaneWithBump( const char *strBump )
+{
+    std::string strTo = std::string( "\"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 0, -1], \"bump\": " ) + strBump;
+
+    return Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1", strTo.c_str() );
+}
+
+    // The bumped normal of a scene's first object at a point, for a ray in a
+    // direction.
+static CVector BumpedNormal( CScene &oScene, CVector oPoint, CVector oDirection, CVector oSmooth )
+{
+    CObjects *pObject = oScene.GetObjectAt( 0 );
+    CRay      oRay;
+    CVector   oBack( oDirection * 5.0 );
+    CVector   oFrom( oPoint - oBack );
+    CVector   oNormal( oSmooth );
+
+    oRay.CreateRay( oDirection, oFrom, 1.0, -1, -1 );
+    if ( pObject && pObject->GetBump() )
+        pObject->GetBump()->Perturb( *pObject, oPoint, oNormal, oRay );
+    return oNormal;
+}
+
+static bool Near( CVector oA, CVector oB, double dTolerance )
+{
+    CVector oDifference = oA - oB;
+
+    return oDifference.Magnitude() < dTolerance;
+}
+
+static void BumpChecks( void )
+{
+    CScene  oScene;
+
+        // A height ramp: a 2 x 1 image, black then white, stretched, so the
+        // height rises 2 a unit along +x between the pixel centers. With a
+        // depth of 0.1 the slope is 0.2, and the normal tilts down it, to -x.
+    Check( oScene.FromJson( PlaneWithBump( "{ \"texture\": { \"type\": \"image\", \"width\": 2, \"height\": 1, \"pixels\": \"AAAA////\", "
+                                          "\"repeat\": false }, \"depth\": 0.1 }" ) ) == 0, "a plane with a height map loads" );
+    {
+        CVector oExpected( -0.2, 0.0, -1.0 );
+
+        oExpected.Normalize();
+        Check( Near( BumpedNormal( oScene, CVector( 0.5, 0.3, 0.0 ), CVector( 0, 0, 1 ), CVector( 0, 0, -1 ) ), oExpected, 1e-6 ),
+               "a height map tilts the normal down its slope, by depth times the slope" );
+        Check( Near( BumpedNormal( oScene, CVector( 0.9, 0.3, 0.0 ), CVector( 0, 0, 1 ), CVector( 0, 0, -1 ) ), CVector( 0, 0, -1 ), 1e-9 ),
+               "where the heights are flat, the normal is as it was" );
+    }
+
+        // A normal map: a flat color (0.75, 0.5, 1) is (0.5, 0, 1) in tangent
+        // space, half a unit toward +u (here +x) for each unit out.
+    Check( oScene.FromJson( PlaneWithBump( "{ \"mode\": \"normal\", \"texture\": { \"type\": \"checker\", "
+                                          "\"colors\": [[0.75, 0.5, 1], [0.75, 0.5, 1]] } }" ) ) == 0, "a plane with a normal map loads" );
+    {
+        CVector oExpected( 0.5, 0.0, -1.0 );
+
+        oExpected.Normalize();
+        Check( Near( BumpedNormal( oScene, CVector( 0.3, 0.2, 0.0 ), CVector( 0, 0, 1 ), CVector( 0, 0, -1 ) ), oExpected, 1e-6 ),
+               "a normal map tilts the normal toward the surface's u direction by its red" );
+
+        CVector oGrazing( 1.0, 0.0, 0.2 );
+        oGrazing.Normalize();
+        Check( Near( BumpedNormal( oScene, CVector( 0.3, 0.2, 0.0 ), oGrazing, CVector( 0, 0, -1 ) ), CVector( 0, 0, -1 ), 1e-9 ),
+               "a tilted normal that would face away from the ray is passed over" );
+    }
+    Check( oScene.FromJson( PlaneWithBump( "{ \"mode\": \"normal\", \"strength\": 2, \"texture\": { \"type\": \"checker\", "
+                                          "\"colors\": [[0.5, 0.75, 1], [0.5, 0.75, 1]] } }" ) ) == 0, "a normal map with a strength loads" );
+    {
+        CVector oExpected( 0.0, 1.0, -1.0 );
+
+        oExpected.Normalize();
+        Check( Near( BumpedNormal( oScene, CVector( 0.3, 0.2, 0.0 ), CVector( 0, 0, 1 ), CVector( 0, 0, -1 ) ), oExpected, 1e-6 ),
+               "green tilts toward v, scaled by strength" );
+    }
+
+        // On a sphere the u and v directions are found from its coordinates:
+        // a flat normal map leaves the normal as it was.
+    Check( oScene.FromJson( Minimal( "\"radius\": 1", "\"radius\": 1, \"bump\": { \"mode\": \"normal\", \"texture\": { \"type\": \"checker\", "
+                                     "\"colors\": [[0.5, 0.5, 1], [0.5, 0.5, 1]] } }" ) ) == 0, "a sphere with a normal map loads" );
+    {
+        CVector oPoint( 0.6, 0.0, -0.8 );
+
+        Check( Near( BumpedNormal( oScene, oPoint, CVector( 0, 0, 1 ), oPoint ), oPoint, 1e-6 ), "a flat normal map changes nothing" );
+    }
+
+        // Saved and read back; every object type takes one; a mesh's faces share it.
+    const char *astrObjects[] = {
+        "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+        "\"type\": \"box\", \"center\": [0, 0, 0], \"size\": 1",
+        "\"type\": \"cone\", \"base\": [0, 0, 0], \"top\": [0, 1, 0], \"baseRadius\": 1",
+        "\"type\": \"cylinder\", \"base\": [0, 0, 0], \"top\": [0, 1, 0], \"radius\": 1",
+        "\"type\": \"triangle\", \"corners\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]]",
+        "\"type\": \"mesh\", \"vertices\": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], \"faces\": [[0, 1, 2]]",
+        "\"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 1, 0]" };
+
+    for ( int nIndex = 0; nIndex < 7; nIndex++ )
+    {
+        std::string strTo = std::string( astrObjects[ nIndex ] ) +
+                            ", \"bump\": { \"texture\": { \"type\": \"noise\", \"seed\": 2 }, \"depth\": 0.02, \"step\": 0.002 }";
+        CScene      oBumped;
+
+        Check( oBumped.FromJson( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1", strTo.c_str() ) ) == 0,
+               "an object with a bump map loads" );
+
+        std::string strSaved = oBumped.ToJson();
+        CScene      oAgain;
+
+        Check( strSaved.find( "\"bump\"" ) != std::string::npos && strSaved.find( "\"depth\": 0.02" ) != std::string::npos &&
+               strSaved.find( "\"step\": 0.002" ) != std::string::npos, "a bump map is saved" );
+        Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "a bump map reads back as it was saved" );
+
+        CMesh *pMesh = dynamic_cast<CMesh *>( oBumped.GetObjectAt( 0 ) );
+        if ( pMesh )
+            Check( pMesh->GetFaceCount() == 1 && pMesh->FaceHasBump( 0 ), "a mesh's faces share its bump map" );
+    }
+    Check( oScene.FromJson( s_strMinimal ) == 0 && oScene.ToJson().find( "\"bump\"" ) == std::string::npos,
+           "an object without a bump map doesn't write one" );
+
+    ExpectError( PlaneWithBump( "{ \"texture\": { \"type\": \"noise\" }, \"mode\": \"bumpy\" }" ), BAD_FILE,
+                 "objects[0].bump.mode: must be \"height\" or \"normal\"" );
+    ExpectError( PlaneWithBump( "{ \"mode\": \"normal\", \"depth\": 1, \"texture\": { \"type\": \"noise\" } }" ), BAD_FILE,
+                 "objects[0].bump.depth: is for a height map" );
+    ExpectError( PlaneWithBump( "{ \"strength\": 1, \"texture\": { \"type\": \"noise\" } }" ), BAD_FILE,
+                 "objects[0].bump.strength: is for a normal map" );
+    ExpectError( PlaneWithBump( "{ \"depth\": 0.1 }" ), BAD_FILE, "objects[0].bump: needs a \"texture\"" );
+    ExpectError( PlaneWithBump( "{ \"step\": 0, \"texture\": { \"type\": \"noise\" } }" ), BAD_FILE, "objects[0].bump.step: must be more than 0" );
+    ExpectError( PlaneWithBump( "{ \"texture\": { \"type\": \"plaid\" } }" ), BAD_FILE, "objects[0].bump.texture: unknown texture type \"plaid\"" );
+    ExpectError( PlaneWithBump( "{ \"texture\": { \"type\": \"noise\" }, \"height\": 1 }" ), BAD_FILE, "height" );
+    ExpectError( PlaneWithBump( "3" ), BAD_FILE, "objects[0].bump: must be an object" );
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -1367,6 +1818,7 @@ int main( int argc, char **argv )
     else if ( argc >= 4 && strcmp( argv[ 1 ], "--textures" ) == 0 )
     {
         TextureChecks( argv[ 2 ] );
+        BrickTextureChecks( argv[ 2 ] );
         ArchiveChecks( argv[ 2 ], argv[ 3 ] );
         MeshTreeChecks( argv[ 2 ] );
         SceneTreeChecks( argv[ 2 ] );
@@ -1385,6 +1837,8 @@ int main( int argc, char **argv )
         SoftChecks();
         PrimitiveChecks();
         HdrChecks();
+        PngChecks();
+        BumpChecks();
     }
 
     if ( g_nFailures == 0 )

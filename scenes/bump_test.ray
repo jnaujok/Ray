@@ -1,0 +1,279 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 320,
+        "imageHeight": 240,
+        "imageFile": "bump_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 16,
+        "depthThreshold": 0.01
+    },
+    "background": [0.55, 0.7, 0.95],
+    "camera": {
+        "position": [0.0, 1.7, -5.2],
+        "lookAt": [0.0, 1.0, 1.5],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 38.0,
+        "horizontalAngle": 49.0,
+        "aspectRatio": 1.333333,
+        "sampler": {
+            "type": "stratified",
+            "grid": 3,
+            "seed": 0
+        },
+        "colorModel": "clip"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.1, 0.1]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "wood",
+                        "colors": [
+                            [0.85, 0.66, 0.42],
+                            [0.8, 0.6, 0.37],
+                            [0.72, 0.51, 0.3],
+                            [0.47, 0.3, 0.16]
+                        ],
+                        "scale": 0.12,
+                        "origin": [0.0, -2.0, 0.0],
+                        "turbulence": 0.4,
+                        "octaves": 4,
+                        "seed": 1,
+                        "axis": [0.988936, 0.0, 0.14834]
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.25,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.2,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "wood",
+                    "colors": [
+                        [0.85, 0.66, 0.42],
+                        [0.8, 0.6, 0.37],
+                        [0.72, 0.51, 0.3],
+                        [0.47, 0.3, 0.16]
+                    ],
+                    "scale": 0.12,
+                    "origin": [0.0, -2.0, 0.0],
+                    "turbulence": 0.4,
+                    "octaves": 4,
+                    "seed": 1,
+                    "axis": [0.988936, 0.0, 0.14834]
+                },
+                "depth": 0.012,
+                "step": 0.001
+            }
+        },
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 2.5],
+            "normal": [0.0, 0.0, -1.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.12, 0.12, 0.12],
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/bricks.png",
+                        "scale": [0.3, 0.3],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": false
+                    }
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/bricks.png",
+                        "scale": [0.3, 0.3],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": false
+                    }
+                }
+            ],
+            "bump": {
+                "mode": "normal",
+                "texture": {
+                    "type": "image",
+                    "file": "textures/bricks_normal.png",
+                    "scale": [0.3, 0.3],
+                    "offset": [0.0, 0.0],
+                    "repeat": true,
+                    "srgb": false
+                },
+                "strength": 1.0,
+                "step": 0.001
+            }
+        },
+        {
+            "type": "sphere",
+            "center": [-1.6, 0.75, 0.4],
+            "radius": 0.75,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.05, 0.03, 0.02]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.35,
+                    "color": [0.8, 0.45, 0.25],
+                    "diffuseCast": false
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.6,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.12,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                },
+                {
+                    "type": "reflective",
+                    "influence": 0.45,
+                    "color": [1.0, 0.7, 0.5],
+                    "diffuseReflectivity": 0.0,
+                    "filterReflection": true
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "noise",
+                    "colors": [
+                        [0.0, 0.0, 0.0],
+                        [1.0, 1.0, 1.0]
+                    ],
+                    "scale": 0.09,
+                    "origin": [0.0, 0.0, 0.0],
+                    "turbulence": 0.0,
+                    "octaves": 2,
+                    "seed": 3
+                },
+                "depth": 0.02,
+                "step": 0.001
+            }
+        },
+        {
+            "type": "sphere",
+            "center": [0.15, 0.55, -0.8],
+            "radius": 0.55,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.04, 0.0]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [0.95, 0.45, 0.05],
+                    "diffuseCast": false
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.5,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.1,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "noise",
+                    "colors": [
+                        [0.0, 0.0, 0.0],
+                        [1.0, 1.0, 1.0]
+                    ],
+                    "scale": 0.025,
+                    "origin": [0.0, 0.0, 0.0],
+                    "turbulence": 0.0,
+                    "octaves": 2,
+                    "seed": 8
+                },
+                "depth": 0.004,
+                "step": 0.001
+            }
+        },
+        {
+            "type": "box",
+            "center": [1.9, 0.6, 0.5],
+            "size": 1.2,
+            "rotation": [0.0, -25.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.08, 0.08]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [0.78, 0.74, 0.68],
+                    "diffuseCast": false
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "image",
+                    "file": "textures/bricks_height.png",
+                    "scale": [1.0, 1.0],
+                    "offset": [0.0, 0.0],
+                    "repeat": true,
+                    "srgb": false
+                },
+                "depth": 0.03,
+                "step": 0.001
+            }
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "position": [-7.0, 3.2, 1.2],
+            "color": [0.75, 0.72, 0.65]
+        },
+        {
+            "type": "point",
+            "position": [2.5, 4.0, -4.5],
+            "color": [0.35, 0.36, 0.4]
+        }
+    ]
+}

@@ -6,6 +6,7 @@
 
 #include "ImageTexture.h"
 #include "SceneJson.h"
+#include "PngImage.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -73,6 +74,17 @@ CImageTexture::CImageTexture( void ) :
 
 BOOL CImageTexture::ParseImage( const std::string &strData, const std::string &strPath, SImage &oImage, std::string &strError )
 {
+    if ( CPngImage::IsPng( strData ) )
+    {
+        std::string strWhy;
+
+        if ( ! CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy ) )
+        {
+            strError = "\"" + strPath + "\" " + strWhy;
+            return FALSE;
+        }
+        return TRUE;
+    }
     if ( strData.size() >= 2 && strData[ 0 ] == 'P' && ( strData[ 1 ] == '6' || strData[ 1 ] == '3' ) )
     {
         size_t  nAt = 2;
@@ -131,7 +143,7 @@ BOOL CImageTexture::ParseImage( const std::string &strData, const std::string &s
         }
     }
 
-    strError = "\"" + strPath + "\" isn't a PPM or Ray raw image";
+    strError = "\"" + strPath + "\" isn't a PNG, PPM or Ray raw image";
     return FALSE;
 }
 

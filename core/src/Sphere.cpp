@@ -211,17 +211,19 @@ void CSphere::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutNumber( oNode, "radius", m_nRadius );
     RayJson::PutColor( oNode, "color", m_oColor );
     m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
+    BumpToJson( oNode );
 }
 
 BOOL CSphere::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "center", "radius", "color", "materials", NULL };
+    static const char *const astrFields[] = { "center", "radius", "color", "materials", "bump", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
            RayJson::GetVector( oNode, "center", m_oCenter, TRUE ) &&
            RayJson::GetNumber( oNode, "radius", m_nRadius, TRUE ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
-           m_oMaterials.FromJson( oNode, "materials" );
+           m_oMaterials.FromJson( oNode, "materials" ) &&
+           BumpFromJson( oNode );
 }
 
 BOOL CSphere::SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV )

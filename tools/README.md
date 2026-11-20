@@ -23,6 +23,18 @@ section. It needs only Python 3. Run it from the repository root whenever the re
 tools/render_previews.py
 ```
 
+## `make_textures.py`
+
+Makes the brick textures in `scenes/textures/` that `bump_test.ray` and the torture test use:
+`bricks.png` (the color, 8-bit RGB, each row with a different PNG filter), `bricks_normal.png` (a
+tangent-space normal map, OpenGL convention, Adam7-interlaced) and `bricks_height.png` (the height
+field the normal map comes from, 16-bit gray). Between them they use most of what Ray's PNG reader
+must handle. It needs only Python 3, and writes the same files every time:
+
+```sh
+tools/make_textures.py
+```
+
 ## `obj_to_ray.py`
 
 Turns a Wavefront OBJ model into a Ray mesh object (JSON), ready to put in a scene's `objects`

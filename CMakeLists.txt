@@ -52,6 +52,7 @@ set(RAY_CORE_SOURCES
     core/src/AdaptiveSampler.cpp
     core/src/AmbientMaterial.cpp
     core/src/Box.cpp
+    core/src/BumpMap.cpp
     core/src/BoxSampler.cpp
     core/src/Camera.cpp
     core/src/CheckerTexture.cpp
@@ -82,6 +83,7 @@ set(RAY_CORE_SOURCES
     core/src/ObjectsArray.cpp
     core/src/PixelAccumulator.cpp
     core/src/PixelSampler.cpp
+    core/src/PngImage.cpp
     core/src/Plane.cpp
     core/src/PtLight.cpp
     core/src/Rays.cpp

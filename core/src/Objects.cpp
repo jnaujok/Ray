@@ -16,6 +16,8 @@
 #include "Scene.h"
 #include "Light.h"
 #include "Sampling.h"
+#include "BumpMap.h"
+#include "SceneJson.h"
 
 #include <string.h>
 
@@ -104,8 +106,38 @@ void CObjects::SetMaterials( void )
 
 #endif
 
-CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal )
+void CObjects::BumpToJson( IASLib::CObjectNode &oNode ) const
 {
+    if ( m_pBump )
+        m_pBump->ToJson( *oNode.putObject( "bump" ) );
+}
+
+BOOL CObjects::BumpFromJson( const IASLib::CJsonNode &oNode )
+{
+    const IASLib::CJsonNode *pBump = oNode.isObject() ? oNode.get( "bump" ) : NULL;
+
+    m_pBump.reset();
+    if ( pBump == NULL )
+        return TRUE;
+
+    RayJson::CWhere           oWhere( "bump" );
+    std::shared_ptr<CBumpMap> pNew( new CBumpMap );
+
+    if ( ! pNew->FromJson( *pBump ) )
+        return FALSE;
+    m_pBump = pNew;
+    return TRUE;
+}
+
+CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oSmoothNormal )
+{
+        // A bump map tilts the normal every material shades with. The smooth
+        // normal is left as it is (a plane's is its own member).
+    CVector     oNormal( oSmoothNormal );
+
+    if ( m_pBump )
+        m_pBump->Perturb( *this, oIntersect, oNormal, oRay );
+
     CColor      oReturn;
     CColor      oColor;
     CRay        oLightRay;

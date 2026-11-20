@@ -108,6 +108,8 @@ class CMesh : public CObjects
         BOOL                    FaceCoordsAt( int nFace, CVector oPoint, FLT &nU, FLT &nV ) { return m_apFaces[ (size_t)nFace ]->SurfaceCoords( oPoint, nU, nV ); }
             /// The normal face nFace shades with at a point on it.
         CVector                 FaceNormalAt( int nFace, CVector oPoint ) { return m_apFaces[ (size_t)nFace ]->NormalAt( oPoint ); }
+            /// Whether face nFace has the mesh's bump map (for tests).
+        BOOL                    FaceHasBump( int nFace ) const { return m_apFaces[ (size_t)nFace ]->GetBump() ? TRUE : FALSE; }
 
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect );
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore );
@@ -118,6 +120,8 @@ class CMesh : public CObjects
             /// must find exactly what this does; the tests hold it to that.
         BOOL                    IntersectEachFace( CRay &oRay, CVector &oIntersect );
         virtual CColor          Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
+            /// The faces share the mesh's bump map, as they share its materials.
+        virtual void            SetBump( const std::shared_ptr<const CBumpMap> &pBump );
 
 #ifdef RAY_GUI
         virtual void            ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );

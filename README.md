@@ -82,8 +82,8 @@ The ray tracing itself is the 1997 code.
 
   <img src="docs/images/tests/soft_test.png" alt="Clear, lightly frosted and heavily frosted glass panes before a striped poster, a mirror ball and a brushed gold ball, and soft shadows from a rectangle light and a sphere light" width="320">
 - **Textures:** any material's color can come from a texture instead: a checkerboard, on the
-  surface or solid (carved from a checkered block), an image file (PPM or Ray raw) laid over the
-  surface, or a solid noise texture: marble, wood, or plain noise and turbulence (granite, stone,
+  surface or solid (carved from a checkered block), an image file (PNG of any kind, PPM, or Ray
+  raw) laid over the surface, or a solid noise texture: marble, wood, or plain noise and turbulence (granite, stone,
   clouds), made from Perlin gradient noise and a ramp of colors. Spheres, planes, cylinders, cones, and boxes have surface coordinates of their own; triangles and meshes take
   `uvs`, and a mesh without them can use a UV map (planar, cylindrical, spherical, or box
   projection) to work them out. Networked engines get the images inside the scene, so they need no
@@ -92,6 +92,13 @@ The ray tracing itself is the 1997 code.
   <img src="docs/images/textures.png" alt="A checkered floor, an image texture on a wall and a sphere, and a solid checker sphere" width="320"> <img src="docs/images/teapot_textured.png" alt="The Utah teapot with an image texture, spherically UV-mapped" width="320">
 
   <img src="docs/images/solid_textures.png" alt="A white marble sphere, a green marble cube, a wooden log and floor before a granite wall, three green glass slabs that darken with thickness, and an amber glass ball" width="640">
+- **Bump and normal maps:** an object's `bump` tilts the normal it is shaded with, so it looks
+  dented, grooved or rough while its shape stays smooth. A height map reads any texture as heights
+  (a little noise makes hammered metal or orange peel; a wood or marble texture makes its grain
+  stand out), and a normal map reads a tangent-space normal image in the common OpenGL convention.
+  Every material on the object follows the bumps, highlights and reflections included.
+
+  <img src="docs/images/tests/bump_test.png" alt="A brick wall with a PNG normal map, a hammered copper ball, an orange-peel ball, a box embossed with bricks by a height map, and a wood floor bumped by its grain" width="320">
 - **Anti-aliasing:** the camera's primary rays come from a pluggable pixel sampler: `corners`
   (five rays per pixel, four of them corners shared with the neighbors, about two rays a pixel),
   `box` (four rays halfway from the center to each corner), `random` (a center ray worth half
@@ -321,7 +328,7 @@ ctest --test-dir build --output-on-failure
 
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
-textures, solid textures and absorbing glass, rough glass and mirrors with area lights, cylinders, cones, and boxes, and a torture test of all of them through a real lens).
+textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, cylinders, cones, and boxes, and a torture test of all of them through a real lens).
 They also check that a lens has the focal length, f-number, focus and color dispersion its
 prescription should, that
 networked engines produce exactly the same bytes as threads (even when an engine drops out mid-render
@@ -334,7 +341,10 @@ shadows testing every object does. They check that gradient noise is smooth, bou
 seed, and that glass absorbs exactly as Beer–Lambert says for the distance through it. They check
 that rough surfaces draw their microfacets from the GGX distribution, that rough glass is the same
 every time for the same ray, that a sphere light's points lie on the disc it shows, that a
-rectangle light shines only to its front, and that hiding half of one gives half its light. With Python 3 installed, they also decode the PNG and
+rectangle light shines only to its front, and that hiding half of one gives half its light. They
+check that PNG images of every color type and bit depth, interlaced or not, decode exactly, that
+damaged or truncated ones are refused, and that height and normal maps tilt the normal the way
+and by the amount they should. With Python 3 installed, they also decode the PNG and
 HDR output (with Python's own zlib) and check it against the raw image. CI runs them
 on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -358,7 +368,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td><td align="center"><img src="docs/images/tests/texture_test.png" alt="render_texture" width="260"><br><code>render_texture</code></td><td align="center"><img src="docs/images/tests/teapot_textured.png" alt="render_teapot_textured (120x90)" width="120"><br><code>render_teapot_textured (120x90)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td><td align="center"><img src="docs/images/tests/solid_textures_test.png" alt="render_solid_textures" width="260"><br><code>render_solid_textures</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td><td align="center"><img src="docs/images/tests/bump_test.png" alt="render_bump" width="260"><br><code>render_bump</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -392,7 +402,7 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
 | [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures); `scenes/textures/` holds texture images |
-| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |
 | [`docs/`](docs) | MFC AppWizard notes, README images, and the changelog's before and after images |
@@ -443,7 +453,8 @@ the format's history.
 The code builds and runs on current compilers, and work on the ray tracing has resumed: a corrected
 camera, anti-aliasing, color models, meshes (with a bounding volume hierarchy), cylinders, cones
 and boxes, solid marble, wood and stone textures, glass that absorbs by thickness, frosted glass
-and brushed mirrors, area lights with soft shadows, and JSON scenes so far. Next up are choices for sampling and color, and the new shapes,
+and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG textures, and JSON
+scenes so far. Next up are choices for sampling and color, and the new shapes,
 in the scene editor.
 
 ## Changelog

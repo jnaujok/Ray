@@ -19,10 +19,13 @@
 #include "Globals.h"
 #include "MaterialList.h"
 
+#include <memory>
+
 #ifdef RAY_GUI
     #include "SceneTreeView.h"
 #endif
 
+class CBumpMap;
 class CLight;
 class CScene;
 
@@ -37,6 +40,7 @@ class CObjects
     protected:
         CMaterialList       m_oMaterials;
         BOOL                m_bOwnsMaterials;   // FALSE for a mesh's faces, which share the mesh's
+        std::shared_ptr<const CBumpMap> m_pBump;    // tilts the shading normal, if set (a mesh's faces share the mesh's)
 #ifdef RAY_GUI
         HTREEITEM           m_hObjectItem;
         HTREEITEM           m_hMaterialTree;
@@ -89,6 +93,12 @@ class CObjects
         virtual void        Dump( CDumpContext& dc ) const;
 #endif
 #endif
+            // The object's bump or normal map, if it has one ("bump" in
+            // JSON, written and read by each object class through these).
+        const std::shared_ptr<const CBumpMap> &GetBump( void ) const { return m_pBump; }
+        virtual void        SetBump( const std::shared_ptr<const CBumpMap> &pBump ) { m_pBump = pBump; }
+        void                BumpToJson( IASLib::CObjectNode &oNode ) const;
+        BOOL                BumpFromJson( const IASLib::CJsonNode &oNode );
     protected:
         CColor              BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal );
             // Adds what an area light (nLight in the scene) gives the point.
