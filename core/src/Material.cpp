@@ -142,9 +142,15 @@ CColor CMaterial::ColorAt( const CColor &oColor, CVector &oPoint, CObjects *pObj
 
     STexturePoint oAt;
 
-    oAt.oPoint = oPoint;
-    oAt.nU = oAt.nV = 0.0;
-    oAt.bHasUV = ( pObject && pObject->SurfaceCoords( oPoint, oAt.nU, oAt.nV ) ) ? TRUE : FALSE;
+    if ( pObject )
+        pObject->TextureAt( oPoint, oAt );
+    else
+    {
+        oAt.oPoint = oPoint;
+        oAt.nU = oAt.nV = 0.0;
+        oAt.bHasUV = FALSE;
+        oAt.bHasColor = FALSE;
+    }
     return m_pTexture->ColorAt( oAt );
 }
 

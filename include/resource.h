@@ -103,6 +103,20 @@
 #define IDM_MATERIAL_INFLUENCE          32804
 #define IDM_SETTINGS_PROPERTIES         32805
 
+// Editing any part of a scene as JSON (2026).
+#define IDD_JSON_EDIT                   160
+#define IDC_JSON_NOTE                   1040
+#define IDC_JSON_TEXT                   1041
+#define IDC_JSON_ERROR                  1042
+#define IDM_OBJECT_EDIT_JSON            32820
+#define IDM_OBJECT_DELETE               32821
+#define IDM_SCENE_EDIT_SETTINGS         32822
+#define IDM_SCENE_EDIT_CAMERA           32823
+#define IDM_SCENE_EDIT_ENVIRONMENT      32824
+#define IDM_SCENE_ADD_OBJECT            32825
+#define IDM_SCENE_ADD_LIGHT             32826
+#define IDM_SCENE_IMPORT_MODEL          32827
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED

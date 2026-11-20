@@ -331,6 +331,22 @@ BOOL CCsg::SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV )
     return pLeaf->SurfaceCoords( oPoint, nU, nV );
 }
 
+BOOL CCsg::SurfaceColor( CVector &oPoint, CColor &oColor )
+{
+    CObjects *pLeaf = m_pShadeLeaf ? m_pShadeLeaf : m_pHitLeaf;
+
+    return pLeaf ? pLeaf->SurfaceColor( oPoint, oColor ) : FALSE;
+}
+
+CVector CCsg::TextureSpace( const CVector &oPoint ) const
+{
+    const CObjects *pLeaf = m_pShadeLeaf ? m_pShadeLeaf : m_pHitLeaf;
+
+    if ( m_pTextureFrame || pLeaf == NULL )
+        return CObjects::TextureSpace( oPoint );
+    return pLeaf->TextureSpace( oPoint );
+}
+
 BOOL CCsg::SurfaceNormal( CVector &oPoint, CVector &oNormal )
 {
     if ( m_pHitLeaf == NULL || ! m_pHitLeaf->SurfaceNormal( oPoint, oNormal ) )

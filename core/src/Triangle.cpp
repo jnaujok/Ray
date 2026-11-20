@@ -41,6 +41,7 @@ CTriangle::CTriangle( void )
     m_bSmooth = FALSE;
     m_bGivenNormals = FALSE;
     m_bHasUVs = FALSE;
+    m_bHasFaceColor = FALSE;
     CalcNormal();
 }
 
@@ -52,7 +53,8 @@ CTriangle::CTriangle( const CVector &oCorner1, const CVector &oCorner2, const CV
     m_bDoubleSided( bDoubleSided ),
     m_bSmooth( bSmooth ),
     m_bGivenNormals( FALSE ),
-    m_bHasUVs( FALSE )
+    m_bHasUVs( FALSE ),
+    m_bHasFaceColor( FALSE )
 {
     m_oColor.Set( 0.5, 0.5, 0.5 );
     if ( pMaterials )

@@ -1,0 +1,189 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 320,
+        "imageHeight": 240,
+        "imageFile": "models_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 16,
+        "depthThreshold": 0.01
+    },
+    "background": [0.6, 0.75, 0.95],
+    "camera": {
+        "position": [0.0, 3.2, -8.5],
+        "lookAt": [0.0, 0.8, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 32.0,
+        "horizontalAngle": 42.0,
+        "aspectRatio": 1.333333,
+        "sampler": {
+            "type": "stratified",
+            "grid": 2,
+            "seed": 0
+        },
+        "colorModel": "srgb"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.08, 0.08]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.8,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "checker",
+                        "colors": [
+                            [0.35, 0.35, 0.38],
+                            [0.75, 0.75, 0.72]
+                        ],
+                        "size": 1.0,
+                        "solid": false
+                    }
+                }
+            ]
+        },
+        {
+            "type": "mesh",
+            "file": "models/color_cube.stl",
+            "fitSize": 1.6,
+            "rotation": [0.0, 30.0, 0.0],
+            "align": "bottom",
+            "translation": [-2.3, 0.0, 0.6],
+            "smooth": false,
+            "doubleSided": false,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 0.12,
+                    "color": [1.0, 1.0, 1.0],
+                    "texture": {
+                        "type": "faceColors",
+                        "default": [0.8, 0.8, 0.8]
+                    }
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "faceColors",
+                        "default": [0.8, 0.8, 0.8]
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.35,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.2,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ]
+        },
+        {
+            "type": "mesh",
+            "file": "models/magics_gem.stl",
+            "scale": [0.8, 1.2, 0.8],
+            "rotation": [0.0, 20.0, 0.0],
+            "align": "bottom",
+            "translation": [0.0, 0.0, 1.4],
+            "smooth": false,
+            "doubleSided": false,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 0.12,
+                    "color": [1.0, 1.0, 1.0],
+                    "texture": {
+                        "type": "faceColors",
+                        "default": [0.8, 0.8, 0.8]
+                    }
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.8,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "faceColors",
+                        "default": [0.8, 0.8, 0.8]
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.5,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.1,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ]
+        },
+        {
+            "type": "mesh",
+            "file": "models/ring.obj",
+            "scale": [1.0, 1.0, 1.0],
+            "rotation": [70.0, -25.0, 0.0],
+            "align": "bottom",
+            "translation": [2.2, 0.0, 0.2],
+            "smooth": true,
+            "doubleSided": false,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.08, 0.08]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/uv_grid.ppm",
+                        "scale": [1.0, 1.0],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": false
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.3,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.2,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ]
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "position": [-5.0, 9.0, -7.0],
+            "color": [0.85, 0.85, 0.85]
+        },
+        {
+            "type": "point",
+            "position": [7.0, 5.0, -5.0],
+            "color": [0.35, 0.35, 0.4]
+        }
+    ]
+}

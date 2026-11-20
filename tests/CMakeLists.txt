@@ -250,6 +250,32 @@ add_test(NAME render_prism
 set_tests_properties(render_prism PROPERTIES FIXTURES_SETUP render_prism TIMEOUT 900)
 add_test(NAME roundtrip_prism_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/prism_test.ray ${RENDER_DIR})
 
+# Model files: a puzzle cube and a gem from colored STL files (the VisCAM and
+# Magics conventions) and a ring from an OBJ file with texture coordinates.
+add_test(NAME render_models
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/models_test.ray
+                 -DOUTPUT=${RENDER_DIR}/models_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/models_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_models PROPERTIES FIXTURES_SETUP render_models TIMEOUT 300)
+add_test(NAME roundtrip_models_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/models_test.ray ${RENDER_DIR})
+
+# 3DBenchy (225,706 triangles from its STL file) printed in orange plastic,
+# close up, its layer lines a solid texture as both color and bump map.
+add_test(NAME render_benchy
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/benchy_test.ray
+                 -DOUTPUT=${RENDER_DIR}/benchy_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/benchy_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_benchy PROPERTIES FIXTURES_SETUP render_benchy TIMEOUT 900)
+add_test(NAME roundtrip_benchy_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/benchy_test.ray ${RENDER_DIR})
+
 # The torture test: every kind of object (the teapot too), reflection,
 # refraction and textures, through the double Gauss with a 5x5 stratified
 # sampler. Rendered small; the scene itself is 1024x768.
@@ -515,6 +541,35 @@ add_test(NAME network_prism
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_prism PROPERTIES FIXTURES_REQUIRED render_prism
                                        RESOURCE_LOCK ray_network TIMEOUT 900)
+
+# The engines get the model files inside the scene.
+math(EXPR port "${port} + 1")
+add_test(NAME network_models
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/models_test.ray
+                 -DOUTPUT=${RENDER_DIR}/models_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/models_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_models PROPERTIES FIXTURES_REQUIRED render_models
+                                        RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_benchy
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/benchy_test.ray
+                 -DOUTPUT=${RENDER_DIR}/benchy_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/benchy_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_benchy PROPERTIES FIXTURES_REQUIRED render_benchy
+                                        RESOURCE_LOCK ray_network TIMEOUT 900)
 
 # PNG and Radiance HDR output, checked with Python's own zlib.
 find_package(Python3 COMPONENTS Interpreter)

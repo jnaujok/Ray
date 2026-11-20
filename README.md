@@ -59,14 +59,16 @@ The ray tracing itself is the 1997 code.
 
 ## Features
 
-- **Primitives:** spheres, planes, cylinders, cones, boxes, triangles, and triangle meshes.
+- **Primitives:** spheres, planes, cylinders, cones, boxes, triangles, and triangle meshes, typed
+  into the scene or loaded from STL (binary, ASCII, or colored) and OBJ model files.
   Cylinders and cones run between any two points, capped or open (an open one can be seen into and
   shadows itself inside); a cone can be cut off flat at the top, and a box can be any size along
   each axis and turned any way. A triangle's normal comes from
   its corner order; it can be single- or double-sided, and flat or smooth, with corner normals that
   can be given to override the computed ones. A mesh shares vertices
   between faces, gives each vertex the sum of its faces' normals, and keeps its faces in a bounding
-  volume hierarchy, so a ray tests only the few faces near its path. The scene keeps its objects
+  volume hierarchy built by the surface area heuristic, so a ray tests only the few faces near its
+  path, nearest first. The scene keeps its objects
   in one too (planes, which are infinite, are tested every time), and shadow rays stop at the
   first thing in the way.
 - **Constructive solid geometry:** a `csg` object combines closed shapes (spheres, boxes, capped
@@ -115,6 +117,16 @@ The ray tracing itself is the 1997 code.
   <img src="docs/images/textures.png" alt="A checkered floor, an image texture on a wall and a sphere, and a solid checker sphere" width="320"> <img src="docs/images/teapot_textured.png" alt="The Utah teapot with an image texture, spherically UV-mapped" width="320">
 
   <img src="docs/images/solid_textures.png" alt="A white marble sphere, a green marble cube, a wooden log and floor before a granite wall, three green glass slabs that darken with thickness, and an amber glass ball" width="640">
+- **Model files and printed plastic:** a mesh can load an STL or OBJ `file` and place it with a
+  `scale` (or `fitSize`), `rotation`, `align` and `translation`; the file goes into the saved scene
+  and, inside the scene, to networked engines. Colored STL files (the VisCAM/SolidView and
+  Materialise Magics conventions) give each face its color through the `faceColors` texture. The
+  `layers` texture draws the rounded 0.1 mm layer lines of a 3D print, as a color and as a bump map;
+  a model's textures are looked up in its file's own coordinates (millimeters for a printable
+  model), so the layers follow its print axis however it is turned. The sample scenes include
+  [#3DBenchy](https://3dbenchy.com) (225,706 triangles).
+
+  <img src="docs/images/tests/benchy_test.png" alt="3DBenchy in orange plastic, close up on its bow, with the layer lines of a print" width="320"> <img src="docs/images/tests/models_test.png" alt="A puzzle cube and a gem from colored STL files and a textured ring from an OBJ file on a checkered floor" width="320">
 - **Bump and normal maps:** an object's `bump` tilts the normal it is shaded with, so it looks
   dented, grooved or rough while its shape stays smooth. A height map reads any texture as heights
   (a little noise makes hammered metal or orange peel; a wood or marble texture makes its grain
@@ -150,8 +162,11 @@ The ray tracing itself is the 1997 code.
   scales the colors first.
 - **Readable scene files:** scenes are JSON that you can write and edit by hand, with clear errors
   that say where a mistake is.
-- **Scene editor:** MFC MDI application with a scene tree, property dialogs for every object type,
-  and a material editor.
+- **Scene editor:** MFC MDI application with a scene tree, property dialogs for spheres, planes,
+  point lights, the camera and the materials, and a material editor. Anything else, from any shape
+  or light to the camera's sampler, color model and lens and the environment, can be edited, added
+  or deleted as JSON from the tree's right-click menu, and *Import Model* brings in an STL or OBJ
+  file.
 - **Distributed rendering:** `rayengine` processes connect to the master over TCP and pull tiles of
   the image from its queue, trace them (camera rays, lens and sampling included) and send back the
   pixels; faster machines simply take more tiles. Engines can run anywhere that can reach the
@@ -159,8 +174,9 @@ The ray tracing itself is the 1997 code.
   others.
 - **Local rendering:** the same master can trace with one thread per CPU instead, pulling tiles the
   same way.
-- **Models:** [`tools/obj_to_ray.py`](tools/obj_to_ray.py) turns Wavefront OBJ models into meshes;
-  the sample scenes include the Utah teapot.
+- **Models:** meshes load STL and OBJ files directly; [`tools/obj_to_ray.py`](tools/obj_to_ray.py)
+  can still turn an OBJ model into an inline mesh. The sample scenes include the Utah teapot and
+  3DBenchy.
 
 ## How it works
 
@@ -285,7 +301,8 @@ raythrower scenes/lens_test.ray --aa stratified:grid=8 --ppm lens.ppm
 raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
-**Render the torture test**, every kind of object (the teapot too, in marble), mirrors, glass
+**Render the torture test**, every kind of object (the teapot too, in marble, and a layer-lined
+3DBenchy, a colored-STL puzzle cube and an OBJ ring), mirrors, glass
 (the cube absorbing by thickness, the ball frosted, a flint prism splitting colors), a die with drilled
 pips (constructive solid geometry), textures (a wooden mirror frame), a brushed
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light and a low sun, and an
@@ -296,9 +313,17 @@ rays a pixel, each clamped at 1.5, at its full 1024×768 (about two minutes on a
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
-<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, textured shapes and a wood-framed mirror wall under an HDR sky, through a real lens" width="720">
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, textured shapes and a wood-framed mirror wall under an HDR sky, through a real lens" width="720">
 
-**Bring in an OBJ model** as a mesh (`--weld` joins repeated vertices so the surface is smooth
+**Bring in a model**: name an STL or OBJ file in a mesh, and place it (here a printable model,
+which stands on z, turned to stand on y, 2 units across, on the floor):
+
+```json
+{ "type": "mesh", "file": "models/3DBenchy.stl", "fitSize": 2, "rotation": [-90, 0, 0], "align": "bottom",
+  "materials": [ { "type": "diffuse", "color": [1, 1, 1], "texture": { "type": "layers" } } ] }
+```
+
+Or turn an OBJ model into an inline mesh (`--weld` joins repeated vertices so the surface is smooth
 across seams):
 
 ```sh
@@ -343,7 +368,9 @@ each for red, green and blue and a shared exponent). It holds the color model's 
 the traced colors as they are, or scaled by the `hdr` or `reinhard` model's `exposure`.
 
 **Scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
-menu, and choose *Render*.
+menu, and choose *Render*. Right-click the scene's name in the tree to edit its settings, camera or
+environment as JSON, add any object or light as JSON, or import a model; right-click an object or
+light to edit it as JSON or delete it.
 
 ## Testing
 
@@ -354,7 +381,8 @@ ctest --test-dir build --output-on-failure
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
-directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, and a torture test of all of them through a real lens).
+directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
+3DBenchy with printed layer lines, and a torture test of all of them through a real lens).
 They also check that a lens has the focal length, f-number, focus and color dispersion its
 prescription should, that
 networked engines produce exactly the same bytes as threads (even when an engine drops out mid-render
@@ -362,7 +390,7 @@ and another joins), and that tiles and pixels cross the wire
 exactly (including texture images embedded in the scene), that scene files survive a load and save, that mistakes in JSON scenes are reported where
 they are, triangle sidedness and that smooth mesh faces agree along shared edges, where rays hit
 cylinders, cones, and boxes and the normals there, and that a mesh's bounding volume hierarchy finds
-exactly the hits testing every face does, and that the scene's tree finds exactly the hits and
+exactly the hits testing every face does (on the teapot and on 3DBenchy), and that the scene's tree finds exactly the hits and
 shadows testing every object does. They check that gradient noise is smooth, bounded and set by its
 seed, and that glass absorbs exactly as Beer–Lambert says for the distance through it. They check
 that rough surfaces draw their microfacets from the GGX distribution, that rough glass is the same
@@ -405,6 +433,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td><td align="center"><img src="docs/images/tests/solid_textures_test.png" alt="render_solid_textures" width="260"><br><code>render_solid_textures</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td><td align="center"><img src="docs/images/tests/bump_test.png" alt="render_bump" width="260"><br><code>render_bump</code></td><td align="center"><img src="docs/images/tests/lights_test.png" alt="render_lights" width="260"><br><code>render_lights</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment" width="260"><br><code>render_environment</code></td><td align="center"><img src="docs/images/tests/csg_test.png" alt="render_csg" width="260"><br><code>render_csg</code></td><td align="center"><img src="docs/images/tests/prism_test.png" alt="render_prism" width="260"><br><code>render_prism</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/models_test.png" alt="render_models" width="260"><br><code>render_models</code></td><td align="center"><img src="docs/images/tests/benchy_test.png" alt="render_benchy" width="260"><br><code>render_benchy</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -437,8 +466,8 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`src/`](src), [`include/`](include) | MFC scene editor |
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
-| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures); `scenes/textures/` holds texture images |
-| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures |
+| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images and `scenes/models/` model files, among them 3DBenchy (CC0, see [NOTICE](NOTICE)) |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |
 | [`docs/`](docs) | MFC AppWizard notes, README images, and the changelog's before and after images |
@@ -491,8 +520,8 @@ camera, anti-aliasing, color models, meshes (with a bounding volume hierarchy), 
 and boxes, solid marble, wood and stone textures, glass that absorbs by thickness, frosted glass
 and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG textures, spot and
 directional lights, environment maps with image-based lighting, constructive solid geometry,
-dispersive glass, and JSON scenes so far. Next up are choices for sampling and color, and the new shapes,
-in the scene editor.
+dispersive glass, STL and OBJ model files with printed layer lines, and JSON scenes so far. The
+scene editor reaches all of it through JSON editing; next up is a cross-platform scene editor.
 
 ## Changelog
 

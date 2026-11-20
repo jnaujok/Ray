@@ -36,6 +36,26 @@ namespace IASLib
     class CObjectNode;
 }
 
+struct STexturePoint;
+
+    // An affine map, a 3x3 matrix and an offset (row by row, each row's
+    // offset last), from scene points to the space an object's textures are
+    // looked up in: a mesh loaded from a file maps them back into the file's
+    // own coordinates, so its textures move, turn and grow with it.
+struct STextureFrame
+{
+    FLT                 anMatrix[ 12 ];
+
+    CVector             Apply( const CVector &oPoint ) const
+    {
+        CVector oIn( oPoint );
+
+        return CVector( ( anMatrix[ 0 ] * oIn.GetX() ) + ( anMatrix[ 1 ] * oIn.GetY() ) + ( anMatrix[ 2 ] * oIn.GetZ() ) + anMatrix[ 3 ],
+                        ( anMatrix[ 4 ] * oIn.GetX() ) + ( anMatrix[ 5 ] * oIn.GetY() ) + ( anMatrix[ 6 ] * oIn.GetZ() ) + anMatrix[ 7 ],
+                        ( anMatrix[ 8 ] * oIn.GetX() ) + ( anMatrix[ 9 ] * oIn.GetY() ) + ( anMatrix[ 10 ] * oIn.GetZ() ) + anMatrix[ 11 ] );
+    }
+};
+
 class CObjects
 {
     protected:
@@ -45,6 +65,9 @@ class CObjects
             // The materials BaseShade uses instead of the object's own, when
             // set: a csg shading a surface with its part's materials.
         CMaterialList      *m_pShadeMaterials;
+            // Where textures are looked up, if not the scene's own space (a
+            // mesh from a file, and its faces).
+        std::shared_ptr<const STextureFrame> m_pTextureFrame;
 #ifdef RAY_GUI
         HTREEITEM           m_hObjectItem;
         HTREEITEM           m_hMaterialTree;
@@ -67,6 +90,18 @@ class CObjects
             // The surface coordinates (u, v) of a point on the object, for
             // textures. FALSE if the object has none.
         virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV ) { (void)oPoint; nU = nV = 0.0; return FALSE; }
+            // The color the object's own data gives the surface at a point (a
+            // face's color from a colored model file), for the faceColors
+            // texture. FALSE if it gives none.
+        virtual BOOL        SurfaceColor( CVector &oPoint, CColor &oColor ) { (void)oPoint; (void)oColor; return FALSE; }
+            // A scene point in the space the object's textures are looked up
+            // in: the point itself, unless the object has a texture frame.
+        virtual CVector     TextureSpace( const CVector &oPoint ) const
+                            { return m_pTextureFrame ? m_pTextureFrame->Apply( oPoint ) : oPoint; }
+        virtual void        SetTextureFrame( const std::shared_ptr<const STextureFrame> &pFrame ) { m_pTextureFrame = pFrame; }
+            // Everything a texture looks up at a point on the object: the
+            // point in texture space, its surface coordinates and its color.
+        void                TextureAt( CVector &oPoint, STexturePoint &oAt );
             // Intersect, unless this is pIgnore: the object a shadow or
             // reflected ray leaves from. An object made of parts (a mesh)
             // skips only the part pIgnore names, so it can shadow itself.

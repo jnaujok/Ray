@@ -17,6 +17,7 @@
 #include "Light.h"
 #include "Sampling.h"
 #include "BumpMap.h"
+#include "Texture.h"
 #include "SceneJson.h"
 
 #include <string.h>
@@ -106,6 +107,14 @@ void CObjects::SetMaterials( void )
 }
 
 #endif
+
+void CObjects::TextureAt( CVector &oPoint, STexturePoint &oAt )
+{
+    oAt.oPoint = TextureSpace( oPoint );
+    oAt.nU = oAt.nV = 0.0;
+    oAt.bHasUV = SurfaceCoords( oPoint, oAt.nU, oAt.nV ) ? TRUE : FALSE;
+    oAt.bHasColor = SurfaceColor( oPoint, oAt.oColor ) ? TRUE : FALSE;
+}
 
 void CObjects::BumpToJson( IASLib::CObjectNode &oNode ) const
 {

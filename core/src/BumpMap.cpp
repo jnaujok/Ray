@@ -49,9 +49,7 @@ namespace
         STexturePoint oAt;
         CVector       oWhere( oPoint );
 
-        oAt.oPoint = oWhere;
-        oAt.nU = oAt.nV = 0.0;
-        oAt.bHasUV = oObject.SurfaceCoords( oWhere, oAt.nU, oAt.nV ) ? TRUE : FALSE;
+        oObject.TextureAt( oWhere, oAt );
         bHasUV = oAt.bHasUV;
         nU = oAt.nU;
         nV = oAt.nV;

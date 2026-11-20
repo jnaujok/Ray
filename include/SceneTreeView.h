@@ -5,6 +5,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 
+#include <string>
+
 class CRayDoc;
 class CObjects;
 class CMaterial;
@@ -69,7 +71,23 @@ protected:
 	afx_msg void OnSelchanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnSettingsProperties();
 	//}}AFX_MSG
+	afx_msg void OnObjectEditJson();
+	afx_msg void OnObjectDelete();
+	afx_msg void OnSceneEditSettings();
+	afx_msg void OnSceneEditCamera();
+	afx_msg void OnSceneEditEnvironment();
+	afx_msg void OnSceneAddObject();
+	afx_msg void OnSceneAddLight();
+	afx_msg void OnSceneImportModel();
 	DECLARE_MESSAGE_MAP()
+
+        // Shows a part of the scene ("camera", "objects/2", "lights/+", ...)
+        // as JSON to edit, and puts it back; rebuilds the tree after a change.
+    void EditPartAsJson( const char *strPart, const char *strTitle, const char *strNote, const char *strStart = NULL );
+        // The selected object's part ("objects/N", "lights/N", "camera"),
+        // or empty.
+    std::string SelectedPart( void );
+    void RebuildTree( void );
 };
 
 #ifndef _DEBUG  // debug version in RayView.cpp

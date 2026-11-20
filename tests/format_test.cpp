@@ -40,6 +40,9 @@
 #include "PngImage.h"
 #include "BumpMap.h"
 #include "Csg.h"
+#include "ModelFile.h"
+#include "LayersTexture.h"
+#include "FaceColorTexture.h"
 
 
 #include <math.h>
@@ -2613,6 +2616,439 @@ static void ClampChecks( void )
     ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"clamp\": -1" ), BAD_FILE, "camera: clamp can't be negative" );
 }
 
+// --------------------------------------------------------------------------
+// Model files (STL, OBJ), their placement, and the layers and faceColors
+// textures
+// --------------------------------------------------------------------------
+
+static void PutLittle32( std::string &strOut, uint32_t nValue )
+{
+    for ( int nShift = 0; nShift < 32; nShift += 8 )
+        strOut += (char)( ( nValue >> nShift ) & 0xFF );
+}
+
+static void PutLittleFloat( std::string &strOut, float fValue )
+{
+    uint32_t nBits;
+
+    memcpy( &nBits, &fValue, sizeof( nBits ) );
+    PutLittle32( strOut, nBits );
+}
+
+    // A binary STL of the triangles (nine numbers each) and attributes.
+static std::string MakeStl( const std::string &strHeader, const std::vector<float> &afCorners, const std::vector<unsigned> &anAttributes )
+{
+    std::string strOut = strHeader;
+
+    strOut.resize( 80, '\0' );
+    PutLittle32( strOut, (uint32_t)anAttributes.size() );
+    for ( size_t nFace = 0; nFace < anAttributes.size(); nFace++ )
+    {
+        for ( int nIndex = 0; nIndex < 3; nIndex++ )
+            PutLittleFloat( strOut, 0.0f );
+        for ( int nIndex = 0; nIndex < 9; nIndex++ )
+            PutLittleFloat( strOut, afCorners[ ( nFace * 9 ) + (size_t)nIndex ] );
+        strOut += (char)( anAttributes[ nFace ] & 0xFF );
+        strOut += (char)( ( anAttributes[ nFace ] >> 8 ) & 0xFF );
+    }
+    return strOut;
+}
+
+static std::string Base64( const std::string &strData )
+{
+    static const char *strDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string        strOut;
+
+    for ( size_t nAt = 0; nAt < strData.size(); nAt += 3 )
+    {
+        uint32_t nGroup = ( (BYTE)strData[ nAt ] ) << 16;
+        size_t   nHave = ( std::min )( (size_t)3, strData.size() - nAt );
+
+        if ( nHave > 1 )
+            nGroup |= ( (BYTE)strData[ nAt + 1 ] ) << 8;
+        if ( nHave > 2 )
+            nGroup |= (BYTE)strData[ nAt + 2 ];
+        strOut += strDigits[ ( nGroup >> 18 ) & 63 ];
+        strOut += strDigits[ ( nGroup >> 12 ) & 63 ];
+        strOut += ( nHave > 1 ) ? strDigits[ ( nGroup >> 6 ) & 63 ] : '=';
+        strOut += ( nHave > 2 ) ? strDigits[ nGroup & 63 ] : '=';
+    }
+    return strOut;
+}
+
+static bool Near( double dA, double dB, double dTolerance = 1e-9 )
+{
+    return fabs( dA - dB ) <= dTolerance;
+}
+
+static bool NearVector( CVector oA, CVector oB, double dTolerance = 1e-9 )
+{
+    return Near( oA.GetX(), oB.GetX(), dTolerance ) && Near( oA.GetY(), oB.GetY(), dTolerance ) && Near( oA.GetZ(), oB.GetZ(), dTolerance );
+}
+
+    // A scene with one mesh, the model file inside it as "data", and the
+    // mesh's other fields strFields.
+static std::string ModelScene( const std::string &strName, const std::string &strData, const std::string &strFields )
+{
+    return Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                    ( "{ \"type\": \"mesh\", \"file\": \"" + strName + "\", \"data\": \"" + Base64( strData ) + "\"" +
+                      ( strFields.empty() ? "" : ", " + strFields ) + " }" ).c_str() );
+}
+
+static void ModelChecks( void )
+{
+        // Two triangles sharing an edge: a unit square in z = 0, facing +z.
+    std::vector<float>  afSquare = { 0, 0, 0,  1, 0, 0,  1, 1, 0,    0, 0, 0,  1, 1, 0,  0, 1, 0 };
+    std::string         strError;
+
+    {
+            // A binary file whose header starts "solid", as many do.
+        ModelFile::SModel oModel;
+        std::string       strStl = MakeStl( "solid but binary", afSquare, { 0, 0 } );
+
+        Check( ModelFile::Read( strStl, "square.stl", oModel, strError ) == TRUE, "a binary STL reads" );
+        Check( oModel.anFaces.size() == 6 && oModel.aoVertices.size() == 4, "a binary STL beginning \"solid\" is read as binary, and its shared corners joined" );
+        Check( oModel.aoFaceColors.empty(), "a binary STL without colors has none" );
+        Check( ModelFile::Read( strStl, "square.model", oModel, strError ) == TRUE && oModel.anFaces.size() == 6,
+               "a binary STL is recognized by its size whatever its name" );
+        Check( ModelFile::Read( strStl.substr( 0, strStl.size() - 1 ), "square.stl", oModel, strError ) == FALSE &&
+               strError.find( "size doesn't match" ) != std::string::npos, "a binary STL a byte short is refused" );
+    }
+    {
+        ModelFile::SModel oModel;
+        std::string       strAscii = "solid square\n"
+                                     " facet normal 0 0 1\n  outer loop\n   vertex 0 0 0\n   vertex 1 0 0\n   vertex 1 1 0\n  endloop\n endfacet\n"
+                                     " FACET NORMAL 0 0 1\n  OUTER LOOP\n   VERTEX 0 0 0\n   VERTEX 1 1 0\n   VERTEX 0 1 0\n  ENDLOOP\n ENDFACET\n"
+                                     "endsolid square\n";
+
+        Check( ModelFile::Read( strAscii, "square.stl", oModel, strError ) == TRUE && oModel.anFaces.size() == 6 && oModel.aoVertices.size() == 4,
+               "an ASCII STL reads, in either case, its shared corners joined" );
+        Check( ModelFile::Read( "solid x\n facet normal 0 0 1\n outer loop\n vertex 0 0 0\n vertex 1 0 0\n endloop\n endfacet\nendsolid\n",
+                                "bad.stl", oModel, strError ) == FALSE && strError.find( "doesn't have three vertices" ) != std::string::npos,
+               "an ASCII facet with two vertices is refused" );
+        Check( ModelFile::Read( "solid x\n facet normal 0 0 1\n outer loop\n vertex 0 zero 0\n", "bad.stl", oModel, strError ) == FALSE &&
+               strError.find( "doesn't have three numbers" ) != std::string::npos, "an ASCII vertex that isn't numbers is refused" );
+        Check( ModelFile::Read( "solid empty\nendsolid empty\n", "empty.stl", oModel, strError ) == FALSE &&
+               strError.find( "no triangles" ) != std::string::npos, "an STL with no triangles is refused" );
+    }
+    {
+            // VisCAM and SolidView: bit 15 set, red in the high bits.
+        ModelFile::SModel oModel;
+        std::string       strStl = MakeStl( "colored", afSquare, { 0x8000u | ( 31u << 10 ) | ( 16u << 5 ), 0 } );
+
+        Check( ModelFile::Read( strStl, "c.stl", oModel, strError ) == TRUE && oModel.aoFaceColors.size() == 2, "a VisCAM-colored STL reads" );
+        Check( oModel.abHasColor[ 0 ] && Near( oModel.aoFaceColors[ 0 ].GetR(), 1.0 ) && Near( oModel.aoFaceColors[ 0 ].GetG(), 16.0 / 31.0 ) &&
+               Near( oModel.aoFaceColors[ 0 ].GetB(), 0.0 ), "a VisCAM color: red in bits 10-14, green 5-9, blue 0-4" );
+        Check( ! oModel.abHasColor[ 1 ], "a VisCAM face with bit 15 clear has no color" );
+    }
+    {
+            // Materialise Magics: COLOR= in the header, bit 15 clear for a
+            // face's own color, red in the low bits.
+        ModelFile::SModel oModel;
+        std::string       strHeader = std::string( "Magics COLOR=" ) + (char)255 + (char)102 + (char)0 + (char)255;
+        std::string       strStl = MakeStl( strHeader, afSquare, { 31u | ( 8u << 10 ), 0x8000u } );
+
+        Check( ModelFile::Read( strStl, "m.stl", oModel, strError ) == TRUE && oModel.aoFaceColors.size() == 2, "a Magics-colored STL reads" );
+        Check( oModel.abHasColor[ 0 ] && Near( oModel.aoFaceColors[ 0 ].GetR(), 1.0 ) && Near( oModel.aoFaceColors[ 0 ].GetB(), 8.0 / 31.0 ),
+               "a Magics face's own color: red in bits 0-4, blue 10-14" );
+        Check( oModel.abHasColor[ 1 ] && Near( oModel.aoFaceColors[ 1 ].GetR(), 1.0 ) && Near( oModel.aoFaceColors[ 1 ].GetG(), 102.0 / 255.0 ) &&
+               Near( oModel.aoFaceColors[ 1 ].GetB(), 0.0 ), "a Magics face with bit 15 set takes the header's model color" );
+    }
+    {
+        ModelFile::SModel oModel;
+        std::string       strObj = "# a square\nmtllib x.mtl\no square\ng face\ns 1\nusemtl red\n"
+                                   "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0 1.0\n"
+                                   "vt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\nvn 0 0 2\n"
+                                   "f 1/1/1 2/2/1 3/3/1 4/4/1\n";
+
+        Check( ModelFile::Read( strObj, "square.obj", oModel, strError ) == TRUE, "an OBJ reads" );
+        Check( oModel.anFaces.size() == 6 && oModel.aoVertices.size() == 4, "an OBJ quad becomes two triangles" );
+        Check( oModel.anUVs.size() == 8 && oModel.aoNormals.size() == 4 && NearVector( oModel.aoNormals[ 0 ], CVector( 0, 0, 1 ) ),
+               "an OBJ's texture coordinates and normals (made unit) come with its vertices" );
+
+        ModelFile::SModel oRelative;
+        std::string       strNegative = "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\nvn 0 0 1\n"
+                                        "f -4/-4/-1 -3/-3/-1 -2/-2/-1 -1/-1/-1\n";
+
+        Check( ModelFile::Read( strNegative, "square.obj", oRelative, strError ) == TRUE && oRelative.anFaces == oModel.anFaces &&
+               oRelative.anUVs == oModel.anUVs, "negative OBJ indices count back from the last one read" );
+
+        ModelFile::SModel oMixed;
+
+        Check( ModelFile::Read( "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvt 0 0\nf 1/1 2/1 3/1\nf 1 3 4\n", "mixed.obj", oMixed, strError ) == TRUE &&
+               oMixed.anUVs.empty() && oMixed.aoNormals.empty() && oMixed.aoVertices.size() == 4,
+               "texture coordinates only some corners have are dropped" );
+        Check( ModelFile::Read( "v 0 0 0\nv 1 0 0\nf 1 2 3\n", "bad.obj", oMixed, strError ) == FALSE &&
+               strError.find( "line 3" ) != std::string::npos && strError.find( "not yet given" ) != std::string::npos,
+               "an OBJ face naming a vertex not yet given is refused, with its line" );
+        Check( ModelFile::Read( "v 0 0\n", "bad.obj", oMixed, strError ) == FALSE && strError.find( "three numbers" ) != std::string::npos,
+               "an OBJ vertex without three numbers is refused" );
+        Check( ModelFile::Read( "v 0 0 0\n", "bad.obj", oMixed, strError ) == FALSE && strError.find( "no faces" ) != std::string::npos,
+               "an OBJ without faces is refused" );
+        Check( ModelFile::Read( strObj, "square", oMixed, strError ) == TRUE && oMixed.anFaces.size() == 6,
+               "a file named neither .stl nor .obj that isn't an STL is read as OBJ" );
+    }
+
+        // Placement: (1, 0, 0) scaled by 2, turned 90 degrees about z, then
+        // moved by (1, 2, 3), lands at (1, 4, 3).
+    std::string strTriangle = MakeStl( "one", { 0, 0, 0,  1, 0, 0,  0, 1, 0 }, { 0 } );
+
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( ModelScene( "tri.stl", strTriangle, "\"scale\": 2, \"rotation\": [0, 0, 90], \"translation\": [1, 2, 3]" ) ) == 0,
+               "a mesh loads a model file carried as data" );
+
+        CMesh *pMesh = dynamic_cast<CMesh *>( oScene.GetObjectAt( 0 ) );
+
+        Check( pMesh && pMesh->IsFromFile() && pMesh->GetVertices().size() == 3, "the model's vertices load" );
+        if ( pMesh && pMesh->GetVertices().size() == 3 )
+        {
+            Check( NearVector( pMesh->GetVertices()[ 0 ], CVector( 1, 2, 3 ) ) && NearVector( pMesh->GetVertices()[ 1 ], CVector( 1, 4, 3 ) ) &&
+                   NearVector( pMesh->GetVertices()[ 2 ], CVector( -1, 2, 3 ) ), "a model is scaled, then turned, then moved" );
+
+                // The faces look textures up back in the file's coordinates.
+            CRay    oRay;
+            CVector oHit;
+            CVector oTarget( 1.0 - ( 2.0 / 3.0 ), 2.0 + ( 2.0 / 3.0 ), 3.0 );      // the file point (1/3, 1/3, 0)
+
+            oRay.Set( oTarget.GetX(), oTarget.GetY(), oTarget.GetZ() + 5.0, 0.0, 0.0, -1.0, 1e100, 1.0, 0, 0 );
+            Check( pMesh->Intersect( oRay, oHit ) == TRUE, "a ray hits the placed model" );
+
+            BOOL      bFlip;
+            CObjects *pFace = pMesh->HitPart( bFlip );
+
+            Check( NearVector( pFace->TextureSpace( oHit ), CVector( 1.0 / 3.0, 1.0 / 3.0, 0.0 ), 1e-9 ),
+                   "a placed model's textures are looked up at the point in its file" );
+        }
+
+        std::string strSaved = oScene.ToJson();
+
+        Check( strSaved.find( "\"file\": \"tri.stl\"" ) != std::string::npos && strSaved.find( "\"vertices\"" ) == std::string::npos &&
+               strSaved.find( "\"rotation\": [0.0, 0.0, 90.0]" ) != std::string::npos, "a model saves as its file and placement, not its vertices" );
+    }
+    {
+        CScene      oScene;
+        std::string strHigh = MakeStl( "high", { 0, 5, 0,  4, 5, 0,  0, 7, 2 }, { 0 } );
+
+        Check( oScene.FromJson( ModelScene( "h.stl", strHigh, "\"align\": \"bottom\"" ) ) == 0, "a model aligned to the bottom loads" );
+
+        CMesh *pMesh = dynamic_cast<CMesh *>( oScene.GetObjectAt( 0 ) );
+
+        if ( pMesh && pMesh->GetVertices().size() == 3 )
+            Check( NearVector( pMesh->GetVertices()[ 0 ], CVector( -2, 0, -1 ) ) && NearVector( pMesh->GetVertices()[ 2 ], CVector( -2, 2, 1 ) ),
+                   "align bottom centers a model in x and z and stands it on y = 0" );
+        Check( oScene.FromJson( ModelScene( "h.stl", strHigh, "\"align\": \"center\", \"fitSize\": 2" ) ) == 0, "a fitted model loads" );
+        pMesh = dynamic_cast<CMesh *>( oScene.GetObjectAt( 0 ) );
+        if ( pMesh && pMesh->GetVertices().size() == 3 )
+            Check( NearVector( pMesh->GetVertices()[ 0 ], CVector( -1, -0.5, -0.5 ) ) && NearVector( pMesh->GetVertices()[ 1 ], CVector( 1, -0.5, -0.5 ) ),
+                   "fitSize scales a model evenly to that size across its widest, and align center centers it" );
+
+            // Mirrored, the corners are put back the other way round, so the
+            // face still faces the way it did.
+        Check( oScene.FromJson( ModelScene( "tri.stl", strTriangle, "\"scale\": [-1, 1, 1]" ) ) == 0, "a mirrored model loads" );
+        pMesh = dynamic_cast<CMesh *>( oScene.GetObjectAt( 0 ) );
+        if ( pMesh && pMesh->GetFaceCount() == 1 )
+        {
+            CVector oPoint( -0.25, 0.25, 0.0 );
+
+            Check( pMesh->FaceNormalAt( 0, oPoint ).GetZ() > 0.99, "a mirroring scale keeps a model's faces facing out" );
+        }
+    }
+    {
+        CScene      oScene;
+        std::string strColored = MakeStl( "c", afSquare, { 0x8000u | ( 31u << 5 ), 0 } );
+
+        Check( oScene.FromJson( ModelScene( "c.stl", strColored, "" ) ) == 0, "a colored model loads" );
+
+        CMesh *pMesh = dynamic_cast<CMesh *>( oScene.GetObjectAt( 0 ) );
+        CColor oColor;
+
+        Check( pMesh && pMesh->GetFaceCount() == 2 && pMesh->FaceColor( 0, oColor ) && Near( oColor.GetG(), 1.0 ) && Near( oColor.GetR(), 0.0 ) &&
+               ! pMesh->FaceColor( 1, oColor ), "a colored model's faces carry their colors" );
+    }
+
+    ExpectError( Minimal( "\"radius\": 1 }", "\"radius\": 1 }, { \"type\": \"mesh\", \"vertices\": [[0,0,0],[1,0,0],[0,1,0]], \"faces\": [[0,1,2]], \"scale\": 2 }" ),
+                 BAD_FILE, "\"scale\" places a model loaded from a \"file\"" );
+    ExpectError( ModelScene( "tri.stl", strTriangle, "\"faces\": [[0, 1, 2]]" ), BAD_FILE, "not \"faces\" with a file" );
+    ExpectError( ModelScene( "tri.stl", strTriangle, "\"scale\": 2, \"fitSize\": 1" ), BAD_FILE, "a \"scale\" or a \"fitSize\", not both" );
+    ExpectError( ModelScene( "tri.stl", strTriangle, "\"fitSize\": 0" ), BAD_FILE, "fitSize must be more than 0" );
+    ExpectError( ModelScene( "tri.stl", strTriangle, "\"scale\": [1, 0, 1]" ), BAD_FILE, "can't be 0" );
+    ExpectError( ModelScene( "tri.stl", strTriangle, "\"align\": \"top\"" ), BAD_FILE, "unknown align \"top\"" );
+    ExpectError( ModelScene( "tri.stl", "solid nothing\n", "" ), BAD_FILE, "the model \"tri.stl\" has no triangles" );
+    ExpectError( Minimal( "\"radius\": 1 }", "\"radius\": 1 }, { \"type\": \"mesh\", \"file\": \"no/such/model.stl\" }" ),
+                 BAD_FILE, "can't open the model \"no/such/model.stl\"" );
+
+        // The layers texture: rounded beads, 0 at the seams and 1 between.
+    Check( CLayersTexture::Bead( 0.0 ) == 0.0 && CLayersTexture::Bead( 0.5 ) == 1.0 && Near( CLayersTexture::Bead( 0.25 ), 0.75 ) &&
+           Near( CLayersTexture::Bead( 1.0 ), 0.0 ), "a layer is a parabolic bead, 0 at its seams and 1 in its middle" );
+    {
+        CLayersTexture  oLayers;
+        STexturePoint   oAt;
+        CColor          oMiddle, oSeam;
+
+        oAt.nU = oAt.nV = 0.0;
+        oAt.bHasUV = FALSE;
+        oAt.bHasColor = FALSE;
+        oAt.oPoint.Set( 3.0, -2.0, 0.05 );
+        oMiddle = oLayers.ColorAt( oAt );
+        oAt.oPoint.Set( 3.0, -2.0, 0.2 );
+        oSeam = oLayers.ColorAt( oAt );
+        Check( Near( oMiddle.GetR(), 1.0 ) && Near( oSeam.GetR(), 0.7 ), "the default layers are 0.1 apart along z, light gray darkening to the seams" );
+
+        std::unique_ptr<CTexture> pRead( CTexture::Create( "layers" ) );
+        IASLib::CObjectNode       oNode;
+
+        oLayers.ToJson( oNode );
+        Check( pRead && pRead->FromJson( oNode ), "layers round-trip through JSON" );
+        ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"layers\", \"axis\": [0, 0, 0] } } ]" ),
+                     BAD_FILE, "axis can't be [0, 0, 0]" );
+
+        CFaceColorTexture oFaces;
+
+        oAt.bHasColor = TRUE;
+        oAt.oColor.Set( 0.1, 0.2, 0.3 );
+        Check( Near( oFaces.ColorAt( oAt ).GetB(), 0.3 ), "faceColors shows a face's own color" );
+        oAt.bHasColor = FALSE;
+        Check( Near( oFaces.ColorAt( oAt ).GetR(), 0.8 ), "faceColors shows its default where a face has no color" );
+    }
+}
+
+    // Editing one part of a scene as JSON, as the scene editor does.
+static void SceneEditChecks( void )
+{
+    CScene oScene;
+
+    Check( oScene.FromJson( s_strMinimal ) == 0, "the minimal scene loads" );
+
+    std::string strSphere = oScene.PartToJson( "objects/0" );
+
+    Check( strSphere.find( "\"type\": \"sphere\"" ) != std::string::npos && strSphere.find( "\"radius\": 1.0" ) != std::string::npos,
+           "an object's part of the scene comes out as its JSON" );
+    Check( oScene.PartToJson( "objects/1" ).empty() && oScene.PartToJson( "environment" ).empty() && oScene.PartToJson( "nonsense" ).empty(),
+           "a part the scene doesn't have comes out empty" );
+
+    Check( oScene.EditPart( "objects/0", "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": 2 }", "" ) == 0 &&
+           oScene.GetObjectCount() == 1 && dynamic_cast<CBox *>( oScene.GetObjectAt( 0 ) ) != NULL, "an object can be replaced by one of another type" );
+    Check( oScene.EditPart( "objects/+", strSphere, "" ) == 0 && oScene.GetObjectCount() == 2 && dynamic_cast<CSphere *>( oScene.GetObjectAt( 1 ) ) != NULL,
+           "an object can be added" );
+    Check( oScene.IndexOfObject( oScene.GetObjectAt( 1 ) ) == 1 && oScene.IndexOfObject( NULL ) == -1, "an object's place is found" );
+
+    std::string strBefore = oScene.ToJson();
+
+    Check( oScene.EditPart( "objects/0", "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": -1 }", "" ) == BAD_FILE &&
+           strstr( oScene.GetLoadError(), "size" ) != NULL && oScene.ToJson() == strBefore, "a bad edit is reported and changes nothing" );
+    Check( oScene.EditPart( "objects/0", "{ \"type\": \"spot\", \"position\": [0, 0, 0], \"direction\": [0, -1, 0], \"color\": [1, 1, 1] }", "" ) == BAD_FILE &&
+           oScene.ToJson() == strBefore, "a light can't go in the objects" );
+    Check( oScene.EditPart( "objects/7", strSphere, "" ) == BAD_FILE && oScene.EditPart( "objects/x", strSphere, "" ) == BAD_FILE &&
+           oScene.ToJson() == strBefore, "an object the scene doesn't have can't be edited" );
+    Check( oScene.EditPart( "objects/0", "{ \"type\": ", "" ) == BAD_FILE && oScene.ToJson() == strBefore, "text that isn't JSON is refused" );
+
+    Check( oScene.EditPart( "lights/+", "{ \"type\": \"directional\", \"direction\": [0, -1, 0], \"color\": [0.5, 0.5, 0.5] }", "" ) == 0 &&
+           oScene.GetLightCount() == 2, "a light can be added" );
+    Check( oScene.EditPart( "lights/0", "", "" ) == 0 && oScene.GetLightCount() == 1, "empty text removes a light" );
+    Check( oScene.EditPart( "objects/0", "", "" ) == 0 && oScene.GetObjectCount() == 1 && dynamic_cast<CSphere *>( oScene.GetObjectAt( 0 ) ) != NULL,
+           "empty text removes an object" );
+
+    Check( oScene.EditPart( "camera", "{ \"position\": [0, 0, -5], \"lookAt\": [0, 0, 0], \"sampler\": \"corners\", \"clamp\": 2 }", "" ) == 0 &&
+           strcmp( oScene.GetCamera().GetSampler().GetName(), "corners" ) == 0 && oScene.GetCamera().GetClamp() == 2.0,
+           "the camera can be edited, sampler and all" );
+    Check( oScene.EditPart( "camera", "", "" ) == BAD_FILE, "the camera can't be left out" );
+    Check( oScene.EditPart( "environment", "{ \"type\": \"sky\" }", "" ) == 0 && oScene.GetEnvironment() != NULL, "an environment can be added" );
+    Check( oScene.EditPart( "environment", " \n", "" ) == 0 && oScene.GetEnvironment() == NULL, "empty text removes the environment" );
+    Check( oScene.EditPart( "settings", "{ \"imageWidth\": 99 }", "" ) == 0 && oScene.GetSettings().GetImageWidth() == 99, "the settings can be edited" );
+}
+
+    // The model files in scenes/models: Benchy, the colored STLs and the OBJ
+    // ring, the mesh tree on Benchy, and a scene's models going into an
+    // archive and out beside a JSON file.
+static void ModelFileChecks( const char *strScenes, const char *strDir )
+{
+    CScene oBenchy;
+
+    Check( oBenchy.Load( ( std::string( strScenes ) + "/benchy_test.ray" ).c_str() ) == 0, "the Benchy scene loads" );
+
+    CMesh *pBenchy = dynamic_cast<CMesh *>( oBenchy.GetObjectAt( 1 ) );
+
+    Check( pBenchy != NULL && pBenchy->GetFaceCount() > 225000, "Benchy's 225,706 triangles load (less any with no area)" );
+    if ( pBenchy )
+    {
+        CVector oMinimum, oMaximum;
+
+        pBenchy->GetBounds( oMinimum, oMaximum );
+        Check( Near( oMinimum.GetY(), 0.0, 1e-3 ) && Near( oMaximum.GetY(), 48.0, 1e-3 ),
+               "Benchy, turned from z up to y up and aligned to the bottom, stands 48 mm tall on y = 0" );
+
+            // The tree finds exactly what testing every face finds.
+        unsigned nSeed = 777;
+        int      nHits = 0;
+        int      nDiffer = 0;
+
+        for ( int nRay = 0; nRay < 60; nRay++ )
+        {
+            double adValue[ 4 ];
+
+            for ( int nIndex = 0; nIndex < 4; nIndex++ )
+            {
+                nSeed = ( nSeed * 1103515245u ) + 12345u;
+                adValue[ nIndex ] = ( ( nSeed >> 8 ) & 0xFFFF ) / 65535.0;
+            }
+
+            double  dAngle = adValue[ 0 ] * 6.283185307179586;
+            CVector oFrom( 100.0 * cos( dAngle ), 60.0 * adValue[ 1 ], 100.0 * sin( dAngle ) );
+            CVector oTo( ( adValue[ 2 ] * 50.0 ) - 25.0, adValue[ 3 ] * 45.0, 0.0 );
+            CVector oDirection = oTo - oFrom;
+            CRay    oTree, oEach;
+            CVector oTreeHit, oEachHit;
+
+            oDirection.Normalize();
+            oTree.Set( oFrom.GetX(), oFrom.GetY(), oFrom.GetZ(), oDirection.GetX(), oDirection.GetY(), oDirection.GetZ(), 1e100, 1.0, 0, 0 );
+            oEach = oTree;
+
+            BOOL bTree = pBenchy->Intersect( oTree, oTreeHit );
+            BOOL bEach = pBenchy->IntersectEachFace( oEach, oEachHit );
+
+            if ( bTree )
+                nHits++;
+            if ( bTree != bEach || oTree.GetT() != oEach.GetT() || ! NearVector( oTreeHit, oEachHit, 0.0 ) )
+                nDiffer++;
+        }
+        Check( nHits > 20, "many rays at Benchy hit it" );
+        Check( nDiffer == 0, "Benchy's tree finds exactly the hit testing every face finds" );
+    }
+
+    CScene oModels;
+
+    Check( oModels.Load( ( std::string( strScenes ) + "/models_test.ray" ).c_str() ) == 0, "the models scene loads" );
+
+    CMesh *pCube = dynamic_cast<CMesh *>( oModels.GetObjectAt( 1 ) );
+    CMesh *pGem = dynamic_cast<CMesh *>( oModels.GetObjectAt( 2 ) );
+    CMesh *pRing = dynamic_cast<CMesh *>( oModels.GetObjectAt( 3 ) );
+    CColor oColor;
+
+    Check( pCube && pCube->GetFaceCount() == 588 && pCube->FaceColor( 0, oColor ), "the puzzle cube's 588 faces load with their VisCAM colors" );
+    Check( pGem && pGem->GetFaceCount() == 8 && pGem->FaceColor( 1, oColor ) && Near( oColor.GetR(), 230.0 / 255.0 ),
+           "the gem's faces without colors of their own take its Magics model color" );
+    Check( pRing && pRing->GetFaceCount() == 32 * 16 * 2 && pRing->HasUVs(), "the OBJ ring's quads load as triangles, with texture coordinates" );
+
+    std::string strArchive = std::string( strDir ) + "/models_archive.ray";
+    std::string strJsonDir = std::string( strDir ) + "/models_json";
+    std::string strJson = strJsonDir + "/scene.ray";
+
+    Check( oModels.Save( strArchive.c_str() ) == 0, "a scene with model files saves as an archive" );
+    Check( oModels.SaveJson( strJson.c_str() ) == 0, "it saves as JSON" );
+    Check( ReadFile( strJsonDir + "/models/color_cube.stl" ) == ReadFile( std::string( strScenes ) + "/models/color_cube.stl" ) &&
+           ReadFile( strJsonDir + "/models/ring.obj" ) == ReadFile( std::string( strScenes ) + "/models/ring.obj" ),
+           "the model files are extracted beside the JSON, unchanged" );
+
+    CScene oArchived;
+
+        // The archive is away from scenes/, so its models must come from inside it.
+    Check( oArchived.Load( strArchive.c_str() ) == 0, "the archive loads with its model files from inside it" );
+    Check( oArchived.ToJson() == oModels.ToJson(), "the archived scene reads back the same" );
+    remove( strArchive.c_str() );
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -2626,6 +3062,7 @@ int main( int argc, char **argv )
         MeshTreeChecks( argv[ 2 ] );
         SceneTreeChecks( argv[ 2 ] );
         LensTableChecks( argv[ 2 ] );
+        ModelFileChecks( argv[ 2 ], argv[ 3 ] );
     }
     else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
@@ -2647,6 +3084,8 @@ int main( int argc, char **argv )
         CsgChecks();
         DispersionChecks();
         ClampChecks();
+        ModelChecks();
+        SceneEditChecks();
     }
 
     if ( g_nFailures == 0 )

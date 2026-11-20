@@ -10462,6 +10462,149 @@
                     "filterReflection": false
                 }
             ]
+        },
+        {
+            "type": "mesh",
+            "file": "models/3DBenchy.stl",
+            "fitSize": 2.0,
+            "rotation": [-90.0, 145.0, 0.0],
+            "align": "bottom",
+            "translation": [-3.9, 0.0, -6.9],
+            "smooth": false,
+            "doubleSided": false,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.04, 0.01]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "layers",
+                        "colors": [
+                            [0.8, 0.36, 0.07],
+                            [0.95, 0.45, 0.1]
+                        ],
+                        "scale": 0.1,
+                        "origin": [0.0, 0.0, 0.0],
+                        "turbulence": 0.0,
+                        "octaves": 6,
+                        "seed": 0,
+                        "axis": [0.0, 0.0, 1.0]
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.3,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.25,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "layers",
+                    "colors": [
+                        [0.0, 0.0, 0.0],
+                        [1.0, 1.0, 1.0]
+                    ],
+                    "scale": 0.1,
+                    "origin": [0.0, 0.0, 0.0],
+                    "turbulence": 0.0,
+                    "octaves": 6,
+                    "seed": 0,
+                    "axis": [0.0, 0.0, 1.0]
+                },
+                "depth": 0.03,
+                "step": 0.002
+            }
+        },
+        {
+            "type": "mesh",
+            "file": "models/color_cube.stl",
+            "fitSize": 0.9,
+            "rotation": [0.0, 25.0, 0.0],
+            "align": "bottom",
+            "translation": [4.5, 0.0, -6.3],
+            "smooth": false,
+            "doubleSided": false,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 0.12,
+                    "color": [1.0, 1.0, 1.0],
+                    "texture": {
+                        "type": "faceColors",
+                        "default": [0.8, 0.8, 0.8]
+                    }
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "faceColors",
+                        "default": [0.8, 0.8, 0.8]
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.35,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.2,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ]
+        },
+        {
+            "type": "mesh",
+            "file": "models/ring.obj",
+            "scale": [0.55, 0.55, 0.55],
+            "rotation": [0.0, 15.0, 0.0],
+            "align": "bottom",
+            "translation": [-0.9, 0.0, -7.6],
+            "smooth": true,
+            "doubleSided": false,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.08, 0.08, 0.08]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/uv_grid.ppm",
+                        "scale": [1.0, 1.0],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": false
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.3,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.2,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ]
         }
     ],
     "lights": [
