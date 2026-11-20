@@ -6,11 +6,11 @@
 # only what the editor needs. RAY_WXWIDGETS_URL can point the fetch at a local
 # copy of the release tarball.
 
-set(RAY_WXWIDGETS_VERSION 3.2.6)
+set(RAY_WXWIDGETS_VERSION 3.2.9)
 set(RAY_WXWIDGETS_URL
     "https://github.com/wxWidgets/wxWidgets/releases/download/v${RAY_WXWIDGETS_VERSION}/wxWidgets-${RAY_WXWIDGETS_VERSION}.tar.bz2"
     CACHE STRING "Where to fetch the wxWidgets release tarball from")
-set(RAY_WXWIDGETS_SHA256 939e5b77ddc5b6092d1d7d29491fe67010a2433cf9b9c0d841ee4d04acb9dce7)
+set(RAY_WXWIDGETS_SHA256 fb90f9538bffd6a02edbf80037a0c14c2baf9f509feac8f76ab2a5e4321f112b)
 option(RAY_USE_SYSTEM_WXWIDGETS "Use an installed wxWidgets if find_package finds one" ON)
 
 find_package(OpenGL REQUIRED)

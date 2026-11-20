@@ -13,7 +13,7 @@ build/editor/ray-editor scenes/torture_test.ray     # macOS: build/editor/ray-ed
 ```
 
 - CMake uses an installed wxWidgets (3.1 or later, with `core`, `base`, `gl` and `propgrid`) if
-  `find_package` finds one. Otherwise it fetches wxWidgets 3.2.6 and builds it as static
+  `find_package` finds one. Otherwise it fetches wxWidgets 3.2.9 and builds it as static
   libraries with only what the editor needs, which takes a few minutes the first time.
   `-DRAY_USE_SYSTEM_WXWIDGETS=OFF` always fetches it, and `-DRAY_WXWIDGETS_URL=file:///…`
   fetches from a local copy of the release tarball.

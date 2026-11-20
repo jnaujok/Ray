@@ -115,7 +115,7 @@ jobs:
             build/_deps/wxwidgets-src
             build/_deps/wxwidgets-build
             build/_deps/wxwidgets-subbuild
-          key: wxwidgets-3.2.6-${{ runner.os }}-${{ hashFiles('cmake/RayEditor.cmake') }}
+          key: wxwidgets-3.2.9-${{ runner.os }}-${{ hashFiles('cmake/RayEditor.cmake') }}
 
       - name: Configure
         shell: bash

@@ -44,7 +44,7 @@ progressively over it. Rendering doesn't change: every reference render is byte 
   - **Files:** new, open (scene archives and JSON), and save as a `.ray` archive or as `.json`.
   - **How it's built:** the logic (`editor/logic/`: the document, tessellation, the view's camera,
     picking and the progressive render) uses no window toolkit and is always built; only
-    `editor/gui/` uses wxWidgets. CMake uses an installed wxWidgets 3.1+ or fetches 3.2.6 (pinned
+    `editor/gui/` uses wxWidgets. CMake uses an installed wxWidgets 3.1+ or fetches 3.2.9 (pinned
     by SHA-256) and builds only `base`, `core`, `gl` and `propgrid`, as static libraries (about
     five minutes on a 16-core machine). The view uses OpenGL 1.x fixed-function calls only, so it
     runs on Windows' `opengl32`, macOS's legacy 2.1 profile and Mesa alike.

@@ -262,7 +262,7 @@ cmake --build build --parallel
 
 This builds `raythrower` and `rayengine`. To build the cross-platform scene editor too, turn on
 `RAY_BUILD_EDITOR`. CMake uses an installed wxWidgets if it finds one, and otherwise downloads
-wxWidgets 3.2.6 and builds it (a few minutes, the first time). On Linux install the GTK 3 and
+wxWidgets 3.2.9 and builds it (a few minutes, the first time). On Linux install the GTK 3 and
 OpenGL development packages first (`sudo apt-get install libgtk-3-dev libgl1-mesa-dev`):
 
 ```sh

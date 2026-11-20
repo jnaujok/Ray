@@ -55,7 +55,7 @@ ctest --test-dir build --output-on-failure
   `-DFETCHCONTENT_SOURCE_DIR_IASLIB=/path/to/IASLib`. SJSON's LZ4 and zstd support is kept off.
 - The GUI needs MSVC with MFC: `-DRAY_BUILD_GUI=ON`, then build the `Ray` target.
 - The cross-platform editor: `-DRAY_BUILD_EDITOR=ON`, then build the `ray-editor` target. CMake
-  uses an installed wxWidgets (`find_package`) or fetches 3.2.6 (pinned by SHA-256 in
+  uses an installed wxWidgets (`find_package`) or fetches 3.2.9 (pinned by SHA-256 in
   `cmake/RayEditor.cmake`) and builds only `base`, `core`, `gl` and `propgrid`, static. Linux needs
   `libgtk-3-dev` and `libgl1-mesa-dev`. `-DRAY_WXWIDGETS_URL=file:///…` fetches a local tarball.
   New editor source files go in `cmake/RayEditor.cmake` (GUI) or `editor/CMakeLists.txt` (logic).

@@ -1,3 +1,8 @@
+// wxWidgets first: on Windows it must include <windows.h> with GDI (for
+// OpenGL), before IASLib includes a lean one.
+#include <wx/wx.h>
+#include <wx/glcanvas.h>
+
 #include "Globals.h"
 #include "SceneCanvas.h"
 
