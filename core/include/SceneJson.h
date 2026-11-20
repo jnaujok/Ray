@@ -24,9 +24,17 @@
 #include "JSON/ObjectNode.h"
 #include "JSON/ArrayNode.h"
 
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 class CVector;
+
+namespace IASLib
+{
+    class CResourceFile;
+}
 class CColor;
 
 namespace RayJson
@@ -89,6 +97,49 @@ namespace RayJson
         /// How to write an absolute path into the scene being saved: relative
         /// to its directory, or strFallback when no scene is being saved.
     std::string     PathForSave( const std::string &strAbsolute, const std::string &strFallback );
+
+        /// While one exists, files a scene names are looked for in this
+        /// archive (by name) before the disk.
+    class CArchiveSource
+    {
+        public:
+            explicit    CArchiveSource( IASLib::CResourceFile &oArchive );
+                       ~CArchiveSource( void );
+        private:
+            IASLib::CResourceFile *m_pPrevious;
+                        CArchiveSource( const CArchiveSource & );
+            CArchiveSource &operator =( const CArchiveSource & );
+    };
+
+        /// Reads a file a scene names: from the archive being read, if it has
+        /// one by that name, else from the disk (relative to the scene file).
+        /// strPath is where on the disk it came from (empty: the archive).
+    BOOL            ReadSceneFile( const std::string &strName, std::string &strData, std::string &strPath, std::string &strError );
+
+        /// While one exists, files a scene names are collected as it is
+        /// written, to go into an archive (or out beside a JSON file).
+    class CFileCollector
+    {
+        public:
+                        CFileCollector( void );
+                       ~CFileCollector( void );
+                /// The files, name and data, in the order they were named.
+            const std::vector< std::pair< std::string, std::shared_ptr<const std::string> > > &Files( void ) const { return m_aoFiles; }
+                /// Adds a file; returns the name to write in the scene, which
+                /// is strName unless another file already has it.
+            std::string Add( const std::string &strName, const std::shared_ptr<const std::string> &pData );
+        private:
+            std::vector< std::pair< std::string, std::shared_ptr<const std::string> > > m_aoFiles;
+            CFileCollector *m_pPrevious;
+                        CFileCollector( const CFileCollector & );
+            CFileCollector &operator =( const CFileCollector & );
+    };
+
+        /// The name to write in a scene for a file it uses: with a collector,
+        /// the file goes in with it (pData; strName is its name); otherwise a
+        /// path relative to where the scene is saved (from strAbsolute).
+    std::string     SceneFileName( const std::string &strName, const std::string &strAbsolute,
+                                   const std::shared_ptr<const std::string> &pData );
 
         /// Records an error at the current place and returns FALSE.
     BOOL            Fail( const std::string &strMessage );

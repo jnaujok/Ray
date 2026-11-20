@@ -135,7 +135,7 @@ add_test(NAME render_teapot_textured
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(render_teapot_textured PROPERTIES TIMEOUT 600)
 add_test(NAME roundtrip_teapot_textured COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/teapot_textured.ray ${RENDER_DIR})
-add_test(NAME texture_checks COMMAND format_test --textures ${PROJECT_SOURCE_DIR}/scenes)
+add_test(NAME texture_checks COMMAND format_test --textures ${PROJECT_SOURCE_DIR}/scenes ${RENDER_DIR})
 
 add_test(NAME render_sampler_stratified
          COMMAND ${CMAKE_COMMAND}

@@ -57,7 +57,13 @@ ctest --test-dir build --output-on-failure
   `CRay::CreateRay`, `CCamera::RayDirection`, `CCamera::PrimaryRay`, `CLens`, and the pixel
   samplers) without being asked to. A camera without a lens must stay an exact pinhole.
   Fixing crashes and undefined behavior is fine.
-- **Scene files are JSON** (`.ray`, version 3; documented in `scenes/README.md`). Each scene class
+- **Saved scenes are IASLib resource archives** (`CResourceFile`): `scene.json` (folder 1) and
+  every file the scene uses (folder 2), under the names the scene gives them. Plain JSON `.ray`
+  files load too, and the sample scenes in `scenes/` stay JSON so diffs stay readable;
+  `--save-json` writes JSON with the files extracted beside it. Read a file a scene names with
+  `RayJson::ReadSceneFile` (archive first, then disk) and write its name with
+  `RayJson::SceneFileName`, so it goes into the archive, never with plain `fopen`.
+- **The scene itself is JSON** (version 3; documented in `scenes/README.md`). Each scene class
   reads and writes its own fields in `ToJson`/`FromJson`, through the `RayJson` helpers in
   `SceneJson.h`; readers reject unknown fields and report errors with `RayJson::Fail`. Keep the
   format backward compatible: add optional fields with defaults, and bump `JSON_VERSION` in

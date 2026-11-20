@@ -128,6 +128,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Saved scenes are IASLib resource archives** (`CResourceFile`): `scene.json` and every file the
+  scene uses (texture images), under the names the scene gives them, so one `.ray` file carries
+  the whole scene. Saving writes beside the file and renames it into place, so a failed save
+  leaves the old file. Plain JSON `.ray` files still load (the sample scenes stay JSON), and new
+  `CScene::SaveJson` / `raythrower --save-json` writes JSON for editing by hand, extracting the
+  files beside it. Files a scene names are read from its archive first (`RayJson::ReadSceneFile`)
+  and collected into it when saving (`RayJson::SceneFileName`); names outside the scene's
+  directory are stored under `files/`. The round-trip tests compare scenes rather than bytes,
+  since archives record when they were written.
 - The default trace depth is 16 levels (`settings.maximumDepth`; the camera ray is level 1, so 15
   reflections or refractions), up from the 1997 default of 15, and every sample scene uses it.
   The deepest bounces in `reflection_test`, `reflect_me` and `reflect_test2` change their renders;

@@ -25,6 +25,10 @@
 #include "Files/File.h"
 #include "Streams/FileStream.h"
 #include "Streams/StringStream.h"
+#include "Resources/Resource.h"
+#include "Resources/ResourceFile.h"
+
+#include <filesystem>
 
 #include <stdio.h>
 #include <memory>
@@ -43,6 +47,16 @@ static char THIS_FILE[] = __FILE__;
 
     // JSON scene files say what they are, and their version follows on from
     // the two binary versions.
+    // Saved scenes are IASLib resource archives: the scene's JSON, and the
+    // files it uses, each under the name the scene gives it.
+#define ARCHIVE_MAGIC       "IASRES\r\n"
+#define FOLDER_SCENE        1
+#define FOLDER_FILES        2
+#define RESOURCE_SCENE      1
+#define TYPE_SCENE          1
+#define TYPE_FILE           2
+#define SCENE_RESOURCE_NAME "scene.json"
+
 #define JSON_FORMAT     "Ray scene"
 #define JSON_VERSION    3
 
@@ -362,21 +376,134 @@ DWORD CScene::Load( const char *strFileName )
         return FromJson( strData.substr( nStart ) );
     }
 
+    if ( strData.compare( 0, 8, ARCHIVE_MAGIC, 8 ) == 0 )
+    {
+        IASLib::CResourceFile oArchive;
+
+        if ( ! oArchive.Open( strFileName, IASLib::CResourceFile::READ_ONLY ) )
+        {
+            m_strLoadError = std::string( "the scene archive can't be read: " ) + (const char *)oArchive.GetLastError();
+            return BAD_FILE;
+        }
+
+        std::shared_ptr<const IASLib::CResource> pScene = oArchive.Get( FOLDER_SCENE, RESOURCE_SCENE );
+
+        if ( ! pScene || pScene->GetResourceType() != TYPE_SCENE )
+        {
+            m_strLoadError = "the archive has no scene in it";
+            return BAD_FILE;
+        }
+
+            // Files the scene names come from the archive (or else the disk,
+            // relative to the archive).
+        std::string             strName( strFileName );
+        size_t                  nSlash = strName.find_last_of( "/\\" );
+        RayJson::CBaseDirectory oBase( ( nSlash == std::string::npos ) ? std::string() : strName.substr( 0, nSlash ) );
+        RayJson::CArchiveSource oSource( oArchive );
+
+        return FromJson( std::string( (const char *)pScene->GetData(), pScene->GetLength() ) );
+    }
+
     if ( strData.compare( 0, 4, MAGIC_NUMBER, 4 ) == 0 )
         m_strLoadError = "it is a binary scene from 1996-1999, which is no longer read; "
                          "the sample scenes have JSON versions in scenes/";
     else
-        m_strLoadError = "it is not a JSON scene file";
+        m_strLoadError = "it is not a scene file (a scene archive or JSON)";
     return BAD_FILE;
 }
 
 DWORD CScene::Save( const char *strFileName )
 {
-        // Files the scene names are written relative to where it is saved.
-    std::string             strName( strFileName );
-    size_t                  nSlash = strName.find_last_of( "/\\" );
-    RayJson::CSaveDirectory oSave( ( nSlash == std::string::npos ) ? std::string() : strName.substr( 0, nSlash ) );
-    std::string             strData = ToJson( FALSE );
+    RayJson::CFileCollector oFiles;
+    std::string             strScene = ToJson( FALSE );
+    std::string             strTemporary = std::string( strFileName ) + ".saving";
+
+    m_strLoadError.clear();
+
+        // Written beside the file and then put in its place, so a failed save
+        // leaves the old file as it was.
+    {
+        IASLib::CResourceFile oArchive;
+        IASLib::CResource     oScene( FOLDER_SCENE, RESOURCE_SCENE );
+        bool                  bWritten;
+
+        if ( ! oArchive.Open( strTemporary.c_str(), IASLib::CResourceFile::CREATE ) )
+        {
+            m_strLoadError = (const char *)oArchive.GetLastError();
+            return BAD_FILE;
+        }
+        oArchive.SetAutoFlush( false );
+
+        oScene.SetName( SCENE_RESOURCE_NAME );
+        oScene.SetModifiedBy( "Ray" );
+        oScene.SetResourceType( TYPE_SCENE );
+        oScene.SetData( strScene.data(), strScene.size() );
+        bWritten = oArchive.Put( oScene );
+
+        for ( size_t nIndex = 0; bWritten && nIndex < oFiles.Files().size(); nIndex++ )
+        {
+            IASLib::CResource oFile( FOLDER_FILES, (short)( nIndex + 1 ) );
+
+            oFile.SetName( oFiles.Files()[ nIndex ].first.c_str() );
+            oFile.SetModifiedBy( "Ray" );
+            oFile.SetResourceType( TYPE_FILE );
+            oFile.SetData( oFiles.Files()[ nIndex ].second->data(), oFiles.Files()[ nIndex ].second->size() );
+            bWritten = oArchive.Put( oFile );
+        }
+        if ( oFiles.Files().size() > 32767 )
+            bWritten = false;
+        if ( ! bWritten || ! oArchive.Flush() || ! oArchive.Close() )
+        {
+            m_strLoadError = (const char *)oArchive.GetLastError();
+            oArchive.Close();
+            remove( strTemporary.c_str() );
+            return BAD_FILE;
+        }
+    }
+
+    std::error_code oError;
+
+    std::filesystem::rename( strTemporary, strFileName, oError );
+    if ( oError )
+    {
+        m_strLoadError = oError.message();
+        remove( strTemporary.c_str() );
+        return BAD_FILE;
+    }
+    return 0;
+}
+
+DWORD CScene::SaveJson( const char *strFileName )
+{
+    RayJson::CFileCollector oFiles;
+    std::string             strData;
+    std::filesystem::path   oDirectory = std::filesystem::path( strFileName ).parent_path();
+
+    m_strLoadError.clear();
+    strData = ToJson( FALSE );
+
+        // The files the scene uses go beside it, under the names it gives them.
+    for ( size_t nIndex = 0; nIndex < oFiles.Files().size(); nIndex++ )
+    {
+        std::filesystem::path   oPath = oDirectory / oFiles.Files()[ nIndex ].first;
+        std::error_code         oError;
+
+        if ( oPath.has_parent_path() )
+            std::filesystem::create_directories( oPath.parent_path(), oError );
+
+        FILE *pFile = fopen( oPath.string().c_str(), "wb" );
+
+        if ( pFile == NULL ||
+             fwrite( oFiles.Files()[ nIndex ].second->data(), 1, oFiles.Files()[ nIndex ].second->size(), pFile ) !=
+                 oFiles.Files()[ nIndex ].second->size() )
+        {
+            if ( pFile )
+                fclose( pFile );
+            m_strLoadError = "can't write " + oPath.string();
+            return BAD_FILE;
+        }
+        fclose( pFile );
+    }
 
     FILE *pFile = fopen( strFileName, "wb" );
     if ( pFile == NULL )

@@ -48,6 +48,7 @@ namespace
         std::string strSampler;         // Empty: what the scene says.
         std::string strColorModel;      // Empty: what the scene says.
         std::string strSave;
+        std::string strSaveJson;
         int         nTasks = 0;
         int         nPort = RAY_WIRE_DEFAULT_PORT;
         int         nTimeout = 60;
@@ -91,8 +92,10 @@ namespace
         for ( int nIndex = 0; nIndex < nTypes; nIndex++ )
             printf( "                                %-9s %s%s\n", aoModels[ nIndex ].strName, aoModels[ nIndex ].strDescription,
                     ( nIndex == 0 ) ? " (default)" : "" );
-        printf( "  --save <file>               Save the scene, with any --aa or --color applied, and\n" );
-        printf( "                              exit without tracing\n" );
+        printf( "  --save <file>               Save the scene (with any --aa, --color or --size) as a\n" );
+        printf( "                              scene archive, with its textures inside, and exit\n" );
+        printf( "  --save-json <file>          Save it as plain JSON, for editing by hand, with the\n" );
+        printf( "                              files it uses written beside it, and exit\n" );
         printf( "  -q, --quiet                 Print only errors\n" );
         printf( "  -h, --help                  Show this help\n" );
     }
@@ -246,7 +249,8 @@ namespace
                 }
                 nCount++;
             }
-            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--engine" || strArg == "--save" )
+            else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--engine" || strArg == "--save" ||
+                      strArg == "--save-json" )
             {
                 if ( strNext == NULL )
                 {
@@ -255,6 +259,7 @@ namespace
                 }
                 std::string &strTarget = ( strArg == "--ppm" ) ? oOptions.strPpm :
                                          ( strArg == "--save" ) ? oOptions.strSave :
+                                         ( strArg == "--save-json" ) ? oOptions.strSaveJson :
                                          ( strArg == "--engine" ) ? oOptions.strEngine : oOptions.strOutput;
                 strTarget = strNext;
                 nCount++;
@@ -464,15 +469,28 @@ int main( int argc, char **argv )
         oScene.GetSettings().SetImageHeight( oOptions.nHeight );
     }
 
-    if ( ! oOptions.strSave.empty() )
+    if ( ! oOptions.strSave.empty() || ! oOptions.strSaveJson.empty() )
     {
-        if ( oScene.Save( oOptions.strSave.c_str() ) != 0 )
+        if ( ! oOptions.strSave.empty() )
         {
-            fprintf( stderr, "Couldn't write %s\n", oOptions.strSave.c_str() );
-            return 1;
+            if ( oScene.Save( oOptions.strSave.c_str() ) != 0 )
+            {
+                fprintf( stderr, "Couldn't write %s: %s\n", oOptions.strSave.c_str(), oScene.GetLoadError() );
+                return 1;
+            }
+            if ( ! oOptions.bQuiet )
+                printf( "Scene saved to %s\n", oOptions.strSave.c_str() );
         }
-        if ( ! oOptions.bQuiet )
-            printf( "Scene saved to %s\n", oOptions.strSave.c_str() );
+        if ( ! oOptions.strSaveJson.empty() )
+        {
+            if ( oScene.SaveJson( oOptions.strSaveJson.c_str() ) != 0 )
+            {
+                fprintf( stderr, "Couldn't write %s: %s\n", oOptions.strSaveJson.c_str(), oScene.GetLoadError() );
+                return 1;
+            }
+            if ( ! oOptions.bQuiet )
+                printf( "Scene saved as JSON to %s\n", oOptions.strSaveJson.c_str() );
+        }
         return 0;
     }
 

@@ -75,13 +75,20 @@ class CScene
         DWORD               FromJson( const std::string &strText );
             /// The same, from a JSON tree.
         DWORD               FromJsonTree( const IASLib::CJsonNode &oRoot );
-            /// Reads a JSON .ray file. Returns 0, BAD_FILE or WRONG_VERSION.
-            /// (The binary files of 1996-1999 are no longer read.)
+            /// Reads a .ray file: a scene archive or plain JSON. Returns 0,
+            /// BAD_FILE or WRONG_VERSION. (The binary files of 1996-1999 are
+            /// no longer read.)
         DWORD               Load( const char *strFileName );
             /// Why the last Load or FromJson failed.
         const char         *GetLoadError( void ) const { return m_strLoadError.c_str(); }
-            /// Writes a .ray file as JSON. Returns 0 or BAD_FILE.
+            /// Writes a .ray file: an IASLib resource archive holding the scene
+            /// as JSON ("scene.json") and every file it uses (texture images),
+            /// under the names the scene gives them. Returns 0 or BAD_FILE
+            /// (see GetLoadError). A failed save leaves any old file as it was.
         DWORD               Save( const char *strFileName );
+            /// Writes the scene as a plain JSON file, for editing by hand, and
+            /// the files it uses beside it, under the names it gives them.
+        DWORD               SaveJson( const char *strFileName );
         virtual CLight     *GetLight( int nIndex );
             /// The scene's nIndex'th object (not light), or NULL.
         CObjects           *GetObjectAt( int nIndex ) { return ( nIndex >= 0 && nIndex < m_oObjects.GetSize() ) ? m_oObjects[ nIndex ] : NULL; }

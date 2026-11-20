@@ -28,6 +28,16 @@ Two 1997 files, `yyy.ray` (saved by an in-between build that wrote an extra, und
 `stream_test1.ray` (debug-heap fill bytes, not a scene), could never be read and were not
 converted.
 
+## Scene files
+
+A saved `.ray` file is an IASLib resource archive (`CResourceFile`, starting `IASRES`): resource
+1/1 is `scene.json`, the scene below, and folder 2 holds every file the scene uses (texture images),
+each named as the scene names it. Files a scene names are looked for in its archive first, then on
+disk relative to the scene file. A `.ray` file can also be the plain JSON itself, as the sample
+scenes here are; `raythrower scene.ray --save-json out.ray` writes one from an archive, with the
+files it uses extracted beside it, and `--save` turns it back into an archive. A file named outside
+the scene's directory (absolute, or climbing out with `..`) is stored under `files/`.
+
 ## The JSON format (version 3)
 
 A scene is one JSON object. Fields marked *required* must be there; any other field that is left
@@ -173,8 +183,7 @@ it about an axis:
 Faces across a cylindrical or spherical map's seam are unwrapped rather than smeared across the
 whole texture, and a corner on the axis (a pole) takes its face's other corners' angle. An image's (0, 0) is its bottom left corner and (1, 1) its top right; pixels are
 blended bilinearly. When a scene is copied to a task its images travel inside it (as base64
-`pixels`), so networked engines need no files; saved files name the image, relative to wherever
-the scene is saved.
+`pixels`), so networked engines need no files; a saved scene carries its images in its archive.
 
 **Lights.**
 

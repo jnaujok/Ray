@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <filesystem>
 #include <string>
 
 static int g_nFailures = 0;
@@ -505,22 +506,59 @@ static void RoundTrip( const char *strScene, const char *strDir )
     CScene  oScene;
     Check( oScene.Load( strScene ) == 0, "the scene loads" );
     Check( oScene.Save( strFirst.c_str() ) == 0, "the scene saves" );
+    Check( ReadFile( strFirst ).compare( 0, 8, "IASRES\r\n" ) == 0, "a saved scene is a resource archive" );
 
     CScene  oAgain;
     Check( oAgain.Load( strFirst.c_str() ) == 0, "the saved scene loads" );
     Check( oAgain.Save( strSecond.c_str() ) == 0, "the reloaded scene saves" );
 
-    std::string strData = ReadFile( strFirst );
-    Check( ! strData.empty() && strData == ReadFile( strSecond ), "saving is stable across a reload" );
+        // Archives record when they were written, so compare the scenes.
+    CScene  oThird;
+    Check( oThird.Load( strSecond.c_str() ) == 0, "the second save loads" );
+    Check( oScene.ToJson() == oAgain.ToJson() && oAgain.ToJson() == oThird.ToJson(), "saving is stable across a reload" );
 
     remove( strFirst.c_str() );
     remove( strSecond.c_str() );
 }
 
+    // A texture named outside the scene's directory is stored, and extracted,
+    // under files/ instead.
+static void ArchiveChecks( const char *strScenes, const char *strDir )
+{
+    std::string strOutside = std::string( strDir ) + "/archive_outside.ray";
+    std::string strArchive = std::string( strDir ) + "/archive_test.ray";
+    std::string strJsonDir = std::string( strDir ) + "/archive_json";
+    std::string strJson = strJsonDir + "/scene.ray";
+    std::string strImage = std::filesystem::absolute( std::string( strScenes ) + "/textures/uv_grid.ppm" ).string();
+    CScene      oScene;
+
+    {
+        FILE *pFile = fopen( strOutside.c_str(), "wb" );
+        std::string strText = Minimal( "\"radius\": 1", ( "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": "
+                                       "{ \"type\": \"image\", \"file\": \"" + strImage + "\" } } ]" ).c_str() );
+        fwrite( strText.data(), 1, strText.size(), pFile );
+        fclose( pFile );
+    }
+    Check( oScene.Load( strOutside.c_str() ) == 0, "a scene naming a texture by absolute path loads" );
+    Check( oScene.Save( strArchive.c_str() ) == 0, "it saves as an archive" );
+    Check( oScene.SaveJson( strJson.c_str() ) == 0, "it saves as JSON" );
+    Check( ReadFile( strJsonDir + "/files/uv_grid.ppm" ) == ReadFile( strImage ), "the texture is extracted under files/" );
+    Check( ReadFile( strJson ).find( "\"files/uv_grid.ppm\"" ) != std::string::npos, "the JSON names the extracted texture" );
+
+    CScene oArchived;
+    Check( oArchived.Load( strArchive.c_str() ) == 0, "the archive loads with the texture from inside it" );
+
+    remove( strOutside.c_str() );
+    remove( strArchive.c_str() );
+}
+
 int main( int argc, char **argv )
 {
-    if ( argc >= 3 && strcmp( argv[ 1 ], "--textures" ) == 0 )
+    if ( argc >= 4 && strcmp( argv[ 1 ], "--textures" ) == 0 )
+    {
         TextureChecks( argv[ 2 ] );
+        ArchiveChecks( argv[ 2 ], argv[ 3 ] );
+    }
     else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
     else

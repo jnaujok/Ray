@@ -9,6 +9,7 @@
 #include "Color.h"
 
 #include "JSON/JsonParser.h"
+#include "Resources/ResourceFile.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -24,6 +25,8 @@ namespace
     thread_local int                        t_nEmbedData = 0;
     thread_local std::string                t_strBaseDirectory;
     thread_local std::string                t_strSaveDirectory;
+    thread_local IASLib::CResourceFile     *t_pArchive = NULL;
+    thread_local RayJson::CFileCollector   *t_pCollector = NULL;
 
     std::string Where( void )
     {
@@ -284,6 +287,116 @@ namespace RayJson
             return oFile.generic_string();
             // Forward slashes, so the scene works on every platform.
         return oRelative.generic_string();
+    }
+
+    CArchiveSource::CArchiveSource( IASLib::CResourceFile &oArchive ) :
+        m_pPrevious( t_pArchive )
+    {
+        t_pArchive = &oArchive;
+    }
+
+    CArchiveSource::~CArchiveSource( void )
+    {
+        t_pArchive = m_pPrevious;
+    }
+
+    BOOL ReadSceneFile( const std::string &strName, std::string &strData, std::string &strPath, std::string &strError )
+    {
+        short nFolder, nResource;
+
+        if ( t_pArchive && t_pArchive->FindByName( strName.c_str(), nFolder, nResource ) )
+        {
+            std::shared_ptr<const IASLib::CResource> pResource = t_pArchive->Get( nFolder, nResource );
+
+            if ( ! pResource )
+            {
+                strError = "the archive's copy of \"" + strName + "\" is damaged";
+                return FALSE;
+            }
+            strData.assign( (const char *)pResource->GetData(), pResource->GetLength() );
+            strPath.clear();
+            return TRUE;
+        }
+
+        strPath = ResolvePath( strName );
+
+        FILE   *pFile = fopen( strPath.c_str(), "rb" );
+        char    achBuffer[ 65536 ];
+        size_t  nRead;
+
+        if ( pFile == NULL )
+        {
+            strError = "can't open \"" + strName + "\"";
+            return FALSE;
+        }
+        strData.clear();
+        while ( ( nRead = fread( achBuffer, 1, sizeof( achBuffer ), pFile ) ) > 0 )
+            strData.append( achBuffer, nRead );
+        fclose( pFile );
+        return TRUE;
+    }
+
+    CFileCollector::CFileCollector( void ) :
+        m_pPrevious( t_pCollector )
+    {
+        t_pCollector = this;
+    }
+
+    CFileCollector::~CFileCollector( void )
+    {
+        t_pCollector = m_pPrevious;
+    }
+
+    std::string CFileCollector::Add( const std::string &strName, const std::shared_ptr<const std::string> &pData )
+    {
+            // A name that is absolute or climbs out of the scene's directory
+            // would put the file somewhere else when it is extracted: keep only
+            // its file name, under "files/".
+        std::filesystem::path   oName = std::filesystem::path( strName ).lexically_normal();
+        std::string             strBase = oName.generic_string();
+
+        if ( strBase.empty() || strBase == "." || oName.is_absolute() || oName.has_root_name() ||
+             strBase.compare( 0, 2, ".." ) == 0 )
+            strBase = "files/" + ( oName.filename().empty() ? std::string( "file" ) : oName.filename().generic_string() );
+
+        std::string strTry = strBase;
+
+            // The same data under the same name is one file; another file
+            // with the name gets a number added.
+        for ( int nTry = 2; ; nTry++ )
+        {
+            bool bTaken = false;
+
+            for ( size_t nIndex = 0; nIndex < m_aoFiles.size(); nIndex++ )
+            {
+                if ( m_aoFiles[ nIndex ].first == strTry )
+                {
+                    if ( *m_aoFiles[ nIndex ].second == *pData )
+                        return strTry;
+                    bTaken = true;
+                }
+            }
+            if ( ! bTaken )
+                break;
+
+            size_t nDot = strBase.find_last_of( '.' );
+            size_t nSlash = strBase.find_last_of( '/' );
+
+            if ( nDot == std::string::npos || ( nSlash != std::string::npos && nDot < nSlash ) )
+                strTry = strBase + "-" + std::to_string( nTry );
+            else
+                strTry = strBase.substr( 0, nDot ) + "-" + std::to_string( nTry ) + strBase.substr( nDot );
+        }
+        m_aoFiles.push_back( std::make_pair( strTry, pData ) );
+        return strTry;
+    }
+
+    std::string SceneFileName( const std::string &strName, const std::string &strAbsolute,
+                               const std::shared_ptr<const std::string> &pData )
+    {
+        if ( t_pCollector && pData )
+            return t_pCollector->Add( strName, pData );
+        return PathForSave( strAbsolute, strName );
     }
 
     BOOL Fail( const std::string &strMessage )

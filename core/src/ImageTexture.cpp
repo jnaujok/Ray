@@ -14,22 +14,6 @@
 
 namespace
 {
-        // Reads a whole file; FALSE if it can't be opened.
-    BOOL ReadWholeFile( const std::string &strPath, std::string &strData )
-    {
-        FILE   *pFile = fopen( strPath.c_str(), "rb" );
-        char    achBuffer[ 65536 ];
-        size_t  nRead;
-
-        if ( pFile == NULL )
-            return FALSE;
-        strData.clear();
-        while ( ( nRead = fread( achBuffer, 1, sizeof( achBuffer ), pFile ) ) > 0 )
-            strData.append( achBuffer, nRead );
-        fclose( pFile );
-        return TRUE;
-    }
-
         // The next whole number in a PPM header, skipping white space and
         // comments. FALSE at the end of the data.
     BOOL NextNumber( const std::string &strData, size_t &nAt, long &nValue )
@@ -87,16 +71,8 @@ CImageTexture::CImageTexture( void ) :
     m_anOffset[ 0 ] = m_anOffset[ 1 ] = 0.0;
 }
 
-BOOL CImageTexture::ReadImage( const std::string &strPath, SImage &oImage, std::string &strError )
+BOOL CImageTexture::ParseImage( const std::string &strData, const std::string &strPath, SImage &oImage, std::string &strError )
 {
-    std::string strData;
-
-    if ( ! ReadWholeFile( strPath, strData ) )
-    {
-        strError = "can't open the image \"" + strPath + "\"";
-        return FALSE;
-    }
-
     if ( strData.size() >= 2 && strData[ 0 ] == 'P' && ( strData[ 1 ] == '6' || strData[ 1 ] == '3' ) )
     {
         size_t  nAt = 2;
@@ -219,9 +195,27 @@ CColor CImageTexture::ColorAt( const STexturePoint &oAt ) const
 
 void CImageTexture::ToJson( IASLib::CObjectNode &oNode ) const
 {
-    if ( ! m_strFile.empty() )
-        oNode.put( "file", RayJson::PathForSave( m_strPath, m_strFile ) );
-    if ( m_pImage && ( m_strFile.empty() || RayJson::EmbeddingData() ) )
+    if ( ! m_strFile.empty() || m_pImage )
+    {
+        std::shared_ptr<const std::string> pData = m_pFileData;
+
+            // An image that came inside a scene copy has no file of its own:
+            // to save it, make one, in Ray's raw format.
+        if ( ! pData && m_pImage )
+        {
+            std::string strRaw;
+
+            strRaw += (char)( ( m_pImage->nWidth >> 8 ) & 0xFF );
+            strRaw += (char)( m_pImage->nWidth & 0xFF );
+            strRaw += (char)( ( m_pImage->nHeight >> 8 ) & 0xFF );
+            strRaw += (char)( m_pImage->nHeight & 0xFF );
+            strRaw.append( (const char *)m_pImage->anPixels.data(), m_pImage->anPixels.size() );
+            pData.reset( new std::string( strRaw ) );
+        }
+
+        oNode.put( "file", RayJson::SceneFileName( m_strFile.empty() ? std::string( "textures/image.raw" ) : m_strFile, m_strPath, pData ) );
+    }
+    if ( m_pImage && RayJson::EmbeddingData() )
     {
         oNode.put( "width", m_pImage->nWidth );
         oNode.put( "height", m_pImage->nHeight );
@@ -264,9 +258,13 @@ BOOL CImageTexture::FromJson( const IASLib::CJsonNode &oNode )
 
         if ( m_strFile.empty() )
             return RayJson::Fail( "needs \"file\"" );
-        m_strPath = RayJson::ResolvePath( m_strFile );
-        if ( ! ReadImage( m_strPath, *pImage, strError ) )
-            return RayJson::Fail( "can't open the image \"" + m_strFile + "\"" + ( strError.find( "can't open" ) == 0 ? "" : ": " + strError ) );
+        std::string strData;
+
+        if ( ! RayJson::ReadSceneFile( m_strFile, strData, m_strPath, strError ) )
+            return RayJson::Fail( "can't open the image \"" + m_strFile + "\"" );
+        if ( ! ParseImage( strData, m_strFile, *pImage, strError ) )
+            return RayJson::Fail( strError );
+        m_pFileData.reset( new std::string( strData ) );
     }
     m_pImage = pImage;
     return TRUE;

@@ -248,7 +248,8 @@ rayengine master.example.com 7997                       # on each of three machi
 | `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`; settings after a colon, as in `random:samples=9` |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`; settings as for `--aa`, as in `reinhard:exposure=1.5` |
 | `--size <w>x<h>` | Image size, instead of the scene's |
-| `--save <file>` | Save the scene (with any `--aa`/`--color`/`--size`) and exit |
+| `--save <file>` | Save the scene (with any `--aa`/`--color`/`--size`) as a scene archive, textures inside, and exit |
+| `--save-json <file>` | Save it as plain JSON, with the files it uses beside it, and exit |
 
 Images are written in the original raw format: a 2-byte width, a 2-byte height (both big-endian),
 then RGB bytes. `--ppm` gives a copy any image viewer can open.
@@ -329,8 +330,12 @@ encoding, so `gamma` and `srgb` look washed out; `reinhard` brings back clipped 
 
 ## Scene files
 
-`.ray` files are JSON: render settings, the camera with its sampler and color model, objects with
-their materials, and lights. Only the camera is required; anything else left out takes its default.
+A saved `.ray` file is an [IASLib](https://github.com/jnaujok/IASLib) resource archive holding the
+scene and every file it uses, such as texture images, so one file carries the whole scene. The
+scene inside is JSON: render settings, the camera with its sampler and color model, objects with
+their materials, and lights. Plain JSON `.ray` files load too (the sample scenes are kept that way),
+and `raythrower --save-json` writes one, with the files it uses beside it, for editing by hand.
+Only the camera is required; anything else left out takes its default.
 
 ```json
 {

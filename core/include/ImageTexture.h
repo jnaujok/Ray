@@ -11,7 +11,8 @@
 *   the color directly (byte / 255), matching the default color model;   *
 *   with "srgb" they are decoded from the sRGB curve first.              *
 *                                                                        *
-*   A scene file names the image file, relative to the scene file. A     *
+*   A scene names the image file; a saved scene archive carries the file *
+*   inside it, and a JSON scene names it relative to the scene file. A   *
 *   copy of the scene sent to a task carries the pixels instead (see     *
 *   RayJson::CEmbedData), so engines need no files.                      *
 *                                                                        *
@@ -42,7 +43,8 @@ class CImageTexture : public CTexture
 
     protected:
         std::string                     m_strFile;  // as the scene gave it
-        std::string                     m_strPath;  // where it was read from, absolute
+        std::string                     m_strPath;  // where it was read from, absolute (empty: an archive)
+        std::shared_ptr<const std::string> m_pFileData;    // the file as read, to save with the scene
         std::shared_ptr<const SImage>   m_pImage;   // shared by copies
         FLT                             m_anScale[ 2 ];
         FLT                             m_anOffset[ 2 ];
@@ -57,9 +59,10 @@ class CImageTexture : public CTexture
         virtual CTexture       *Clone( void ) const { return new CImageTexture( *this ); }
         virtual const char     *GetName( void ) const { return "image"; }
 
-            /// Reads a PPM or Ray raw image; FALSE, with why in strError, if
-            /// it can't be read.
-        static BOOL             ReadImage( const std::string &strPath, SImage &oImage, std::string &strError );
+            /// Decodes a PPM or Ray raw image from a file's contents (strName
+            /// names it in messages); FALSE, with why in strError, if it
+            /// can't be read.
+        static BOOL             ParseImage( const std::string &strData, const std::string &strName, SImage &oImage, std::string &strError );
 
         virtual CColor          ColorAt( const STexturePoint &oAt ) const;
         virtual void            ToJson( IASLib::CObjectNode &oNode ) const;

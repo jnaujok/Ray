@@ -27,7 +27,8 @@ raythrower <FileToTrace> [options]
 | `--aa <sampler>` | Pixel sampler, instead of the scene's: `none`, `corners`, `box`, `random`, or `stratified`, with any settings after a colon (`random:samples=9,seed=2`, `stratified:grid=8`) |
 | `--color <model>` | Color model, instead of the scene's: `clip`, `gamma`, `srgb`, or `reinhard`, with settings as for `--aa` (`reinhard:exposure=1.5`) |
 | `--size <w>x<h>` | Image size, instead of the scene's |
-| `--save <file>` | Save the scene, with any `--aa`, `--color` or `--size` applied, and exit without tracing |
+| `--save <file>` | Save the scene, with any `--aa`, `--color` or `--size` applied, as a scene archive (with its texture images inside), and exit without tracing |
+| `--save-json <file>` | Save it as plain JSON for editing by hand, writing the files it uses beside it, and exit |
 | `-q`, `--quiet` | Print only errors |
 
 Without `--listen` it traces with one thread per task. When the trace finishes it prints the pixel
