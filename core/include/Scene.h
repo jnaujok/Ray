@@ -19,6 +19,7 @@
 #include "LightArray.h"
 
 #include <string>
+#include <vector>
 
 namespace IASLib
 {
@@ -39,6 +40,31 @@ class CScene
         CCamera             m_oCamera;
         CColor              m_oBackgroundColor;
         std::string         m_strLoadError;
+
+            // A bounding volume hierarchy over the objects, built when a ray
+            // first needs it, so a ray tests only the objects near its path.
+            // Objects without bounds (planes) are tested every time.
+        struct STreeNode
+        {
+            FLT             anMin[ 3 ];
+            FLT             anMax[ 3 ];
+            int             nLeft;              // child nodes, if nCount is 0
+            int             nRight;
+            int             nFirst;             // the leaf's objects in m_anTreeObjects
+            int             nCount;
+        };
+        std::vector<STreeNode>  m_aoTree;
+        std::vector<int>        m_anTreeObjects;    // object numbers, grouped by leaf
+        std::vector<int>        m_anUnbounded;      // object numbers
+        std::vector<FLT>        m_anObjectBounds;   // min x, y, z, max x, y, z for each object
+        BOOL                    m_bTreeBuilt;
+        CObjects               *m_pLastOccluder;    // what last blocked a shadow ray
+
+        void                ForgetTree( void );
+        void                BuildTree( void );
+        int                 BuildTreeNode( int nFirst, int nCount );
+        static BOOL         RayHitsBox( const FLT anMin[ 3 ], const FLT anMax[ 3 ], const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ],
+                                        FLT nLimit );
 #ifdef RAY_GUI
         HTREEITEM           m_hCamera;
         HTREEITEM           m_hObjects;
@@ -63,6 +89,15 @@ class CScene
             // TO DO: Replace TraceScene calls with multiple calls to TraceRay
         virtual BOOL        TraceRay( CRay &oRay, CColor &oColor, CObjects *pDeny = NULL );
         virtual BOOL        Intersect( CRay &oRay, CObjects *pIgnore = NULL );
+            /// The object the ray hits first (and sets the ray's t and the
+            /// point), or NULL, using the tree; pDeny is skipped as in
+            /// TraceRay.
+        CObjects           *ClosestHit( CRay &oRay, CVector &oIntersect, CObjects *pDeny );
+            /// The same, and Intersect, without the tree: every object, in
+            /// order. The tree must find exactly what these do; the tests
+            /// hold it to that.
+        CObjects           *ClosestHitByEachObject( CRay &oRay, CVector &oIntersect, CObjects *pDeny );
+        BOOL                IntersectEachObject( CRay &oRay, CObjects *pIgnore );
 
             /// The scene as JSON text (version 3 of the .ray format): indented
             /// for a file, or on one line for the network.

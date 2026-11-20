@@ -30,7 +30,8 @@ set(RAY_SAMPLER_TESTS
     box       box
     random2   random:samples=2
     random4   random:samples=4
-    random9   random:samples=9)
+    random9   random:samples=9
+    adaptive  adaptive)
 set(RAY_SAMPLER_SCENE scan_test)
 
 # The color models other than the default, each rendered with one scene.
@@ -257,6 +258,23 @@ add_test(NAME network_sampler_random4
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_sampler_random4 PROPERTIES FIXTURES_REQUIRED render_sampler_random4
                                                         RESOURCE_LOCK ray_network TIMEOUT 300)
+
+# The adaptive sampler decides on rays from colors; networked engines must
+# decide the same.
+math(EXPR port "${port} + 1")
+add_test(NAME network_sampler_adaptive
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray
+                 -DOUTPUT=${RENDER_DIR}/${RAY_SAMPLER_SCENE}_adaptive_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DAA=adaptive
+                 -DEXACT_WITH=${RENDER_DIR}/${RAY_SAMPLER_SCENE}_adaptive.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_sampler_adaptive PROPERTIES FIXTURES_REQUIRED render_sampler_adaptive
+                                                         RESOURCE_LOCK ray_network TIMEOUT 300)
 
 # The channel a ray is traced in travels in its tag; it must come back from
 # networked engines intact.

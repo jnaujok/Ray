@@ -24,21 +24,6 @@ static char THIS_FILE[] = __FILE__;
 
 #define COLOR_VERSION   ((DWORD)1)
 
-CColor::CColor( FLT nRed, FLT nGreen, FLT nBlue )
-{
-    m_nRed = nRed;
-    m_nGreen = nGreen;
-    m_nBlue = nBlue;
-
-}
-
-CColor::CColor( const CColor &oSource )
-{
-    m_nRed = oSource.m_nRed;
-    m_nGreen = oSource.m_nGreen;
-    m_nBlue = oSource.m_nBlue;
-}
-
 CColor::CColor( CVector &oSource )
 {
     m_nRed = oSource.GetX();
@@ -46,9 +31,6 @@ CColor::CColor( CVector &oSource )
     m_nBlue = oSource.GetZ();
 }
 
-CColor::~CColor( void )
-{
-}
       
 FLT CColor::Distance( const CColor &oCompare )
 {
@@ -59,39 +41,6 @@ FLT CColor::Distance( const CColor &oCompare )
               ABS(m_nBlue - oCompare.m_nBlue );
 
     return nResult;
-}
-
-CColor CColor::operator +( const CColor &oAdd )
-{
-    CColor  oTemp;
-
-    oTemp.m_nRed = m_nRed + oAdd.m_nRed;
-    oTemp.m_nGreen = m_nGreen + oAdd.m_nGreen;
-    oTemp.m_nBlue = m_nBlue + oAdd.m_nBlue;
-
-    return oTemp;
-}
-
-CColor CColor::operator *( FLT nScale )
-{
-    CColor  oTemp;
-
-    oTemp.m_nRed = m_nRed * nScale;
-    oTemp.m_nGreen = m_nGreen * nScale;
-    oTemp.m_nBlue = m_nBlue * nScale;
-
-    return oTemp;
-}
-
-CColor CColor::operator *( const CColor &oMult )
-{
-    CColor  oTemp;
-
-    oTemp.m_nRed = m_nRed * oMult.m_nRed;
-    oTemp.m_nGreen = m_nGreen * oMult.m_nGreen;
-    oTemp.m_nBlue = m_nBlue * oMult.m_nBlue;
-
-    return oTemp;
 }
 
 BOOL CColor::operator ==( const CColor &oCompare )
@@ -112,15 +61,6 @@ BOOL CColor::operator !=( const CColor &oCompare )
     return TRUE;
 }
 
-
-CColor &CColor::operator =( const CColor &oSource )
-{
-    m_nRed = oSource.m_nRed;
-    m_nGreen = oSource.m_nGreen;
-    m_nBlue = oSource.m_nBlue;
-
-    return *this;
-}
 
 CColor &CColor::operator =( CVector &oSource )
 {

@@ -111,6 +111,9 @@ class CMesh : public CObjects
 
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect );
         virtual BOOL            Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore );
+            /// Stops at the first face the ray hits.
+        virtual BOOL            Occludes( CRay &oRay, CObjects *pIgnore );
+        virtual BOOL            GetBounds( CVector &oMinimum, CVector &oMaximum );
             /// Intersect without the tree: every face, in order. The tree
             /// must find exactly what this does; the tests hold it to that.
         BOOL                    IntersectEachFace( CRay &oRay, CVector &oIntersect );

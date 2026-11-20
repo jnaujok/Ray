@@ -386,3 +386,41 @@ BOOL CTriangle::FromJson( const IASLib::CJsonNode &oNode )
     return RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            m_oMaterials.FromJson( oNode, "materials" );
 }
+
+    // A box a little larger than [anLow, anHigh], so hits a hair outside the
+    // exact shape (as some tests allow) are inside it.
+static void PadBounds( FLT anLow[ 3 ], FLT anHigh[ 3 ], CVector &oMinimum, CVector &oMaximum )
+{
+    FLT nMargin = 1e-6 * ( 1.0 + ( anHigh[ 0 ] - anLow[ 0 ] ) + ( anHigh[ 1 ] - anLow[ 1 ] ) + ( anHigh[ 2 ] - anLow[ 2 ] ) );
+
+    oMinimum.Set( anLow[ 0 ] - nMargin, anLow[ 1 ] - nMargin, anLow[ 2 ] - nMargin );
+    oMaximum.Set( anHigh[ 0 ] + nMargin, anHigh[ 1 ] + nMargin, anHigh[ 2 ] + nMargin );
+}
+
+BOOL CTriangle::GetBounds( CVector &oMinimum, CVector &oMaximum )
+{
+    FLT anLow[ 3 ] = { 1e300, 1e300, 1e300 };
+    FLT anHigh[ 3 ] = { -1e300, -1e300, -1e300 };
+
+    for ( int nCorner = 0; nCorner < 3; nCorner++ )
+    {
+        CVector &oCorner = GetCorner( nCorner );
+        FLT      anValue[ 3 ] = { oCorner.GetX(), oCorner.GetY(), oCorner.GetZ() };
+
+        for ( int nAxis = 0; nAxis < 3; nAxis++ )
+        {
+            anLow[ nAxis ] = ( anValue[ nAxis ] < anLow[ nAxis ] ) ? anValue[ nAxis ] : anLow[ nAxis ];
+            anHigh[ nAxis ] = ( anValue[ nAxis ] > anHigh[ nAxis ] ) ? anValue[ nAxis ] : anHigh[ nAxis ];
+        }
+    }
+        // A triangle's hit test allows a point slightly outside its edges.
+    FLT nSlack = 1e-3 * ( ( anHigh[ 0 ] - anLow[ 0 ] ) + ( anHigh[ 1 ] - anLow[ 1 ] ) + ( anHigh[ 2 ] - anLow[ 2 ] ) );
+
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        anLow[ nAxis ] -= nSlack;
+        anHigh[ nAxis ] += nSlack;
+    }
+    PadBounds( anLow, anHigh, oMinimum, oMaximum );
+    return TRUE;
+}

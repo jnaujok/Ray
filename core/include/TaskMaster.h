@@ -48,11 +48,11 @@ class CTaskMaster
                 EVENT_WAKE          // nothing; makes the master look at m_bStop
             };
 
-            EKind               nKind;
-            int                 nTask;
-            uint32_t            nTrace;
+            EKind               nKind = EVENT_WAKE;
+            int                 nTask = -1;
+            uint32_t            nTrace = 0;
             STile               oTile;
-            long long           nRays;
+            long long           nRays = 0;
             std::vector<double> anColors;
         };
 

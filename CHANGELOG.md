@@ -10,6 +10,62 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.5] - 2026-11-20
+
+Faster: plain value types for vectors and colors, a bounding volume hierarchy over the scene,
+shadow rays that stop at the first hit, and lens tables worked out once and saved with the scene.
+Every render is byte for byte what it was; the full-size torture test takes about a minute on a
+Release build. Plus the `adaptive` sampler.
+
+### Added
+
+- **The `adaptive` sampler** (`--aa adaptive`, or `{ "type": "adaptive" }` in a scene): each
+  pixel gets at least `min` rays (default 9), then more, one at a time, until the standard error of
+  its brightness is under `threshold` (default 0.01) or it has `max` (default 64). Rays follow the
+  R2 low-discrepancy sequence, shifted for each pixel by a hash, so any number of them is spread
+  evenly over the pixel and over a real lens, and the image is reproducible and the same in every
+  task. On the torture test at 320×240, measured against a 144-ray render: the scene's 5×5
+  stratified sampler (75 rays a pixel with the three channels) has an RMS error of 2.54 levels;
+  `adaptive` has 2.23 with 18% fewer rays, and with `min` 16, 1.84 with the same rays. New tests:
+  `render_sampler_adaptive` (with a reference render and a README preview) and
+  `network_sampler_adaptive`, which must match threads byte for byte. Samplers now get each ray's
+  color before making the next, which `CTileTracer` always did.
+- **A lens's exit pupil tables are worked out before the scene is sent, and saved with it.** The
+  master works them out once, on every core, when the scene is loaded; they go into the lens's
+  record (`exitPupil`: the tables as exact base64 doubles, and a fingerprint of the setup they are
+  for), so tasks and engines use them instead of working them out each, and a saved scene loads
+  without working them out. If the lens, focus, aperture or sensor changes, the fingerprint no
+  longer matches and they are worked out again. `lens_test`, `chromatic_test` and `torture_test`
+  are re-saved with theirs; renders are byte for byte the same.
+
+### Changed
+
+- **Faster tracing, with every render byte for byte the same.** On a Release build, the torture
+  test at 320×240 went from about 13.0 s to 6.7 s, and `scan_test` with 9 random rays a pixel at
+  1280×960 from 7.3 s to 5.4 s:
+  - `CVector` and `CColor` are plain value types: no virtual functions, and their small members
+    are inline, so the compiler can keep them in registers. The biggest single gain.
+  - The scene keeps its objects in a bounding volume hierarchy: each object reports a bounding box
+    (`CObjects::GetBounds`; planes have none and are tested every time), and a ray tests only the
+    objects in boxes it passes through. Of objects hit at exactly the same distance, the first in
+    the scene wins, as when every object was tested in order; `format_test` checks that the tree
+    and the plain loop find exactly the same hits and shadows.
+  - Shadow rays stop at the first thing in the way: a mesh stops at the first face it finds in its
+    tree (`CObjects::Occludes`), and the object that blocked the last shadow ray is tried first.
+  - A chromatic lens no longer traces the sampler's own ray through the glass, which was only used
+    for where the sample falls; it is made again for each color anyway (`CCamera::SetAimOnly`).
+  - A lens works out the index of each glass in each color once, instead of in every step of every
+    ray.
+- `scenes/README.md` no longer says reflected rays keep their parent's influence: they carry it
+  times their material's share, so rays off weakly reflective surfaces stop after a few bounces.
+- `CLAUDE.md`: time renders with a Release build; bounded objects override `GetBounds`, and objects
+  made of parts `Occludes`.
+
+### Fixed
+
+- Release builds warned that parts of a task's events and inbox messages might be used
+  uninitialized when copied; they now start at defaults.
+
 ## [2026-alpha-0.4.1] - 2026-11-20
 
 Real lenses cast blocked rays again, so lens renders have almost no grain from the lens.
@@ -497,7 +553,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4.1...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.5...HEAD
+[2026-alpha-0.5]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4.1...2026-alpha-0.5
 [2026-alpha-0.4.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4...2026-alpha-0.4.1
 [2026-alpha-0.4]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.3...2026-alpha-0.4
 [2026-alpha-0.3]: https://github.com/jnaujok/Ray/compare/v0.2.0...2026-alpha-0.3

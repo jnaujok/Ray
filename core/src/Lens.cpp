@@ -6,10 +6,12 @@
 
 #include "Lens.h"
 #include "SceneJson.h"
-#include "Threading/Mutex.h"
+#include "Threading/Thread.h"
+#include "JSON/ObjectNode.h"
 
 #include <atomic>
-#include <map>
+#include <functional>
+#include <thread>
 
 #include <math.h>
 #include <stdio.h>
@@ -172,6 +174,8 @@ BOOL CLens::SetPrescription( const char *strName )
                                  aoPrescriptions[ nIndex ].aoSurfaces + aoPrescriptions[ nIndex ].nSurfaces );
             m_strPrescription = strName;
             m_bPrepared = FALSE;
+            for ( int nChannel = 0; nChannel < 4; nChannel++ )
+                m_anIorTable[ nChannel ].clear();
             return TRUE;
         }
     }
@@ -183,9 +187,20 @@ void CLens::SetSurfaces( const std::vector<SSurface> &aoSurfaces )
     m_aoSurfaces = aoSurfaces;
     m_strPrescription.clear();
     m_bPrepared = FALSE;
+    for ( int nChannel = 0; nChannel < 4; nChannel++ )
+        m_anIorTable[ nChannel ].clear();
 }
 
 FLT CLens::IorAt( int nIndex, int nChannel ) const
+{
+    const std::vector<FLT> &anTable = m_anIorTable[ ( nChannel >= 0 && nChannel < 4 ) ? nChannel : 0 ];
+
+    if ( (size_t)( nIndex + 1 ) < anTable.size() && anTable.size() == m_aoSurfaces.size() + 1 )
+        return anTable[ (size_t)( nIndex + 1 ) ];
+    return WorkOutIor( nIndex, nChannel );
+}
+
+FLT CLens::WorkOutIor( int nIndex, int nChannel ) const
 {
     if ( nIndex < 0 )
         return 1.0;
@@ -394,10 +409,22 @@ BOOL CLens::Prepare( FLT nDefaultFocus, std::string &strError )
     FLT     nFullStop = 0.0;
 
     m_bPrepared = FALSE;
+    for ( int nChannel = 0; nChannel < 4; nChannel++ )
+        m_anIorTable[ nChannel ].clear();
     if ( m_aoSurfaces.empty() )
     {
         strError = "a lens needs at least one surface";
         return FALSE;
+    }
+
+        // Every index, worked out once.
+    for ( int nChannel = 0; nChannel < 4; nChannel++ )
+    {
+        std::vector<FLT> anTable( m_aoSurfaces.size() + 1 );
+
+        for ( int nIndex = -1; nIndex < (int)m_aoSurfaces.size(); nIndex++ )
+            anTable[ (size_t)( nIndex + 1 ) ] = WorkOutIor( nIndex, nChannel );
+        m_anIorTable[ nChannel ].swap( anTable );
     }
 
     m_anVertexZ.assign( m_aoSurfaces.size(), 0.0 );
@@ -514,9 +541,22 @@ BOOL CLens::Prepare( FLT nDefaultFocus, std::string &strError )
         m_nExposure = (FLT)nTried / (FLT)nPassed;
     }
 
-        // The exit pupil's table, shared with any lens set up the same way.
+        // The exit pupil tables: kept if they are already for this setup,
+        // taken from the scene file if it brought ones for it, else worked
+        // out.
     m_nPupilReach = ( m_nSensorWidth / 2.0 ) * PUPIL_REACH;
-    m_pPupil = SharedPupilTable( *this );
+
+    std::string strKey = TablesKey();
+
+    if ( ! m_pTables || m_strTablesKey != strKey )
+    {
+        if ( m_pLoadedTables && m_strLoadedKey == strKey )
+            m_pTables = m_pLoadedTables;
+        else
+            BuildTables();
+        m_strTablesKey = strKey;
+    }
+    m_pLoadedTables.reset();
     m_bPrepared = TRUE;
     return TRUE;
 }
@@ -622,108 +662,219 @@ void CLens::FindPupil( int nRing, SPupil &oPupil ) const
     }
 }
 
-struct CLens::SPupilTable
-{
-    SPupil                                  aoRings[ PUPIL_RINGS ];
-    std::atomic<bool>                       abDone[ PUPIL_RINGS ];
-    IASLib::CMutex                          amutexRings[ PUPIL_RINGS ];
 
-        // The share of rays that get through, at each ring's inner edge
-        // (and the last ring's outer edge), for each channel.
-    FLT                                     anPass[ 4 ][ PUPIL_RINGS + 1 ];
-    std::atomic<bool>                       abPassDone[ 4 ][ PUPIL_RINGS + 1 ];
-    IASLib::CMutex                          amutexPass[ 4 ][ PUPIL_RINGS + 1 ];
 
-    SPupilTable( void )
-    {
-        for ( int nRing = 0; nRing < PUPIL_RINGS; nRing++ )
-            abDone[ nRing ] = false;
-        for ( int nChannel = 0; nChannel < 4; nChannel++ )
-        {
-            for ( int nKnot = 0; nKnot <= PUPIL_RINGS; nKnot++ )
-                abPassDone[ nChannel ][ nKnot ] = false;
-        }
-    }
-};
+
+
 
 namespace
 {
-        // What a lens's exit pupil depends on, as bytes.
-    std::string PupilKey( const std::vector<CLens::SSurface> &aoSurfaces, const std::vector<FLT> &anVertexZ, FLT nStopRadius,
-                          FLT nSensorZ, FLT nSensorWidth, BOOL bChromatic )
+    void PutBigEndian( std::vector<unsigned char> &anOut, double dValue )
     {
-        std::string strKey;
-        auto        Add = [ &strKey ]( FLT nValue ) { strKey.append( (const char *)&nValue, sizeof( nValue ) ); };
+        uint64_t nBits;
 
-        for ( size_t nIndex = 0; nIndex < aoSurfaces.size(); nIndex++ )
-        {
-            Add( aoSurfaces[ nIndex ].nRadius );
-            Add( aoSurfaces[ nIndex ].nThickness );
-            Add( aoSurfaces[ nIndex ].nIor );
-            Add( aoSurfaces[ nIndex ].nAperture );
-            Add( aoSurfaces[ nIndex ].bStop ? 1.0 : 0.0 );
-            Add( aoSurfaces[ nIndex ].nAbbe );
-        }
-        for ( size_t nIndex = 0; nIndex < anVertexZ.size(); nIndex++ )
-            Add( anVertexZ[ nIndex ] );
-        Add( nStopRadius );
-        Add( nSensorZ );
-        Add( nSensorWidth );
-        Add( bChromatic ? 1.0 : 0.0 );
-        return strKey;
+        memcpy( &nBits, &dValue, sizeof( nBits ) );
+        for ( int nByte = 7; nByte >= 0; nByte-- )
+            anOut.push_back( (unsigned char)( nBits >> ( nByte * 8 ) ) );
     }
+
+    double GetBigEndian( const std::vector<unsigned char> &anIn, size_t nAt )
+    {
+        uint64_t nBits = 0;
+        double   dValue;
+
+        for ( int nByte = 0; nByte < 8; nByte++ )
+            nBits = ( nBits << 8 ) | anIn[ nAt + (size_t)nByte ];
+        memcpy( &dValue, &nBits, sizeof( dValue ) );
+        return dValue;
+    }
+
+        // The tables as bytes: each ring's center, half widths and whether it
+        // is open; then, for each channel, how many shares and the shares.
+        // Doubles, big-endian, so they read back exactly anywhere.
+    std::vector<unsigned char> TablesToBytes( const std::vector<CLens::SPupil> &aoRings, const std::vector<FLT> *aanPass )
+    {
+        std::vector<unsigned char> anOut;
+
+        PutBigEndian( anOut, (double)aoRings.size() );
+        for ( size_t nRing = 0; nRing < aoRings.size(); nRing++ )
+        {
+            PutBigEndian( anOut, (double)aoRings[ nRing ].nCenterX );
+            PutBigEndian( anOut, (double)aoRings[ nRing ].nCenterY );
+            PutBigEndian( anOut, (double)aoRings[ nRing ].nHalfX );
+            PutBigEndian( anOut, (double)aoRings[ nRing ].nHalfY );
+            PutBigEndian( anOut, aoRings[ nRing ].bOpen ? 1.0 : 0.0 );
+        }
+        for ( int nChannel = 0; nChannel < 4; nChannel++ )
+        {
+            PutBigEndian( anOut, (double)aanPass[ nChannel ].size() );
+            for ( size_t nKnot = 0; nKnot < aanPass[ nChannel ].size(); nKnot++ )
+                PutBigEndian( anOut, (double)aanPass[ nChannel ][ nKnot ] );
+        }
+        return anOut;
+    }
+
+    bool BytesToTables( const std::vector<unsigned char> &anIn, std::vector<CLens::SPupil> &aoRings, std::vector<FLT> *aanPass )
+    {
+        size_t nAt = 0;
+
+        auto Next = [ & ]( double &dValue ) -> bool
+        {
+            if ( nAt + 8 > anIn.size() )
+                return false;
+            dValue = GetBigEndian( anIn, nAt );
+            nAt += 8;
+            return true;
+        };
+
+        double dCount;
+
+        if ( ! Next( dCount ) || dCount != PUPIL_RINGS )
+            return false;
+        aoRings.assign( PUPIL_RINGS, CLens::SPupil() );
+        for ( int nRing = 0; nRing < PUPIL_RINGS; nRing++ )
+        {
+            double adValue[ 5 ];
+
+            for ( int nValue = 0; nValue < 5; nValue++ )
+            {
+                if ( ! Next( adValue[ nValue ] ) )
+                    return false;
+            }
+            aoRings[ (size_t)nRing ].nCenterX = (FLT)adValue[ 0 ];
+            aoRings[ (size_t)nRing ].nCenterY = (FLT)adValue[ 1 ];
+            aoRings[ (size_t)nRing ].nHalfX = (FLT)adValue[ 2 ];
+            aoRings[ (size_t)nRing ].nHalfY = (FLT)adValue[ 3 ];
+            aoRings[ (size_t)nRing ].bOpen = ( adValue[ 4 ] != 0.0 ) ? TRUE : FALSE;
+        }
+        for ( int nChannel = 0; nChannel < 4; nChannel++ )
+        {
+            if ( ! Next( dCount ) || ( dCount != 0.0 && dCount != PUPIL_RINGS + 1 ) )
+                return false;
+            aanPass[ nChannel ].assign( (size_t)dCount, 0.0 );
+            for ( size_t nKnot = 0; nKnot < aanPass[ nChannel ].size(); nKnot++ )
+            {
+                double dValue;
+
+                if ( ! Next( dValue ) )
+                    return false;
+                aanPass[ nChannel ][ nKnot ] = (FLT)dValue;
+            }
+        }
+        return nAt == anIn.size();
+    }
+
+        // One of the threads working out the tables: takes jobs (a ring, or
+        // a channel's share at a ring's edge) until there are none left.
+    class CTableWorker : public IASLib::CThread
+    {
+        protected:
+            std::atomic<int>       &m_nNext;
+            int                     m_nJobs;
+            std::function<void( int )> m_fnJob;
+
+        public:
+            CTableWorker( std::atomic<int> &nNext, int nJobs, std::function<void( int )> fnJob ) :
+                IASLib::CThread( "lens tables", true ),
+                m_nNext( nNext ),
+                m_nJobs( nJobs ),
+                m_fnJob( fnJob )
+            {
+                SetNoDelete( true );
+                Resume();
+            }
+
+            virtual void *Run( void )
+            {
+                for ( int nJob = m_nNext++; nJob < m_nJobs; nJob = m_nNext++ )
+                    m_fnJob( nJob );
+                return NULL;
+            }
+    };
 }
 
-std::shared_ptr<CLens::SPupilTable> CLens::SharedPupilTable( const CLens &oLens )
+std::string CLens::TablesKey( void ) const
 {
-    static IASLib::CMutex                                       s_mutex;
-    static std::map<std::string, std::weak_ptr<SPupilTable>>    s_mapTables;
+    std::vector<unsigned char>  anBytes;
+    uint64_t                    nHash = 1469598103934665603ull;     // FNV-1a
+    char                        achKey[ 32 ];
 
-    std::string                     strKey = PupilKey( oLens.m_aoSurfaces, oLens.m_anVertexZ, oLens.m_nStopRadius, oLens.m_nSensorZ,
-                                                       oLens.m_nSensorWidth, oLens.IsChromatic() );
-    IASLib::CMutexLock              oLock( s_mutex );
-    std::shared_ptr<SPupilTable>    pTable = s_mapTables[ strKey ].lock();
-
-    if ( ! pTable )
+    PutBigEndian( anBytes, 2.0 );       // the tables' layout and how they are worked out
+    PutBigEndian( anBytes, (double)PUPIL_RINGS );
+    PutBigEndian( anBytes, (double)PUPIL_GRID );
+    PutBigEndian( anBytes, (double)PUPIL_RADII );
+    PutBigEndian( anBytes, (double)PUPIL_REACH );
+    PutBigEndian( anBytes, (double)EXPOSURE_GRID );
+    for ( size_t nIndex = 0; nIndex < m_aoSurfaces.size(); nIndex++ )
     {
-        pTable = std::make_shared<SPupilTable>();
-        s_mapTables[ strKey ] = pTable;
+        PutBigEndian( anBytes, (double)m_aoSurfaces[ nIndex ].nRadius );
+        PutBigEndian( anBytes, (double)m_aoSurfaces[ nIndex ].nThickness );
+        PutBigEndian( anBytes, (double)m_aoSurfaces[ nIndex ].nIor );
+        PutBigEndian( anBytes, (double)m_aoSurfaces[ nIndex ].nAperture );
+        PutBigEndian( anBytes, m_aoSurfaces[ nIndex ].bStop ? 1.0 : 0.0 );
+        PutBigEndian( anBytes, (double)m_aoSurfaces[ nIndex ].nAbbe );
     }
-    return pTable;
+    PutBigEndian( anBytes, (double)m_nStopRadius );
+    PutBigEndian( anBytes, (double)m_nSensorZ );
+    PutBigEndian( anBytes, (double)m_nSensorWidth );
+    PutBigEndian( anBytes, IsChromatic() ? 1.0 : 0.0 );
+
+    for ( size_t nIndex = 0; nIndex < anBytes.size(); nIndex++ )
+    {
+        nHash ^= anBytes[ nIndex ];
+        nHash *= 1099511628211ull;
+    }
+    snprintf( achKey, sizeof( achKey ), "%016llx", (unsigned long long)nHash );
+    return achKey;
 }
 
-const CLens::SPupil &CLens::PupilFor( int nRing ) const
+void CLens::BuildTables( void )
 {
-    SPupilTable &oTable = *m_pPupil;
+    std::shared_ptr<STables>    pTables = std::make_shared<STables>();
+    std::vector<int>            anChannels;
+    std::atomic<int>            nNext( 0 );
 
-    if ( ! oTable.abDone[ nRing ].load( std::memory_order_acquire ) )
+        // The channels rays are traced in: red, green and blue apart for a
+        // chromatic lens, else all at once.
+    if ( IsChromatic() )
+        anChannels = { CHANNEL_RED, CHANNEL_GREEN, CHANNEL_BLUE };
+    else
+        anChannels = { CHANNEL_ALL };
+
+    pTables->aoRings.assign( PUPIL_RINGS, SPupil() );
+    for ( size_t nIndex = 0; nIndex < anChannels.size(); nIndex++ )
+        pTables->anPass[ anChannels[ nIndex ] ].assign( PUPIL_RINGS + 1, 0.0 );
+
+        // Jobs: every ring, then every channel's share at every ring edge.
+    int  nJobs = PUPIL_RINGS + ( (int)anChannels.size() * ( PUPIL_RINGS + 1 ) );
+    auto Job = [ & ]( int nJob )
     {
-        IASLib::CMutexLock oLock( oTable.amutexRings[ nRing ] );
-
-        if ( ! oTable.abDone[ nRing ].load( std::memory_order_relaxed ) )
+        if ( nJob < PUPIL_RINGS )
+            FindPupil( nJob, pTables->aoRings[ (size_t)nJob ] );
+        else
         {
-            FindPupil( nRing, oTable.aoRings[ nRing ] );
-            oTable.abDone[ nRing ].store( true, std::memory_order_release );
+            int nShare = nJob - PUPIL_RINGS;
+            int nChannel = anChannels[ (size_t)( nShare / ( PUPIL_RINGS + 1 ) ) ];
+            int nKnot = nShare % ( PUPIL_RINGS + 1 );
+
+            pTables->anPass[ nChannel ][ (size_t)nKnot ] = FindPass( nKnot, nChannel );
         }
-    }
-    return oTable.aoRings[ nRing ];
-}
+    };
 
-FLT CLens::PassFor( int nKnot, int nChannel ) const
-{
-    SPupilTable &oTable = *m_pPupil;
+    int nThreads = (int)std::thread::hardware_concurrency();
 
-    if ( ! oTable.abPassDone[ nChannel ][ nKnot ].load( std::memory_order_acquire ) )
+    nThreads = ( nThreads < 1 ) ? 1 : ( nThreads > nJobs ) ? nJobs : nThreads;
+
+    std::vector<CTableWorker *> apWorkers;
+
+    for ( int nThread = 0; nThread < nThreads; nThread++ )
+        apWorkers.push_back( new CTableWorker( nNext, nJobs, Job ) );
+    for ( size_t nThread = 0; nThread < apWorkers.size(); nThread++ )
     {
-        IASLib::CMutexLock oLock( oTable.amutexPass[ nChannel ][ nKnot ] );
-
-        if ( ! oTable.abPassDone[ nChannel ][ nKnot ].load( std::memory_order_relaxed ) )
-        {
-            oTable.anPass[ nChannel ][ nKnot ] = FindPass( nKnot, nChannel );
-            oTable.abPassDone[ nChannel ][ nKnot ].store( true, std::memory_order_release );
-        }
+        apWorkers[ nThread ]->Join();
+        delete apWorkers[ nThread ];
     }
-    return oTable.anPass[ nChannel ][ nKnot ];
+    m_pTables = pTables;
 }
 
 FLT CLens::FindPass( int nKnot, int nChannel ) const
@@ -779,7 +930,7 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
     FLT nFromCenter = SQRT( ( anOrigin[ 0 ] * anOrigin[ 0 ] ) + ( anOrigin[ 1 ] * anOrigin[ 1 ] ) );
     int nRing = ( m_nPupilReach > 0.0 ) ? (int)( ( nFromCenter / m_nPupilReach ) * PUPIL_RINGS ) : PUPIL_RINGS;
 
-    if ( nRing < 0 || nRing >= PUPIL_RINGS || ! m_pPupil )
+    if ( nRing < 0 || nRing >= PUPIL_RINGS || ! m_pTables )
     {
             // Beyond the rings: anywhere on the rear element, by Shirley and
             // Chiu's concentric map from the unit square to the disc, which
@@ -796,7 +947,7 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
             // through; it counts for the share of rays aimed anywhere on the
             // rear element that would have, so the image is exactly as bright
             // (and vignetted) as before, without the noise of blocked rays.
-        const SPupil &oPupil = PupilFor( nRing );
+        const SPupil &oPupil = m_pTables->aoRings[ (size_t)nRing ];
 
         if ( ! oPupil.bOpen )
             return FALSE;
@@ -836,10 +987,14 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
                 {
                         // The share that gets through, between this ring's
                         // edges.
-                    FLT nAcross = ( ( nFromCenter / m_nPupilReach ) * PUPIL_RINGS ) - nRing;
-                    int nSlot = ( nChannel >= CHANNEL_RED && nChannel <= CHANNEL_BLUE ) ? nChannel : CHANNEL_ALL;
+                    FLT                     nAcross = ( ( nFromCenter / m_nPupilReach ) * PUPIL_RINGS ) - nRing;
+                    int                     nSlot = ( nChannel >= CHANNEL_RED && nChannel <= CHANNEL_BLUE ) ? nChannel : CHANNEL_ALL;
+                    const std::vector<FLT> &anPass = m_pTables->anPass[ nSlot ];
 
-                    *pnWeight = ( PassFor( nRing, nSlot ) * ( 1.0 - nAcross ) ) + ( PassFor( nRing + 1, nSlot ) * nAcross );
+                        // A channel that isn't traced (a chromatic lens's
+                        // all-channel ray) has no share: it is only aimed.
+                    *pnWeight = anPass.empty() ? 1.0 :
+                                ( anPass[ (size_t)nRing ] * ( 1.0 - nAcross ) ) + ( anPass[ (size_t)nRing + 1 ] * nAcross );
                 }
                 return TRUE;
             }
@@ -907,12 +1062,22 @@ void CLens::ToJson( IASLib::CObjectNode &oNode ) const
     oNode.put( "seed", m_nSeed );
     if ( ! m_bChromatic )
         RayJson::PutBool( oNode, "chromatic", FALSE );
+    if ( m_pTables )
+    {
+            // The exit pupil tables, exactly, with the fingerprint of the
+            // setup they are for, so tasks and later loads needn't work them
+            // out again.
+        IASLib::CObjectNode *pTables = oNode.putObject( "exitPupil" );
+
+        pTables->put( "key", m_strTablesKey );
+        pTables->putBinary( "data", TablesToBytes( m_pTables->aoRings, m_pTables->anPass ) );
+    }
 }
 
 BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "prescription", "surfaces", "fNumber", "focusDistance", "sensorWidth",
-                                              "millimetersPerUnit", "seed", "chromatic", NULL };
+                                              "millimetersPerUnit", "seed", "chromatic", "exitPupil", NULL };
     static const char *const astrSurface[] = { "radius", "thickness", "ior", "aperture", "stop", "abbe", NULL };
     std::string             strPrescription;
 
@@ -925,6 +1090,27 @@ BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
          ! RayJson::GetInt( oNode, "seed", m_nSeed, 0, 2147483647, FALSE ) ||
          ! RayJson::GetBool( oNode, "chromatic", m_bChromatic, FALSE ) )
         return FALSE;
+
+    const IASLib::CJsonNode *pTables = oNode.get( "exitPupil" );
+
+    m_pLoadedTables.reset();
+    m_strLoadedKey.clear();
+    if ( pTables )
+    {
+        static const char *const astrTables[] = { "key", "data", NULL };
+        RayJson::CWhere          oWhere( "exitPupil" );
+        std::string              strKey;
+        const IASLib::CJsonNode *pData = pTables->isObject() ? pTables->get( "data" ) : NULL;
+        std::vector<unsigned char> anData;
+        std::shared_ptr<STables> pLoaded = std::make_shared<STables>();
+
+        if ( ! RayJson::OnlyFields( *pTables, astrTables ) || ! RayJson::GetString( *pTables, "key", strKey, TRUE ) )
+            return FALSE;
+        if ( pData == NULL || ! pData->binaryValue( anData ) || ! BytesToTables( anData, pLoaded->aoRings, pLoaded->anPass ) )
+            return RayJson::Fail( "data must be the exit pupil tables, in base64" );
+        m_pLoadedTables = pLoaded;
+        m_strLoadedKey = strKey;
+    }
 
     if ( m_nFNumber < 0.0 )
         return RayJson::Fail( "fNumber must be positive" );

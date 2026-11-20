@@ -74,6 +74,7 @@ class CTriangle : public CObjects
         CVector             NormalAt( CVector &oPoint );
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
+        virtual BOOL        GetBounds( CVector &oMinimum, CVector &oMaximum );
             // The corners' surface coordinates blended by barycentric
             // weights; FALSE if the triangle has none.
         virtual BOOL        SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV );

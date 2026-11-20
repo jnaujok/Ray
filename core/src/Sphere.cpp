@@ -240,3 +240,23 @@ BOOL CSphere::SurfaceCoords( CVector &oPoint, FLT &nU, FLT &nV )
     nV = 0.5 + ( ASIN( nY ) / PI );
     return TRUE;
 }
+
+    // A box a little larger than [anLow, anHigh], so hits a hair outside the
+    // exact shape (as some tests allow) are inside it.
+static void PadBounds( FLT anLow[ 3 ], FLT anHigh[ 3 ], CVector &oMinimum, CVector &oMaximum )
+{
+    FLT nMargin = 1e-6 * ( 1.0 + ( anHigh[ 0 ] - anLow[ 0 ] ) + ( anHigh[ 1 ] - anLow[ 1 ] ) + ( anHigh[ 2 ] - anLow[ 2 ] ) );
+
+    oMinimum.Set( anLow[ 0 ] - nMargin, anLow[ 1 ] - nMargin, anLow[ 2 ] - nMargin );
+    oMaximum.Set( anHigh[ 0 ] + nMargin, anHigh[ 1 ] + nMargin, anHigh[ 2 ] + nMargin );
+}
+
+BOOL CSphere::GetBounds( CVector &oMinimum, CVector &oMaximum )
+{
+    FLT nRadius = ABS( m_nRadius );
+    FLT anLow[ 3 ] = { m_oCenter.GetX() - nRadius, m_oCenter.GetY() - nRadius, m_oCenter.GetZ() - nRadius };
+    FLT anHigh[ 3 ] = { m_oCenter.GetX() + nRadius, m_oCenter.GetY() + nRadius, m_oCenter.GetZ() + nRadius };
+
+    PadBounds( anLow, anHigh, oMinimum, oMaximum );
+    return TRUE;
+}

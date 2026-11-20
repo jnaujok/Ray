@@ -18,6 +18,9 @@
 
 #include "RaySettings.h"
 #include "Scene.h"
+
+#include <algorithm>
+#include <cmath>
 #include "Globals.h"
 #include "SceneJson.h"
 
@@ -60,7 +63,9 @@ static char THIS_FILE[] = __FILE__;
 #define JSON_FORMAT     "Ray scene"
 #define JSON_VERSION    3
 
-CScene::CScene( void )
+CScene::CScene( void ) :
+    m_bTreeBuilt( FALSE ),
+    m_pLastOccluder( NULL )
 {
     m_oObjects.RemoveAll();
     m_oLights.RemoveAll();
@@ -137,6 +142,7 @@ void CScene::AddLight( CLight *pLight )
 void CScene::AddObject( CObjects *pObject )
 {
     m_oObjects.Add( pObject );
+    ForgetTree();
 #ifdef RAY_GUI
     if ( m_hObjects )
         pObject->ToTree( m_poSceneTree, m_hObjects );
@@ -258,20 +264,283 @@ BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
 
 BOOL CScene::Intersect( CRay &oRay, CObjects *pIgnore )
 {
-    int         nObject;
-    CObjects   *pObject;
-    CVector     oIntersect;
+    if ( ! m_bTreeBuilt )
+        BuildTree();
 
-    nObject = 0;
-    while ( nObject < m_oObjects.GetSize() )
+        // Any hit will do. What blocked the last shadow ray is the likeliest
+        // to block this one (the next point along, toward the same light).
+    if ( m_pLastOccluder && m_pLastOccluder->Occludes( oRay, pIgnore ) )
+        return TRUE;
+
+    for ( size_t nIndex = 0; nIndex < m_anUnbounded.size(); nIndex++ )
     {
-        pObject = m_oObjects[ nObject ];
+        CObjects *pObject = m_oObjects[ m_anUnbounded[ nIndex ] ];
 
-        if ( pObject->Intersect( oRay, oIntersect, pIgnore ) )
+        if ( pObject != m_pLastOccluder && pObject->Occludes( oRay, pIgnore ) )
+        {
+            m_pLastOccluder = pObject;
             return TRUE;
-        nObject++;
+        }
+    }
+
+    if ( m_aoTree.empty() )
+        return FALSE;
+
+    FLT anOrigin[ 3 ] = { oRay.GetX(), oRay.GetY(), oRay.GetZ() };
+    FLT anDirection[ 3 ] = { oRay.GetI(), oRay.GetJ(), oRay.GetK() };
+    FLT nLimit = oRay.GetT();
+    int anStack[ 128 ];
+    int nStack = 0;
+
+    anStack[ nStack++ ] = 0;
+    while ( nStack > 0 )
+    {
+        const STreeNode &oNode = m_aoTree[ (size_t)anStack[ --nStack ] ];
+
+        if ( ! RayHitsBox( oNode.anMin, oNode.anMax, anOrigin, anDirection, nLimit ) )
+            continue;
+        if ( oNode.nCount == 0 )
+        {
+            anStack[ nStack++ ] = oNode.nRight;
+            anStack[ nStack++ ] = oNode.nLeft;
+            continue;
+        }
+        for ( int nIndex = oNode.nFirst; nIndex < oNode.nFirst + oNode.nCount; nIndex++ )
+        {
+            CObjects *pObject = m_oObjects[ m_anTreeObjects[ (size_t)nIndex ] ];
+
+            if ( pObject != m_pLastOccluder && pObject->Occludes( oRay, pIgnore ) )
+            {
+                m_pLastOccluder = pObject;
+                return TRUE;
+            }
+        }
     }
     return FALSE;
+}
+
+CObjects *CScene::ClosestHit( CRay &oRay, CVector &oIntersect, CObjects *pDeny )
+{
+    if ( ! m_bTreeBuilt )
+        BuildTree();
+
+        // The closest hit, and of objects hit at exactly the same distance
+        // the first in the scene, which is what testing every object in
+        // order finds. Each object is tested against a copy of the ray
+        // limited to just past the closest hit so far, so a tie still shows.
+    FLT     nBest = oRay.GetT();
+    int     nWinner = -1;
+    auto    Try = [ & ]( int nObject )
+    {
+        CRay    oTry( oRay );
+        CVector oHit;
+
+        if ( nWinner >= 0 )
+            oTry.SetT( std::nextafter( nBest, nBest * 2.0 + 1.0 ) );
+        if ( m_oObjects[ nObject ]->Intersect( oTry, oHit, pDeny ) )
+        {
+            FLT nT = oTry.GetT();
+
+            if ( nWinner < 0 || nT < nBest || ( nT == nBest && nObject < nWinner ) )
+            {
+                nBest = nT;
+                nWinner = nObject;
+                oIntersect = oHit;
+            }
+        }
+    };
+
+    for ( size_t nIndex = 0; nIndex < m_anUnbounded.size(); nIndex++ )
+        Try( m_anUnbounded[ nIndex ] );
+
+    if ( ! m_aoTree.empty() )
+    {
+        FLT anOrigin[ 3 ] = { oRay.GetX(), oRay.GetY(), oRay.GetZ() };
+        FLT anDirection[ 3 ] = { oRay.GetI(), oRay.GetJ(), oRay.GetK() };
+        int anStack[ 128 ];
+        int nStack = 0;
+
+        anStack[ nStack++ ] = 0;
+        while ( nStack > 0 )
+        {
+            const STreeNode &oNode = m_aoTree[ (size_t)anStack[ --nStack ] ];
+
+            if ( ! RayHitsBox( oNode.anMin, oNode.anMax, anOrigin, anDirection, nBest ) )
+                continue;
+            if ( oNode.nCount == 0 )
+            {
+                anStack[ nStack++ ] = oNode.nRight;
+                anStack[ nStack++ ] = oNode.nLeft;
+                continue;
+            }
+            for ( int nIndex = oNode.nFirst; nIndex < oNode.nFirst + oNode.nCount; nIndex++ )
+                Try( m_anTreeObjects[ (size_t)nIndex ] );
+        }
+    }
+
+    if ( nWinner < 0 )
+        return NULL;
+    oRay.SetT( nBest );
+    return m_oObjects[ nWinner ];
+}
+
+CObjects *CScene::ClosestHitByEachObject( CRay &oRay, CVector &oIntersect, CObjects *pDeny )
+{
+    CObjects *pIntersection = NULL;
+
+    for ( int nObject = 0; nObject < m_oObjects.GetSize(); nObject++ )
+    {
+        if ( m_oObjects[ nObject ]->Intersect( oRay, oIntersect, pDeny ) )
+            pIntersection = m_oObjects[ nObject ];
+    }
+    return pIntersection;
+}
+
+BOOL CScene::IntersectEachObject( CRay &oRay, CObjects *pIgnore )
+{
+    CVector oIntersect;
+
+    for ( int nObject = 0; nObject < m_oObjects.GetSize(); nObject++ )
+    {
+        if ( m_oObjects[ nObject ]->Intersect( oRay, oIntersect, pIgnore ) )
+            return TRUE;
+    }
+    return FALSE;
+}
+
+void CScene::ForgetTree( void )
+{
+    m_aoTree.clear();
+    m_anTreeObjects.clear();
+    m_anUnbounded.clear();
+    m_anObjectBounds.clear();
+    m_bTreeBuilt = FALSE;
+    m_pLastOccluder = NULL;
+}
+
+BOOL CScene::RayHitsBox( const FLT anMin[ 3 ], const FLT anMax[ 3 ], const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit )
+{
+    FLT nNear = 0.0;
+    FLT nFar = nLimit;
+
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        if ( anDirection[ nAxis ] == 0.0 )
+        {
+            if ( anOrigin[ nAxis ] < anMin[ nAxis ] || anOrigin[ nAxis ] > anMax[ nAxis ] )
+                return FALSE;
+            continue;
+        }
+
+        FLT nT1 = ( anMin[ nAxis ] - anOrigin[ nAxis ] ) / anDirection[ nAxis ];
+        FLT nT2 = ( anMax[ nAxis ] - anOrigin[ nAxis ] ) / anDirection[ nAxis ];
+
+        if ( nT1 > nT2 )
+        {
+            FLT nSwap = nT1;
+
+            nT1 = nT2;
+            nT2 = nSwap;
+        }
+        if ( nT1 > nNear )
+            nNear = nT1;
+        if ( nT2 < nFar )
+            nFar = nT2;
+        if ( nNear > nFar )
+            return FALSE;
+    }
+    return TRUE;
+}
+
+void CScene::BuildTree( void )
+{
+    ForgetTree();
+    m_anObjectBounds.assign( (size_t)m_oObjects.GetSize() * 6, 0.0 );
+    for ( int nObject = 0; nObject < m_oObjects.GetSize(); nObject++ )
+    {
+        CVector oMinimum, oMaximum;
+
+        if ( m_oObjects[ nObject ]->GetBounds( oMinimum, oMaximum ) )
+        {
+            FLT *pnBounds = &m_anObjectBounds[ (size_t)nObject * 6 ];
+
+            pnBounds[ 0 ] = oMinimum.GetX();
+            pnBounds[ 1 ] = oMinimum.GetY();
+            pnBounds[ 2 ] = oMinimum.GetZ();
+            pnBounds[ 3 ] = oMaximum.GetX();
+            pnBounds[ 4 ] = oMaximum.GetY();
+            pnBounds[ 5 ] = oMaximum.GetZ();
+            m_anTreeObjects.push_back( nObject );
+        }
+        else
+            m_anUnbounded.push_back( nObject );
+    }
+    if ( ! m_anTreeObjects.empty() )
+        BuildTreeNode( 0, (int)m_anTreeObjects.size() );
+    m_bTreeBuilt = TRUE;
+}
+
+int CScene::BuildTreeNode( int nFirst, int nCount )
+{
+    int         nNode = (int)m_aoTree.size();
+    STreeNode   oNode;
+    FLT         anLow[ 3 ] = { 1e300, 1e300, 1e300 };       // the objects' centers' extent
+    FLT         anHigh[ 3 ] = { -1e300, -1e300, -1e300 };
+
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        oNode.anMin[ nAxis ] = 1e300;
+        oNode.anMax[ nAxis ] = -1e300;
+    }
+    for ( int nIndex = nFirst; nIndex < nFirst + nCount; nIndex++ )
+    {
+        const FLT *pnBounds = &m_anObjectBounds[ (size_t)m_anTreeObjects[ (size_t)nIndex ] * 6 ];
+
+        for ( int nAxis = 0; nAxis < 3; nAxis++ )
+        {
+            FLT nCenter = ( pnBounds[ nAxis ] + pnBounds[ nAxis + 3 ] ) / 2.0;
+
+            oNode.anMin[ nAxis ] = ( pnBounds[ nAxis ] < oNode.anMin[ nAxis ] ) ? pnBounds[ nAxis ] : oNode.anMin[ nAxis ];
+            oNode.anMax[ nAxis ] = ( pnBounds[ nAxis + 3 ] > oNode.anMax[ nAxis ] ) ? pnBounds[ nAxis + 3 ] : oNode.anMax[ nAxis ];
+            anLow[ nAxis ] = ( nCenter < anLow[ nAxis ] ) ? nCenter : anLow[ nAxis ];
+            anHigh[ nAxis ] = ( nCenter > anHigh[ nAxis ] ) ? nCenter : anHigh[ nAxis ];
+        }
+    }
+    oNode.nFirst = nFirst;
+    oNode.nCount = nCount;
+    oNode.nLeft = oNode.nRight = -1;
+    m_aoTree.push_back( oNode );
+    if ( nCount <= 2 )
+        return nNode;
+
+        // Split at the median center along the axis the centers spread
+        // furthest on.
+    int nSplitAxis = 0;
+
+    for ( int nAxis = 1; nAxis < 3; nAxis++ )
+    {
+        if ( anHigh[ nAxis ] - anLow[ nAxis ] > anHigh[ nSplitAxis ] - anLow[ nSplitAxis ] )
+            nSplitAxis = nAxis;
+    }
+
+    int nHalf = nCount / 2;
+
+    std::nth_element( m_anTreeObjects.begin() + nFirst, m_anTreeObjects.begin() + nFirst + nHalf,
+                      m_anTreeObjects.begin() + nFirst + nCount, [ & ]( int nA, int nB )
+                      {
+                          FLT nCenterA = m_anObjectBounds[ (size_t)nA * 6 + nSplitAxis ] + m_anObjectBounds[ (size_t)nA * 6 + nSplitAxis + 3 ];
+                          FLT nCenterB = m_anObjectBounds[ (size_t)nB * 6 + nSplitAxis ] + m_anObjectBounds[ (size_t)nB * 6 + nSplitAxis + 3 ];
+
+                          return ( nCenterA != nCenterB ) ? ( nCenterA < nCenterB ) : ( nA < nB );
+                      } );
+
+    int nLeft = BuildTreeNode( nFirst, nHalf );
+    int nRight = BuildTreeNode( nFirst + nHalf, nCount - nHalf );
+
+    m_aoTree[ (size_t)nNode ].nLeft = nLeft;
+    m_aoTree[ (size_t)nNode ].nRight = nRight;
+    m_aoTree[ (size_t)nNode ].nCount = 0;
+    return nNode;
 }
 
 
@@ -299,16 +568,9 @@ BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny )
         return TRUE;
     }
 
-    nCount = 0;
-    pIntersection = NULL;
-
-    while ( nCount < m_oObjects.GetSize() )
-    {
-        pObject = m_oObjects[ nCount ];
-        if ( pObject->Intersect( oRay, oIntersect, pDeny ) )
-            pIntersection = pObject;
-        nCount++;
-    }
+    (void)nCount;
+    (void)pObject;
+    pIntersection = ClosestHit( oRay, oIntersect, pDeny );
 
     if ( pIntersection )
     {
@@ -677,6 +939,7 @@ DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
 
     m_oObjects.RemoveAll();
     m_oLights.RemoveAll();
+    ForgetTree();
     m_oSettings = oSettings;
     m_oCamera = oCamera;
     m_oBackgroundColor = oBackground;

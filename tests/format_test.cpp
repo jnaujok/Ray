@@ -12,6 +12,8 @@
 #include "Sphere.h"
 #include "ImageExport.h"
 #include "HdrColorModel.h"
+#include "Lens.h"
+#include "AdaptiveSampler.h"
 #include "ImageFile.h"
 #include "ThreadTaskMaster.h"
 #include "SocketTaskMaster.h"
@@ -865,6 +867,111 @@ static void EngineChecks( const char *strScenes, const char *strDir )
     remove( strEngines.c_str() );
 }
 
+    // The scene's tree must find exactly what testing every object does:
+    // rays through the torture test from all around, and shadow rays.
+static void SceneTreeChecks( const char *strScenes )
+{
+    CScene      oScene;
+    unsigned    nSeed = 4242;
+    int         nHits = 0, nDiffer = 0, nShadowDiffer = 0, nShadowed = 0;
+
+    Check( oScene.Load( ( std::string( strScenes ) + "/torture_test.ray" ).c_str() ) == 0, "the torture test loads" );
+
+    for ( int nRay = 0; nRay < 3000; nRay++ )
+    {
+        double adValue[ 6 ];
+
+        for ( int nIndex = 0; nIndex < 6; nIndex++ )
+        {
+            nSeed = ( nSeed * 1103515245u ) + 12345u;
+            adValue[ nIndex ] = ( ( nSeed >> 8 ) & 0xFFFF ) / 65535.0;
+        }
+
+        CVector oFrom( ( adValue[ 0 ] * 24.0 ) - 12.0, adValue[ 1 ] * 8.0, ( adValue[ 2 ] * 24.0 ) - 12.0 );
+        CVector oTo( ( adValue[ 3 ] * 14.0 ) - 7.0, adValue[ 4 ] * 4.0, ( adValue[ 5 ] * 14.0 ) - 6.0 );
+        CVector oDirection = oTo - oFrom;
+        CRay    oTree, oEach;
+        CVector oTreeHit, oEachHit;
+
+        oDirection.Normalize();
+        oTree.Set( oFrom.GetX(), oFrom.GetY(), oFrom.GetZ(), oDirection.GetX(), oDirection.GetY(), oDirection.GetZ(), 1e100, 1.0, 0, 0 );
+        oEach = oTree;
+
+        CObjects *pTree = oScene.ClosestHit( oTree, oTreeHit, NULL );
+        CObjects *pEach = oScene.ClosestHitByEachObject( oEach, oEachHit, NULL );
+
+        if ( pTree )
+            nHits++;
+        if ( pTree != pEach || oTree.GetT() != oEach.GetT() || oTreeHit.GetX() != oEachHit.GetX() ||
+             oTreeHit.GetY() != oEachHit.GetY() || oTreeHit.GetZ() != oEachHit.GetZ() )
+            nDiffer++;
+
+            // A shadow ray from the hit toward a light, ignoring the object.
+        if ( pEach )
+        {
+            CVector oLight( 0.0, 9.0, 3.0 );
+            CVector oToLight = oLight - oEachHit;
+            CRay    oShadowTree, oShadowEach;
+
+            oShadowTree.CreateRay( oToLight, oEachHit, 1.0, -1, -1 );
+            oShadowEach = oShadowTree;
+
+            BOOL bTree = oScene.Intersect( oShadowTree, pEach );
+            BOOL bEach = oScene.IntersectEachObject( oShadowEach, pEach );
+
+            nShadowed += bEach ? 1 : 0;
+            nShadowDiffer += ( bTree != bEach ) ? 1 : 0;
+        }
+    }
+    Check( nHits > 1000 && nShadowed > 50, "many rays through the torture test hit something, and some are shadowed" );
+    Check( nDiffer == 0, "the scene's tree finds exactly the closest hit testing every object finds" );
+    Check( nShadowDiffer == 0, "the scene's tree finds exactly the shadows testing every object finds" );
+}
+
+    // A lens's exit pupil tables go into the scene and come back exactly;
+    // tables for another setup are worked out again.
+static void LensTableChecks( const char *strScenes )
+{
+    CScene oScene;
+
+    Check( oScene.Load( ( std::string( strScenes ) + "/lens_test.ray" ).c_str() ) == 0, "lens_test loads" );
+
+    std::string strJson = oScene.ToJson( TRUE );
+
+    Check( strJson.find( "\"exitPupil\"" ) != std::string::npos, "the scene carries the lens's exit pupil tables" );
+
+    CScene oAgain;
+
+    Check( oAgain.FromJson( strJson ) == 0 && oAgain.ToJson( TRUE ) == strJson, "the tables come back exactly" );
+
+        // The tables can't be cut short.
+    std::string strReadable = oScene.ToJson();
+    size_t nAt = strReadable.find( "\"data\": \"" );
+    std::string strDamaged = strReadable;
+
+    if ( nAt != std::string::npos )
+        strDamaged.replace( nAt + 9, 8, "" );
+    ExpectError( strDamaged, BAD_FILE, "data must be the exit pupil tables, in base64" );
+
+        // Refocused, the lens works out tables of its own.
+    size_t      nFocus = strReadable.find( "\"focusDistance\": " );
+    std::string strMoved = strReadable;
+
+    if ( nFocus != std::string::npos )
+        strMoved.insert( nFocus + 17, "1" );
+    CScene oMoved;
+    Check( oMoved.FromJson( strMoved ) == 0, "a refocused lens_test loads" );
+
+    std::string strMovedJson = oMoved.ToJson();
+    size_t      nKeyA = strReadable.find( "\"key\": \"" ), nKeyB = strMovedJson.find( "\"key\": \"" );
+
+    Check( nKeyA != std::string::npos && nKeyB != std::string::npos &&
+           strReadable.substr( nKeyA, 26 ) != strMovedJson.substr( nKeyB, 26 ), "a refocused lens's tables are worked out again" );
+
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"sampler\": { \"type\": \"adaptive\", \"min\": 16, \"max\": 8 }" ),
+                 BAD_FILE, "max can't be less than min" );
+}
+
 static void RoundTrip( const char *strScene, const char *strDir )
 {
     std::string strBase = std::string( strDir ) + "/roundtrip_";
@@ -933,6 +1040,8 @@ int main( int argc, char **argv )
         TextureChecks( argv[ 2 ] );
         ArchiveChecks( argv[ 2 ], argv[ 3 ] );
         MeshTreeChecks( argv[ 2 ] );
+        SceneTreeChecks( argv[ 2 ] );
+        LensTableChecks( argv[ 2 ] );
     }
     else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );

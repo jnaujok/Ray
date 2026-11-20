@@ -137,7 +137,7 @@ BOOL CCamera::PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, 
 {
     if ( pnWeight )
         *pnWeight = 1.0;
-    if ( ! m_pLens )
+    if ( ! m_pLens || m_bAimOnly )
     {
         oOrigin = m_oPosition;
         oDirection = RayDirection( nScreenX, nScreenY, nAspect );

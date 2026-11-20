@@ -64,6 +64,14 @@ class CObjects
             // skips only the part pIgnore names, so it can shadow itself.
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore )
                             { return ( pIgnore == this ) ? FALSE : Intersect( oRay, oIntersect ); }
+            // Whether the ray hits the object at all before its t (for
+            // shadows), ignoring pIgnore as Intersect does. Any hit will do,
+            // so an object made of parts can stop at the first.
+        virtual BOOL        Occludes( CRay &oRay, CObjects *pIgnore )
+                            { CVector oIntersect; return Intersect( oRay, oIntersect, pIgnore ); }
+            // The object's bounding box, for the scene's tree. FALSE if it
+            // has none (an infinite plane).
+        virtual BOOL        GetBounds( CVector &oMinimum, CVector &oMaximum ) { (void)oMinimum; (void)oMaximum; return FALSE; }
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
 #ifdef RAY_GUI

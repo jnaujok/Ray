@@ -67,7 +67,7 @@ places.
 | `imageFile` | `"ray.out"` | Where `raythrower` writes the image, unless given `-o` |
 | `colorDepth` | `8` | Bits per channel (kept from 1997; images are always 8-bit) |
 | `maximumDepth` | `16` | How many levels deep a ray may be traced: the ray from the camera is level 1, and each reflection or refraction one more, so 16 allows 15 bounces |
-| `depthThreshold` | `0.01` | A ray whose influence on its pixel falls below this is not traced further. (Reflected and refracted rays keep their parent's influence, so in practice `maximumDepth` is what stops them.) |
+| `depthThreshold` | `0.01` | A ray whose influence on its pixel falls below this is not traced further. A reflected or refracted ray carries its parent's influence times its material's share, so rays off a weakly reflective surface stop after a few bounces; between strong mirrors `maximumDepth` stops them |
 | `reserved1997` | | Settings the 1997 code defined but never implemented (anti-aliasing, caustics, focal blur, haze, and so on), kept so nothing is lost. Only the ones that differ from their defaults are written. The tracer ignores them. |
 
 **`camera`**
@@ -79,13 +79,17 @@ places.
 | `up` | `[0, 1, 0]` | Which way is up; the image's top edge faces this way |
 | `verticalAngle` | `30` | Vertical field of view in degrees. The horizontal one follows from the image's shape, so pixels are square. |
 | `horizontalAngle`, `aspectRatio` | `40`, `1.333…` | Kept from 1997; not used for rendering |
-| `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half), or `"stratified"` (an n×n grid of equally weighted rays, each at a random point in its cell) |
+| `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half), `"stratified"` (an n×n grid of equally weighted rays, each at a random point in its cell), or `"adaptive"` (more rays only where a pixel's rays disagree) |
 | `lens` | none | A real lens, below; without one the camera is a pinhole |
 | `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, `"reinhard"`, or `"hdr"` |
 
 A sampler or color model is a name, or an object with a `type` and its settings:
 `{ "type": "random", "samples": 9, "seed": 0 }` (N from 1 to 1024, default 4; the same seed always
-gives the same image), `{ "type": "stratified", "grid": 5 }` (n from 1 to 32, default 4), `{ "type": "gamma", "gamma": 2.2 }`, or
+gives the same image), `{ "type": "stratified", "grid": 5 }` (n from 1 to 32, default 4),
+`{ "type": "adaptive", "min": 9, "max": 64, "threshold": 0.01 }` (each pixel gets at least `min`
+rays, then more until the standard error of its brightness, on the scale where 1 is white, is under
+`threshold`, or it has `max`; rays follow a low-discrepancy sequence, reproducible like the others),
+`{ "type": "gamma", "gamma": 2.2 }`, or
 `{ "type": "reinhard", "exposure": 1, "white": 4 }`
 (`exposure` scales the colors first; with a `white` luminance, that and anything brighter maps to
 white), or `{ "type": "hdr", "exposure": 1 }` (high dynamic range: the colors scaled by
@@ -118,6 +122,7 @@ tracing.
 | `millimetersPerUnit` | `1000` | How big a scene unit is (1000: scene units are meters) |
 | `seed` | `0` | Picks the points rays cross the lens at |
 | `chromatic` | `true` | Trace red, green and blue apart where the glasses have Abbe numbers; `false` traces every channel at the d line, a third of the work |
+| `exitPupil` | | Written by Ray: the lens's exit pupil tables (base64) and a `key`, a fingerprint of the setup they are for. Tasks and later loads use them instead of working them out; if the lens, focus, aperture or sensor changes, the key no longer matches and they are worked out again, so it can be left alone or deleted |
 
 Each surface: `radius` of curvature in mm (positive when its center of curvature is toward the
 sensor; `0` for flat), `thickness` to the next surface in mm (the last one's is ignored: focusing
