@@ -144,6 +144,3 @@ ctest --test-dir build --output-on-failure
 
 - The MFC application can only be built on Windows; on Linux and macOS only the core and the
   command-line programs build.
-- Every thread's copy of a scene builds its own mesh faces (about 460 bytes a triangle), so a large
-  model costs memory once per thread: 3DBenchy's 225,706 triangles take about 4.5 GB at 16 threads.
-  The model file itself is read once and shared.

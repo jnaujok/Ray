@@ -19,10 +19,10 @@ when the binary format was dropped; they are in the repository's history.
 | `xxx.ray` | version 1 | Read with the legacy number format |
 | `huh.ray` | transitional | Version-2 header with legacy numbers; renders blank |
 | `lens_test.ray` | | `scan_test` through a real lens: the built-in double Gauss wide open (f/2), focused on the glass sphere, with 1 scene unit = 10 cm and a 5×5 stratified sampler |
-| `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration, plus the softness of one simple lens |
+| `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced in red, green and blue), each sample clamped at 1.5 |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5 |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
@@ -31,7 +31,7 @@ when the binary format was dropped; they are in the repository's history.
 | `csg_test.ray` | | Constructive solid geometry: a glass lens blank (two balls' intersection), a bowl (a ball with a smaller one and a turned box taken out, blue outside, white inside and clay at the cut rim, by `childMaterials`), a die (a rounded cube, itself the intersection of a cube and a ball, with six pips drilled in and painted black) and a hammered gold capsule (a cylinder and two balls, with a bump map), with a 3×3 stratified sampler |
 | `models_test.ray` | | Model files: a puzzle cube from a VisCAM-colored STL, a gem from a Magics-colored STL (four faces with their own colors, four with the model's), both shown by the `faceColors` texture, and a ring from an OBJ file of quads with texture coordinates and normals, wearing an image texture, each placed by `fitSize` or `scale`, `rotation`, `align` and `translation`, with a 2×2 stratified sampler |
 | `benchy_test.ray` | | 3DBenchy (`models/3DBenchy.stl`, 225,706 triangles) printed in orange plastic, close up on its bow, its 0.1 mm layer lines a `layers` texture for both its color and its bump map, with a 3×3 stratified sampler |
-| `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they split into red, green and blue, with a 2×2 stratified sampler |
+| `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
 
@@ -92,6 +92,7 @@ places.
 | `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half), `"stratified"` (an n×n grid of equally weighted rays, each at a random point in its cell), or `"adaptive"` (more rays only where a pixel's rays disagree) |
 | `lens` | none | A real lens, below; without one the camera is a pinhole |
 | `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, `"reinhard"`, or `"hdr"` |
+| `dispersion` | `"rgb"` | How white light splits where it disperses (glass with an `abbe` number, a chromatic lens): `"rgb"`, into red, green and blue rays, or `"spectral"`, into four single wavelengths weighed by the CIE color matching functions, which smear into a continuous rainbow over a pixel's samples (see Dispersion, below). Scenes without dispersion render the same either way |
 | `clamp` | `0` (off) | The brightest any one sample's red, green or blue may be before the sampler averages it in. A rare ray that finds a light through rough glass, off a rough mirror or from an area light can be far brighter than its pixel's other rays and show as a lone bright speck (a "firefly"); a clamp of 1.5 to 2 removes them, at the cost of a little of the brightest highlights. Can't be negative |
 
 A sampler or color model is a name, or an object with a `type` and its settings:
@@ -276,6 +277,17 @@ traces three times as many rays from there on. Ray traces from the eye, so a pri
 seen through it (edges fringe with color) but casts no rainbow on the floor: light reaching a
 surface through glass is not traced.
 
+With the camera's `"dispersion": "spectral"` a split makes four single wavelengths instead, one
+from each quarter of 380 to 720 nm, picked from where the ray's sample falls in its pixel so a
+pixel's samples spread evenly over the range. Each is bent by the Cauchy index at its own
+wavelength, and what it sees is weighed by how that wavelength looks (the CIE 1931 color matching
+functions, as linear sRGB, scaled so an even spread of wavelengths adds up to white). Over a
+pixel the colors smear into a continuous rainbow, with the yellows and cyans three bars can't
+show. A chromatic lens is traced the same way (four wavelengths a sample). It costs a third more
+rays than red, green and blue, and the smear is a little grainier, so it wants a sampler with many rays a
+pixel; the purest spectral colors are outside sRGB, so they come out a little dimmer. Scenes
+without dispersive glass or a chromatic lens render exactly the same either way.
+
 **Textures.** Any material can have a `texture` that gives its color at each point instead of its
 `color`. A texture is an object with a `type`:
 
@@ -418,7 +430,7 @@ same image, and networked engines give exactly the same as threads.
   fields that older readers would refuse but that change nothing when left out, such as an
   object's `bump` (2026-alpha-0.8), and the `environment` and the `spot` and `directional` lights
   (2026-alpha-0.9), and `csg` objects, a transparent material's `abbe` and the camera's `clamp`
-  (2026-alpha-0.10).
+  (2026-alpha-0.10), and the camera's `dispersion` (2026-alpha-0.11.1).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

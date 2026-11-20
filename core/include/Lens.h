@@ -94,8 +94,21 @@ class CLens
         };
 
             // The channel a ray is traced in: every channel at the d line, or
-            // one of red, green and blue at its own wavelength.
-        enum EChannel { CHANNEL_ALL = 0, CHANNEL_RED = 1, CHANNEL_GREEN = 2, CHANNEL_BLUE = 3 };
+            // one of red, green and blue at its own wavelength, or (with
+            // spectral dispersion) a single wavelength: CHANNEL_SPECTRAL plus
+            // the wavelength in hundredths of a nanometer.
+        enum EChannel { CHANNEL_ALL = 0, CHANNEL_RED = 1, CHANNEL_GREEN = 2, CHANNEL_BLUE = 3, CHANNEL_SPECTRAL = 0x10000 };
+
+            /// The channel for a single wavelength, in nanometers.
+        static int              WavelengthChannel( FLT nNanometers );
+            /// Whether a channel is a single wavelength.
+        static BOOL             IsSpectral( int nChannel ) { return ( nChannel >= CHANNEL_SPECTRAL ) ? TRUE : FALSE; }
+            /// A single-wavelength channel's wavelength, in nanometers.
+        static FLT              ChannelWavelength( int nChannel ) { return ( nChannel - CHANNEL_SPECTRAL ) / 100.0; }
+            /// The index at a wavelength (in micrometers) of a glass with
+            /// index nIor at the d line and Abbe number nAbbe, from the Cauchy
+            /// curve through both.
+        static FLT              IndexAt( FLT nIor, FLT nAbbe, FLT nMicrometers );
 
             // One entry of the table of lenses that can be named in a scene.
         struct SPrescription
@@ -212,8 +225,8 @@ class CLens
             /// The index, in a channel, of a glass with index nIor at the d
             /// line and Abbe number nAbbe (0: it doesn't disperse), from a
             /// Cauchy curve through both: red at the C line, green at the d
-            /// line (nIor itself), blue at the F line. Dispersive transparent
-            /// materials use it too.
+            /// line (nIor itself), blue at the F line, or a single-wavelength
+            /// channel at its own. Dispersive transparent materials use it too.
         static FLT              DispersedIndex( FLT nIor, FLT nAbbe, int nChannel );
         int                     GetSeed( void ) const { return m_nSeed; }
 

@@ -52,6 +52,10 @@ class CCamera : public CObjects
             // The brightest any one sample's red, green or blue may be before
             // the sampler averages it in; 0 doesn't clamp.
         FLT                             m_nClamp = 0.0;
+            // How light splits into colors in dispersive glass and a
+            // chromatic lens: into red, green and blue, or into single
+            // wavelengths (see Spectrum.h).
+        BOOL                            m_bSpectral = FALSE;
         std::string                     m_strLensError;     // why the lens couldn't be prepared
     public:
                     CCamera( void );
@@ -129,6 +133,10 @@ class CCamera : public CObjects
             // brightest highlights.
         FLT         GetClamp( void ) const { return m_nClamp; }
         void        SetClamp( FLT nClamp ) { m_nClamp = nClamp; }
+            // Whether dispersion is traced wavelength by wavelength
+            // ("dispersion": "spectral") rather than in red, green and blue.
+        BOOL        IsSpectral( void ) const { return m_bSpectral; }
+        void        SetSpectral( BOOL bSpectral ) { m_bSpectral = bSpectral; }
             // A sample's color with each channel clamped (unchanged if the
             // camera doesn't clamp).
         CColor      ClampSample( const CColor &oColor ) const;

@@ -104,6 +104,7 @@ set(RAY_CORE_SOURCES
     core/src/SpecularMaterial.cpp
     core/src/Sphere.cpp
     core/src/SphereLight.cpp
+    core/src/Spectrum.cpp
     core/src/SpotLight.cpp
     core/src/DirectionalLight.cpp
     core/src/Environment.cpp

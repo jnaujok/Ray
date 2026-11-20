@@ -193,6 +193,10 @@ void CLens::SetSurfaces( const std::vector<SSurface> &aoSurfaces )
 
 FLT CLens::IorAt( int nIndex, int nChannel ) const
 {
+        // A single wavelength has no table: work it out each time.
+    if ( IsSpectral( nChannel ) )
+        return WorkOutIor( nIndex, nChannel );
+
     const std::vector<FLT> &anTable = m_anIorTable[ ( nChannel >= 0 && nChannel < 4 ) ? nChannel : 0 ];
 
     if ( (size_t)( nIndex + 1 ) < anTable.size() && anTable.size() == m_aoSurfaces.size() + 1 )
@@ -212,19 +216,29 @@ FLT CLens::WorkOutIor( int nIndex, int nChannel ) const
     return DispersedIndex( oSurface.nIor, oSurface.nAbbe, nChannel );
 }
 
-FLT CLens::DispersedIndex( FLT nIor, FLT nAbbe, int nChannel )
+int CLens::WavelengthChannel( FLT nNanometers )
 {
-    if ( nChannel == CHANNEL_ALL || nChannel == CHANNEL_GREEN || ! ( nAbbe > 0.0 ) || nIor == 1.0 )
-        return nIor;
+    return CHANNEL_SPECTRAL + (int)floor( ( nNanometers * 100.0 ) + 0.5 );
+}
 
+FLT CLens::IndexAt( FLT nIor, FLT nAbbe, FLT nMicrometers )
+{
         // Cauchy's n = A + B / wavelength^2, through n at the d line and the
         // Abbe number V = ( n_d - 1 ) / ( n_F - n_C ).
     FLT nB = ( nIor - 1.0 ) /
              ( nAbbe * ( ( 1.0 / ( WAVELENGTH_F * WAVELENGTH_F ) ) - ( 1.0 / ( WAVELENGTH_C * WAVELENGTH_C ) ) ) );
     FLT nA = nIor - ( nB / ( WAVELENGTH_D * WAVELENGTH_D ) );
-    FLT nWavelength = ( nChannel == CHANNEL_RED ) ? WAVELENGTH_C : WAVELENGTH_F;
 
-    return nA + ( nB / ( nWavelength * nWavelength ) );
+    return nA + ( nB / ( nMicrometers * nMicrometers ) );
+}
+
+FLT CLens::DispersedIndex( FLT nIor, FLT nAbbe, int nChannel )
+{
+    if ( nChannel == CHANNEL_ALL || nChannel == CHANNEL_GREEN || ! ( nAbbe > 0.0 ) || nIor == 1.0 )
+        return nIor;
+    if ( IsSpectral( nChannel ) )
+        return IndexAt( nIor, nAbbe, ChannelWavelength( nChannel ) / 1000.0 );
+    return IndexAt( nIor, nAbbe, ( nChannel == CHANNEL_RED ) ? WAVELENGTH_C : WAVELENGTH_F );
 }
 
 BOOL CLens::IsChromatic( void ) const
@@ -995,6 +1009,16 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
                         // edges.
                     FLT                     nAcross = ( ( nFromCenter / m_nPupilReach ) * PUPIL_RINGS ) - nRing;
                     int                     nSlot = ( nChannel >= CHANNEL_RED && nChannel <= CHANNEL_BLUE ) ? nChannel : CHANNEL_ALL;
+
+                        // A single wavelength takes the share of the
+                        // nearest of the three channels the lens measured.
+                    if ( IsSpectral( nChannel ) )
+                    {
+                        FLT nMicrometers = ChannelWavelength( nChannel ) / 1000.0;
+
+                        nSlot = ( nMicrometers >= ( WAVELENGTH_C + WAVELENGTH_D ) / 2.0 ) ? CHANNEL_RED :
+                                ( nMicrometers >= ( WAVELENGTH_D + WAVELENGTH_F ) / 2.0 ) ? CHANNEL_GREEN : CHANNEL_BLUE;
+                    }
                     const std::vector<FLT> &anPass = m_pTables->anPass[ nSlot ];
 
                         // A channel that isn't traced (a chromatic lens's

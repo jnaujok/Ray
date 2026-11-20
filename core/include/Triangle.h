@@ -60,6 +60,17 @@ class CTriangle : public CObjects
     public:
                             DYNAMIC_OBJECTS( CTriangle );
 
+            // The unit normal of a face with these corners, by the rule
+            // CalcNormal uses (the cross of the edges from corner 1 to 2 and
+            // from 2 to 3); zero if they are in a line.
+        static CVector      FaceNormal( CVector oCorner1, CVector oCorner2, CVector oCorner3 );
+            // Whether a ray from anOrigin along anDirection meets the face
+            // with these corners and normal closer than nLimit, and where:
+            // Intersect's test, for a mesh that keeps its faces as indices.
+        static BOOL         HitFace( CVector oCorner1, CVector oCorner2, CVector oCorner3, CVector oNormal,
+                                     BOOL bDoubleSided, const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit,
+                                     FLT &nT, CVector &oPoint );
+
                             CTriangle( void );
             // A face of a mesh: it shares the mesh's materials (pMaterials)
             // without owning them.

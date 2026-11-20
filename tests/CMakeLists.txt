@@ -100,7 +100,7 @@ add_test(NAME render_lens
 set_tests_properties(render_lens PROPERTIES TIMEOUT 600)
 add_test(NAME roundtrip_lens_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/lens_test.ray ${RENDER_DIR})
 # Chromatic aberration: scan_test through an uncorrected BK7 singlet, each
-# sample traced in red, green and blue apart.
+# sample traced at three single wavelengths (spectral dispersion).
 add_test(NAME render_chromatic
          COMMAND ${CMAKE_COMMAND}
                  -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -238,7 +238,7 @@ set_tests_properties(render_csg PROPERTIES FIXTURES_SETUP render_csg TIMEOUT 300
 add_test(NAME roundtrip_csg_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/csg_test.ray ${RENDER_DIR})
 
 # Dispersion: a flint glass prism (a csg) and ball before white bars, which
-# they split into red, green and blue.
+# they fan out into a spectrum (spectral dispersion).
 add_test(NAME render_prism
          COMMAND ${CMAKE_COMMAND}
                  -DRAYTHROWER=$<TARGET_FILE:raythrower>

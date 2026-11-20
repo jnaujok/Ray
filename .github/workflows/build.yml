@@ -48,8 +48,8 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: Test
-        # Windows runners are small: the tests labelled slow (minutes each) run on the others.
-        run: ctest --test-dir build -C Release --output-on-failure --parallel 4 ${{ runner.os == 'Windows' && '-LE slow' || '' }}
+        # Every test, the ones labelled slow included, on every system.
+        run: ctest --test-dir build -C Release --output-on-failure --parallel 4
 
       - name: Package
         if: always()

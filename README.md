@@ -68,7 +68,8 @@ The ray tracing itself is the 1997 code.
   can be given to override the computed ones. A mesh shares vertices
   between faces, gives each vertex the sum of its faces' normals, and keeps its faces in a bounding
   volume hierarchy built by the surface area heuristic, so a ray tests only the few faces near its
-  path, nearest first. The scene keeps its objects
+  path, nearest first. Its faces are just three vertex indices each (about 50 bytes a face with the
+  tree), and every thread's copy of a scene shares one copy of each mesh's shape, built once. The scene keeps its objects
   in one too (planes, which are infinite, are tested every time), and shadow rays stop at the
   first thing in the way.
 - **Constructive solid geometry:** a `csg` object combines closed shapes (spheres, boxes, capped
@@ -100,10 +101,13 @@ The ray tracing itself is the 1997 code.
   satin mirror blurs its reflection (GGX microfacets), best with a sampler that traces many rays
   a pixel. Glass with an Abbe number disperses: a ray splits into red, green and blue at it, each
   bent by its own index, so a flint glass prism or ball fringes what is seen through it with color.
+  With the camera's `"dispersion": "spectral"` it splits instead into four single wavelengths,
+  weighed by the CIE color matching functions, so over a pixel's samples the colors smear into a
+  continuous rainbow (yellows and cyans too) instead of three bars.
   An optional sample clamp on the camera keeps a rare very bright ray (a "firefly") from showing
   as a lone speck.
 
-  <img src="docs/images/tests/prism_test.png" alt="A flint glass prism and ball before white bars on a black wall, splitting them into red, green and blue" width="320">
+  <img src="docs/images/tests/prism_test.png" alt="A flint glass prism and ball before white bars on a black wall, fanning them out into a spectrum" width="320">
 
   <img src="docs/images/tests/soft_test.png" alt="Clear, lightly frosted and heavily frosted glass panes before a striped poster, a mirror ball and a brushed gold ball, and soft shadows from a rectangle light and a sphere light" width="320">
 - **Textures:** any material's color can come from a texture instead: a checkerboard, on the
@@ -147,7 +151,8 @@ The ray tracing itself is the 1997 code.
   in lens patents) and rays are traced from the sensor back through each element. Rays the barrel or
   aperture stop blocks go dark, so depth of field, vignetting, and the lens's own aberrations and
   distortion come out of the optics. Give the glasses Abbe numbers and red, green and blue are
-  traced at their own wavelengths, for chromatic aberration. Focus and exposure are worked out
+  traced at their own wavelengths, for chromatic aberration (or, with spectral dispersion, four
+  single wavelengths a sample, so the fringes smear into a rainbow). Focus and exposure are worked out
   automatically; a 50 mm f/2 double Gauss is built in. Rays are aimed only at the part of the
   rear element light gets through to each point of the sensor (the exit pupil), and a ray the lens
   blocks is cast again, so no ray is wasted on the aperture stop and the lens adds almost no grain;
@@ -303,11 +308,12 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 
 **Render the torture test**, every kind of object (the teapot too, in marble, and a layer-lined
 3DBenchy, a colored-STL puzzle cube and an OBJ ring), mirrors, glass
-(the cube absorbing by thickness, the ball frosted, a flint prism splitting colors), a die with drilled
+(the cube absorbing by thickness, the ball frosted, a flint prism fanning colors into a spectrum), a die with drilled
 pips (constructive solid geometry), textures (a wooden mirror frame), a brushed
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light and a low sun, and an
 HDR sky in the mirrors and glass that lights the scene too, through the double Gauss lens at 25
-rays a pixel, each clamped at 1.5, at its full 1024×768 (about two minutes on an idle 16-core machine, with a Release build):
+rays a pixel, each traced at four wavelengths (spectral dispersion) and clamped at 1.5, at its full
+1024×768 (about two and a half minutes on an idle 16-core machine, with a Release build):
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
@@ -379,8 +385,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 The torture test, the Benchy close-up and the prism (and their network twins) are labelled `slow`;
-`ctest --test-dir build -LE slow` runs everything else in a minute or two. CI's Windows job skips
-them (its runners are small); the Linux, macOS and sanitizer jobs run everything.
+`ctest --test-dir build -LE slow` runs everything else in a minute or two. CI runs everything, on
+every system.
 
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
@@ -410,8 +416,11 @@ half sky and the foot of a wall. They check where rays hit a union, an intersect
 and a nested csg and the normals there (inside out on a subtracted shape), from outside, inside and
 leaving the surface, that each surface takes its own shape's materials with `childMaterials`, that
 dispersive glass bends each color by the index a lens's glass would have, that a ray in every color
-splits into exactly what rays traced in each color alone see, and that the sample clamp caps each
-channel. With Python 3 installed, they also decode the PNG and
+splits into exactly what rays traced in each color alone see, that spectral weights add up to
+white over the visible range, that a wavelength bends as its line's index says and is picked the
+same way every time, that a camera without dispersive glass sees the same in spectral mode, that
+every thread's copy of a scene shares a mesh's geometry and lets it go with the last one, and that
+the sample clamp caps each channel. With Python 3 installed, they also decode the PNG and
 HDR output (with Python's own zlib) and check it against the raw image. CI runs them
 on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -524,7 +533,8 @@ camera, anti-aliasing, color models, meshes (with a bounding volume hierarchy), 
 and boxes, solid marble, wood and stone textures, glass that absorbs by thickness, frosted glass
 and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG textures, spot and
 directional lights, environment maps with image-based lighting, constructive solid geometry,
-dispersive glass, STL and OBJ model files with printed layer lines, and JSON scenes so far. The
+dispersive glass with spectral dispersion, STL and OBJ model files with printed layer lines and
+lean, shared meshes, and JSON scenes so far. The
 scene editor reaches all of it through JSON editing; next up is a cross-platform scene editor.
 
 ## Changelog

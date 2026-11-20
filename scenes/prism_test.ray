@@ -22,7 +22,8 @@
             "grid": 2,
             "seed": 0
         },
-        "colorModel": "clip"
+        "colorModel": "clip",
+        "dispersion": "spectral"
     },
     "objects": [
         {
