@@ -27,6 +27,9 @@ class CRay
         FLT             m_nZ;
         FLT             m_nT;
         FLT             m_nInfluence;
+            // What a primary ray's color counts for: a lens sampling only
+            // part of its rear element scales by the share it samples.
+        FLT             m_nWeight;
         long            m_nPixelX;
         long            m_nPixelY;
         long            m_nDepth;
@@ -56,6 +59,9 @@ class CRay
         virtual FLT     GetT(void) {return m_nT;}
         virtual FLT     GetInfluence( void ) { return m_nInfluence; }
         void            SetInfluence( FLT nInfluence ) { m_nInfluence = nInfluence; }
+            /// The factor a primary ray's traced color is multiplied by (1
+            /// unless a lens sampled only part of its rear element).
+        FLT             GetWeight( void ) const { return m_nWeight; }
         virtual void    SetT( FLT nNewT );
             // Sets every field (as the wire protocol carries them), with a
             // depth of 0.

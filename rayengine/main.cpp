@@ -79,16 +79,15 @@ int main( int argc, char **argv )
         return 1;
     }
 
-        // RunEngine is FALSE when no rays came at all, which is fine when
-        // there were more engines than work; only a real error fails.
-    if ( ! oEngine.RunEngine() && oEngine.GetLastError()[ 0 ] != '\0' )
+        // RunEngine is TRUE when the master told it to stop.
+    if ( ! oEngine.RunEngine() )
     {
         fprintf( stderr, "rayengine: %s\n", oEngine.GetLastError() );
         return 1;
     }
 
 #ifdef _DEBUG
-    printf( "Total Rays Traced: %lu\n", oEngine.GetRaysTraced() );
+    printf( "Tiles traced: %lld, rays traced: %lld\n", oEngine.GetTilesTraced(), oEngine.GetRaysTraced() );
 #endif
 
     return 0;

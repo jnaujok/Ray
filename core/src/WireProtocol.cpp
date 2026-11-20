@@ -4,8 +4,6 @@
 
 #include "WireProtocol.h"
 #include "Scene.h"
-#include "RayArray.h"
-#include "ColorArray.h"
 #include "SceneJson.h"
 
 #include "Exceptions/StreamException.h"
@@ -52,8 +50,32 @@ namespace
         return dValue;
     }
 
-    const size_t s_nRayBytes = 8 * 8 + 2 * 4;
-    const size_t s_nColorBytes = 2 * 4 + 3 * 8;
+        // A tile's header: the trace number, left, top, width, height.
+    const size_t s_nTileBytes = 5 * 4;
+        // The most pixels a tile may have.
+    const uint64_t s_nMaxTilePixels = 4096u * 4096u;
+
+    void PutTile( std::string &strOut, uint32_t nTrace, const STile &oTile )
+    {
+        PutUInt32( strOut, nTrace );
+        PutUInt32( strOut, (uint32_t)oTile.nLeft );
+        PutUInt32( strOut, (uint32_t)oTile.nTop );
+        PutUInt32( strOut, (uint32_t)oTile.nWidth );
+        PutUInt32( strOut, (uint32_t)oTile.nHeight );
+    }
+
+    bool GetTile( const std::string &strIn, uint32_t &nTrace, STile &oTile )
+    {
+        if ( strIn.size() < s_nTileBytes )
+            return false;
+        nTrace = GetUInt32( strIn, 0 );
+        oTile.nLeft = (int)GetUInt32( strIn, 4 );
+        oTile.nTop = (int)GetUInt32( strIn, 8 );
+        oTile.nWidth = (int)GetUInt32( strIn, 12 );
+        oTile.nHeight = (int)GetUInt32( strIn, 16 );
+        return oTile.nLeft >= 0 && oTile.nTop >= 0 && oTile.nWidth > 0 && oTile.nHeight > 0 &&
+               (uint64_t)oTile.nWidth * (uint64_t)oTile.nHeight <= s_nMaxTilePixels;
+    }
 }
 
 namespace RayWire
@@ -133,47 +155,6 @@ namespace RayWire
         return strPacket;
     }
 
-    std::string CEncoder::Rays( CRayArray &oRays )
-    {
-        std::string strPacket;
-
-        strPacket.reserve( (size_t)oRays.GetSize() * s_nRayBytes );
-        for ( int nIndex = 0; nIndex < oRays.GetSize(); nIndex++ )
-        {
-            CRay &oRay = oRays[ nIndex ];
-
-            PutDouble( strPacket, (double)oRay.GetX() );
-            PutDouble( strPacket, (double)oRay.GetY() );
-            PutDouble( strPacket, (double)oRay.GetZ() );
-            PutDouble( strPacket, (double)oRay.GetI() );
-            PutDouble( strPacket, (double)oRay.GetJ() );
-            PutDouble( strPacket, (double)oRay.GetK() );
-            PutDouble( strPacket, (double)oRay.GetT() );
-            PutDouble( strPacket, (double)oRay.GetInfluence() );
-            PutUInt32( strPacket, (uint32_t)oRay.GetPixelX() );
-            PutUInt32( strPacket, (uint32_t)oRay.GetPixelY() );
-        }
-        return strPacket;
-    }
-
-    std::string CEncoder::Colors( CColorArray &oColors )
-    {
-        std::string strPacket;
-
-        strPacket.reserve( (size_t)oColors.GetSize() * s_nColorBytes );
-        for ( int nIndex = 0; nIndex < oColors.GetSize(); nIndex++ )
-        {
-            CColor &oColor = oColors[ nIndex ];
-
-            PutUInt32( strPacket, (uint32_t)oColors.GetX( nIndex ) );
-            PutUInt32( strPacket, (uint32_t)oColors.GetY( nIndex ) );
-            PutDouble( strPacket, (double)oColor.GetR() );
-            PutDouble( strPacket, (double)oColor.GetG() );
-            PutDouble( strPacket, (double)oColor.GetB() );
-        }
-        return strPacket;
-    }
-
     CDecoder::CDecoder( unsigned nOwnId, unsigned nPeerId ) :
         m_oSjson( nOwnId ),
         m_nPeerId( nPeerId )
@@ -203,83 +184,80 @@ namespace RayWire
         return true;
     }
 
-    bool CDecoder::Rays( const std::string &strPacket, CRayArray &oRays )
+    std::string EncodeTile( uint32_t nTrace, const STile &oTile )
     {
-        CRay oRay;
+        std::string strPayload;
 
-        oRays.RemoveAll();
-        if ( strPacket.size() % s_nRayBytes )
-        {
-            m_strError = "a batch of rays has the wrong length";
-            return false;
-        }
-        for ( size_t nAt = 0; nAt < strPacket.size(); nAt += s_nRayBytes )
-        {
-            oRay.Set( (FLT)GetDouble( strPacket, nAt ), (FLT)GetDouble( strPacket, nAt + 8 ), (FLT)GetDouble( strPacket, nAt + 16 ),
-                      (FLT)GetDouble( strPacket, nAt + 24 ), (FLT)GetDouble( strPacket, nAt + 32 ), (FLT)GetDouble( strPacket, nAt + 40 ),
-                      (FLT)GetDouble( strPacket, nAt + 48 ), (FLT)GetDouble( strPacket, nAt + 56 ),
-                      (int)GetUInt32( strPacket, nAt + 64 ), (int)GetUInt32( strPacket, nAt + 68 ) );
-            oRays.Add( oRay );
-        }
-        return true;
+        PutTile( strPayload, nTrace, oTile );
+        return strPayload;
     }
 
-    bool CDecoder::Colors( const std::string &strPacket, CColorArray &oColors )
+    bool DecodeTile( const std::string &strPayload, uint32_t &nTrace, STile &oTile )
     {
-        oColors.RemoveAll();
-        if ( strPacket.size() % s_nColorBytes )
-        {
-            m_strError = "a batch of colors has the wrong length";
+        return ( strPayload.size() == s_nTileBytes ) && GetTile( strPayload, nTrace, oTile );
+    }
+
+    std::string EncodePixels( uint32_t nTrace, const STile &oTile, uint64_t nRays, const std::vector<double> &anColors )
+    {
+        std::string strPayload;
+
+        strPayload.reserve( s_nTileBytes + 8 + ( anColors.size() * 8 ) );
+        PutTile( strPayload, nTrace, oTile );
+        PutUInt32( strPayload, (uint32_t)( nRays >> 32 ) );
+        PutUInt32( strPayload, (uint32_t)( nRays & 0xFFFFFFFFu ) );
+        for ( size_t nIndex = 0; nIndex < anColors.size(); nIndex++ )
+            PutDouble( strPayload, anColors[ nIndex ] );
+        return strPayload;
+    }
+
+    bool DecodePixels( const std::string &strPayload, uint32_t &nTrace, STile &oTile, uint64_t &nRays, std::vector<double> &anColors )
+    {
+        if ( ! GetTile( strPayload, nTrace, oTile ) )
             return false;
-        }
-        for ( size_t nAt = 0; nAt < strPacket.size(); nAt += s_nColorBytes )
-            oColors.Add( CColor( (FLT)GetDouble( strPacket, nAt + 8 ), (FLT)GetDouble( strPacket, nAt + 16 ),
-                                 (FLT)GetDouble( strPacket, nAt + 24 ) ),
-                         (int)GetUInt32( strPacket, nAt ), (int)GetUInt32( strPacket, nAt + 4 ) );
+
+        size_t nValues = (size_t)oTile.nWidth * (size_t)oTile.nHeight * 3;
+
+        if ( strPayload.size() != s_nTileBytes + 8 + ( nValues * 8 ) )
+            return false;
+        nRays = ( (uint64_t)GetUInt32( strPayload, s_nTileBytes ) << 32 ) | GetUInt32( strPayload, s_nTileBytes + 4 );
+        anColors.resize( nValues );
+        for ( size_t nIndex = 0; nIndex < nValues; nIndex++ )
+            anColors[ nIndex ] = GetDouble( strPayload, s_nTileBytes + 8 + ( nIndex * 8 ) );
         return true;
     }
 
     std::string ToReadable( uint8_t nTag, const std::string &strPayload )
     {
-        CDecoder                oDecoder( RAY_WIRE_ENGINE_ID, RAY_WIRE_MASTER_ID );
-        IASLib::CObjectNode     oDocument;
+        IASLib::CObjectNode oDocument;
+        uint32_t            nTrace;
+        STile               oTile;
 
-        if ( nTag == MESSAGE_RAYS )
+        if ( nTag == MESSAGE_TILE )
         {
-            CRayArray           oRays;
-            IASLib::CArrayNode *pRays = oDocument.putArray( "rays" );
-
-            if ( ! oDecoder.Rays( strPayload, oRays ) )
+            if ( ! DecodeTile( strPayload, nTrace, oTile ) )
                 return "";
-            for ( int nIndex = 0; nIndex < oRays.GetSize(); nIndex++ )
-            {
-                CRay &oRay = oRays[ nIndex ];
-
-                pRays->addObject()
-                    ->put( "x", (double)oRay.GetX() )->put( "y", (double)oRay.GetY() )->put( "z", (double)oRay.GetZ() )
-                    ->put( "i", (double)oRay.GetI() )->put( "j", (double)oRay.GetJ() )->put( "k", (double)oRay.GetK() )
-                    ->put( "t", (double)oRay.GetT() )->put( "influence", (double)oRay.GetInfluence() )
-                    ->put( "px", oRay.GetPixelX() )->put( "py", oRay.GetPixelY() );
-            }
         }
-        else if ( nTag == MESSAGE_COLOR )
+        else if ( nTag == MESSAGE_PIXELS )
         {
-            CColorArray         oColors;
-            IASLib::CArrayNode *pColors = oDocument.putArray( "colors" );
+            uint64_t            nRays;
+            std::vector<double> anColors;
 
-            if ( ! oDecoder.Colors( strPayload, oColors ) )
+            if ( ! DecodePixels( strPayload, nTrace, oTile, nRays, anColors ) )
                 return "";
-            for ( int nIndex = 0; nIndex < oColors.GetSize(); nIndex++ )
-            {
-                CColor &oColor = oColors[ nIndex ];
+            oDocument.put( "rays", (double)nRays );
 
-                pColors->addObject()
-                    ->put( "px", oColors.GetX( nIndex ) )->put( "py", oColors.GetY( nIndex ) )
-                    ->put( "r", (double)oColor.GetR() )->put( "g", (double)oColor.GetG() )->put( "b", (double)oColor.GetB() );
-            }
+            IASLib::CArrayNode *pPixels = oDocument.putArray( "pixels" );
+
+            for ( size_t nAt = 0; nAt < anColors.size(); nAt += 3 )
+                pPixels->addArray()->add( anColors[ nAt ] )->add( anColors[ nAt + 1 ] )->add( anColors[ nAt + 2 ] );
         }
         else
             return "";
+        oDocument.put( "trace", (double)nTrace );
+        oDocument.put( "left", oTile.nLeft );
+        oDocument.put( "top", oTile.nTop );
+        oDocument.put( "width", oTile.nWidth );
+        oDocument.put( "height", oTile.nHeight );
         return oDocument.toJson( 2 );
     }
 }

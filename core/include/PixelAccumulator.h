@@ -36,6 +36,8 @@ class CPixelAccumulator
             uint32_t            nWeight;
         };
 
+        int                     m_nLeft;            // the part of the image held
+        int                     m_nTop;
         int                     m_nWidth;
         int                     m_nHeight;
         uint32_t                m_nTotalWeight;
@@ -44,12 +46,14 @@ class CPixelAccumulator
     public:
                                 CPixelAccumulator( void );
 
-            /// Starts an image; each pixel is done when its samples' weights
-            /// add up to nTotalWeight.
-        void                    Begin( int nWidth, int nHeight, uint32_t nTotalWeight );
-            /// Adds a sample to pixel (nX, nY). Pixels outside the image are
-            /// ignored, so a sample shared with pixels off the edge can be
-            /// added to all its pixels without checking.
+            /// Starts the part of an image nWidth by nHeight pixels from
+            /// (nLeft, nTop); each pixel is done when its samples' weights add
+            /// up to nTotalWeight.
+        void                    Begin( int nLeft, int nTop, int nWidth, int nHeight, uint32_t nTotalWeight );
+            /// Adds a sample to pixel (nX, nY), in image coordinates. Pixels
+            /// outside the part held are ignored, so a sample shared with
+            /// pixels beyond it can be added to all its pixels without
+            /// checking.
         void                    Add( CPixelWriter &oWriter, int nX, int nY, const CColor &oColor, uint32_t nWeight );
             /// Frees the sums.
         void                    End( void );

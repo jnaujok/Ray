@@ -33,6 +33,8 @@ namespace
 CStratifiedSampler::CStratifiedSampler( int nGrid, int nSeed ) :
     m_nGrid( ( nGrid >= 1 && nGrid <= MAXIMUM_GRID ) ? nGrid : 4 ),
     m_nSeed( nSeed ),
+    m_nLeft( 0 ),
+    m_nTop( 0 ),
     m_nWidth( 0 ),
     m_nHeight( 0 ),
     m_nPixel( 0 ),
@@ -40,15 +42,17 @@ CStratifiedSampler::CStratifiedSampler( int nGrid, int nSeed ) :
 {
 }
 
-long long CStratifiedSampler::Begin( int nWidth, int nHeight )
+long long CStratifiedSampler::Begin( int nLeft, int nTop, int nWidth, int nHeight )
 {
+    m_nLeft = nLeft;
+    m_nTop = nTop;
     m_nWidth = ( nWidth > 0 ) ? nWidth : 0;
     m_nHeight = ( nHeight > 0 ) ? nHeight : 0;
     if ( ( m_nWidth == 0 ) || ( m_nHeight == 0 ) )
         m_nWidth = m_nHeight = 0;
     m_nPixel = 0;
     m_nRay = 0;
-    m_oSums.Begin( m_nWidth, m_nHeight, (uint32_t)( m_nGrid * m_nGrid ) );
+    m_oSums.Begin( m_nLeft, m_nTop, m_nWidth, m_nHeight, (uint32_t)( m_nGrid * m_nGrid ) );
 
     return (long long)( m_nGrid * m_nGrid ) * (long long)m_nWidth * (long long)m_nHeight;
 }
@@ -58,8 +62,8 @@ BOOL CStratifiedSampler::NextRay( CScene &oScene, CRay &oRay )
     if ( m_nPixel >= m_nWidth * m_nHeight )
         return FALSE;
 
-    int         nX = m_nPixel % m_nWidth;
-    int         nY = m_nPixel / m_nWidth;
+    int         nX = m_nLeft + ( m_nPixel % m_nWidth );
+    int         nY = m_nTop + ( m_nPixel / m_nWidth );
     uint64_t    nKey = Mix( (uint64_t)(uint32_t)m_nSeed );
 
     nKey = Mix( nKey ^ (uint64_t)(uint32_t)nX );

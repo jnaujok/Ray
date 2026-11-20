@@ -74,10 +74,15 @@ ctest --test-dir build --output-on-failure
   `Scene.cpp` only for a change old readers would get wrong. Update `scenes/README.md` with it.
 - **The 1997 binary scene format is gone,** along with `CRayStream`. Don't bring back binary
   scene files.
-- **The wire** (`WireProtocol.h`): the scene goes as SJSON, ray and color batches as fixed-layout
-  big-endian IEEE-754 doubles, for speed (SJSON costs tens of microseconds a ray to encode). Numbers
-  must cross exactly, so networked engines match threads byte for byte; the `network_*` tests and
-  `format_test`'s wire checks hold you to it. Bump `RAY_WIRE_VERSION` for any change.
+- **The wire** (`WireProtocol.h`): the scene goes as SJSON; tiles and their pixels as fixed-layout
+  big-endian numbers, the pixels as IEEE-754 doubles. Numbers must cross exactly, so networked
+  engines match threads byte for byte; the `network_*` tests, `engine_churn` and `format_test`'s
+  wire checks hold you to it. Bump `RAY_WIRE_VERSION` for any change.
+- **The work unit is a tile.** Tasks (threads or engines) pull tiles from the master's queue and
+  trace them with `CTileTracer`, which runs the camera's sampler and lens for the tile, so camera
+  rays are made in parallel. The master only hands out tiles and writes pixels. Splitting the image
+  differently must not change it: samplers sum in fixed point, and a ray shared across a tile edge
+  (a corner) is traced by both tiles and comes out the same.
 - **If JSON output changes**, re-save the sample scenes with
   `raythrower scenes/<scene>.ray --save scenes/<scene>.ray` and check the renders still match.
 - Use IASLib for strings, streams, files, threads, sockets, and JSON rather than adding new
@@ -97,8 +102,9 @@ ctest --test-dir build --output-on-failure
 - **Line endings:** LF everywhere except `*.dsp`, `*.dsw`, `*.clw`, and `*.bat`, which must stay
   CRLF because Visual C++ 6 and `cmd.exe` need it. `.gitattributes` enforces this.
 - **New ways of sampling pixels** (anti-aliasing and the like) are `CPixelSampler` subclasses
-  attached to the camera, listed in the table in `core/src/PixelSampler.cpp`. Keep sampling out of
-  `CTaskMaster` and the engines.
+  attached to the camera, listed in the table in `core/src/PixelSampler.cpp`. They sample one
+  tile at a time (`Begin( left, top, width, height )`) in image coordinates; keep sampling inside
+  the samplers, not in `CTaskMaster`, `CTileTracer` or the transports.
 - **New ways of turning pixel colors into bytes** (gamma, tone mapping, and the like) are
   `CColorModel` subclasses attached to the camera, listed in the table in
   `core/src/ColorModel.cpp`. Samplers hand linear, unclipped colors to the `CPixelWriter`.
@@ -121,7 +127,5 @@ ctest --test-dir build --output-on-failure
 
 ## Known issues
 
-- Meshes are slow: every ray inside a mesh's bounding box tests every face (there is no
-  acceleration structure within a mesh yet).
 - The MFC application can only be built on Windows; on Linux and macOS only the core and the
   command-line programs build.

@@ -29,6 +29,8 @@ class CRandomSampler : public CPixelSampler
     protected:
         int                     m_nSamples;         // N: the random rays a pixel
         int                     m_nSeed;
+        int                     m_nLeft;            // The tile being sampled.
+        int                     m_nTop;
         int                     m_nWidth;
         int                     m_nHeight;
         int                     m_nPixel;           // The next pixel, in reading order.
@@ -51,7 +53,7 @@ class CRandomSampler : public CPixelSampler
             /// to 1 across and down the pixel.
         void                    Offset( int nX, int nY, int nRay, FLT &nU, FLT &nV ) const;
 
-        virtual long long       Begin( int nWidth, int nHeight );
+        virtual long long       Begin( int nLeft, int nTop, int nWidth, int nHeight );
         virtual BOOL            NextRay( CScene &oScene, CRay &oRay );
         virtual void            PutSample( CPixelWriter &oWriter, int nTagX, int nTagY, const CColor &oColor );
         virtual void            End( void );

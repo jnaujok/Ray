@@ -9,6 +9,8 @@
 #include "Color.h"
 
 CBoxSampler::CBoxSampler( void ) :
+    m_nLeft( 0 ),
+    m_nTop( 0 ),
     m_nWidth( 0 ),
     m_nHeight( 0 ),
     m_nPixel( 0 ),
@@ -16,15 +18,17 @@ CBoxSampler::CBoxSampler( void ) :
 {
 }
 
-long long CBoxSampler::Begin( int nWidth, int nHeight )
+long long CBoxSampler::Begin( int nLeft, int nTop, int nWidth, int nHeight )
 {
+    m_nLeft = nLeft;
+    m_nTop = nTop;
     m_nWidth = ( nWidth > 0 ) ? nWidth : 0;
     m_nHeight = ( nHeight > 0 ) ? nHeight : 0;
     if ( ( m_nWidth == 0 ) || ( m_nHeight == 0 ) )
         m_nWidth = m_nHeight = 0;
     m_nPixel = 0;
     m_nRay = 0;
-    m_oSums.Begin( m_nWidth, m_nHeight, 4 );
+    m_oSums.Begin( m_nLeft, m_nTop, m_nWidth, m_nHeight, 4 );
 
     return 4LL * (long long)m_nWidth * (long long)m_nHeight;
 }
@@ -34,8 +38,8 @@ BOOL CBoxSampler::NextRay( CScene &oScene, CRay &oRay )
     if ( m_nPixel >= m_nWidth * m_nHeight )
         return FALSE;
 
-    int nX = m_nPixel % m_nWidth;
-    int nY = m_nPixel / m_nWidth;
+    int nX = m_nLeft + ( m_nPixel % m_nWidth );
+    int nY = m_nTop + ( m_nPixel / m_nWidth );
     int nI = m_nRay & 1;
     int nJ = m_nRay >> 1;
 

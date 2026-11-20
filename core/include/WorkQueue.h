@@ -41,6 +41,14 @@ class TWorkQueue
                                 return Take();
                             }
 
+            /// Waits at most nTimeoutMs for an item. Returns false if none came.
+        bool                PopFor( T &oItem, int nTimeoutMs )
+                            {
+                                if ( ! m_semItems.TimedWait( nTimeoutMs ) )
+                                    return false;
+                                oItem = Take();
+                                return true;
+                            }
             /// Takes an item if one is waiting.
         bool                TryPop( T &oItem )
                             {

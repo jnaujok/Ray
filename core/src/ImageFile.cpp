@@ -128,6 +128,20 @@ BOOL CImageFile::PutPoint( int nX, int nY, const CColor &oColor )
     return PutRGB( nX, nY, nRed, nGreen, nBlue );
 }
 
+BOOL CImageFile::PutLinear( int nX, int nY, const CColor &oColor )
+{
+    if ( m_anLinear.empty() || ( nX < 0 ) || ( nY < 0 ) || ( (DWORD)nX >= m_nWidth ) || ( (DWORD)nY >= m_nHeight ) )
+        return FALSE;
+
+    CColor  oCopy( oColor );
+    size_t  nAt = ( ( (size_t)m_nWidth * (size_t)nY ) + (size_t)nX ) * 3;
+
+    m_anLinear[ nAt ] = (float)oCopy.GetR();
+    m_anLinear[ nAt + 1 ] = (float)oCopy.GetG();
+    m_anLinear[ nAt + 2 ] = (float)oCopy.GetB();
+    return TRUE;
+}
+
 BOOL CImageFile::PutRGB( int nX, int nY, BYTE nRed, BYTE nGreen, BYTE nBlue )
 {
     long    dwOffset;

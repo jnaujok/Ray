@@ -62,6 +62,13 @@ void CReinhardColorModel::ToRGB( const CColor &oColor, BYTE &nRed, BYTE &nGreen,
     nBlue = ToByte( CSrgbColorModel::Encode( (FLT)dBlue ) );
 }
 
+CColor CReinhardColorModel::ToLinear( const CColor &oColor ) const
+{
+    CColor oSource( oColor );
+
+    return oSource * m_nExposure;
+}
+
 void CReinhardColorModel::ToJson( IASLib::CObjectNode &oNode ) const
 {
     RayJson::PutNumber( oNode, "exposure", m_nExposure );

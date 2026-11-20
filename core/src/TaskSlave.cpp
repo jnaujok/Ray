@@ -5,51 +5,50 @@
 #endif
 
 #include "Scene.h"
-#include "RayArray.h"
-#include "ColorArray.h"
 #include "TaskSlave.h"
 
-#ifdef RAY_GUI
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
 #undef THIS_FILE
 static char THIS_FILE[] = __FILE__;
 #endif
-#endif
 
 BOOL CTaskSlave::RunEngine( void )
 {
-    CScene          oScene;
-    CRayArray       oRays( 128 );
-    CColorArray     oColors;
-    CColor          oColor;
-    int             nCount;
-    BOOL            bRetVal = FALSE;
+    std::unique_ptr<CScene> pScene;
+    CTileTracer             oTracer;
+    std::vector<double>     anColors;
+    STile                   oTile;
+    uint32_t                nTrace;
 
-    if ( SceneFromMaster( oScene ) )
+    for ( ;; )
     {
-        while ( RaysFromMaster( oRays ) )
+        switch ( FromMaster( pScene, oTile, nTrace ) )
         {
-            bRetVal = TRUE;
-            if ( oRays.GetSize() )
+            case FROM_MASTER_SCENE:
+                if ( ! RequestWork() )
+                    return FALSE;
+                break;
+
+            case FROM_MASTER_TILE:
             {
-                nCount = 0;
-                oColors.RemoveAll();
+                if ( ! pScene )
+                    return FALSE;       // a tile before any scene
 
-                while ( nCount < oRays.GetSize() )
-                {
-                    oScene.TraceRay( oRays[ nCount ], oColor, NULL );
+                long long nRays = oTracer.Trace( *pScene, oTile, anColors );
 
-                    oColors.Add( oColor, oRays[nCount].GetPixelX(), oRays[nCount].GetPixelY() );
-
-                    nCount++;
-                }
-
-                ColorsToMaster( oColors );
+                m_nTilesTraced++;
+                m_nRaysTraced += nRays;
+                if ( ! PixelsToMaster( nTrace, oTile, nRays, anColors ) || ! RequestWork() )
+                    return FALSE;
+                break;
             }
-            oRays.RemoveAll();
+
+            case FROM_MASTER_STOP:
+                return TRUE;
+
+            default:
+                return FALSE;
         }
     }
-    return bRetVal;
 }
-

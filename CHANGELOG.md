@@ -10,9 +10,129 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.4] - 2026-11-19
+
+New shapes and a new way to share out the work: cylinders, cones and boxes; meshes with a bounding
+volume hierarchy; a torture test of everything through a real lens; PNG and high dynamic range
+output; and tasks that pull tiles of the image, so camera rays are made in parallel and engines can
+come and go.
+
+### Added
+
+- **Cylinders, cones and boxes.** Three new object types for scene files (documented in
+  `scenes/README.md`):
+  - `cylinder`: `base`, `top` and `radius`.
+  - `cone`: `base`, `top`, `baseRadius` and `topRadius` (default 0, a point). A cone with a
+    `topRadius` is truncated.
+  - `box`: `center`, `size` (one number for a cube, or `[x, y, z]`) and `rotation` (degrees about
+    x, then y, then z).
+
+  Cylinders and cones point any way, from `base` to `top`. They are capped by default; with
+  `"capped": false` they are open shells that can be seen into and shadow and reflect themselves
+  inside. All three have their own surface coordinates for textures.
+
+  The new sample scene `scenes/primitives_test.ray` has its own reference render and tests:
+  `render_primitives`, `roundtrip_primitives_test`, and `network_primitives`, which must match the
+  threaded render byte for byte. Its preview is in the README's expected-output table. Look for:
+  - the inside of the open yellow tube, dark except where light falls through its open end;
+  - the image texture upright on each face of the cube and wrapped around the truncated cone, with
+    the grid filling its top cap;
+  - the floor seen through the turned glass box, bent by refraction.
+
+  ![The new primitives_test scene](docs/images/tests/primitives_test.png)
+
+  `format_test` checks where rays hit each shape and the normals there, open and capped ends, rays
+  from inside, surface coordinates, and the errors for bad sizes and radii. No existing render
+  changes. The scene editor shows the new objects in its tree but has no dialogs to add or edit
+  them yet.
+
+- **Torture test.** `scenes/torture_test.ray` uses everything at once: every kind of object (sphere,
+  plane, cylinder, cone, box, triangle, and the teapot mesh), mirrors, glass, image and checker
+  textures, a reflective floor and a black-framed mirror wall, seen through the double Gauss lens with a 5×5
+  stratified sampler (25 rays a pixel, each traced in red, green and blue) at 1024×768. The
+  `render_torture` test renders it at 160×120 and compares it with a new reference render, which is
+  in the README's expected-output table; `roundtrip_torture_test` loads and saves it. The lens
+  focuses on the teapot at f/2 with a scene unit of 5 cm, so the depth of field is shallow. Look
+  for the teapot and the scene behind the camera in the mirror wall, blurred because their light
+  travels farther than the teapot's; the floor bent through the glass sphere and the green glass cube; and the
+  nearest checks of the floor out of focus. The grain is the lens's: each of the
+  25 rays takes a different path through the glass.
+
+  ![The torture test at 1024x768](docs/images/torture_test.png)
+
+- **PNG and high dynamic range output.** `raythrower --png <file>` writes the image as a PNG, and
+  `--hdr <file>` writes every pixel's linear, unclipped color as a Radiance HDR (`.hdr`, RGBE)
+  file, so highlights brighter than white survive for image editors, Blender and HDR viewers. Both
+  are written by the new `CImageExport`, with a small deflate encoder of its own for PNG, so no
+  zlib is needed. The raw format is still what the trace writes.
+- **The `hdr` color model** (`--color hdr`, or `{ "type": "hdr", "exposure": 1 }` in a scene):
+  colors scaled by `exposure` go unclipped into `--hdr` files, and 8-bit files get them clipped
+  and sRGB-encoded. Color models now give the linear color for HDR files (`ToLinear`); `reinhard`'s
+  is scaled by its exposure, and the others' is the traced color as it is.
+- New tests: `render_color_hdr` (with a reference render, the same as `srgb` at exposure 1), unit
+  checks of RGBE encoding and the `hdr` model, and `image_output`, which renders `scan_test` with
+  `--png` and `--hdr` and decodes both with `tools/check_image.py`. The PNG must match the raw
+  image exactly, and the HDR file within RGBE's precision, with colors above 1. It runs when CMake
+  finds Python 3.
+
 ### Changed
 
+- **Real lenses aim their rays at the exit pupil, so lens renders are less grainy.** A ray from the
+  sensor used to go toward any point of the lens's rear element, and many were blocked by the
+  aperture stop, especially toward the edges where the lens vignettes: blocked rays come back
+  black, and how many varied from pixel to pixel. Now, for each of 64 rings of the sensor out from
+  the center, the lens works out the exit pupil: an ellipse on the rear element around everywhere
+  light gets through, found by tracing a grid of rays (in every color, for a chromatic lens). Rays
+  are aimed only inside it, and each counts for the ellipse's share of the rear element
+  (`CRay::GetWeight`), so the image is exactly as bright as before on average.
+  - On a plain grey background through the double Gauss, the pixel-to-pixel noise falls by about a
+    quarter at the center and nearly 40% at the edges and corners. `lens_test` is about 37%
+    smoother, and the torture test about 27%. Average brightness is unchanged (within 0.3%).
+  - When light gets through the whole rear element (as in `chromatic_test`, whose last surface is
+    the stop), the lens aims at all of it, as before.
+  - The rings are worked out the first time a ray needs them, and shared by every copy of the lens
+    in the program, so the worker threads split the work and the master does none.
+  - The `lens_test`, `chromatic_test` and `torture_test` references are regenerated, with their
+    previews in the README; no other render changes. Look for the finer grain across the frame and
+    the cleaner edges:
+
+    ![Before and after exit-pupil sampling: lens_test, chromatic_test, the torture test, and a full-size crop of it](docs/images/changelog/exit-pupil.png)
+- **Tasks pull tiles of the image instead of being dealt batches of rays.** The master splits the
+  image into tiles (32×32 pixels, `raythrower --tile` to change it) and keeps them in a queue. Each
+  task, a thread or a networked `rayengine`, asks for a tile and traces it with the new
+  `CTileTracer`: it runs the camera's pixel sampler for the tile, makes the camera rays itself
+  (through the lens, once a channel for a chromatic one), traces them, and sends back the tile's
+  linear pixels, then asks for the next. Faster tasks take more tiles.
+  - Making camera rays was the master's job, on one thread. With a real lens that held the torture
+    test to about 3 of 16 cores. Now it takes 3 min 46 s at 1024×768 instead of 13 min 44 s,
+    using about 10 cores.
+  - Renders are byte for byte what they were: all 36 reference renders, and the full-size torture
+    test, match. Samplers sum in fixed point, and a ray two tiles share (a corner of the `corners`
+    sampler) is traced by both and comes out the same.
+  - **Engines can come and go.** With `--listen`, `-N` engines must connect before tracing starts,
+    but more can connect at any time, even mid-render: they get the scene and start asking for
+    tiles. An engine that drops out has its unfinished tiles handed to the others. A trace fails
+    only if every engine is gone and none connects within the `--timeout`. The new `engine_churn`
+    test runs one engine that quits after its first tile and another that joins mid-trace, and the
+    image must match threads exactly.
+  - The wire protocol is version 4: `MESSAGE_REQUEST`, `MESSAGE_TILE`, `MESSAGE_PIXELS` (the
+    pixels as doubles) and `MESSAGE_STOP` replace the ray and color batches. Engines and masters
+    must come from the same release.
+  - `CPixelSampler::Begin` takes a tile (`left, top, width, height`), in image coordinates;
+    `BeginImage( width, height )` samples a whole image. `CPixelWriter` is now an interface:
+    `CImageWriter` writes the image through the color model, and `CTileTracer` keeps a tile's
+    pixels.
+- **Meshes are much faster.** A mesh keeps its faces in a bounding volume hierarchy, so a ray tests
+  only the faces in boxes it passes through instead of every face. The teapot renders about 30
+  times faster (41 s to 1.4 s at 320×240 on 16 cores). Renders are byte for byte the same: of faces
+  hit at exactly the same distance, the tree picks the first in the mesh, as testing every face in
+  order did. `format_test` checks that the tree and the plain loop find exactly the same hits.
 - `.gitignore` ignores `nohup.out`.
+
+### Removed
+
+- `raythrower --batch` (rays per batch), and `CRayArray` and `CColorArray`, which carried the
+  batches; `--tile` sets the work unit's size instead.
 
 ### Fixed
 
@@ -350,7 +470,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.3...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4...HEAD
+[2026-alpha-0.4]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.3...2026-alpha-0.4
 [2026-alpha-0.3]: https://github.com/jnaujok/Ray/compare/v0.2.0...2026-alpha-0.3
 [0.2.0]: https://github.com/jnaujok/Ray/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jnaujok/Ray/releases/tag/v0.1.0

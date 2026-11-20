@@ -133,8 +133,10 @@ static FLT LensUnit( uint64_t nValue )
 }
 
 BOOL CCamera::PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, FLT nImageY, CVector &oOrigin, CVector &oDirection,
-                          int nChannel )
+                          int nChannel, FLT *pnWeight )
 {
+    if ( pnWeight )
+        *pnWeight = 1.0;
     if ( ! m_pLens )
     {
         oOrigin = m_oPosition;
@@ -157,7 +159,7 @@ BOOL CCamera::PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, 
 
     nLensU -= (FLT)floor( (double)nLensU );
     nLensV -= (FLT)floor( (double)nLensV );
-    if ( ! m_pLens->RayFor( nScreenX, nScreenY, nAspect, nLensU, nLensV, anOrigin, anDirection, nChannel ) )
+    if ( ! m_pLens->RayFor( nScreenX, nScreenY, nAspect, nLensU, nLensV, anOrigin, anDirection, nChannel, pnWeight ) )
     {
         oOrigin = m_oPosition;
         oDirection = m_oForward;

@@ -22,10 +22,12 @@ rayengine <master-host> [port] [--retry <seconds>]
 
 1. Connects to the master and sends a hello with the protocol version. The master turns away an
    engine of a different version, so engines and masters must come from the same release
-   (version 3: the scene as SJSON, batches as fixed-layout binary).
-2. Receives the scene, as SJSON.
-3. Receives batches of primary rays, traces each one, and sends the colors back.
-4. Exits when it is sent an empty batch, or when the master goes away.
+   (version 4: the scene as SJSON, then tiles of the image).
+2. Receives the scene, as SJSON, and asks for a tile.
+3. Traces each tile it is given (making its own camera rays, through the lens if the camera has
+   one, and sampling them as the camera says), sends the tile's pixels back, and asks for the next.
+4. Exits when the master tells it to stop, or goes away. An engine can connect at any time, even
+   in the middle of a render: it gets the scene and starts asking for tiles.
 
 The engine is a `CSocketTaskSlave` (`core/src/SocketTaskSlave.cpp`) running the shared
 `CTaskSlave::RunEngine` loop; the code is in [`main.cpp`](main.cpp). It replaces the 1997 PVM

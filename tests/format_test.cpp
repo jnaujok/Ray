@@ -5,10 +5,20 @@
 //   format_test                   the wire and JSON checks
 //   format_test <scene.ray> <dir> load, save, load, save; the two saves must match
 #include "Globals.h"
-#include "RayArray.h"
-#include "ColorArray.h"
 #include "WireProtocol.h"
 #include "Mesh.h"
+#include "Cone.h"
+#include "Box.h"
+#include "Sphere.h"
+#include "ImageExport.h"
+#include "HdrColorModel.h"
+#include "ImageFile.h"
+#include "ThreadTaskMaster.h"
+#include "SocketTaskMaster.h"
+#include "SocketTaskSlave.h"
+#include "Streams/SocketStream.h"
+#include <thread>
+#include <chrono>
 #include "SpecularMaterial.h"
 #include "TransparentMaterial.h"
 #include "Scene.h"
@@ -33,65 +43,43 @@ static void Check( bool bCondition, const char *strWhat )
     }
 }
 
-    // Rays, colors and a scene must cross the wire exactly.
+    // Tiles and their pixels must cross the wire exactly.
 static void WireChecks( void )
 {
-    RayWire::CEncoder   oEncoder( RAY_WIRE_MASTER_ID );
-    RayWire::CDecoder   oDecoder( RAY_WIRE_ENGINE_ID, RAY_WIRE_MASTER_ID );
-    const double        adValues[] = { 0.0, 0.1, -3.141592653589793, 1e-300, 6.02214076e23, 2.0 / 3.0, 1e100, -7.25 };
+    const double        adValues[] = { 0.0, 0.1, -3.141592653589793, 1e-300, 6.02214076e23, 2.0 / 3.0, 1e100, -7.25, NAN };
     const int           nValues = (int)( sizeof( adValues ) / sizeof( adValues[ 0 ] ) );
-    CRayArray           oRays;
-    CRay                oRay;
+    STile               oTile = { 64, 96, 7, 5 };
+    STile               oRead;
+    uint32_t            nTrace = 0;
+    uint64_t            nRays = 0;
+    std::vector<double> anColors, anRead;
 
     Check( RayWire::DecodeHello( RayWire::EncodeHello() ), "the hello reads back" );
 
-        // Several batches, so stream mode's caches and deltas are used.
-    for ( int nBatch = 0; nBatch < 3; nBatch++ )
-    {
-        oRays.RemoveAll();
-        for ( int nIndex = 0; nIndex < 40; nIndex++ )
-        {
-            double d = adValues[ ( nIndex + nBatch ) % nValues ] + nIndex * 1e-9;
+    Check( RayWire::DecodeTile( RayWire::EncodeTile( 42, oTile ), nTrace, oRead ) && nTrace == 42 && oRead.nLeft == 64 &&
+           oRead.nTop == 96 && oRead.nWidth == 7 && oRead.nHeight == 5, "a tile arrives exactly" );
 
-            oRay.Set( d, -d, 0.5, d * 3.0, 1.0 / ( 1.0 + nIndex ), -0.25, 1e100, 1.0, nIndex, 1000 + nBatch );
-            oRays.Add( oRay );
-        }
+    for ( int nIndex = 0; nIndex < 7 * 5 * 3; nIndex++ )
+        anColors.push_back( adValues[ nIndex % nValues ] + nIndex * 1e-9 );
+    Check( RayWire::DecodePixels( RayWire::EncodePixels( 43, oTile, 0x123456789ull, anColors ), nTrace, oRead, nRays, anRead ) &&
+           nTrace == 43 && nRays == 0x123456789ull && oRead.nWidth == 7 && anRead.size() == anColors.size(),
+           "a tile's pixels decode" );
 
-        CRayArray oRead;
-        Check( oDecoder.Rays( oEncoder.Rays( oRays ), oRead ), "a batch of rays decodes" );
-        Check( oRead.GetSize() == oRays.GetSize(), "every ray arrives" );
-        for ( int nIndex = 0; nIndex < oRead.GetSize() && nIndex < oRays.GetSize(); nIndex++ )
-        {
-            CRay &oA = oRays[ nIndex ];
-            CRay &oB = oRead[ nIndex ];
+    bool bExact = anRead.size() == anColors.size();
 
-            Check( oA.GetX() == oB.GetX() && oA.GetY() == oB.GetY() && oA.GetZ() == oB.GetZ() &&
-                   oA.GetI() == oB.GetI() && oA.GetJ() == oB.GetJ() && oA.GetK() == oB.GetK() &&
-                   oA.GetT() == oB.GetT() && oA.GetInfluence() == oB.GetInfluence() &&
-                   oA.GetPixelX() == oB.GetPixelX() && oA.GetPixelY() == oB.GetPixelY(), "a ray arrives exactly" );
-        }
-    }
+    for ( size_t nIndex = 0; bExact && nIndex < anColors.size(); nIndex++ )
+        bExact = ( memcmp( &anRead[ nIndex ], &anColors[ nIndex ], sizeof( double ) ) == 0 );
+    Check( bExact, "every pixel arrives exactly, bit for bit" );
 
-    std::string strReadable = RayWire::ToReadable( MESSAGE_RAYS, oEncoder.Rays( oRays ) );
-    Check( strReadable.find( "\"influence\"" ) != std::string::npos && strReadable.find( "\"py\": 1002" ) != std::string::npos,
-           "a batch of rays can be read as JSON" );
+    std::string strReadable = RayWire::ToReadable( MESSAGE_PIXELS, RayWire::EncodePixels( 43, oTile, 9, anColors ) );
+    Check( strReadable.find( "\"pixels\"" ) != std::string::npos && strReadable.find( "\"left\": 64" ) != std::string::npos,
+           "a pixels message can be read as JSON" );
 
-    CRayArray oEmpty, oRead;
-    Check( oDecoder.Rays( oEncoder.Rays( oEmpty ), oRead ) && oRead.GetSize() == 0, "an empty batch (stop) arrives" );
-
-    RayWire::CEncoder   oColorOut( RAY_WIRE_ENGINE_ID );
-    RayWire::CDecoder   oColorIn( RAY_WIRE_MASTER_ID, RAY_WIRE_ENGINE_ID );
-    CColorArray         oColors, oColorsRead;
-
-    for ( int nIndex = 0; nIndex < nValues; nIndex++ )
-        oColors.Add( CColor( adValues[ nIndex ], 1.0 - adValues[ nIndex ], 0.3 ), nIndex, 2 * nIndex );
-    Check( oColorIn.Colors( oColorOut.Colors( oColors ), oColorsRead ), "a batch of colors decodes" );
-    Check( oColorsRead.GetSize() == oColors.GetSize(), "every color arrives" );
-    for ( int nIndex = 0; nIndex < oColorsRead.GetSize() && nIndex < oColors.GetSize(); nIndex++ )
-        Check( oColorsRead[ nIndex ] == oColors[ nIndex ] && oColorsRead.GetX( nIndex ) == oColors.GetX( nIndex ) &&
-               oColorsRead.GetY( nIndex ) == oColors.GetY( nIndex ), "a color arrives exactly" );
-
-    Check( ! oColorIn.Colors( std::string( "\x50garbage", 8 ), oColorsRead ), "a damaged packet is refused" );
+    std::string strShort = RayWire::EncodePixels( 43, oTile, 9, anColors );
+    strShort.resize( strShort.size() - 8 );
+    Check( ! RayWire::DecodePixels( strShort, nTrace, oRead, nRays, anRead ), "a short pixels message is refused" );
+    STile oEmpty = { 0, 0, 0, 5 };
+    Check( ! RayWire::DecodeTile( RayWire::EncodeTile( 1, oEmpty ), nTrace, oRead ), "an empty tile is refused" );
 }
 
 static std::string ReadFile( const std::string &strFile )
@@ -567,6 +555,316 @@ static void MaterialChecks( void )
     Check( oPlaneScene.ToJson() == strBefore, "shading a plane from behind leaves the plane as it was" );
 }
 
+    // A ray from (dX, dY, dZ) along (dI, dJ, dK), which must be a unit vector.
+static CRay RayFrom( double dX, double dY, double dZ, double dI, double dJ, double dK )
+{
+    CRay oRay;
+
+    oRay.Set( dX, dY, dZ, dI, dJ, dK, 1e100, 1.0, 0, 0 );
+    return oRay;
+}
+
+    // The ray hits oObject at t = dT, where the outward normal is
+    // (dNX, dNY, dNZ).
+static bool HitsAt( CObjects &oObject, CRay oRay, double dT, double dNX, double dNY, double dNZ )
+{
+    CVector oHit;
+
+    if ( ! oObject.Intersect( oRay, oHit ) || ABS( oRay.GetT() - dT ) > 1e-9 )
+        return false;
+
+    CCone  *pCone = dynamic_cast<CCone *>( &oObject );
+    CBox   *pBox = dynamic_cast<CBox *>( &oObject );
+    CVector oNormal = pCone ? pCone->NormalAt( oHit ) : pBox->NormalAt( oHit );
+
+    return ABS( oNormal.GetX() - dNX ) < 1e-9 && ABS( oNormal.GetY() - dNY ) < 1e-9 && ABS( oNormal.GetZ() - dNZ ) < 1e-9;
+}
+
+static bool Misses( CObjects &oObject, CRay oRay )
+{
+    CVector oHit;
+
+    return oObject.Intersect( oRay, oHit ) ? false : true;
+}
+
+static void PrimitiveChecks( void )
+{
+    CScene      oScene;
+    CObjects   *pObject;
+    CVector     oHit;
+
+        // A capped cylinder of radius 1 from y = -1 to 1.
+    pObject = FirstObject( oScene, "{ \"type\": \"cylinder\", \"base\": [0, -1, 0], \"top\": [0, 1, 0], \"radius\": 1 }" );
+    if ( pObject )
+    {
+        Check( HitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a ray hits a cylinder's side" );
+        Check( HitsAt( *pObject, RayFrom( 0.5, 5, 0, 0, -1, 0 ), 4.0, 0, 1, 0 ), "a ray hits a cylinder's top cap" );
+        Check( HitsAt( *pObject, RayFrom( 0.5, -5, 0, 0, 1, 0 ), 4.0, 0, -1, 0 ), "a ray hits a cylinder's base cap" );
+        Check( HitsAt( *pObject, RayFrom( 0, 0, 0, 1, 0, 0 ), 1.0, 1, 0, 0 ), "a ray from inside a cylinder hits its side" );
+        Check( Misses( *pObject, RayFrom( 0, 1.5, -5, 0, 0, 1 ) ), "a ray over a cylinder misses it" );
+        Check( Misses( *pObject, RayFrom( 0, 0, -5, 0, 0, -1 ) ), "a ray away from a cylinder misses it" );
+
+        CRay oLeaving = RayFrom( 0, 0, -1, 0, 0, 1 );
+        Check( ! pObject->Intersect( oLeaving, oHit, pObject ), "a ray leaving a capped cylinder doesn't hit it again" );
+
+            // u as on a sphere, v up the side.
+        CSphere oSphere( 0.0, 0.0, 0.0, 1.0 );
+        CVector oSide( 0.0, 0.0, 1.0 );
+        FLT     nU, nV, nSphereU, nSphereV;
+        Check( pObject->SurfaceCoords( oSide, nU, nV ) && oSphere.SurfaceCoords( oSide, nSphereU, nSphereV ) &&
+               ABS( nU - nSphereU ) < 1e-12 && ABS( nV - 0.5 ) < 1e-12, "a cylinder's u runs as a sphere's, and v up its side" );
+        CVector oCap( 0.5, 1.0, 0.0 );
+        Check( pObject->SurfaceCoords( oCap, nU, nV ) && ABS( nU - 0.75 ) < 1e-12 && ABS( nV - 0.5 ) < 1e-12,
+               "a cylinder's top cap fills the unit square" );
+    }
+
+        // The same, open.
+    pObject = FirstObject( oScene, "{ \"type\": \"cylinder\", \"base\": [0, -1, 0], \"top\": [0, 1, 0], \"radius\": 1, \"capped\": false }" );
+    if ( pObject )
+    {
+        Check( Misses( *pObject, RayFrom( 0.5, 5, 0, 0, -1, 0 ) ), "a ray down an open cylinder passes through" );
+        Check( HitsAt( *pObject, RayFrom( 0, 0.5, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a ray hits an open cylinder's side" );
+
+        CRay oLeaving = RayFrom( 0, 0, -1, 0, 0, 1 );
+        Check( pObject->Intersect( oLeaving, oHit, pObject ) && ABS( oLeaving.GetT() - 2.0 ) < 1e-9,
+               "a ray leaving an open cylinder's inside hits its far side" );
+        CRay oOutward = RayFrom( 0, 0, -1, 0, 0, -1 );
+        Check( ! pObject->Intersect( oOutward, oHit, pObject ), "a ray leaving an open cylinder outward doesn't hit it" );
+    }
+
+        // A cone from radius 1 at y = 0 to a point at y = 2.
+    pObject = FirstObject( oScene, "{ \"type\": \"cone\", \"base\": [0, 0, 0], \"top\": [0, 2, 0], \"baseRadius\": 1 }" );
+    if ( pObject )
+    {
+        double dLength = sqrt( 1.25 );
+
+        Check( HitsAt( *pObject, RayFrom( 0, 1, -5, 0, 0, 1 ), 4.5, 0, 0.5 / dLength, -1.0 / dLength ),
+               "a ray hits a cone's side, where the normal tips up by the slope" );
+        Check( HitsAt( *pObject, RayFrom( 0.2, -1, 0, 0, 1, 0 ), 1.0, 0, -1, 0 ), "a ray hits a cone's base" );
+        Check( Misses( *pObject, RayFrom( 0, 2.1, -5, 0, 0, 1 ) ), "a ray over a cone's point misses it" );
+        Check( Misses( *pObject, RayFrom( 0, 1, -5, 0, 1, 0 ) ), "a ray past a cone misses it, and the other half of the double cone" );
+    }
+
+        // Truncated: radius 0.5 at the top.
+    pObject = FirstObject( oScene, "{ \"type\": \"cone\", \"base\": [0, 0, 0], \"top\": [0, 2, 0], \"baseRadius\": 1, \"topRadius\": 0.5 }" );
+    if ( pObject )
+    {
+        Check( HitsAt( *pObject, RayFrom( 0.4, 5, 0, 0, -1, 0 ), 3.0, 0, 1, 0 ), "a ray hits a truncated cone's top" );
+            // Radius 0.75 at y = 1; the radius shrinks 0.25 a unit up.
+        Check( HitsAt( *pObject, RayFrom( 0.75, 5, 0, 0, -1, 0 ), 4.0, 1.0 / sqrt( 1.0625 ), 0.25 / sqrt( 1.0625 ), 0 ),
+               "a ray past a truncated cone's top hits its side" );
+    }
+
+        // A box 2 by 4 by 6, turned 90 degrees about y: its x runs along -z
+        // and its z along +x.
+    pObject = FirstObject( oScene, "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": [2, 4, 6], \"rotation\": [0, 90, 0] }" );
+    if ( pObject )
+    {
+        Check( HitsAt( *pObject, RayFrom( -10, 0, 0, 1, 0, 0 ), 7.0, -1, 0, 0 ), "a ray hits a turned box's long side" );
+        Check( HitsAt( *pObject, RayFrom( 0, 0, -10, 0, 0, 1 ), 9.0, 0, 0, -1 ), "a ray hits a turned box's short side" );
+        Check( HitsAt( *pObject, RayFrom( 0, 10, 0, 0, -1, 0 ), 8.0, 0, 1, 0 ), "a ray hits a box's top" );
+        Check( Misses( *pObject, RayFrom( -10, 2.5, 0, 1, 0, 0 ) ), "a ray over a box misses it" );
+    }
+
+        // A cube of size 2, and the texture on its faces.
+    pObject = FirstObject( oScene, "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": 2 }" );
+    if ( pObject )
+    {
+        Check( HitsAt( *pObject, RayFrom( 0, 0, 0, 1, 0, 0 ), 1.0, 1, 0, 0 ), "a ray from inside a cube hits its side" );
+
+        FLT     nU, nV;
+        CVector oFront( 0.5, -0.5, -1.0 ), oRight( 1.0, -0.5, 0.5 );
+        Check( pObject->SurfaceCoords( oFront, nU, nV ) && ABS( nU - 0.75 ) < 1e-12 && ABS( nV - 0.25 ) < 1e-12,
+               "a cube's front face holds the unit square, upright" );
+        Check( pObject->SurfaceCoords( oRight, nU, nV ) && ABS( nU - 0.75 ) < 1e-12 && ABS( nV - 0.25 ) < 1e-12,
+               "a cube's right face holds the unit square, upright as seen from the right" );
+        Check( oScene.ToJson().find( "\"size\": 2" ) != std::string::npos, "a cube's size is written as one number" );
+    }
+
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"cylinder\", \"base\": [0, 0, 0], \"top\": [0, 1, 0], \"radius\": 0" ),
+                 BAD_FILE, "objects[0]: the radius must be more than 0" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"cone\", \"base\": [0, 1, 0], \"top\": [0, 1, 0], \"baseRadius\": 1" ),
+                 BAD_FILE, "objects[0]: the base and top can't be the same point" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"cone\", \"base\": [0, 0, 0], \"top\": [0, 1, 0], \"baseRadius\": -1" ),
+                 BAD_FILE, "objects[0]: a radius can't be negative" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"box\", \"center\": [0, 0, 0], \"size\": [1, 0, 1]" ),
+                 BAD_FILE, "objects[0]: every size must be more than 0" );
+    ExpectError( Minimal( "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1",
+                          "\"type\": \"cylinder\", \"base\": [0, 0, 0], \"top\": [0, 1, 0], \"radius\": 1, \"baseRadius\": 1" ),
+                 BAD_FILE, "objects[0]: unknown field \"baseRadius\"" );
+}
+
+    // The mesh's tree must find exactly the hit testing every face does:
+    // rays at the teapot from all around, many grazing its edges.
+static void MeshTreeChecks( const char *strScenes )
+{
+    CScene  oScene;
+
+    Check( oScene.Load( ( std::string( strScenes ) + "/teapot.ray" ).c_str() ) == 0, "the teapot loads" );
+
+    CMesh  *pMesh = dynamic_cast<CMesh *>( oScene.GetObjectAt( 1 ) );
+
+    Check( pMesh != NULL, "the teapot is a mesh" );
+    if ( pMesh == NULL )
+        return;
+
+    unsigned    nSeed = 12345;
+    int         nHits = 0;
+    int         nDiffer = 0;
+
+    for ( int nRay = 0; nRay < 2000; nRay++ )
+    {
+        double adValue[ 6 ];
+
+        for ( int nIndex = 0; nIndex < 6; nIndex++ )
+        {
+            nSeed = ( nSeed * 1103515245u ) + 12345u;
+            adValue[ nIndex ] = ( ( nSeed >> 8 ) & 0xFFFF ) / 65535.0;
+        }
+
+            // From a point around the teapot toward a point inside its box.
+        double dAngle = adValue[ 0 ] * 6.283185307179586;
+        CVector oFrom( 8.0 * cos( dAngle ), ( adValue[ 1 ] * 8.0 ) - 2.0, 8.0 * sin( dAngle ) );
+        CVector oTo( ( adValue[ 2 ] * 6.6 ) - 3.1, adValue[ 3 ] * 3.3, ( adValue[ 4 ] * 4.2 ) - 2.1 );
+        CVector oDirection = oTo - oFrom;
+        CRay    oTree, oEach;
+        CVector oTreeHit, oEachHit;
+
+        oDirection.Normalize();
+        oTree.Set( oFrom.GetX(), oFrom.GetY(), oFrom.GetZ(), oDirection.GetX(), oDirection.GetY(), oDirection.GetZ(), 1e100, 1.0, 0, 0 );
+        oEach = oTree;
+
+        BOOL bTree = pMesh->Intersect( oTree, oTreeHit );
+        BOOL bEach = pMesh->IntersectEachFace( oEach, oEachHit );
+
+        if ( bTree )
+            nHits++;
+        if ( bTree != bEach || oTree.GetT() != oEach.GetT() || oTreeHit.GetX() != oEachHit.GetX() ||
+             oTreeHit.GetY() != oEachHit.GetY() || oTreeHit.GetZ() != oEachHit.GetZ() )
+            nDiffer++;
+    }
+    Check( nHits > 500, "many rays at the teapot hit it" );
+    Check( nDiffer == 0, "the mesh's tree finds exactly the hit testing every face finds" );
+}
+
+static void HdrChecks( void )
+{
+    BYTE anRgbe[ 4 ];
+
+        // RGBE: a mantissa byte a channel over a shared power of two.
+    CImageExport::ToRgbe( 1.0f, 1.0f, 1.0f, anRgbe );
+    Check( anRgbe[ 0 ] == 128 && anRgbe[ 1 ] == 128 && anRgbe[ 2 ] == 128 && anRgbe[ 3 ] == 129, "white is RGBE 128 128 128 129" );
+    CImageExport::ToRgbe( 12.0f, 3.0f, 0.0f, anRgbe );
+    Check( anRgbe[ 0 ] == 192 && anRgbe[ 1 ] == 48 && anRgbe[ 2 ] == 0 && anRgbe[ 3 ] == 132, "a color brighter than white keeps its brightness" );
+    CImageExport::ToRgbe( -1.0f, NAN, 0.0f, anRgbe );
+    Check( anRgbe[ 0 ] == 0 && anRgbe[ 1 ] == 0 && anRgbe[ 2 ] == 0 && anRgbe[ 3 ] == 0, "negative and NaN channels are black" );
+
+        // The hdr color model scales by its exposure and doesn't clip; its
+        // bytes are the sRGB of the scaled color.
+    CScene          oScene;
+    CHdrColorModel  oModel;
+    CColor          oBright( 3.0, 0.5, 0.0 );
+    BYTE            nRed, nGreen, nBlue;
+
+    Check( oModel.SetExposure( 2.0 ) && ! oModel.SetExposure( 0.0 ), "the hdr exposure must be positive" );
+    CColor oLinear = oModel.ToLinear( oBright );
+    Check( oLinear.GetR() == 6.0 && oLinear.GetG() == 1.0 && oLinear.GetB() == 0.0, "the hdr model scales by its exposure and doesn't clip" );
+    oModel.ToRGB( oBright, nRed, nGreen, nBlue );
+    Check( nRed == 255 && nGreen == 255 && nBlue == 0, "the hdr model's bytes clip the scaled color" );
+
+    Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"colorModel\": { \"type\": \"hdr\", \"exposure\": 0.5 }" ) ) == 0 &&
+           strcmp( oScene.GetCamera().GetColorModel().GetName(), "hdr" ) == 0 &&
+           oScene.ToJson().find( "\"exposure\": 0.5" ) != std::string::npos, "a scene chooses the hdr color model and its exposure" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"colorModel\": { \"type\": \"hdr\", \"exposure\": -1 }" ),
+                 BAD_FILE, "exposure must be a positive number" );
+
+        // The PNG's chunks.
+    std::vector<BYTE> anPixels( 4 * 3 * 3, 200 );
+    std::vector<BYTE> anPng = CImageExport::EncodePng( 4, 3, anPixels );
+    Check( anPng.size() > 33 && memcmp( anPng.data(), "\x89PNG\r\n\x1a\n", 8 ) == 0 && memcmp( anPng.data() + 12, "IHDR", 4 ) == 0 &&
+           memcmp( anPng.data() + anPng.size() - 8, "IEND", 4 ) == 0, "a PNG has its signature, header and end" );
+}
+
+    // An engine that quits after its first tile, without sending it.
+class CQuitter : public CSocketTaskSlave
+{
+    public:
+        virtual BOOL PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors )
+        {
+            (void)nTrace; (void)oTile; (void)nRays; (void)anColors;
+            delete m_pStream;       // drops the connection
+            m_pStream = NULL;
+            return FALSE;
+        }
+};
+
+    // Engines that come and go: the image must still be whole, and exactly
+    // what threads make.
+static void EngineChecks( const char *strScenes, const char *strDir )
+{
+    std::string strThreads = std::string( strDir ) + "/churn_threads.raw";
+    std::string strEngines = std::string( strDir ) + "/churn_engines.raw";
+    CScene      oScene;
+
+    Check( oScene.Load( ( std::string( strScenes ) + "/scan_test.ray" ).c_str() ) == 0, "scan_test loads" );
+    oScene.GetSettings().SetImageWidth( 96 );
+    oScene.GetSettings().SetImageHeight( 72 );
+
+    {
+        CThreadTaskMaster   oThreads;
+        CImageFile          oImage( strThreads.c_str(), 96, 72, FALSE );
+
+        oThreads.SetTileSize( 16 );
+        oThreads.SpawnTasks( 3 );
+        Check( oThreads.TraceScene( oScene, oImage ) == TRUE, "threads trace the image" );
+        oThreads.EndTasks();
+    }
+
+    CSocketTaskMaster oMaster( 0, 30 );
+
+    Check( oMaster.Listen() == TRUE, "the master listens" );
+
+    int         nPort = oMaster.GetPort();
+    std::thread oFirst( [ nPort ]()
+    {
+        CQuitter oQuitter;
+
+        if ( oQuitter.Connect( "127.0.0.1", nPort, 10 ) )
+            oQuitter.RunEngine();
+    } );
+
+    oMaster.SetTileSize( 16 );
+    Check( oMaster.SpawnTasks( 1 ) == TRUE, "the first engine connects" );
+
+        // The second engine comes once the trace is under way.
+    std::thread oSecond( [ nPort ]()
+    {
+        CSocketTaskSlave oEngine;
+
+        std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
+        if ( oEngine.Connect( "127.0.0.1", nPort, 10 ) )
+            oEngine.RunEngine();
+    } );
+
+    {
+        CImageFile oImage( strEngines.c_str(), 96, 72, FALSE );
+
+        Check( oMaster.TraceScene( oScene, oImage ) == TRUE, "the trace finishes though its first engine quit" );
+    }
+    oMaster.EndTasks();
+    oFirst.join();
+    oSecond.join();
+
+    Check( ReadFile( strEngines ).size() == 4 + 96 * 72 * 3 && ReadFile( strEngines ) == ReadFile( strThreads ),
+           "the image is exactly what threads make, with an engine lost and one joining late" );
+    remove( strThreads.c_str() );
+    remove( strEngines.c_str() );
+}
+
 static void RoundTrip( const char *strScene, const char *strDir )
 {
     std::string strBase = std::string( strDir ) + "/roundtrip_";
@@ -628,10 +926,13 @@ static void ArchiveChecks( const char *strScenes, const char *strDir )
 
 int main( int argc, char **argv )
 {
-    if ( argc >= 4 && strcmp( argv[ 1 ], "--textures" ) == 0 )
+    if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
+        EngineChecks( argv[ 2 ], argv[ 3 ] );
+    else if ( argc >= 4 && strcmp( argv[ 1 ], "--textures" ) == 0 )
     {
         TextureChecks( argv[ 2 ] );
         ArchiveChecks( argv[ 2 ], argv[ 3 ] );
+        MeshTreeChecks( argv[ 2 ] );
     }
     else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
@@ -643,6 +944,8 @@ int main( int argc, char **argv )
         LensChecks();
         UVMapChecks();
         MaterialChecks();
+        PrimitiveChecks();
+        HdrChecks();
     }
 
     if ( g_nFailures == 0 )

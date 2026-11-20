@@ -5,7 +5,8 @@
 *   out for a pixel, a linear color of any brightness, into the bytes    *
 *   written to the image file. A camera owns one color model, the way a  *
 *   camera holds a film; attach a different one to change how colors    *
-*   are clipped, gamma encoded, or tone mapped.                          *
+*   are clipped, gamma encoded, or tone mapped. For high dynamic range   *
+*   files it also gives the linear, unclipped color (ToLinear).          *
 *                                                                        *
 *   To add a color model, derive from this class and add it to the table *
 *   in ColorModel.cpp so it can be chosen by name.                       *
@@ -45,6 +46,10 @@ class CColorModel
 
             /// The bytes to write for a pixel of this linear color.
         virtual void            ToRGB( const CColor &oColor, BYTE &nRed, BYTE &nGreen, BYTE &nBlue ) const = 0;
+            /// The linear color to write for a pixel in a high dynamic range
+            /// file (Radiance HDR): unclipped and unencoded. The default is
+            /// the color as it is; a model with an exposure applies it.
+        virtual CColor          ToLinear( const CColor &oColor ) const;
 
             /// Writes the model's settings, if it has any, into a scene file's
             /// JSON object for it (which already holds its "type").

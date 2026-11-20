@@ -34,7 +34,7 @@ set(RAY_SAMPLER_TESTS
 set(RAY_SAMPLER_SCENE scan_test)
 
 # The color models other than the default, each rendered with one scene.
-set(RAY_COLOR_MODELS gamma srgb reinhard)
+set(RAY_COLOR_MODELS gamma srgb reinhard hdr)
 set(RAY_COLOR_SCENE scan_test)
 
 add_test(NAME ray_stream_format COMMAND format_test)
@@ -74,7 +74,7 @@ foreach(index RANGE 0 ${last} 2)
 endforeach()
 
 # The Utah teapot: a smooth, double-sided mesh of 6,320 triangles. Rendered
-# small, since every ray inside its bounding box tests every face.
+# small, as it was before meshes had a bounding volume hierarchy.
 add_test(NAME render_teapot
          COMMAND ${CMAKE_COMMAND}
                  -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -136,6 +136,38 @@ add_test(NAME render_teapot_textured
 set_tests_properties(render_teapot_textured PROPERTIES TIMEOUT 600)
 add_test(NAME roundtrip_teapot_textured COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/teapot_textured.ray ${RENDER_DIR})
 add_test(NAME texture_checks COMMAND format_test --textures ${PROJECT_SOURCE_DIR}/scenes ${RENDER_DIR})
+# Engines that come and go: one quits after its first tile, another joins
+# during the trace; the image must still be exactly what threads make.
+add_test(NAME engine_churn COMMAND format_test --engines ${PROJECT_SOURCE_DIR}/scenes ${RENDER_DIR})
+set_tests_properties(engine_churn PROPERTIES RESOURCE_LOCK ray_network TIMEOUT 120)
+
+# Cylinders, cones and boxes: open and capped, truncated, turned, textured
+# and glass.
+add_test(NAME render_primitives
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/primitives_test.ray
+                 -DOUTPUT=${RENDER_DIR}/primitives_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/primitives_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_primitives PROPERTIES FIXTURES_SETUP render_primitives TIMEOUT 300)
+add_test(NAME roundtrip_primitives_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/primitives_test.ray ${RENDER_DIR})
+
+# The torture test: every kind of object (the teapot too), reflection,
+# refraction and textures, through the double Gauss with a 5x5 stratified
+# sampler. Rendered small; the scene itself is 1024x768.
+add_test(NAME render_torture
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/torture_test.ray
+                 -DOUTPUT=${RENDER_DIR}/torture_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/torture_test.raw
+                 -DSIZE=160x120
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_torture PROPERTIES TIMEOUT 900)
+add_test(NAME roundtrip_torture_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/torture_test.ray ${RENDER_DIR})
 
 add_test(NAME render_sampler_stratified
          COMMAND ${CMAKE_COMMAND}
@@ -256,6 +288,36 @@ add_test(NAME network_texture
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_texture PROPERTIES FIXTURES_REQUIRED render_texture
                                                 RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_primitives
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/primitives_test.ray
+                 -DOUTPUT=${RENDER_DIR}/primitives_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/primitives_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_primitives PROPERTIES FIXTURES_REQUIRED render_primitives
+                                                   RESOURCE_LOCK ray_network TIMEOUT 300)
+
+# PNG and Radiance HDR output, checked with Python's own zlib.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME image_output
+             COMMAND ${CMAKE_COMMAND}
+                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                     -DPYTHON=${Python3_EXECUTABLE}
+                     -DCHECK=${PROJECT_SOURCE_DIR}/tools/check_image.py
+                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/scan_test.ray
+                     -DOUTPUT=${RENDER_DIR}/image_output
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/ImageOutputTest.cmake)
+    set_tests_properties(image_output PROPERTIES TIMEOUT 300)
+else()
+    message(STATUS "Python 3 not found: the image_output test is skipped")
+endif()
 
 # raythrower --spawn starts the rayengine next to it.
 add_dependencies(raythrower rayengine)

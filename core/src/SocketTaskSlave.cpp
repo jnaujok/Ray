@@ -5,8 +5,6 @@
 #endif
 
 #include "Scene.h"
-#include "RayArray.h"
-#include "ColorArray.h"
 #include "SocketTaskSlave.h"
 #include "WireProtocol.h"
 
@@ -21,9 +19,7 @@
 
 CSocketTaskSlave::CSocketTaskSlave( void ) :
     m_pStream( NULL ),
-    m_oEncoder( RAY_WIRE_ENGINE_ID ),
-    m_oDecoder( RAY_WIRE_ENGINE_ID, RAY_WIRE_MASTER_ID ),
-    m_nRaysTraced( 0 )
+    m_oDecoder( RAY_WIRE_ENGINE_ID, RAY_WIRE_MASTER_ID )
 {
 }
 
@@ -82,77 +78,79 @@ BOOL CSocketTaskSlave::Connect( const char *strHost, int nPort, int nRetrySecond
     return TRUE;
 }
 
-BOOL CSocketTaskSlave::Receive( uint8_t nExpected, std::string &strPayload )
+CTaskSlave::EMessage CSocketTaskSlave::FromMaster( std::unique_ptr<CScene> &pScene, STile &oTile, uint32_t &nTrace )
 {
-    uint8_t nTag;
+    uint8_t     nTag;
+    std::string strPayload;
 
     if ( m_pStream == NULL )
-        return FALSE;
+        return FROM_MASTER_ERROR;
 
     try
     {
         if ( ! RayWire::ReceiveFrame( *m_pStream, nTag, strPayload ) )
         {
             m_strLastError = "The master closed the connection";
-            return FALSE;
+            return FROM_MASTER_ERROR;
         }
     }
     catch ( IASLib::CException &oException )
     {
         m_strLastError = oException.GetMessage();
-        return FALSE;
+        return FROM_MASTER_ERROR;
     }
 
-    if ( nTag != nExpected )
+    switch ( nTag )
     {
-        m_strLastError.Format( "Expected message %d from the master, got %d", (int)nExpected, (int)nTag );
-        return FALSE;
+        case MESSAGE_SCENE:
+            pScene.reset( new CScene );
+            if ( ! m_oDecoder.Scene( strPayload, *pScene ) )
+            {
+                m_strLastError.Format( "The scene from the master could not be read: %s", m_oDecoder.GetError().c_str() );
+                pScene.reset();
+                return FROM_MASTER_ERROR;
+            }
+            return FROM_MASTER_SCENE;
+
+        case MESSAGE_TILE:
+            if ( ! RayWire::DecodeTile( strPayload, nTrace, oTile ) )
+            {
+                m_strLastError = "A tile from the master could not be read";
+                return FROM_MASTER_ERROR;
+            }
+            return FROM_MASTER_TILE;
+
+        case MESSAGE_STOP:
+            return FROM_MASTER_STOP;
+
+        default:
+            m_strLastError.Format( "Unexpected message %d from the master", (int)nTag );
+            return FROM_MASTER_ERROR;
     }
-    return TRUE;
 }
 
-BOOL CSocketTaskSlave::SceneFromMaster( CScene &oScene )
+BOOL CSocketTaskSlave::Send( uint8_t nTag, const std::string &strPayload )
 {
-    std::string strPayload;
-
-    if ( ! Receive( MESSAGE_SCENE, strPayload ) )
+    if ( m_pStream == NULL )
         return FALSE;
-
-    if ( ! m_oDecoder.Scene( strPayload, oScene ) )
-    {
-        m_strLastError.Format( "The scene from the master could not be read: %s", m_oDecoder.GetError().c_str() );
-        return FALSE;
-    }
-    return TRUE;
-}
-
-BOOL CSocketTaskSlave::RaysFromMaster( CRayArray &oRays )
-{
-    std::string strPayload;
-
-    oRays.RemoveAll();
-    if ( ! Receive( MESSAGE_RAYS, strPayload ) )
-        return FALSE;
-
-    if ( ! m_oDecoder.Rays( strPayload, oRays ) )
-    {
-        m_strLastError.Format( "Rays from the master could not be read: %s", m_oDecoder.GetError().c_str() );
-        return FALSE;
-    }
-    return ( oRays.GetSize() != 0 );
-}
-
-BOOL CSocketTaskSlave::ColorsToMaster( CColorArray &oColors )
-{
     try
     {
-        RayWire::SendFrame( *m_pStream, MESSAGE_COLOR, m_oEncoder.Colors( oColors ) );
+        RayWire::SendFrame( *m_pStream, nTag, strPayload );
     }
     catch ( IASLib::CException &oException )
     {
         m_strLastError = oException.GetMessage();
         return FALSE;
     }
-    m_nRaysTraced += (unsigned long)oColors.GetSize();
     return TRUE;
+}
+
+BOOL CSocketTaskSlave::RequestWork( void )
+{
+    return Send( MESSAGE_REQUEST, std::string() );
+}
+
+BOOL CSocketTaskSlave::PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors )
+{
+    return Send( MESSAGE_PIXELS, RayWire::EncodePixels( nTrace, oTile, (uint64_t)nRays, anColors ) );
 }

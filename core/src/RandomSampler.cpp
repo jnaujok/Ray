@@ -34,6 +34,8 @@ namespace
 CRandomSampler::CRandomSampler( int nSamples, int nSeed ) :
     m_nSamples( 4 ),
     m_nSeed( nSeed ),
+    m_nLeft( 0 ),
+    m_nTop( 0 ),
     m_nWidth( 0 ),
     m_nHeight( 0 ),
     m_nPixel( 0 ),
@@ -61,8 +63,10 @@ void CRandomSampler::Offset( int nX, int nY, int nRay, FLT &nU, FLT &nV ) const
     nV = Unit( Mix( nKey ) );
 }
 
-long long CRandomSampler::Begin( int nWidth, int nHeight )
+long long CRandomSampler::Begin( int nLeft, int nTop, int nWidth, int nHeight )
 {
+    m_nLeft = nLeft;
+    m_nTop = nTop;
     m_nWidth = ( nWidth > 0 ) ? nWidth : 0;
     m_nHeight = ( nHeight > 0 ) ? nHeight : 0;
     if ( ( m_nWidth == 0 ) || ( m_nHeight == 0 ) )
@@ -72,7 +76,7 @@ long long CRandomSampler::Begin( int nWidth, int nHeight )
 
         // Weights: the center N, each random ray 1, so the center is half
         // of the total 2N.
-    m_oSums.Begin( m_nWidth, m_nHeight, (uint32_t)( 2 * m_nSamples ) );
+    m_oSums.Begin( m_nLeft, m_nTop, m_nWidth, m_nHeight, (uint32_t)( 2 * m_nSamples ) );
 
     return (long long)( m_nSamples + 1 ) * (long long)m_nWidth * (long long)m_nHeight;
 }
@@ -82,8 +86,8 @@ BOOL CRandomSampler::NextRay( CScene &oScene, CRay &oRay )
     if ( m_nPixel >= m_nWidth * m_nHeight )
         return FALSE;
 
-    int nX = m_nPixel % m_nWidth;
-    int nY = m_nPixel / m_nWidth;
+    int nX = m_nLeft + ( m_nPixel % m_nWidth );
+    int nY = m_nTop + ( m_nPixel / m_nWidth );
     int nTagX = ( nX * ( m_nSamples + 1 ) ) + m_nRay;
 
     if ( m_nRay == 0 )

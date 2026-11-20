@@ -41,6 +41,8 @@ class CReinhardColorModel : public CColorModel
         BOOL                    SetWhite( FLT nWhite );
 
         virtual void            ToRGB( const CColor &oColor, BYTE &nRed, BYTE &nGreen, BYTE &nBlue ) const;
+            /// The color scaled by the exposure, before tone mapping.
+        virtual CColor          ToLinear( const CColor &oColor ) const;
         virtual void            ToJson( IASLib::CObjectNode &oNode ) const;
         virtual BOOL            FromJson( const IASLib::CJsonNode &oNode );
 };

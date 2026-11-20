@@ -39,6 +39,7 @@ CRay::CRay( void )
     m_nZ = 0.0;
     m_nT = 1e100;       // effective infinity
     m_nInfluence = 0.0;
+    m_nWeight = 1.0;
     m_nPixelX = 0;
     m_nPixelY = 0;
     m_nDepth = 0;
@@ -56,6 +57,7 @@ CRay::CRay( const CRay &oRay )
     m_nZ = oRay.m_nZ;
     m_nT = oRay.m_nT;
     m_nInfluence = oRay.m_nInfluence;
+    m_nWeight = oRay.m_nWeight;
     m_nPixelX = oRay.m_nPixelX;
     m_nPixelY = oRay.m_nPixelY;
     m_nDepth = oRay.m_nDepth;
@@ -77,6 +79,7 @@ CRay &CRay::operator =( const CRay &oRay )
     m_nZ = oRay.m_nZ;
     m_nT = oRay.m_nT;
     m_nInfluence = oRay.m_nInfluence;
+    m_nWeight = oRay.m_nWeight;
     m_nPixelX = oRay.m_nPixelX;
     m_nPixelY = oRay.m_nPixelY;
     m_nDepth = oRay.m_nDepth;
@@ -100,6 +103,7 @@ void CRay::CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX
     m_nK = oNormal.GetZ();
     m_nT = oVector.Magnitude();
     m_nInfluence = nInfluence;
+    m_nWeight = 1.0;
     m_nPixelX = nX;
     m_nPixelY = nY;
     m_nDepth = 0;
@@ -131,8 +135,9 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
 
         // A ray the camera's lens blocks gets no influence, so it traces as
         // black.
+    m_nWeight = 1.0;
     if ( ! oCamera.PrimaryRay( ( ( nImageX * 2.0 ) / nWidth ) - 1.0, 1.0 - ( ( nImageY * 2.0 ) / nHeight ),
-                               nWidth / nHeight, nImageX, nImageY, oStartPos, oDirection, nChannel ) )
+                               nWidth / nHeight, nImageX, nImageY, oStartPos, oDirection, nChannel, &m_nWeight ) )
         nInfluence = 0.0;
     m_nImageX = nImageX;
     m_nImageY = nImageY;
@@ -162,6 +167,7 @@ void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInf
     m_nK = nK;
     m_nT = nT;
     m_nInfluence = nInfluence;
+    m_nWeight = 1.0;
     m_nPixelX = nPixelX;
     m_nPixelY = nPixelY;
     m_nDepth = 0;

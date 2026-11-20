@@ -9,6 +9,7 @@
 #include "SceneJson.h"
 
 #include <math.h>
+#include <algorithm>
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -41,6 +42,8 @@ void CMesh::DeleteFaces( void )
     for ( size_t nIndex = 0; nIndex < m_apFaces.size(); nIndex++ )
         delete m_apFaces[ nIndex ];
     m_apFaces.clear();
+    m_aoNodes.clear();
+    m_anOrder.clear();
     m_pHitFace = NULL;
 }
 
@@ -143,6 +146,7 @@ BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vect
         FLT nMargin = 1e-6 * ( 1.0 + ABS( anMax[ 0 ] - anMin[ 0 ] ) + ABS( anMax[ 1 ] - anMin[ 1 ] ) + ABS( anMax[ 2 ] - anMin[ 2 ] ) );
         m_oMinimum.Set( anMin[ 0 ] - nMargin, anMin[ 1 ] - nMargin, anMin[ 2 ] - nMargin );
         m_oMaximum.Set( anMax[ 0 ] + nMargin, anMax[ 1 ] + nMargin, anMax[ 2 ] + nMargin );
+        BuildTree( nMargin );
     }
 
     if ( m_anUVs.empty() && m_oUVMap.nType != UVMAP_NONE )
@@ -343,6 +347,141 @@ BOOL CMesh::HitsBox( CRay &oRay )
     return TRUE;
 }
 
+    // Leaves hold at most this many faces.
+#define LEAF_FACES  4
+
+void CMesh::BuildTree( FLT nMargin )
+{
+    std::vector<FLT> anCenters( m_apFaces.size() * 3 );
+
+    m_aoNodes.clear();
+    m_anOrder.resize( m_apFaces.size() );
+    for ( size_t nFace = 0; nFace < m_apFaces.size(); nFace++ )
+    {
+        m_anOrder[ nFace ] = (int)nFace;
+        for ( int nCorner = 0; nCorner < 3; nCorner++ )
+        {
+            CVector &oCorner = m_apFaces[ nFace ]->GetCorner( nCorner );
+
+            anCenters[ ( nFace * 3 ) ] += oCorner.GetX() / 3.0;
+            anCenters[ ( nFace * 3 ) + 1 ] += oCorner.GetY() / 3.0;
+            anCenters[ ( nFace * 3 ) + 2 ] += oCorner.GetZ() / 3.0;
+        }
+    }
+    if ( ! m_apFaces.empty() )
+    {
+        m_aoNodes.reserve( ( m_apFaces.size() * 2 ) / LEAF_FACES + 2 );
+        BuildNode( 0, (int)m_apFaces.size(), anCenters, nMargin );
+    }
+}
+
+int CMesh::BuildNode( int nFirst, int nCount, const std::vector<FLT> &anCenters, FLT nMargin )
+{
+    int     nNode = (int)m_aoNodes.size();
+    SNode   oNode;
+    FLT     anLow[ 3 ] = { 1e300, 1e300, 1e300 };     // the faces' centers' extent
+    FLT     anHigh[ 3 ] = { -1e300, -1e300, -1e300 };
+
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        oNode.anMin[ nAxis ] = 1e300;
+        oNode.anMax[ nAxis ] = -1e300;
+    }
+    for ( int nIndex = nFirst; nIndex < nFirst + nCount; nIndex++ )
+    {
+        int nFace = m_anOrder[ (size_t)nIndex ];
+
+        for ( int nCorner = 0; nCorner < 3; nCorner++ )
+        {
+            CVector &oCorner = m_apFaces[ (size_t)nFace ]->GetCorner( nCorner );
+            FLT      anValue[ 3 ] = { oCorner.GetX(), oCorner.GetY(), oCorner.GetZ() };
+
+            for ( int nAxis = 0; nAxis < 3; nAxis++ )
+            {
+                oNode.anMin[ nAxis ] = (std::min)( oNode.anMin[ nAxis ], anValue[ nAxis ] );
+                oNode.anMax[ nAxis ] = (std::max)( oNode.anMax[ nAxis ], anValue[ nAxis ] );
+            }
+        }
+        for ( int nAxis = 0; nAxis < 3; nAxis++ )
+        {
+            anLow[ nAxis ] = (std::min)( anLow[ nAxis ], anCenters[ ( (size_t)nFace * 3 ) + nAxis ] );
+            anHigh[ nAxis ] = (std::max)( anHigh[ nAxis ], anCenters[ ( (size_t)nFace * 3 ) + nAxis ] );
+        }
+    }
+        // A little larger, as the mesh's own box is: a face's hit test
+        // allows a point a hair outside its edges.
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        oNode.anMin[ nAxis ] -= nMargin;
+        oNode.anMax[ nAxis ] += nMargin;
+    }
+    oNode.nFirst = nFirst;
+    oNode.nCount = nCount;
+    oNode.nLeft = oNode.nRight = -1;
+    m_aoNodes.push_back( oNode );
+
+    if ( nCount <= LEAF_FACES )
+        return nNode;
+
+        // Split at the median center along the axis the centers spread
+        // furthest on.
+    int nSplitAxis = 0;
+
+    for ( int nAxis = 1; nAxis < 3; nAxis++ )
+    {
+        if ( anHigh[ nAxis ] - anLow[ nAxis ] > anHigh[ nSplitAxis ] - anLow[ nSplitAxis ] )
+            nSplitAxis = nAxis;
+    }
+
+    int nHalf = nCount / 2;
+
+    std::nth_element( m_anOrder.begin() + nFirst, m_anOrder.begin() + nFirst + nHalf, m_anOrder.begin() + nFirst + nCount,
+                      [ & ]( int nA, int nB )
+                      {
+                          FLT nCenterA = anCenters[ ( (size_t)nA * 3 ) + nSplitAxis ];
+                          FLT nCenterB = anCenters[ ( (size_t)nB * 3 ) + nSplitAxis ];
+
+                          return ( nCenterA != nCenterB ) ? ( nCenterA < nCenterB ) : ( nA < nB );
+                      } );
+
+    int nLeft = BuildNode( nFirst, nHalf, anCenters, nMargin );
+    int nRight = BuildNode( nFirst + nHalf, nCount - nHalf, anCenters, nMargin );
+
+    m_aoNodes[ (size_t)nNode ].nLeft = nLeft;
+    m_aoNodes[ (size_t)nNode ].nRight = nRight;
+    m_aoNodes[ (size_t)nNode ].nCount = 0;
+    return nNode;
+}
+
+BOOL CMesh::HitsNode( const SNode &oNode, const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT nLimit )
+{
+    FLT nNear = 0.0;
+    FLT nFar = nLimit;
+
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        if ( anDirection[ nAxis ] == 0.0 )
+        {
+            if ( anOrigin[ nAxis ] < oNode.anMin[ nAxis ] || anOrigin[ nAxis ] > oNode.anMax[ nAxis ] )
+                return FALSE;
+            continue;
+        }
+
+        FLT nT1 = ( oNode.anMin[ nAxis ] - anOrigin[ nAxis ] ) / anDirection[ nAxis ];
+        FLT nT2 = ( oNode.anMax[ nAxis ] - anOrigin[ nAxis ] ) / anDirection[ nAxis ];
+
+        if ( nT1 > nT2 )
+            std::swap( nT1, nT2 );
+        if ( nT1 > nNear )
+            nNear = nT1;
+        if ( nT2 < nFar )
+            nFar = nT2;
+        if ( nNear > nFar )
+            return FALSE;
+    }
+    return TRUE;
+}
+
 BOOL CMesh::Intersect( CRay &oRay, CVector &oIntersect )
 {
     return Intersect( oRay, oIntersect, NULL );
@@ -356,16 +495,73 @@ BOOL CMesh::Intersect( CRay &oRay, CVector &oIntersect, CObjects *pIgnore )
     if ( pIgnore == this || ! HitsBox( oRay ) )
         return FALSE;
 
+    FLT     anOrigin[ 3 ] = { oRay.GetX(), oRay.GetY(), oRay.GetZ() };
+    FLT     anDirection[ 3 ] = { oRay.GetI(), oRay.GetJ(), oRay.GetK() };
+    FLT     nBest = oRay.GetT();
+    int     nBestFace = -1;
+    CVector oBestHit;
+    int     anStack[ 128 ];
+    int     nStack = 0;
+
+        // The closest hit, and of faces hit at exactly the same distance the
+        // first in the mesh, which is the face testing every face in order
+        // finds. Each face is tested against the ray's own limit, so its
+        // distance doesn't depend on the order the tree visits faces in;
+        // boxes beyond the closest hit so far are skipped.
+    anStack[ nStack++ ] = 0;
+    while ( nStack > 0 )
+    {
+        const SNode &oNode = m_aoNodes[ (size_t)anStack[ --nStack ] ];
+
+        if ( ! HitsNode( oNode, anOrigin, anDirection, nBest ) )
+            continue;
+
+        if ( oNode.nCount == 0 )
+        {
+            anStack[ nStack++ ] = oNode.nRight;
+            anStack[ nStack++ ] = oNode.nLeft;
+            continue;
+        }
+
+        for ( int nIndex = oNode.nFirst; nIndex < oNode.nFirst + oNode.nCount; nIndex++ )
+        {
+            int         nFace = m_anOrder[ (size_t)nIndex ];
+            CTriangle  *pFace = m_apFaces[ (size_t)nFace ];
+            CRay        oTry( oRay );
+
+            if ( pFace == pIgnore || ! pFace->Intersect( oTry, oHit ) )
+                continue;
+            if ( oTry.GetT() < nBest || ( oTry.GetT() == nBest && nFace < nBestFace ) )
+            {
+                nBest = oTry.GetT();
+                nBestFace = nFace;
+                oBestHit = oHit;
+            }
+        }
+    }
+
+    if ( nBestFace >= 0 )
+    {
+        bHit = TRUE;
+        oRay.SetT( nBest );
+        oIntersect = oBestHit;
+        m_pHitFace = m_apFaces[ (size_t)nBestFace ];
+    }
+    return bHit;
+}
+
+BOOL CMesh::IntersectEachFace( CRay &oRay, CVector &oIntersect )
+{
+    CVector oHit;
+    BOOL    bHit = FALSE;
+
         // Each face only reports a hit closer than the ray's closest so far,
         // so the last face that reports one is the closest.
     for ( size_t nIndex = 0; nIndex < m_apFaces.size(); nIndex++ )
     {
-        CTriangle *pFace = m_apFaces[ nIndex ];
-
-        if ( pFace != pIgnore && pFace->Intersect( oRay, oHit ) )
+        if ( m_apFaces[ nIndex ]->Intersect( oRay, oHit ) )
         {
             bHit = TRUE;
-            m_pHitFace = pFace;
             oIntersect = oHit;
         }
     }

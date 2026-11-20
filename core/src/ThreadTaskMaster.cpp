@@ -5,111 +5,113 @@
 #endif
 
 #include "Scene.h"
-#include "ImageFile.h"
-#include "RayArray.h"
-#include "ColorArray.h"
 #include "TaskSlave.h"
 #include "ThreadTaskMaster.h"
-#include "WireProtocol.h"
-
 #include "Threading/Thread.h"
-#include "Threading/Semaphore.h"
 
-    // How many batches of rays may wait for one worker.
-#define WORKER_QUEUE_DEPTH      16
+#if defined(RAY_GUI) && defined(_DEBUG)
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
 
 namespace
 {
-        // What the master sends a worker: the scene (once), then batches of
-        // rays. An empty batch tells the worker to stop.
+        // What the master sends a worker.
     struct SInbox
     {
-        std::shared_ptr<const std::string>  pScene;
-        std::unique_ptr<CRayArray>          pRays;
+        CTaskSlave::EMessage                nKind;
+        std::shared_ptr<const std::string>  pScene;     // FROM_MASTER_SCENE: its JSON
+        STile                               oTile;      // FROM_MASTER_TILE
+        uint32_t                            nTrace;
     };
 }
 
 class CThreadTaskMaster::CWorker : public IASLib::CThread, public CTaskSlave
 {
     protected:
-        TWorkQueue<SInbox>          m_oInbox;
-        IASLib::CSemaphore          m_semFreeSlots;
-        TWorkQueue<CColorArray *>  &m_oResults;
+        int                 m_nIndex;
+        CThreadTaskMaster  &m_oMaster;
+        TWorkQueue<SInbox>  m_oInbox;
 
     public:
-        CWorker( int nIndex, TWorkQueue<CColorArray *> &oResults ) :
+        CWorker( int nIndex, CThreadTaskMaster &oMaster ) :
             IASLib::CThread( "Ray tracing worker", true ),
-            m_semFreeSlots( WORKER_QUEUE_DEPTH ),
-            m_oResults( oResults )
+            m_nIndex( nIndex ),
+            m_oMaster( oMaster )
         {
-            (void)nIndex;
             SetNoDelete( true );
             Resume();
         }
 
-        void SendScene( std::shared_ptr<const std::string> pScene )
+        void Send( SInbox oItem )
         {
-            SInbox oItem;
-            oItem.pScene = pScene;
-            m_oInbox.Push( std::move( oItem ) );
-        }
-
-        void SendRays( CRayArray &oRays )
-        {
-            SInbox oItem;
-
-            m_semFreeSlots.Wait();
-            oItem.pRays.reset( new CRayArray( oRays ) );
-            m_oInbox.Push( std::move( oItem ) );
-        }
-
-            // Tells the worker to stop. Takes no queue slot, so it cannot
-            // block even if the worker has already ended.
-        void SendStop( void )
-        {
-            SInbox oItem;
-            oItem.pRays.reset( new CRayArray );
             m_oInbox.Push( std::move( oItem ) );
         }
 
         virtual void *Run( void )
         {
-            RunEngine();
-                // RunEngine only returns when it was told to stop, or could not
-                // read the scene. Either way the master hears about it.
-            m_oResults.Push( NULL );
+                // RunEngine only returns early if something failed; then the
+                // master hears that this task is gone.
+            if ( ! RunEngine() )
+            {
+                CTaskMaster::SEvent oEvent;
+
+                oEvent.nKind = CTaskMaster::SEvent::EVENT_LOST;
+                oEvent.nTask = m_nIndex;
+                m_oMaster.PostEvent( std::move( oEvent ) );
+            }
             return NULL;
         }
 
-        virtual BOOL SceneFromMaster( CScene &oScene )
+        virtual EMessage FromMaster( std::unique_ptr<CScene> &pScene, STile &oTile, uint32_t &nTrace )
         {
             SInbox oItem = m_oInbox.Pop();
 
-            if ( ! oItem.pScene )
-                return FALSE;
-            return ( oScene.FromJson( *oItem.pScene ) == 0 ) ? TRUE : FALSE;
+            if ( oItem.nKind == FROM_MASTER_SCENE )
+            {
+                pScene.reset( new CScene );
+                if ( ! oItem.pScene || pScene->FromJson( *oItem.pScene ) != 0 )
+                {
+                    pScene.reset();
+                    return FROM_MASTER_ERROR;
+                }
+            }
+            else if ( oItem.nKind == FROM_MASTER_TILE )
+            {
+                oTile = oItem.oTile;
+                nTrace = oItem.nTrace;
+            }
+            return oItem.nKind;
         }
 
-        virtual BOOL RaysFromMaster( CRayArray &oRays )
+        virtual BOOL RequestWork( void )
         {
-            SInbox oItem = m_oInbox.Pop();
+            CTaskMaster::SEvent oEvent;
 
-            m_semFreeSlots.Post();
-            oRays.RemoveAll();
-            if ( ! oItem.pRays )
-                return FALSE;
-            oRays = *oItem.pRays;
-            return ( oRays.GetSize() != 0 );
+            oEvent.nKind = CTaskMaster::SEvent::EVENT_REQUEST;
+            oEvent.nTask = m_nIndex;
+            m_oMaster.PostEvent( std::move( oEvent ) );
+            return TRUE;
         }
 
-        virtual BOOL ColorsToMaster( CColorArray &oColors )
+        virtual BOOL PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors )
         {
-            m_oResults.Push( new CColorArray( oColors ) );
+            CTaskMaster::SEvent oEvent;
+
+            oEvent.nKind = CTaskMaster::SEvent::EVENT_PIXELS;
+            oEvent.nTask = m_nIndex;
+            oEvent.nTrace = nTrace;
+            oEvent.oTile = oTile;
+            oEvent.nRays = nRays;
+            oEvent.anColors = anColors;
+            m_oMaster.PostEvent( std::move( oEvent ) );
             return TRUE;
         }
 };
 
-CThreadTaskMaster::CThreadTaskMaster( void )
+CThreadTaskMaster::CThreadTaskMaster( void ) :
+    m_nSceneTextTrace( 0 )
 {
 }
 
@@ -121,86 +123,67 @@ CThreadTaskMaster::~CThreadTaskMaster( void )
 BOOL CThreadTaskMaster::SpawnTasks( int nTasksToSpawn )
 {
     EndTasks();
-
     if ( nTasksToSpawn <= 0 )
         nTasksToSpawn = 1;
 
     for ( int nCount = 0; nCount < nTasksToSpawn; nCount++ )
-        m_apWorkers.push_back( new CWorker( nCount, m_oResults ) );
-
-    m_nTasks = (int)m_apWorkers.size();
+    {
+        m_apWorkers.push_back( new CWorker( nCount, *this ) );
+        TaskStarted( nCount );
+    }
     return TRUE;
 }
 
 BOOL CThreadTaskMaster::EndTasks( void )
 {
-    CColorArray    *pColors;
+    SInbox oStop;
 
+    oStop.nKind = CTaskSlave::FROM_MASTER_STOP;
     for ( size_t nCount = 0; nCount < m_apWorkers.size(); nCount++ )
-        m_apWorkers[ nCount ]->SendStop();
-
+        m_apWorkers[ nCount ]->Send( oStop );
     for ( size_t nCount = 0; nCount < m_apWorkers.size(); nCount++ )
     {
         m_apWorkers[ nCount ]->Join();
         delete m_apWorkers[ nCount ];
     }
     m_apWorkers.clear();
-    m_nTasks = 0;
-
-        // Throw away anything the workers sent after the trace ended.
-    while ( m_oResults.TryPop( pColors ) )
-        delete pColors;
-
+    m_pSceneText.reset();
+    m_nSceneTextTrace = 0;
+    ForgetTasks();
     return TRUE;
 }
 
-BOOL CThreadTaskMaster::SceneToTasks( CScene &oScene )
-{
-        // Each worker gets its own copy of the scene, through its JSON text.
-    std::shared_ptr<const std::string> pScene( new std::string( oScene.ToJson( TRUE ) ) );
-
-    for ( size_t nCount = 0; nCount < m_apWorkers.size(); nCount++ )
-        m_apWorkers[ nCount ]->SendScene( pScene );
-
-    return TRUE;
-}
-
-BOOL CThreadTaskMaster::RaysToTask( CRayArray &oRays, int nTask )
+BOOL CThreadTaskMaster::SceneToTask( int nTask, CScene &oScene )
 {
     if ( ( nTask < 0 ) || ( nTask >= (int)m_apWorkers.size() ) )
         return FALSE;
 
-    m_apWorkers[ (size_t)nTask ]->SendRays( oRays );
+        // Each worker gets its own copy of the scene, through its JSON text,
+        // made once a trace.
+    if ( ! m_pSceneText || m_nSceneTextTrace != m_nTrace )
+    {
+        m_pSceneText.reset( new std::string( oScene.ToJson( TRUE ) ) );
+        m_nSceneTextTrace = m_nTrace;
+    }
+
+    SInbox oItem;
+
+    oItem.nKind = CTaskSlave::FROM_MASTER_SCENE;
+    oItem.pScene = m_pSceneText;
+    m_apWorkers[ (size_t)nTask ]->Send( oItem );
     return TRUE;
 }
 
-int CThreadTaskMaster::ColorsFromTasks( BOOL bWait )
+BOOL CThreadTaskMaster::TileToTask( int nTask, uint32_t nTrace, const STile &oTile )
 {
-    CColorArray    *pColors;
-    int             nPixels = 0;
-    bool            bHaveOne;
+    if ( ( nTask < 0 ) || ( nTask >= (int)m_apWorkers.size() ) )
+        return FALSE;
 
-    if ( bWait )
-    {
-        pColors = m_oResults.Pop();
-        bHaveOne = true;
-    }
-    else
-        bHaveOne = m_oResults.TryPop( pColors );
+    SInbox oItem;
 
-    while ( bHaveOne )
-    {
-        if ( pColors == NULL )
-            return -1;      // A worker stopped in the middle of the trace.
-
-        for ( int nCount = 0; nCount < pColors->GetSize(); nCount++ )
-            PutSample( pColors->GetX( nCount ), pColors->GetY( nCount ), (*pColors)[ nCount ] );
-
-        nPixels += pColors->GetSize();
-        delete pColors;
-
-        bHaveOne = m_oResults.TryPop( pColors );
-    }
-
-    return nPixels;
+    oItem.nKind = CTaskSlave::FROM_MASTER_TILE;
+    oItem.oTile = oTile;
+    oItem.nTrace = nTrace;
+    m_apWorkers[ (size_t)nTask ]->Send( oItem );
+    return TRUE;
 }
