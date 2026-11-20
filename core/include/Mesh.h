@@ -30,6 +30,11 @@
 #include <string>
 #include <vector>
 
+namespace ModelFile
+{
+    struct SModel;
+}
+
 class CMesh : public CObjects
 {
     protected:
@@ -62,6 +67,9 @@ class CMesh : public CObjects
         std::string             m_strFile;          // its name in the scene
         std::string             m_strFilePath;      // where on the disk it came from (empty: the archive or the scene)
         std::shared_ptr<const std::string> m_pFileData;
+            // The file as read, shared by every copy of the scene that names
+            // it, so it is read once while any of them lives.
+        std::shared_ptr<const ModelFile::SModel> m_pModel;
         CVector                 m_oScale;
         FLT                     m_nFitSize;         // 0: use m_oScale
         CVector                 m_oRotation;

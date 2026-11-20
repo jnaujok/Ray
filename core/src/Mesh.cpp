@@ -102,6 +102,7 @@ BOOL CMesh::LoadModel( const std::string &strData, const std::string &strName, s
 
     if ( ! pModel )
         return FALSE;
+    m_pModel = pModel;
 
     const ModelFile::SModel &oModel = *pModel;
     const FLT               nToRadians = PI / 180.0;

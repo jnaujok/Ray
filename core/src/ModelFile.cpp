@@ -92,7 +92,7 @@ namespace
             {
                 size_t operator ()( const SKey &oKey ) const
                 {
-                    uint64_t nHash = 1469598103934665603ULL;
+                    uint64_t nHash = 0;
 
                     for ( int nAxis = 0; nAxis < 3; nAxis++ )
                     {
@@ -101,7 +101,13 @@ namespace
                         uint64_t nBits;
 
                         memcpy( &nBits, &dValue, sizeof( nBits ) );
-                        nHash = ( nHash ^ nBits ) * 1099511628211ULL;
+                            // Mixed so every bit reaches the low ones: a float
+                            // made a double has 29 low bits of zeros, and some
+                            // tables pick a bucket by the low bits alone.
+                        nHash = ( nHash ^ nBits ) + 0x9E3779B97F4A7C15ULL;
+                        nHash = ( nHash ^ ( nHash >> 30 ) ) * 0xBF58476D1CE4E5B9ULL;
+                        nHash = ( nHash ^ ( nHash >> 27 ) ) * 0x94D049BB133111EBULL;
+                        nHash ^= nHash >> 31;
                     }
                     return (size_t)nHash;
                 }
