@@ -71,11 +71,16 @@ The ray tracing itself is the 1997 code.
   first thing in the way.
 
   <img src="docs/images/tests/primitives_test.png" alt="A capped cylinder, an open tube, a cone, a textured truncated cone, a textured cube, and a glass box on a checkered floor" width="320">
-- **Lights:** point lights.
+- **Lights:** point lights, and area lights that cast soft shadows: a glowing ball
+  (`sphereLight`) and a glowing panel (`rectangleLight`), each shaded from points spread over it.
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by
   influence. Transparent materials can absorb light by how far it travels inside (Beer–Lambert),
   so thick glass is deeper in color than thin, and a glass ball darker through its middle than at
-  its rim.
+  its rim. Glass and mirrors can be rough: frosted glass blurs what is behind it, and a brushed or
+  satin mirror blurs its reflection (GGX microfacets), best with a sampler that traces many rays
+  a pixel.
+
+  <img src="docs/images/tests/soft_test.png" alt="Clear, lightly frosted and heavily frosted glass panes before a striped poster, a mirror ball and a brushed gold ball, and soft shadows from a rectangle light and a sphere light" width="320">
 - **Textures:** any material's color can come from a texture instead: a checkerboard, on the
   surface or solid (carved from a checkered block), an image file (PPM or Ray raw) laid over the
   surface, or a solid noise texture: marble, wood, or plain noise and turbulence (granite, stone,
@@ -251,7 +256,8 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
 **Render the torture test**, every kind of object (the teapot too, in marble), mirrors, glass
-(the cube absorbing by thickness) and textures (a wooden mirror frame) through the double Gauss lens at 25 rays a pixel, at its full 1024×768 (about a minute on a
+(the cube absorbing by thickness, the ball frosted), textures (a wooden mirror frame), a brushed
+gold tube, and soft shadows from a sphere light and a rectangle light, through the double Gauss lens at 25 rays a pixel, at its full 1024×768 (about a minute on a
 16-core machine, with a Release build):
 
 ```sh
@@ -315,7 +321,7 @@ ctest --test-dir build --output-on-failure
 
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
-textures, solid textures and absorbing glass, cylinders, cones, and boxes, and a torture test of all of them through a real lens).
+textures, solid textures and absorbing glass, rough glass and mirrors with area lights, cylinders, cones, and boxes, and a torture test of all of them through a real lens).
 They also check that a lens has the focal length, f-number, focus and color dispersion its
 prescription should, that
 networked engines produce exactly the same bytes as threads (even when an engine drops out mid-render
@@ -325,7 +331,10 @@ they are, triangle sidedness and that smooth mesh faces agree along shared edges
 cylinders, cones, and boxes and the normals there, and that a mesh's bounding volume hierarchy finds
 exactly the hits testing every face does, and that the scene's tree finds exactly the hits and
 shadows testing every object does. They check that gradient noise is smooth, bounded and set by its
-seed, and that glass absorbs exactly as Beer–Lambert says for the distance through it. With Python 3 installed, they also decode the PNG and
+seed, and that glass absorbs exactly as Beer–Lambert says for the distance through it. They check
+that rough surfaces draw their microfacets from the GGX distribution, that rough glass is the same
+every time for the same ray, that a sphere light's points lie on the disc it shows, that a
+rectangle light shines only to its front, and that hiding half of one gives half its light. With Python 3 installed, they also decode the PNG and
 HDR output (with Python's own zlib) and check it against the raw image. CI runs them
 on every platform, and again on Linux under AddressSanitizer and UndefinedBehaviorSanitizer.
 
@@ -349,6 +358,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td><td align="center"><img src="docs/images/tests/texture_test.png" alt="render_texture" width="260"><br><code>render_texture</code></td><td align="center"><img src="docs/images/tests/teapot_textured.png" alt="render_teapot_textured (120x90)" width="120"><br><code>render_teapot_textured (120x90)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td><td align="center"><img src="docs/images/tests/solid_textures_test.png" alt="render_solid_textures" width="260"><br><code>render_solid_textures</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -432,8 +442,8 @@ the format's history.
 
 The code builds and runs on current compilers, and work on the ray tracing has resumed: a corrected
 camera, anti-aliasing, color models, meshes (with a bounding volume hierarchy), cylinders, cones
-and boxes, solid marble, wood and stone textures, glass that absorbs by thickness, and JSON scenes
-so far. Next up are choices for sampling and color, and the new shapes,
+and boxes, solid marble, wood and stone textures, glass that absorbs by thickness, frosted glass
+and brushed mirrors, area lights with soft shadows, and JSON scenes so far. Next up are choices for sampling and color, and the new shapes,
 in the scene editor.
 
 ## Changelog

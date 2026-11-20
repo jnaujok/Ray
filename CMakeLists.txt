@@ -87,6 +87,7 @@ set(RAY_CORE_SOURCES
     core/src/Rays.cpp
     core/src/RandomSampler.cpp
     core/src/RaySettings.cpp
+    core/src/RectangleLight.cpp
     core/src/ReflectiveMaterial.cpp
     core/src/ReinhardColorModel.cpp
     core/src/Scene.cpp
@@ -96,6 +97,7 @@ set(RAY_CORE_SOURCES
     core/src/SocketTaskSlave.cpp
     core/src/SpecularMaterial.cpp
     core/src/Sphere.cpp
+    core/src/SphereLight.cpp
     core/src/SrgbColorModel.cpp
     core/src/StratifiedSampler.cpp
     core/src/Texture.cpp

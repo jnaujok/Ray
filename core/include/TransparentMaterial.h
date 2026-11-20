@@ -14,6 +14,9 @@ class CTransparentMaterial : public CMaterial
             // so twice as far is that color squared). 0 absorbs nothing.
         CColor              m_oAttenuationColor;
         FLT                 m_nAttenuationDistance;
+            // GGX roughness: 0 is clear glass; more blurs what is seen
+            // through it, as frosted glass does.
+        FLT                 m_nRoughness;
 
     public:
                             DEFINE_MATERIAL( CTransparentMaterial );

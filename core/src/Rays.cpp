@@ -21,6 +21,9 @@
 #include "Rays.h"
 #include "Camera.h"
 #include "Scene.h"
+#include "Sampling.h"
+
+#include <string.h>
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -46,6 +49,9 @@ CRay::CRay( void )
     m_nImageX = 0.0;
     m_nImageY = 0.0;
     m_pInside = NULL;
+    m_nSampleU = 0.5;
+    m_nSampleV = 0.5;
+    m_nSampleKey = 0;
 }
 
 CRay::CRay( const CRay &oRay )
@@ -65,6 +71,9 @@ CRay::CRay( const CRay &oRay )
     m_nImageX = oRay.m_nImageX;
     m_nImageY = oRay.m_nImageY;
     m_pInside = oRay.m_pInside;
+    m_nSampleU = oRay.m_nSampleU;
+    m_nSampleV = oRay.m_nSampleV;
+    m_nSampleKey = oRay.m_nSampleKey;
 }
 
 CRay::~CRay( void )
@@ -88,6 +97,9 @@ CRay &CRay::operator =( const CRay &oRay )
     m_nImageX = oRay.m_nImageX;
     m_nImageY = oRay.m_nImageY;
     m_pInside = oRay.m_pInside;
+    m_nSampleU = oRay.m_nSampleU;
+    m_nSampleV = oRay.m_nSampleV;
+    m_nSampleKey = oRay.m_nSampleKey;
 
     return *this;
 }
@@ -111,6 +123,9 @@ void CRay::CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX
     m_nPixelY = nY;
     m_nDepth = 0;
     m_pInside = NULL;
+    m_nSampleU = 0.5;
+    m_nSampleV = 0.5;
+    m_nSampleKey = 0;
 }
 
     // The primary ray from the camera through the center of pixel (nX, nY),
@@ -160,6 +175,15 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
     m_nPixelY = nTagY;
     m_nDepth = 0;
     m_pInside = NULL;
+
+        // The sample point is where the ray falls in its pixel; the key is
+        // the pixel's, so every ray of a pixel is shifted alike.
+    FLT nPixelX = (FLT)floor( (double)nImageX );
+    FLT nPixelY = (FLT)floor( (double)nImageY );
+
+    m_nSampleU = nImageX - nPixelX;
+    m_nSampleV = nImageY - nPixelY;
+    m_nSampleKey = RaySampling::Mix( RaySampling::Mix( (uint64_t)(int64_t)nPixelX ) ^ (uint64_t)(int64_t)nPixelY );
 }
 
 void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInfluence, int nPixelX, int nPixelY )
@@ -177,6 +201,9 @@ void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInf
     m_nPixelY = nPixelY;
     m_nDepth = 0;
     m_pInside = NULL;
+    m_nSampleU = 0.5;
+    m_nSampleV = 0.5;
+    m_nSampleKey = 0;
 }
 
 void CRay::SetT( FLT nNewT )
@@ -184,4 +211,50 @@ void CRay::SetT( FLT nNewT )
     m_nT = nNewT;
 }
 
+void CRay::InheritSample( const CRay &oParent, uint64_t nBranch )
+{
+        // The new ray's point is a hash of its parent's, not the same point:
+        // the same one (only shifted) would tie each bounce's choice to the
+        // one before in a way fixed for the pixel, and a pixel's rough glass
+        // would blur by its own kernel, which more rays never smooth out.
+        // Hashed, it is independent of the parent's (and still the same on
+        // every run, from the parent's exact bits).
+    uint64_t    nBitsU;
+    uint64_t    nBitsV;
+    double      dU = (double)oParent.m_nSampleU;
+    double      dV = (double)oParent.m_nSampleV;
 
+    memcpy( &nBitsU, &dU, sizeof( nBitsU ) );
+    memcpy( &nBitsV, &dV, sizeof( nBitsV ) );
+    m_nSampleKey = RaySampling::Mix( oParent.m_nSampleKey ^ RaySampling::Mix( nBranch + ( (uint64_t)oParent.m_nDepth << 40 ) ) );
+
+    uint64_t    nHash = RaySampling::Mix( RaySampling::Mix( m_nSampleKey ^ nBitsU ) ^ nBitsV );
+
+    m_nSampleU = RaySampling::Unit( nHash );
+    m_nSampleV = RaySampling::Unit( RaySampling::Mix( nHash ) );
+}
+
+void CRay::SamplePoint( uint64_t nPurpose, FLT &nU, FLT &nV ) const
+{
+    uint64_t    nHash = RaySampling::Mix( m_nSampleKey ^ RaySampling::Mix( nPurpose + ( (uint64_t)m_nDepth << 40 ) ) );
+    uint64_t    nTurn = RaySampling::Mix( RaySampling::Mix( nHash ) );
+    FLT         nShiftedU = RaySampling::Wrap( m_nSampleU + RaySampling::Unit( nHash ) );
+    FLT         nShiftedV = RaySampling::Wrap( m_nSampleV + RaySampling::Unit( RaySampling::Mix( nHash ) ) );
+
+        // Turning and mirroring the square too, differently for each
+        // purpose, keeps one use's points from lining up with another's.
+    if ( nTurn & 1 )
+        nShiftedU = ( nShiftedU > 0.0 ) ? 1.0 - nShiftedU : 0.0;
+    if ( nTurn & 2 )
+        nShiftedV = ( nShiftedV > 0.0 ) ? 1.0 - nShiftedV : 0.0;
+    if ( nTurn & 4 )
+    {
+        nU = nShiftedV;
+        nV = nShiftedU;
+    }
+    else
+    {
+        nU = nShiftedU;
+        nV = nShiftedV;
+    }
+}

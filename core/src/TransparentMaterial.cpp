@@ -7,6 +7,7 @@
 #include "TransparentMaterial.h"
 #include "Scene.h"
 #include "SceneJson.h"
+#include "Sampling.h"
 
 #include <math.h>
 
@@ -27,7 +28,8 @@ IMPLEMENT_MATERIAL( CTransparentMaterial, Transparent Material, "transparent" );
 CTransparentMaterial::CTransparentMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 ),
 m_oAttenuationColor( 1.0, 1.0, 1.0 ),
-m_nAttenuationDistance( 0.0 )
+m_nAttenuationDistance( 0.0 ),
+m_nRoughness( 0.0 )
 {
     m_nIndexOfRefraction = 1.0;
 }
@@ -35,7 +37,8 @@ m_nAttenuationDistance( 0.0 )
 CTransparentMaterial::CTransparentMaterial( CColor oColor, FLT nRefract ) :
 m_oColor( oColor ),
 m_oAttenuationColor( 1.0, 1.0, 1.0 ),
-m_nAttenuationDistance( 0.0 )
+m_nAttenuationDistance( 0.0 ),
+m_nRoughness( 0.0 )
 {
     m_nIndexOfRefraction = nRefract;
 }
@@ -123,6 +126,36 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
     BOOL        bLeaving = ( oViewIncident.GetInside() == pIntersect ) ? TRUE : FALSE;
     BOOL        bPasses = Refract( oView, oNormal, m_nIndexOfRefraction, oTransmit );
 
+        // Rough (frosted) glass bends the ray through a microfacet normal
+        // drawn from around the surface's. One tilted past the ray, or that
+        // would send it out the wrong side, is passed over for the clear
+        // direction.
+    if ( m_nRoughness > 0.0 )
+    {
+        FLT     nU;
+        FLT     nV;
+        CVector oRough;
+
+        oViewIncident.SamplePoint( RaySampling::PURPOSE_REFRACT, nU, nV );
+
+        CVector oMicro = RaySampling::Microfacet( oNormal, m_nRoughness, nU, nV );
+        FLT     nSide = oNormal.Dot( oView );
+
+        if ( ( oMicro.Dot( oView ) > 0.0 ) == ( nSide > 0.0 ) )
+        {
+            BOOL    bRoughPasses = Refract( oView, oMicro, m_nIndexOfRefraction, oRough );
+            FLT     nOut = oNormal.Dot( oRough );
+
+                // Through the surface the ray keeps going the way it was;
+                // reflected inside, it turns back.
+            if ( bRoughPasses ? ( ( nOut > 0.0 ) == ( nSide > 0.0 ) ) : ( ( nOut > 0.0 ) != ( nSide > 0.0 ) ) )
+            {
+                oTransmit = oRough;
+                bPasses = bRoughPasses;
+            }
+        }
+    }
+
     oTransStep = oTransmit * TRANSMIT_STEP;
 
     oTemp = oIntersect + oTransStep;
@@ -132,6 +165,7 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
         // The above function is tailored for Shadow rays, so we need to stretch
         // out the valid intersection range.
 
+    oTransmitted.InheritSample( oViewIncident, RaySampling::PURPOSE_REFRACT );
     oTransmitted.SetT( 1e100 );
     oTransmitted.SetDepth( oViewIncident.GetDepth() );
         // Passing through the surface changes sides; reflecting inside it
@@ -214,19 +248,24 @@ void CTransparentMaterial::ToJson( IASLib::CObjectNode &oNode )
         RayJson::PutColor( oNode, "attenuationColor", m_oAttenuationColor );
         RayJson::PutNumber( oNode, "attenuationDistance", m_nAttenuationDistance );
     }
+    if ( m_nRoughness > 0.0 )
+        RayJson::PutNumber( oNode, "roughness", m_nRoughness );
 }
 
 BOOL CTransparentMaterial::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "influence", "texture", "color", "indexOfRefraction",
-                                              "attenuationColor", "attenuationDistance", NULL };
+                                              "attenuationColor", "attenuationDistance", "roughness", NULL };
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
          ! RayJson::GetColor( oNode, "color", m_oColor, FALSE ) ||
          ! RayJson::GetNumber( oNode, "indexOfRefraction", m_nIndexOfRefraction, FALSE ) ||
          ! RayJson::GetColor( oNode, "attenuationColor", m_oAttenuationColor, FALSE ) ||
-         ! RayJson::GetNumber( oNode, "attenuationDistance", m_nAttenuationDistance, FALSE ) )
+         ! RayJson::GetNumber( oNode, "attenuationDistance", m_nAttenuationDistance, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "roughness", m_nRoughness, FALSE ) )
         return FALSE;
+    if ( ( m_nRoughness < 0.0 ) || ( m_nRoughness > 1.0 ) )
+        return RayJson::Fail( "roughness must be between 0 and 1" );
     if ( m_nAttenuationDistance < 0.0 )
         return RayJson::Fail( "attenuationDistance can't be negative" );
 
