@@ -27,7 +27,8 @@ namespace RaySampling
     {
         PURPOSE_REFLECT = 0x5245464CULL,        // a rough mirror's direction
         PURPOSE_REFRACT = 0x52465241ULL,        // rough glass's direction
-        PURPOSE_LIGHT = 0x4C494748ULL           // plus the light's index: a point on an area light
+        PURPOSE_LIGHT = 0x4C494748ULL,          // plus the light's index: a point on an area light
+        PURPOSE_ENVIRONMENT = 0x454E5649ULL     // a direction toward the sky, for the environment's light
     };
 
         /// SplitMix64's finalizer.

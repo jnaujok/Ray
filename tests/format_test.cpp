@@ -28,6 +28,10 @@
 #include "WoodTexture.h"
 #include "SphereLight.h"
 #include "RectangleLight.h"
+#include "SpotLight.h"
+#include "DirectionalLight.h"
+#include "Environment.h"
+#include "JSON/ObjectNode.h"
 #include "Sampling.h"
 #include "SceneJson.h"
 #include "Scene.h"
@@ -1811,6 +1815,481 @@ static void BumpChecks( void )
     ExpectError( PlaneWithBump( "3" ), BAD_FILE, "objects[0].bump: must be an object" );
 }
 
+// --------------------------------------------------------------------------
+// Spot and directional lights, and the environment
+// --------------------------------------------------------------------------
+
+    // The color a ray from oFrom along oDirection brings back.
+static CColor TraceFrom( CScene &oScene, CVector oFrom, CVector oDirection )
+{
+    CRay    oRay;
+    CColor  oColor( 0, 0, 0 );
+
+    oDirection.Normalize();
+    oRay.Set( oFrom.GetX(), oFrom.GetY(), oFrom.GetZ(), oDirection.GetX(), oDirection.GetY(), oDirection.GetZ(), 1e100, 1.0, 0, 0 );
+    oScene.TraceRay( oRay, oColor, NULL );
+    return oColor;
+}
+
+    // A scene of a white diffuse floor, under strLights, with strExtra objects.
+static std::string FloorUnder( const char *strLights, const char *strExtra = "", const char *strEnvironment = "" )
+{
+    std::string strText =
+        "{ \"format\": \"Ray scene\", \"version\": 3, \"background\": [0, 0, 0],\n";
+
+    strText += strEnvironment;
+    strText +=
+        "  \"camera\": { \"position\": [0, 1, -10], \"lookAt\": [0, 0, 0] },\n"
+        "  \"objects\": [ { \"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 1, 0],\n"
+        "                   \"materials\": [ { \"type\": \"diffuse\", \"color\": [1, 1, 1] } ] }";
+    strText += strExtra;
+    strText += " ],\n  \"lights\": [ ";
+    strText += strLights;
+    strText += " ] }\n";
+    return strText;
+}
+
+    // The light reaching the floor at (dX, 0, dZ), seen from straight above.
+static double FloorAt( CScene &oScene, double dX, double dZ )
+{
+    return TraceFrom( oScene, CVector( dX, 0.5, dZ ), CVector( 0.0, -1.0, 0.0 ) ).GetR();
+}
+
+static void LightChecks( void )
+{
+        // A spot light lights its cone, fully inside the fading edge and not
+        // at all outside it, along a smoothstep between.
+    CScene  oSpotScene;
+
+    Check( oSpotScene.FromJson( FloorUnder( "{ \"type\": \"spot\", \"position\": [0, 10, 0], \"direction\": [0, -1, 0], "
+                                            "\"color\": [1, 1, 1], \"angle\": 30, \"falloff\": 10 }" ) ) == 0,
+           "a scene with a spot light loads" );
+
+    CSpotLight *pSpot = dynamic_cast<CSpotLight *>( oSpotScene.GetLight( 0 ) );
+
+    Check( pSpot != NULL && pSpot->GetSampleCount() == 0, "a spot light without a radius is a point" );
+    if ( pSpot )
+    {
+        bool bEdge = true;
+
+        for ( int nDegrees = 0; nDegrees <= 40; nDegrees++ )
+        {
+            double  dAngle = nDegrees * PI / 180.0;
+            CVector oToLight( -sin( dAngle ), cos( dAngle ), 0.0 );     // from the lit point up to the light
+            double  dFactor = pSpot->ConeFactor( oToLight );
+            double  dExpected;
+
+            if ( nDegrees <= 20 )
+                dExpected = 1.0;
+            else if ( nDegrees >= 30 )
+                dExpected = 0.0;
+            else
+            {
+                double dT = ( cos( dAngle ) - cos( 30.0 * PI / 180.0 ) ) / ( cos( 20.0 * PI / 180.0 ) - cos( 30.0 * PI / 180.0 ) );
+
+                dExpected = dT * dT * ( 3.0 - 2.0 * dT );
+            }
+            bEdge = bEdge && ABS( dFactor - dExpected ) < 1e-12;
+        }
+        Check( bEdge, "a spot light's cone is full inside its falloff, empty outside it, and a smoothstep between" );
+    }
+
+        // On the floor: 10 up, a 30 degree cone reaches tan( 30 ) x 10 = 5.77.
+    double dCenter = FloorAt( oSpotScene, 0.0, 0.0 );
+    double dEdge = FloorAt( oSpotScene, 10.0 * tan( 25.0 * PI / 180.0 ), 0.0 );
+    double dOutside = FloorAt( oSpotScene, 6.0, 0.0 );
+
+    Check( ABS( dCenter - 1.0 ) < 1e-9, "a spot light lights the middle of its pool fully" );
+    Check( dEdge > 0.05 && dEdge < 0.95, "a spot light's pool fades at its edge" );
+    Check( dOutside == 0.0, "a spot light leaves the floor outside its cone dark" );
+
+        // With a radius, a spot light is a disc with soft shadows: a post's
+        // shadow has a penumbra.
+    CScene oSoftSpot;
+
+    Check( oSoftSpot.FromJson( FloorUnder( "{ \"type\": \"spot\", \"position\": [0, 10, 0], \"direction\": [0, -1, 0], "
+                                           "\"color\": [1, 1, 1], \"angle\": 40, \"falloff\": 0, \"radius\": 1, \"samples\": 64 }",
+                                           ", { \"type\": \"box\", \"center\": [-5, 5, 0], \"size\": [10, 0.2, 10] }" ) ) == 0,
+           "a spot light with a radius loads" );
+    Check( oSoftSpot.GetLight( 0 ) && oSoftSpot.GetLight( 0 )->GetSampleCount() == 64, "a spot light with a radius is sampled" );
+
+    double dHalf = FloorAt( oSoftSpot, 0.0, 0.0 );
+
+    Check( ABS( dHalf - 0.5 ) < 0.05, "half a spot light's disc hidden gives about half its light" );
+
+        // The new lights read, save and read back the same; a spot light
+        // without a radius writes none.
+    const char *strLights =
+        "{ \"type\": \"spot\", \"position\": [1, 2, 3], \"direction\": [0, -2, 0], \"color\": [1, 0.5, 0.25], \"angle\": 25, \"falloff\": 5 },\n"
+        "{ \"type\": \"spot\", \"position\": [1, 2, 3], \"direction\": [0, -1, 0], \"color\": [1, 1, 1], \"radius\": 0.5, \"samples\": 3 },\n"
+        "{ \"type\": \"directional\", \"direction\": [1, -1, 0], \"color\": [0.9, 0.9, 0.8] },\n"
+        "{ \"type\": \"directional\", \"direction\": [0, -1, 1], \"color\": [1, 1, 1], \"angle\": 0.53, \"samples\": 4 }";
+    CScene      oLightScene;
+
+    Check( oLightScene.FromJson( FloorUnder( strLights ) ) == 0, "a scene with spot and directional lights loads" );
+
+    std::string strSaved = oLightScene.ToJson();
+    CScene      oReread;
+
+    Check( oReread.FromJson( strSaved ) == 0 && oReread.ToJson() == strSaved, "spot and directional lights read back the same" );
+    Check( strSaved.find( "\"spot\"" ) != std::string::npos && strSaved.find( "\"falloff\": 5.0" ) != std::string::npos &&
+           strSaved.find( "\"angle\": 25.0" ) != std::string::npos && strSaved.find( "\"angle\": 30.0" ) != std::string::npos,
+           "a spot light saves its angle and falloff, with the defaults" );
+    Check( strSaved.find( "\"radius\": 0.5" ) != std::string::npos && strSaved.find( "\"samples\": 3" ) != std::string::npos,
+           "a spot light with a radius saves it" );
+    Check( strSaved.find( "\"directional\"" ) != std::string::npos && strSaved.find( "\"angle\": 0.53" ) != std::string::npos &&
+           strSaved.find( "\"samples\": 4" ) != std::string::npos, "a directional light saves its angle and samples" );
+
+    CScene oPlainSpot;
+
+    Check( oPlainSpot.FromJson( FloorUnder( "{ \"type\": \"spot\", \"position\": [0, 1, 0], \"direction\": [0, -1, 0], \"color\": [1, 1, 1] }" ) ) == 0 &&
+           oPlainSpot.ToJson().find( "\"radius\"" ) == std::string::npos && oPlainSpot.ToJson().find( "\"samples\"" ) == std::string::npos,
+           "a spot light without a radius saves no radius or samples" );
+
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"spot\", \"direction\": [0, 0, 0]" ), BAD_FILE, "direction must not be [0, 0, 0]" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"spot\"" ), BAD_FILE, "direction" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"spot\", \"direction\": [0, -1, 0], \"angle\": 90" ), BAD_FILE,
+                 "angle must be more than 0 and less than 90 degrees" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"spot\", \"direction\": [0, -1, 0], \"angle\": 20, \"falloff\": 25" ), BAD_FILE,
+                 "falloff must be from 0 to the angle" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"spot\", \"direction\": [0, -1, 0], \"radius\": -1" ), BAD_FILE,
+                 "radius must be 0 or more" );
+    ExpectError( Minimal( "\"type\": \"point\", \"position\": [5, 5, -5]", "\"type\": \"directional\", \"direction\": [0, 0, 0]" ), BAD_FILE,
+                 "direction must not be [0, 0, 0]" );
+    ExpectError( Minimal( "\"type\": \"point\", \"position\": [5, 5, -5]", "\"type\": \"directional\", \"direction\": [0, -1, 0], \"angle\": 90" ),
+                 BAD_FILE, "angle must be from 0 up to 90 degrees" );
+    ExpectError( Minimal( "\"type\": \"point\"", "\"type\": \"directional\", \"direction\": [0, -1, 0]" ), BAD_FILE, "position" );
+
+        // Sunlight: every point gets the same light, from the same direction,
+        // and a shadow the same size as what casts it, however far away.
+    CScene oSun;
+
+    Check( oSun.FromJson( FloorUnder( "{ \"type\": \"directional\", \"direction\": [1, -1, 0], \"color\": [1, 1, 1] }",
+                                      ", { \"type\": \"box\", \"center\": [0, 50, 0], \"size\": [2, 0.2, 2] }" ) ) == 0,
+           "a scene with a directional light loads" );
+
+    CLight *pSun = oSun.GetLight( 0 );
+    CVector oFrom( 3.0, 0.0, 4.0 );
+    CVector oToSun = pSun ? pSun->ToLight( oFrom ) : CVector( 0, 0, 0 );
+
+    Check( ABS( oToSun.Magnitude() - RAY_FAR_AWAY ) < 1e-6 && ABS( oToSun.GetX() + oToSun.GetY() ) < 1e-6 && oToSun.GetY() > 0.0,
+           "a directional light is RAY_FAR_AWAY back along its direction" );
+
+    double dNear = FloorAt( oSun, 0.0, 0.0 );
+    double dFar = FloorAt( oSun, 1000.0, 3000.0 );
+
+    Check( ABS( dNear - cos( PI / 4.0 ) ) < 1e-9 && ABS( dFar - dNear ) < 1e-9, "sunlight is the same everywhere" );
+        // The box, 50 up, shades the floor 50 along the light: around (50, 0, 0).
+    Check( FloorAt( oSun, 50.0, 0.0 ) == 0.0 && FloorAt( oSun, 50.0, 1.5 ) > 0.5 && FloorAt( oSun, 47.0, 0.0 ) > 0.5,
+           "a directional light's shadow falls along it, the size of what casts it" );
+
+        // A sun with an angle casts soft shadows: blurred more the farther
+        // the shadow falls from what casts it.
+    CScene oSoftSun;
+
+    Check( oSoftSun.FromJson( FloorUnder( "{ \"type\": \"directional\", \"direction\": [0, -1, 0], \"color\": [1, 1, 1], \"angle\": 10, \"samples\": 64 }",
+                                          ", { \"type\": \"box\", \"center\": [-50, 10, 0], \"size\": [100, 0.2, 100] }" ) ) == 0,
+           "a directional light with an angle loads" );
+    Check( ABS( FloorAt( oSoftSun, 0.0, 0.0 ) - 0.5 ) < 0.05 && FloorAt( oSoftSun, 0.5, 0.0 ) > 0.55 &&
+           FloorAt( oSoftSun, 0.5, 0.0 ) < 0.98 && FloorAt( oSoftSun, -0.5, 0.0 ) < 0.45 && FloorAt( oSoftSun, -0.5, 0.0 ) > 0.02 &&
+           FloorAt( oSoftSun, 3.0, 0.0 ) > 0.99, "a directional light with an angle casts a soft shadow edge" );
+}
+
+    // A Radiance HDR file of nWidth x nHeight, flat or run-length encoded,
+    // whose pixel (x, y) is RGBE ( x * 16 + 8, y * 32 + 16, 100, 129 ).
+static std::string MakeHdr( int nWidth, int nHeight, bool bEncoded, const char *strSize = NULL )
+{
+    std::string strData = "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n";
+    char        achSize[ 64 ];
+
+    snprintf( achSize, sizeof( achSize ), "-Y %d +X %d\n", nHeight, nWidth );
+    strData += strSize ? strSize : achSize;
+    for ( int nY = 0; nY < nHeight; nY++ )
+    {
+        std::vector<unsigned char> anRgbe;
+
+        for ( int nX = 0; nX < nWidth; nX++ )
+        {
+            anRgbe.push_back( (unsigned char)( nX * 16 + 8 ) );
+            anRgbe.push_back( (unsigned char)( nY * 32 + 16 ) );
+            anRgbe.push_back( 100 );
+            anRgbe.push_back( 129 );
+        }
+        if ( ! bEncoded )
+        {
+            strData.append( anRgbe.begin(), anRgbe.end() );
+            continue;
+        }
+        strData += (char)2;
+        strData += (char)2;
+        strData += (char)( nWidth >> 8 );
+        strData += (char)( nWidth & 0xFF );
+        for ( int nChannel = 0; nChannel < 4; nChannel++ )
+        {
+                // Literals for red, runs for the rest.
+            if ( nChannel == 0 )
+            {
+                strData += (char)nWidth;
+                for ( int nX = 0; nX < nWidth; nX++ )
+                    strData += (char)anRgbe[ (size_t)nX * 4 ];
+            }
+            else
+            {
+                strData += (char)( 128 + nWidth );
+                strData += (char)anRgbe[ nChannel ];
+            }
+        }
+    }
+    return strData;
+}
+
+    // An image environment made from a file's bytes, as a scene copy carries them.
+static bool LoadEnvironment( CEnvironment &oEnvironment, const std::string &strFile, const char *strMore = NULL )
+{
+    IASLib::CObjectNode         oNode;
+    std::vector<unsigned char>  anData( strFile.begin(), strFile.end() );
+
+    oNode.put( "type", "image" );
+    oNode.put( "file", "test.hdr" );
+    oNode.putBinary( "data", anData );
+    if ( strMore && strcmp( strMore, "rotate" ) == 0 )
+        oNode.put( "rotation", 90.0 );
+    if ( strMore && strcmp( strMore, "bright" ) == 0 )
+        oNode.put( "intensity", 2.0 );
+    RayJson::ClearError();
+    return oEnvironment.FromJson( oNode ) ? true : false;
+}
+
+    // The direction the middle of pixel (nX, nY) of an nWidth x nHeight
+    // equirectangular image looks along, unrotated.
+static CVector PixelDirection( int nX, int nY, int nWidth, int nHeight )
+{
+    double dLongitude = ( ( nX + 0.5 ) / nWidth - 0.5 ) * 2.0 * PI;
+    double dPolar = ( nY + 0.5 ) / nHeight * PI;
+
+    return CVector( sin( dLongitude ) * sin( dPolar ), cos( dPolar ), cos( dLongitude ) * sin( dPolar ) );
+}
+
+static bool SameColor( CColor oA, CColor oB, double dTolerance )
+{
+    return ABS( oA.GetR() - oB.GetR() ) <= dTolerance && ABS( oA.GetG() - oB.GetG() ) <= dTolerance &&
+           ABS( oA.GetB() - oB.GetB() ) <= dTolerance;
+}
+
+static void EnvironmentChecks( void )
+{
+        // HDR: RGBE (m + 0.5) x 2^(e - 136), flat or run-length encoded.
+    int                 nWidth = 0;
+    int                 nHeight = 0;
+    std::vector<float>  anFlat;
+    std::vector<float>  anEncoded;
+    std::string         strError;
+
+    Check( CEnvironment::ParseHdr( MakeHdr( 8, 4, false ), nWidth, nHeight, anFlat, strError ) && nWidth == 8 && nHeight == 4,
+           "a flat HDR file reads" );
+    Check( anFlat.size() == 8 * 4 * 3 && anFlat[ ( ( 1 * 8 ) + 3 ) * 3 ] == (float)( ( 3 * 16 + 8 + 0.5 ) / 128.0 ) &&
+           anFlat[ ( ( 1 * 8 ) + 3 ) * 3 + 1 ] == (float)( ( 1 * 32 + 16 + 0.5 ) / 128.0 ) &&
+           anFlat[ ( ( 1 * 8 ) + 3 ) * 3 + 2 ] == (float)( 100.5 / 128.0 ), "an HDR pixel is ( m + 0.5 ) x 2^( e - 136 )" );
+    Check( CEnvironment::ParseHdr( MakeHdr( 8, 4, true ), nWidth, nHeight, anEncoded, strError ) && anEncoded == anFlat,
+           "a run-length encoded HDR file reads the same as a flat one" );
+    Check( ! CEnvironment::ParseHdr( "P6\n1 1\n255\nabc", nWidth, nHeight, anFlat, strError ) &&
+           strError.find( "isn't a Radiance HDR file" ) != std::string::npos, "a file that isn't HDR is turned down" );
+    Check( ! CEnvironment::ParseHdr( MakeHdr( 8, 4, false, "+Y 4 +X 8\n" ), nWidth, nHeight, anFlat, strError ) &&
+           strError.find( "-Y height +X width" ) != std::string::npos, "an HDR file stored another way up is turned down" );
+
+    std::string strShort = MakeHdr( 8, 4, true );
+
+    strShort.resize( strShort.size() - 5 );
+    Check( ! CEnvironment::ParseHdr( strShort, nWidth, nHeight, anFlat, strError ) && strError.find( "ends early" ) != std::string::npos,
+           "a cut-off HDR file is turned down" );
+
+    std::string strBadRun = MakeHdr( 8, 4, true );
+    size_t      nData = strBadRun.find( "+X 8\n" ) + 5;
+
+    strBadRun[ nData + 4 ] = (char)( 128 + 9 );     // a run past the end of the row
+    Check( ! CEnvironment::ParseHdr( strBadRun, nWidth, nHeight, anFlat, strError ) && strError.find( "bad HDR run" ) != std::string::npos,
+           "an HDR run past the end of its row is turned down" );
+
+        // An image environment: the middle of each pixel looks along its
+        // direction, and the sides wrap.
+    CEnvironment oImage;
+
+    Check( LoadEnvironment( oImage, MakeHdr( 8, 4, false ) ), "an image environment loads from the file's bytes" );
+
+    bool bPixels = true;
+
+    for ( int nY = 0; nY < 4; nY++ )
+    {
+        for ( int nX = 0; nX < 8; nX++ )
+        {
+            CColor oSeen = oImage.ColorIn( PixelDirection( nX, nY, 8, 4 ) );
+            CColor oPixel( ( nX * 16 + 8 + 0.5 ) / 128.0, ( nY * 32 + 16 + 0.5 ) / 128.0, 100.5 / 128.0 );
+
+            bPixels = bPixels && SameColor( oSeen, oPixel, 1e-6 );
+        }
+    }
+    Check( bPixels, "an image environment shows each pixel along its direction" );
+
+    FLT nU;
+    FLT nV;
+
+    oImage.ImageCoords( 0.0, 0.0, 1.0, nU, nV );
+        // (PI is Ray's own, to eleven places, so these are near, not exact.)
+    Check( ABS( nU - 0.5 ) < 1e-9 && ABS( nV - 0.5 ) < 1e-9, "the middle of the image lies along +z" );
+    oImage.ImageCoords( 1.0, 0.0, 0.0, nU, nV );
+    Check( ABS( nU - 0.75 ) < 1e-9, "+x is a quarter of the way right of the middle" );
+    oImage.ImageCoords( 0.0, 1.0, 0.0, nU, nV );
+    Check( ABS( nV ) < 1e-9, "straight up is the top of the image" );
+
+        // Looking along -z, straight back, is the left and right edges at
+        // once: half the first column and half the last.
+    CColor oBack = oImage.ColorIn( CVector( -1e-15, 0.0, -1.0 ) );
+    CColor oSeam( ( ( 8 + 0.5 ) / 128.0 + ( 7 * 16 + 8 + 0.5 ) / 128.0 ) / 2.0, ( ( 1 * 32 + 16 + 0.5 ) / 128.0 + ( 2 * 32 + 16 + 0.5 ) / 128.0 ) / 2.0,
+                  100.5 / 128.0 );
+
+    Check( SameColor( oBack, oSeam, 1e-6 ), "an image environment wraps around its sides" );
+
+    CEnvironment oTurned;
+    CEnvironment oBright;
+
+    Check( LoadEnvironment( oTurned, MakeHdr( 8, 4, false ), "rotate" ) &&
+           SameColor( oTurned.ColorIn( CVector( 1.0, 0.0, 0.0 ) ), oImage.ColorIn( CVector( 0.0, 0.0, 1.0 ) ), 1e-9 ),
+           "an environment's rotation turns it about +y" );
+    Check( LoadEnvironment( oBright, MakeHdr( 8, 4, false ), "bright" ) &&
+           SameColor( oBright.ColorIn( CVector( 0.3, 0.2, 1.0 ) ), oImage.ColorIn( CVector( 0.3, 0.2, 1.0 ) ) * 2.0, 1e-12 ),
+           "an environment's intensity scales it" );
+
+        // A sky: the zenith overhead, the horizon level, the ground below,
+        // blended by height to the exponent.
+    CScene oSky;
+
+    Check( oSky.FromJson( FloorUnder( "", "", "  \"environment\": { \"type\": \"sky\", \"zenith\": [0, 0, 1], \"horizon\": [1, 1, 1], "
+                                       "\"ground\": [0.5, 0.25, 0], \"exponent\": 1 },\n" ) ) == 0 && oSky.GetEnvironment() != NULL,
+           "a scene with a sky loads" );
+    if ( oSky.GetEnvironment() )
+    {
+        const CEnvironment *pSky = oSky.GetEnvironment();
+
+        Check( SameColor( pSky->ColorIn( CVector( 0, 1, 0 ) ), CColor( 0, 0, 1 ), 1e-12 ) &&
+               SameColor( pSky->ColorIn( CVector( 1, 0, 0 ) ), CColor( 1, 1, 1 ), 1e-12 ) &&
+               SameColor( pSky->ColorIn( CVector( 0, -1, 0 ) ), CColor( 0.5, 0.25, 0 ), 1e-12 ) &&
+               SameColor( pSky->ColorIn( CVector( 0, 1, 1 ) ), CColor( 1.0 - sqrt( 0.5 ), 1.0 - sqrt( 0.5 ), 1.0 ), 1e-12 ),
+               "a sky blends from the horizon to the zenith and the ground by height" );
+        Check( SameColor( pSky->IrradianceIn( CVector( 0, 1, 0 ) ), CColor( 0, 0, 0 ), 0.0 ), "a sky without samples lights nothing" );
+    }
+
+        // A ray that leaves the scene sees the sky, not the background.
+    Check( SameColor( TraceFrom( oSky, CVector( 0, 1, 0 ), CVector( 0, 1, 0 ) ), CColor( 0, 0, 1 ), 1e-12 ) &&
+           SameColor( TraceFrom( oSky, CVector( 0, 1, 0 ), CVector( 1, 0, 0 ) ), CColor( 1, 1, 1 ), 1e-12 ),
+           "a ray leaving the scene sees the environment" );
+
+        // The sky's light: a uniform sky of color c lights a surface facing
+        // any way with c; a sky white above the horizon and black below
+        // lights the floor with 1, a wall with half, and a ceiling not at all.
+    CScene oUniform;
+
+    Check( oUniform.FromJson( FloorUnder( "", "", "  \"environment\": { \"type\": \"sky\", \"zenith\": [0.5, 0.5, 0.5], \"horizon\": [0.5, 0.5, 0.5], "
+                                           "\"ground\": [0.5, 0.5, 0.5], \"samples\": 16 },\n" ) ) == 0 && oUniform.GetEnvironment(),
+           "a scene lit by a uniform sky loads" );
+    if ( oUniform.GetEnvironment() )
+    {
+        bool bEven = true;
+
+        for ( int nIndex = 0; nIndex < 20; nIndex++ )
+        {
+            CVector oNormal( sin( nIndex * 0.7 ) * cos( nIndex * 1.3 ), cos( nIndex * 0.7 ), sin( nIndex * 0.7 ) * sin( nIndex * 1.3 ) );
+
+            bEven = bEven && SameColor( oUniform.GetEnvironment()->IrradianceIn( oNormal ), CColor( 0.5, 0.5, 0.5 ), 0.005 );
+        }
+        Check( bEven, "a uniform sky lights a surface facing any way the same" );
+    }
+    Check( ABS( FloorAt( oUniform, 0.0, 0.0 ) - 0.5 ) < 0.005, "a floor under a uniform sky of 0.5 is lit to 0.5" );
+
+    CScene oHalfSky;
+
+    Check( oHalfSky.FromJson( FloorUnder( "", "", "  \"environment\": { \"type\": \"sky\", \"zenith\": [1, 1, 1], \"horizon\": [1, 1, 1], "
+                                           "\"ground\": [0, 0, 0], \"exponent\": 0.000001, \"samples\": 64 },\n" ) ) == 0 &&
+           oHalfSky.GetEnvironment(), "a scene lit by a half sky loads" );
+    if ( oHalfSky.GetEnvironment() )
+    {
+        const CEnvironment *pHalf = oHalfSky.GetEnvironment();
+
+        Check( ABS( pHalf->IrradianceIn( CVector( 0, 1, 0 ) ).GetR() - 1.0 ) < 0.01 &&
+               ABS( pHalf->IrradianceIn( CVector( 1, 0, 0 ) ).GetR() - 0.5 ) < 0.01 &&
+               pHalf->IrradianceIn( CVector( 0, -1, 0 ) ).GetR() < 0.01, "the sky's light depends on how much of it a surface faces" );
+    }
+
+        // At the foot of a wall, half the sky is hidden: half the light.
+    CScene oWalled;
+    std::string strWalled = FloorUnder( "", ", { \"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [-1, 0, 0], "
+                                        "\"materials\": [ { \"type\": \"diffuse\", \"color\": [1, 1, 1] } ] }",
+                                        "  \"environment\": { \"type\": \"sky\", \"zenith\": [1, 1, 1], \"horizon\": [1, 1, 1], "
+                                        "\"ground\": [1, 1, 1], \"samples\": 64 },\n" );
+
+    Check( oWalled.FromJson( strWalled ) == 0, "a floor beside a wall under a sky loads" );
+
+    double dOpen = FloorAt( oUniform, 0.0, 0.0 ) * 2.0;     // a white sky of 1
+    double dFoot = TraceFrom( oWalled, CVector( -1e-6, 0.5, 0.0 ), CVector( 0.0, -1.0, 0.0 ) ).GetR();
+
+    Check( ABS( dFoot / dOpen - 0.5 ) < 0.05, "a point at the foot of a wall gets about half the sky's light" );
+
+        // Shiny materials take the sky as their reflections, not as light.
+    CScene oShiny;
+
+    Check( oShiny.FromJson( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"specular\" } ]" )
+                            .replace( 0, 1, "{ \"environment\": { \"type\": \"sky\", \"samples\": 4 }, \"background\": [0, 0, 0], " ) ) == 0,
+           "a shiny ball under a sky loads" );
+
+    CScene oShinyDark;
+
+    Check( oShinyDark.FromJson( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"specular\" } ]" ) ) == 0,
+           "a shiny ball loads" );
+    Check( SameColor( TraceFrom( oShiny, CVector( 0, 0, -5 ), CVector( 0, 0, 1 ) ), TraceFrom( oShinyDark, CVector( 0, 0, -5 ), CVector( 0, 0, 1 ) ), 0.0 ),
+           "a specular material isn't lit by the sky" );
+
+        // Read, save, read back; errors.
+    std::string strSaved = oSky.ToJson();
+    CScene      oReread;
+
+    Check( oReread.FromJson( strSaved ) == 0 && oReread.ToJson() == strSaved, "a sky reads back the same" );
+    Check( strSaved.find( "\"environment\"" ) != std::string::npos && strSaved.find( "\"exponent\": 1.0" ) != std::string::npos &&
+           strSaved.find( "\"samples\": 0" ) != std::string::npos, "a sky saves its settings" );
+
+    CScene oNone;
+
+    Check( oNone.FromJson( s_strMinimal ) == 0 && oNone.ToJson().find( "environment" ) == std::string::npos &&
+           oNone.GetEnvironment() == NULL, "a scene without an environment saves none" );
+
+    ExpectError( Minimal( "\"camera\"", "\"environment\": { \"type\": \"cloud\" }, \"camera\"" ), BAD_FILE, "unknown environment type \"cloud\"" );
+    ExpectError( Minimal( "\"camera\"", "\"environment\": { \"type\": \"sky\", \"intensity\": -1 }, \"camera\"" ), BAD_FILE,
+                 "intensity must be 0 or more" );
+    ExpectError( Minimal( "\"camera\"", "\"environment\": { \"type\": \"sky\", \"exponent\": 0 }, \"camera\"" ), BAD_FILE,
+                 "exponent must be more than 0" );
+    ExpectError( Minimal( "\"camera\"", "\"environment\": { \"type\": \"sky\", \"samples\": 300 }, \"camera\"" ), BAD_FILE, "samples" );
+    ExpectError( Minimal( "\"camera\"", "\"environment\": { \"type\": \"sky\", \"file\": \"x.hdr\" }, \"camera\"" ), BAD_FILE, "file" );
+    ExpectError( Minimal( "\"camera\"", "\"environment\": { \"type\": \"image\" }, \"camera\"" ), BAD_FILE, "file" );
+    ExpectError( Minimal( "\"camera\"", "\"environment\": { \"type\": \"image\", \"file\": \"no_such_sky.hdr\" }, \"camera\"" ), BAD_FILE,
+                 "can't open the image \"no_such_sky.hdr\"" );
+    ExpectError( Minimal( "\"camera\"", "\"environment\": [ 1 ], \"camera\"" ), BAD_FILE, "must be an object" );
+}
+
+    // The sky image in scenes/textures reads, its sun far brighter than white.
+static void SkyTextureChecks( const char *strScenes )
+{
+    std::string         strSky = ReadFile( std::string( strScenes ) + "/textures/sky.hdr" );
+    int                 nWidth = 0;
+    int                 nHeight = 0;
+    std::vector<float>  anPixels;
+    std::string         strError;
+    float               nBrightest = 0.0f;
+
+    Check( CEnvironment::ParseHdr( strSky, nWidth, nHeight, anPixels, strError ) && nWidth == 512 && nHeight == 256,
+           "textures/sky.hdr reads as a 512 x 256 HDR image" );
+    for ( size_t nIndex = 0; nIndex < anPixels.size(); nIndex++ )
+        nBrightest = std::max( nBrightest, anPixels[ nIndex ] );
+    Check( nBrightest > 10.0f, "textures/sky.hdr's sun is far brighter than white" );
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -1819,6 +2298,7 @@ int main( int argc, char **argv )
     {
         TextureChecks( argv[ 2 ] );
         BrickTextureChecks( argv[ 2 ] );
+        SkyTextureChecks( argv[ 2 ] );
         ArchiveChecks( argv[ 2 ], argv[ 3 ] );
         MeshTreeChecks( argv[ 2 ] );
         SceneTreeChecks( argv[ 2 ] );
@@ -1839,6 +2319,8 @@ int main( int argc, char **argv )
         HdrChecks();
         PngChecks();
         BumpChecks();
+        LightChecks();
+        EnvironmentChecks();
     }
 
     if ( g_nFailures == 0 )

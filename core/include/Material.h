@@ -43,6 +43,10 @@ class CMaterial
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect ) = 0;
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect ) = 0;
         virtual LPCSTR      ClassType( void ) { return "CMaterial"; };
+            // Whether the environment's light (CEnvironment, with samples)
+            // shades it: diffuse materials. Light from the sky's other
+            // directions reaches shiny ones as their reflections.
+        virtual BOOL        LitBySky( void ) { return FALSE; }
             // The material as JSON for a scene file: its fields go into oNode,
             // which already holds its "type". FromJson reads them back and
             // returns FALSE, with RayJson::Fail, if one is missing or bad.

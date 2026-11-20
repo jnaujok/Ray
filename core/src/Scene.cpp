@@ -244,7 +244,9 @@ BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
             }
             else
             {
-                oPixel = m_oBackgroundColor;
+                CVector oDirection( oRay.GetI(), oRay.GetJ(), oRay.GetK() );
+
+                oPixel = Escaped( oDirection );
 #ifdef _DEBUG
                     // This should set the scene to a funky gradient
                 oPixel.Set( oPixel.GetR() * ABS(oRay.GetI()), oPixel.GetG() * ABS(oRay.GetJ()), oPixel.GetB() * ABS(oRay.GetK()) );
@@ -579,10 +581,13 @@ BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny )
     }
     else
     {
-        oPixel = m_oBackgroundColor;
+        CVector oDirection( oRay.GetI(), oRay.GetJ(), oRay.GetK() );
+
+        oPixel = Escaped( oDirection );
 #ifdef _DEBUG
             // This should set the scene to a funky gradient
-        oPixel.Set( oPixel.GetR() * ABS(oRay.GetI()), oPixel.GetG() * ABS(oRay.GetJ()), oPixel.GetB() * ABS(oRay.GetK()) );
+        if ( ! m_pEnvironment )
+            oPixel.Set( oPixel.GetR() * ABS(oRay.GetI()), oPixel.GetG() * ABS(oRay.GetJ()), oPixel.GetB() * ABS(oRay.GetK()) );
 #endif
         bRetVal = FALSE;
     }
@@ -590,6 +595,13 @@ BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny )
     return bRetVal;
 }
 
+
+CColor CScene::Escaped( CVector &oDirection )
+{
+    if ( m_pEnvironment )
+        return m_pEnvironment->ColorIn( oDirection );
+    return m_oBackgroundColor;
+}
 
 CLight  *CScene::GetLight( int nIndex )
 {
@@ -797,6 +809,8 @@ IASLib::CObjectNode *CScene::ToJsonTree( void )
     oRoot.put( "version", JSON_VERSION );
     m_oSettings.ToJson( *oRoot.putObject( "settings" ) );
     RayJson::PutColor( oRoot, "background", m_oBackgroundColor );
+    if ( m_pEnvironment )
+        m_pEnvironment->ToJson( *oRoot.putObject( "environment" ) );
     m_oCamera.ToJson( *oRoot.putObject( "camera" ) );
 
     IASLib::CArrayNode *apArrays[ 2 ] = { oRoot.putArray( "objects" ), oRoot.putArray( "lights" ) };
@@ -873,13 +887,14 @@ DWORD CScene::FromJson( const std::string &strText )
 
 DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
 {
-    static const char *const astrFields[] = { "format", "version", "settings", "background", "camera", "objects", "lights", NULL };
+    static const char *const astrFields[] = { "format", "version", "settings", "background", "environment", "camera", "objects", "lights", NULL };
     const IASLib::CJsonNode            *pRoot = &oRoot;
     std::vector<CObjects *>             apObjects;
     std::vector<CObjects *>             apLights;
     CSettings                           oSettings;
     CCamera                             oCamera;
     CColor                              oBackground( 1, 1, 1 );
+    std::shared_ptr<CEnvironment>       pEnvironment;
     std::string                         strFormat;
     int                                 nVersion = 0;
     BOOL                                bRead = FALSE;
@@ -919,7 +934,18 @@ DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
                 bCamera = oCamera.FromJson( *pCamera );
             }
 
-            bRead = bSettings && bCamera &&
+            const IASLib::CJsonNode *pEnvironmentNode = pRoot->get( "environment" );
+            BOOL                     bEnvironment = TRUE;
+
+            if ( bSettings && bCamera && pEnvironmentNode )
+            {
+                RayJson::CWhere oWhere( "environment" );
+
+                pEnvironment.reset( new CEnvironment );
+                bEnvironment = pEnvironment->FromJson( *pEnvironmentNode );
+            }
+
+            bRead = bSettings && bCamera && bEnvironment &&
                     RayJson::GetColor( *pRoot, "background", oBackground, FALSE ) &&
                     ReadObjects( *pRoot, "objects", FALSE, apObjects ) &&
                     ReadObjects( *pRoot, "lights", TRUE, apLights );
@@ -943,6 +969,7 @@ DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
     m_oSettings = oSettings;
     m_oCamera = oCamera;
     m_oBackgroundColor = oBackground;
+    m_pEnvironment = pEnvironment;
     for ( size_t nIndex = 0; nIndex < apObjects.size(); nIndex++ )
         AddObject( apObjects[ nIndex ] );
     for ( size_t nIndex = 0; nIndex < apLights.size(); nIndex++ )

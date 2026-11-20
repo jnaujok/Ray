@@ -25,11 +25,15 @@ tools/render_previews.py
 
 ## `make_textures.py`
 
-Makes the brick textures in `scenes/textures/` that `bump_test.ray` and the torture test use:
+Makes the textures in `scenes/textures/`. The bricks, which `bump_test.ray` and the torture test use:
 `bricks.png` (the color, 8-bit RGB, each row with a different PNG filter), `bricks_normal.png` (a
 tangent-space normal map, OpenGL convention, Adam7-interlaced) and `bricks_height.png` (the height
 field the normal map comes from, 16-bit gray). Between them they use most of what Ray's PNG reader
-must handle. It needs only Python 3, and writes the same files every time:
+must handle. It also makes `sky.hdr`, which `environment_test.ray` and the torture test use as
+their environment: a 512×256 equirectangular afternoon sky (blue overhead, pale at the horizon,
+clouds on a flat layer, low hazy hills and sandy ground), a run-length encoded Radiance HDR file
+whose sun, 38° up and turned 50° from +z toward −x, is 60 times brighter than white. It needs only
+Python 3, and writes the same files every time:
 
 ```sh
 tools/make_textures.py

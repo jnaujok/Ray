@@ -166,7 +166,7 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
             continue;
         }
 
-        oToLight = pLight->GetPosition() - oIntersect;
+        oToLight = pLight->ToLight( oIntersect );
         oLightRay.CreateRay( oToLight, oIntersect, 1.0, -1, -1 );
         if ( ! oScene.Intersect( oLightRay, this ) )
         {
@@ -195,6 +195,11 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
         nLight++;
         pLight = oScene.GetLight( nLight );
     }
+
+    const CEnvironment *pEnvironment = oScene.GetEnvironment();
+
+    if ( pEnvironment && pEnvironment->GetSamples() > 0 )
+        EnvironmentShade( oScene, oRay, oIntersect, oNormal, *pEnvironment, oReturn );
 
         // Do the intersection/shadings that do NOT require light 
         // i.e. reflections, transparency, etc.
@@ -272,6 +277,74 @@ void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, 
 
             oReturn = oReturn + ( oColor * m_oMaterials.GetInfluence( nMaterial ) );
         }
+    }
+}
+
+void CObjects::EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal,
+                                 const CEnvironment &oEnvironment, CColor &oReturn )
+{
+        // The sky's light for the way the surface faces (worked out once,
+        // smooth), scaled by the share of the sky the point can see: that
+        // many shadow rays toward it, spread by the cosine over the half on
+        // the side the ray came from. It goes to the diffuse materials as a
+        // light straight along the normal.
+    int     nSamples = oEnvironment.GetSamples();
+    int     nOpen = 0;
+    FLT     nFirstU;
+    FLT     nFirstV;
+    CVector oUp( oNormal );
+    CVector oView( oIntersect.GetX() - oRay.GetX(), oIntersect.GetY() - oRay.GetY(), oIntersect.GetZ() - oRay.GetZ() );
+    CVector oFirst;
+    CVector oSecond;
+
+    oUp.Normalize();
+    if ( oUp.Dot( oView ) > 0.0 )
+        oUp = oUp * -1.0;
+    RaySampling::Basis( oUp, oFirst, oSecond );
+    oRay.SamplePoint( (uint64_t)RaySampling::PURPOSE_ENVIRONMENT, nFirstU, nFirstV );
+
+    for ( int nSample = 0; nSample < nSamples; nSample++ )
+    {
+        FLT     nU;
+        FLT     nV;
+        FLT     nX;
+        FLT     nY;
+
+        RaySampling::Spread( nFirstU, nFirstV, nSample, nU, nV );
+        RaySampling::ConcentricDisc( nU, nV, nX, nY );
+
+        FLT     nRest = 1.0 - ( nX * nX ) - ( nY * nY );
+        FLT     nUp = ( nRest > 0.0 ) ? SQRT( nRest ) : 0.0;
+        CVector oAcross1( oFirst * nX );
+        CVector oAcross2( oSecond * nY );
+        CVector oAlong( oUp * nUp );
+        CVector oPartway( oAcross1 + oAcross2 );
+        CVector oDirection( oPartway + oAlong );
+        CVector oToSky( oDirection * RAY_FAR_AWAY );
+        CRay    oSkyRay;
+
+        oSkyRay.CreateRay( oToSky, oIntersect, 1.0, -1, -1 );
+        if ( ! oScene.Intersect( oSkyRay, this ) )
+            nOpen++;
+    }
+    if ( nOpen == 0 )
+        return;
+
+    CColor  oSky( oEnvironment.IrradianceIn( oUp ) );
+    CColor  oLight( oSky * ( (FLT)nOpen / (FLT)nSamples ) );
+
+    for ( int nMaterial = 0; nMaterial < m_oMaterials.GetSize(); nMaterial++ )
+    {
+        if ( m_oMaterials.GetInfluence( nMaterial ) == 0.0 || ! m_oMaterials[ nMaterial ]->LitBySky() )
+            continue;
+
+        CVector oMaterialNormal( oNormal );
+        CVector oMaterialToLight( oUp );
+        CVector oMaterialPoint( oIntersect );
+        CColor  oColor = m_oMaterials[ nMaterial ]->GetColor( oScene, oRay, oLight, oMaterialToLight, oMaterialPoint,
+                                                              oMaterialNormal, this );
+
+        oReturn = oReturn + ( oColor * m_oMaterials.GetInfluence( nMaterial ) );
     }
 }
 

@@ -10,6 +10,90 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.9] - 2026-11-20
+
+Light and sky: spot lights with soft edges, directional sunlight whose shadows blur with distance,
+and environment maps, a sky gradient or an HDR picture of the surroundings that shows behind the
+scene, in mirrors and through glass, and can light it too. Scenes without the new fields render
+byte for byte as before.
+
+### Added
+
+- **Spot lights** (`"type": "spot"`): a `position`, a `direction` and a `color`, shining in a cone
+  out to `angle` degrees from its axis (default 30, under 90). The edge of the pool fades over the
+  last `falloff` degrees inside it (default 5) along a smoothstep, so a falloff of 0 is a hard edge.
+  With a `radius` (default 0) it is a glowing disc rather than a point, shaded from `samples` points
+  on the disc it shows each surface, as a sphere light is, so its shadows are soft; without one it
+  is exactly a point light inside its cone.
+- **Directional lights** (`"type": "directional"`): sunlight, from so far away that it arrives
+  everywhere along the same `direction` (the way the light travels) with the same `color`, casting
+  shadows the size of what casts them. It has no position: a shadow ray toward it goes
+  `RAY_FAR_AWAY` (10⁶) scene units. With an `angle`, its angular diameter in degrees (the sun is
+  about 0.53), it is a disc in the sky shaded from `samples` directions, so its shadows are sharp
+  near what casts them and blur farther away.
+  - `CLight::ToLight` gives the vector a shadow ray follows: to the light's position, or back along
+    a sun's direction. Point lights work it out exactly as before.
+- **Environment maps** (a scene's `environment`): what a ray that leaves the scene sees, instead of
+  the flat `background`, whether it is a camera ray that missed everything or a reflected or
+  refracted ray that escaped (`CScene::Escaped`). Two kinds:
+  - `"sky"`: a gradient by height from `horizon` to `zenith` above and to `ground` below, blended by
+    the height raised to `exponent` (default 0.5).
+  - `"image"`: an equirectangular (latitude-longitude) picture of the surroundings in a Radiance
+    HDR file (`.hdr`, RGBE, flat or run-length encoded: `CEnvironment::ParseHdr`) or any image a
+    texture can be (PNG, PPM, Ray raw), turned about +y by `rotation` degrees, looked up bilinearly
+    and wrapped around its sides. HDR colors are linear and may be far brighter than white, so a
+    sun in the sky stays bright in a mirror. The file goes into a saved scene's archive, and a
+    scene copy sent to a task carries its bytes (`data`), so networked engines need no files and
+    match threads byte for byte.
+  - Both take an `intensity` (default 1).
+- **Image-based lighting.** With `samples` (default 0, off), the environment lights diffuse
+  surfaces too. The light a surface would get from the whole sky in front of it, for every way it
+  could face, is worked out once when the scene loads (the sky averaged over a 64 × 32 grid, so a
+  small bright sun counts in full, then weighed by solid angle and cosine into a 32 × 16 map), so
+  it is smooth, with no grain. Each point a ray hits then sends `samples` shadow rays toward the
+  sky, spread by the cosine and stratified like area lights' samples, and the share that get out
+  scales that light, so corners, crevices and the ground under things are darker. Shiny materials
+  (specular, reflective, transparent) take the sky as their reflections, not as light
+  (`CMaterial::LitBySky`). It costs `samples` shadow rays at every point a ray hits.
+- **`scenes/lights_test.ray`**: three spot lights (a warm one with a hard edge, a white one with a
+  soft edge, and a blue soft-edged disc with soft shadows) and a low sun with an angle of 4°, on a
+  box, a ball, a cone and two posts. **`scenes/environment_test.ray`**: the HDR sky behind a mirror
+  ball, a glass ball, a white ball and a red one on a checkered floor, lit by the sky (`samples` 8)
+  and by a sun along the sky's own. New tests `render_lights`, `render_environment` (with
+  reference renders and README previews), `roundtrip_lights_test`, `roundtrip_environment_test`,
+  `network_lights` and `network_environment`. `format_test` checks that a spot light's cone is full
+  inside its falloff, empty outside it and a smoothstep between, on the floor too; that half a
+  spot's disc hidden gives half its light; that sunlight is the same everywhere, falls along its
+  direction and casts a shadow the size of what casts it, with a soft edge when it has an angle;
+  that HDR files decode exactly, flat or run-length encoded, and that damaged ones are refused; that
+  an environment shows each pixel along its own direction, wraps across its seam, turns with its
+  rotation and scales with its intensity; that a sky blends as it should; that a uniform sky lights
+  a surface facing any way the same, a half sky by how much of it a surface faces, and the foot of a
+  wall with about half; that a specular material isn't lit by the sky; that the new fields read
+  back the same; and that bad settings are reported.
+- **`tools/make_textures.py`** also makes `scenes/textures/sky.hdr`: a 512 × 256 afternoon sky,
+  run-length encoded, with clouds on a flat layer, low hazy hills, sandy ground and a sun 60 times
+  brighter than white.
+
+  ![Before and after: the lights test with point lights (left) and with spot lights and a soft sun (right); the environment test with a flat background (left) and an HDR sky (right); and a full-size crop of the torture test at 2026-alpha-0.8 and 2026-alpha-0.9](docs/images/changelog/lights-environment.png)
+
+  Top, the lights test with each spot light as a point light at the same place and the sun as a
+  far point light, and as it is: pools of light with hard and soft edges, the blue spot's soft
+  shadows, and the sun's long shadows blurring away from the posts. Middle, the environment test
+  with the flat background, and with the sky: clouds in the mirror ball, the sky bent through the
+  glass, and the floor lit by the sky and darker under each ball. Bottom, a full-size crop of the
+  torture test: the sky over the mirror wall and in the mirror ball, and the spot light's pool.
+
+### Changed
+
+- **The torture test uses the new features:** it is under `textures/sky.hdr`, turned so the sun
+  stands over the key light, which shows in the mirrors and glass and lights the diffuse surfaces
+  (`samples` 1), with a soft-edged spot light with a radius on the teapot and a low sun with an
+  angle of 1.5° along the sky's. The other lights are dimmed to keep its brightness. Its reference
+  render, README preview and full-size image are regenerated. Each new light, and the sky's light,
+  adds a shadow ray at every point a ray hits, so a full-size Release render takes about 1.7 times
+  as long as at 2026-alpha-0.8: about a minute and a half on an idle 16-core machine.
+
 ## [2026-alpha-0.8] - 2026-11-20
 
 Surface detail: bump and normal maps that tilt the shading normal so surfaces look dented, grooved
@@ -718,7 +802,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.8...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.9...HEAD
+[2026-alpha-0.9]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.8...2026-alpha-0.9
 [2026-alpha-0.8]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.7...2026-alpha-0.8
 [2026-alpha-0.7]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.6...2026-alpha-0.7
 [2026-alpha-0.6]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.5...2026-alpha-0.6

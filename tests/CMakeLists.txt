@@ -196,6 +196,32 @@ add_test(NAME render_bump
 set_tests_properties(render_bump PROPERTIES FIXTURES_SETUP render_bump TIMEOUT 300)
 add_test(NAME roundtrip_bump_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/bump_test.ray ${RENDER_DIR})
 
+# Spot lights (a hard edge, a soft edge, and a soft-edged disc with soft
+# shadows) and a sun with an angular size, whose shadows blur with distance.
+add_test(NAME render_lights
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/lights_test.ray
+                 -DOUTPUT=${RENDER_DIR}/lights_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/lights_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_lights PROPERTIES FIXTURES_SETUP render_lights TIMEOUT 300)
+add_test(NAME roundtrip_lights_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/lights_test.ray ${RENDER_DIR})
+
+# An environment map: an HDR sky behind the scene, in a mirror ball and
+# through a glass one, lighting the diffuse surfaces (image-based lighting).
+add_test(NAME render_environment
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/environment_test.ray
+                 -DOUTPUT=${RENDER_DIR}/environment_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/environment_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_environment PROPERTIES FIXTURES_SETUP render_environment TIMEOUT 300)
+add_test(NAME roundtrip_environment_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/environment_test.ray ${RENDER_DIR})
+
 # The torture test: every kind of object (the teapot too), reflection,
 # refraction and textures, through the double Gauss with a 5x5 stratified
 # sampler. Rendered small; the scene itself is 1024x768.
@@ -403,6 +429,35 @@ add_test(NAME network_bump
                  -DEXACT_WITH=${RENDER_DIR}/bump_test.raw
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_bump PROPERTIES FIXTURES_REQUIRED render_bump
+                                             RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_lights
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/lights_test.ray
+                 -DOUTPUT=${RENDER_DIR}/lights_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/lights_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_lights PROPERTIES FIXTURES_REQUIRED render_lights
+                                             RESOURCE_LOCK ray_network TIMEOUT 300)
+
+    # The engines get the sky image inside the scene, so they need no files.
+math(EXPR port "${port} + 1")
+add_test(NAME network_environment
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/environment_test.ray
+                 -DOUTPUT=${RENDER_DIR}/environment_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/environment_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_environment PROPERTIES FIXTURES_REQUIRED render_environment
                                              RESOURCE_LOCK ray_network TIMEOUT 300)
 
 # PNG and Radiance HDR output, checked with Python's own zlib.
