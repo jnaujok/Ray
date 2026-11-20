@@ -10,6 +10,53 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.6] - 2026-11-20
+
+Solid noise textures (marble, wood, and noise for granite and stone) and glass that absorbs light
+by how far it travels inside, shown in a new test scene and worked into the torture test.
+
+### Added
+
+- **Solid noise textures: `marble`, `wood` and `noise`.** They fill space rather than lie on a
+  surface, so an object looks carved from a block of the material and needs no surface
+  coordinates. Each works out a value from Perlin gradient noise (his 2002 form, with a shuffle
+  picked by `seed`) and looks it up in a ramp of `colors`. `marble` draws thin veins where bands
+  across `axis` meet, bent by `turbulence`. `wood` draws rings about an axis, wobbled by noise.
+  `noise` gives smooth layered noise, or sharp-creased turbulence for granite and stone. All take
+  `scale`, `origin`, `turbulence`, `octaves` and `seed`; see `scenes/README.md`.
+- **Glass that absorbs by the distance light travels inside it.** A `transparent` material's new
+  `attenuationColor` and `attenuationDistance` give the color light is left after going that far
+  through the object. Twice as far gives that color squared (Beer–Lambert). Thick glass is deeper
+  in color than thin, and a glass ball is darker through its middle than at its rim. Each ray
+  carries the transparent object it is inside (`CRay::GetInside`), so the surface where it comes
+  out knows how far it went. A ray turned back inside past the critical angle keeps absorbing.
+  Without the new fields nothing changes, and every existing render is byte for byte the same.
+
+  ![Before and after: green glass slabs 0.15, 0.5 and 1.2 thick and an amber ball, tinted flat by color (left) and absorbing by distance (right)](docs/images/changelog/absorption.png)
+
+  On the left, the old way: a flat tint at each surface, so all three slabs are the same green. On
+  the right, absorption: the thin slab is pale and the thick one dark. The amber ball is deepest
+  through its middle and lightens toward its rim.
+- **The torture test uses them too.** The teapot is polished white marble instead of copper, the
+  mirror's frame is wood (and a little wider, 16.2 by 5.6, so the grain shows round the mirror),
+  and the glass cube is clear glass that turns green by the distance light goes through it. The
+  `torture_test` reference render, its README preview and the full-size README image are
+  regenerated.
+
+  ![Before and after: the torture test with a copper teapot, a black frame and a flat green cube (left), and a marble teapot, a wooden frame and an absorbing glass cube (right)](docs/images/changelog/torture-materials.png)
+
+  Look at the teapot's gray veins, the wood grain round the mirror, and the cube: deeper green
+  where light crosses more glass.
+- **`scenes/solid_textures_test.ray`** shows both: a white marble sphere, a green marble cube, a
+  wooden log and floor, a granite wall, the three slabs and the amber ball. New tests:
+  `render_solid_textures` (with a reference render and a README preview),
+  `roundtrip_solid_textures_test`, and `network_solid_textures`, which must match threads byte for
+  byte. `format_test` checks that the noise is smooth, within about −1 to 1 and 0 on its lattice;
+  that each seed gives its own noise and always the same one; that the color ramp blends evenly;
+  that every texture round-trips through JSON; and that bad settings are reported. It also checks
+  that a ray through a glass ball keeps exactly `attenuationColor` to the power of its chord over
+  `attenuationDistance`.
+
 ## [2026-alpha-0.5] - 2026-11-20
 
 Faster: plain value types for vectors and colors, a bounding volume hierarchy over the scene,
@@ -553,7 +600,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.5...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.6...HEAD
+[2026-alpha-0.6]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.5...2026-alpha-0.6
 [2026-alpha-0.5]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4.1...2026-alpha-0.5
 [2026-alpha-0.4.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.4...2026-alpha-0.4.1
 [2026-alpha-0.4]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.3...2026-alpha-0.4

@@ -23,6 +23,10 @@
 #include <chrono>
 #include "SpecularMaterial.h"
 #include "TransparentMaterial.h"
+#include "MarbleTexture.h"
+#include "NoiseTexture.h"
+#include "WoodTexture.h"
+#include "SceneJson.h"
 #include "Scene.h"
 #include "ReinhardColorModel.h"
 
@@ -31,7 +35,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <memory>
 #include <string>
 
 static int g_nFailures = 0;
@@ -392,6 +398,98 @@ static void LensChecks( void )
                  "camera.lens.surfaces[0]: the surface is wider than its sphere" );
 }
 
+    // A sphere scene whose diffuse material has the texture strTexture.
+static std::string WithTexture( const char *strTexture )
+{
+    std::string strTo = std::string( "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": " ) + strTexture + " } ]";
+
+    return Minimal( "\"radius\": 1", strTo.c_str() );
+}
+
+static void SolidTextureChecks( void )
+{
+    CNoiseTexture   oNoise;
+    double          dLargest = 0.0;
+    bool            bSmooth = true;
+    bool            bLattice = true;
+
+        // Gradient noise: 0 at every lattice point, within about -1 to 1, and
+        // smooth (a tiny step makes a tiny change).
+    for ( int nIndex = 0; nIndex < 20000; nIndex++ )
+    {
+        FLT nX = ( ( nIndex * 37 ) % 1000 ) * 0.0137 - 6.0;
+        FLT nY = ( ( nIndex * 91 ) % 1000 ) * 0.0113 - 5.0;
+        FLT nZ = ( ( nIndex * 53 ) % 1000 ) * 0.0171 - 8.0;
+        FLT nValue = oNoise.Noise( nX, nY, nZ );
+
+        dLargest = ( std::max )( dLargest, (double)ABS( nValue ) );
+        if ( ABS( oNoise.Noise( nX + 1e-6, nY, nZ ) - nValue ) > 1e-4 )
+            bSmooth = false;
+        if ( ABS( oNoise.Noise( floor( nX ), floor( nY ), floor( nZ ) ) ) > 1e-12 )
+            bLattice = false;
+    }
+    Check( dLargest > 0.5 && dLargest < 1.1, "gradient noise stays within about -1 to 1" );
+    Check( bSmooth, "gradient noise is smooth" );
+    Check( bLattice, "gradient noise is 0 on the lattice, negative cells too" );
+
+        // The seed picks the noise; the same seed always the same.
+    CScene oA, oB, oC;
+    Check( oA.FromJson( WithTexture( "{ \"type\": \"noise\", \"seed\": 4 }" ) ) == 0 &&
+           oB.FromJson( WithTexture( "{ \"type\": \"noise\", \"seed\": 4 }" ) ) == 0 &&
+           oC.FromJson( WithTexture( "{ \"type\": \"noise\", \"seed\": 5 }" ) ) == 0, "noise textures load" );
+
+    CNoiseTexture oFour, oFourAgain, oFive;
+    std::unique_ptr<IASLib::CJsonNode> pFour( RayJson::Parse( "{ \"type\": \"noise\", \"seed\": 4 }" ) );
+    std::unique_ptr<IASLib::CJsonNode> pFive( RayJson::Parse( "{ \"type\": \"noise\", \"seed\": 5 }" ) );
+    Check( pFour && pFive && oFour.FromJson( *pFour ) && oFourAgain.FromJson( *pFour ) && oFive.FromJson( *pFive ),
+           "noise settings read" );
+
+    int nSame = 0, nDifferent = 0;
+    for ( int nIndex = 0; nIndex < 100; nIndex++ )
+    {
+        FLT nX = nIndex * 0.31 + 0.1, nY = nIndex * 0.17 + 0.2, nZ = nIndex * 0.07 + 0.3;
+        if ( oFour.Noise( nX, nY, nZ ) == oFourAgain.Noise( nX, nY, nZ ) )
+            nSame++;
+        if ( oFour.Noise( nX, nY, nZ ) != oFive.Noise( nX, nY, nZ ) )
+            nDifferent++;
+    }
+    Check( nSame == 100, "the same seed gives the same noise" );
+    Check( nDifferent > 90, "another seed gives other noise" );
+
+        // The ramp: its ends, and evenly spaced blends between.
+    std::unique_ptr<IASLib::CJsonNode> pRamp( RayJson::Parse( "{ \"colors\": [ [0, 0, 0], [1, 0, 0], [1, 1, 1] ] }" ) );
+    CMarbleTexture oMarble;
+    Check( pRamp && oMarble.FromJson( *pRamp ), "a ramp of three colors reads" );
+    CColor oStart = oMarble.RampAt( -0.5 ), oEnd = oMarble.RampAt( 2.0 ), oQuarter = oMarble.RampAt( 0.25 ), oMiddle = oMarble.RampAt( 0.5 );
+    Check( oStart.GetR() == 0.0 && oEnd.GetB() == 1.0, "the ramp is clamped at its ends" );
+    Check( ABS( oQuarter.GetR() - 0.5 ) < 1e-12 && oQuarter.GetG() == 0.0 && oMiddle.GetR() == 1.0 && oMiddle.GetG() == 0.0,
+           "the ramp blends evenly between its colors" );
+
+        // Every kind round-trips through JSON, axis made a unit vector.
+    const char *astrKinds[] =
+    {
+        "{ \"type\": \"marble\", \"axis\": [0, 2, 0], \"scale\": 0.5, \"turbulence\": 1.5, \"octaves\": 4, \"seed\": 9 }",
+        "{ \"type\": \"wood\", \"origin\": [1, 0, 2], \"colors\": [ [1, 0.8, 0.5], [0.4, 0.2, 0.1] ] }",
+        "{ \"type\": \"noise\", \"turbulence\": 1 }",
+    };
+    for ( size_t nIndex = 0; nIndex < sizeof( astrKinds ) / sizeof( astrKinds[ 0 ] ); nIndex++ )
+    {
+        CScene oScene, oAgain;
+        Check( oScene.FromJson( WithTexture( astrKinds[ nIndex ] ) ) == 0, "a solid texture loads" );
+        std::string strSaved = oScene.ToJson();
+        Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "a solid texture reads back as it was saved" );
+        if ( nIndex == 0 )
+            Check( strSaved.find( "\"axis\": [0.0, 1.0, 0.0]" ) != std::string::npos, "a marble axis is saved as a unit vector" );
+    }
+
+    ExpectError( WithTexture( "{ \"type\": \"marble\", \"scale\": 0 }" ), BAD_FILE, "texture: scale must be positive" );
+    ExpectError( WithTexture( "{ \"type\": \"wood\", \"axis\": [0, 0, 0] }" ), BAD_FILE, "texture: axis can't be [0, 0, 0]" );
+    ExpectError( WithTexture( "{ \"type\": \"noise\", \"octaves\": 13 }" ), BAD_FILE, "octaves" );
+    ExpectError( WithTexture( "{ \"type\": \"noise\", \"turbulence\": -1 }" ), BAD_FILE, "turbulence can't be negative" );
+    ExpectError( WithTexture( "{ \"type\": \"noise\", \"colors\": [ [1, 1, 1] ] }" ), BAD_FILE, "two or more colors" );
+    ExpectError( WithTexture( "{ \"type\": \"noise\", \"size\": 1 }" ), BAD_FILE, "size" );
+}
+
 static void TextureChecks( const char *strScenes )
 {
     CScene      oScene;
@@ -411,8 +509,8 @@ static void TextureChecks( const char *strScenes )
     Check( oCopy.FromJson( strCopy ) == 0, "a copy with embedded images loads without the files" );
     Check( oCopy.ToJson( TRUE ) == strCopy, "an embedded image reads back exactly" );
 
-    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"marble\" } } ]" ),
-                 BAD_FILE, "objects[0].materials[0].texture: unknown texture type \"marble\"" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"plaid\" } } ]" ),
+                 BAD_FILE, "objects[0].materials[0].texture: unknown texture type \"plaid\"" );
     ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"image\", \"file\": \"no/such.ppm\" } } ]" ),
                  BAD_FILE, "objects[0].materials[0].texture: can't open the image \"no/such.ppm\"" );
     ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"image\", "
@@ -420,6 +518,8 @@ static void TextureChecks( const char *strScenes )
                  BAD_FILE, "pixels must be width x height RGB bytes" );
     ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"diffuse\", \"texture\": { \"type\": \"checker\", \"size\": 0 } } ]" ),
                  BAD_FILE, "objects[0].materials[0].texture: size must be positive" );
+
+    SolidTextureChecks();
 }
 
     // The surface coordinates of face nFace of a scene's first object (a mesh)
@@ -495,6 +595,52 @@ static double AngleFromNormal( CVector oDirection, CVector oInto )
     return acos( fmax( -1.0, fmin( 1.0, oDirection.Dot( oInto ) ) ) ) * 180.0 / 3.14159265358979323846;
 }
 
+    // The color a ray along +z from (dX, 0, -5) brings back through a glass
+    // ball of radius 1 at the origin, against a white background, with
+    // transparent settings strGlass (index 1, so it goes straight through).
+static CColor ThroughBall( const char *strGlass, double dX )
+{
+    std::string strTo = std::string( "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"color\": [1, 1, 1], "
+                                     "\"indexOfRefraction\": 1" ) + strGlass + " } ]";
+    std::string strText = Minimal( "\"radius\": 1", strTo.c_str() );
+    CScene      oScene;
+    CRay        oRay;
+    CColor      oColor( 0, 0, 0 );
+
+    strText.replace( strText.find( "\"camera\"" ), 0, "\"background\": [1, 1, 1], " );
+    Check( oScene.FromJson( strText ) == 0, "a glass ball scene loads" );
+    oRay.Set( dX, 0.0, -5.0, 0.0, 0.0, 1.0, 1e100, 1.0, 0, 0 );
+    oScene.TraceRay( oRay, oColor, NULL );
+    return oColor;
+}
+
+static void AbsorptionChecks( void )
+{
+        // Beer-Lambert: through the middle the ray goes 2 inside, so with
+        // [0.5, 0.25, 1] left after 1 it keeps [0.25, 0.0625, 1].
+    const char *strTinted = ", \"attenuationColor\": [0.5, 0.25, 1], \"attenuationDistance\": 1";
+    CColor      oMiddle = ThroughBall( strTinted, 0.0 );
+    CColor      oClear = ThroughBall( "", 0.0 );
+
+    Check( ABS( oClear.GetR() - 1.0 ) < 1e-9 && ABS( oClear.GetG() - 1.0 ) < 1e-9, "clear glass absorbs nothing" );
+    Check( ABS( oMiddle.GetR() - 0.25 ) < 1e-9 && ABS( oMiddle.GetG() - 0.0625 ) < 1e-9 && ABS( oMiddle.GetB() - 1.0 ) < 1e-9,
+           "glass absorbs by the distance through it" );
+
+        // Off center the chord is 2 sqrt( 1 - 0.6^2 ) = 1.6.
+    CColor oSide = ThroughBall( strTinted, 0.6 );
+    Check( ABS( oSide.GetR() - pow( 0.5, 1.6 ) ) < 1e-9 && ABS( oSide.GetG() - pow( 0.25, 1.6 ) ) < 1e-9,
+           "a shorter path through glass absorbs less" );
+
+        // Twice the distance for the same color is half the absorption.
+    CColor oThinner = ThroughBall( ", \"attenuationColor\": [0.5, 0.25, 1], \"attenuationDistance\": 2", 0.0 );
+    Check( ABS( oThinner.GetR() - 0.5 ) < 1e-9 && ABS( oThinner.GetG() - 0.25 ) < 1e-9, "attenuationDistance scales the absorption" );
+
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"attenuationDistance\": -1 } ]" ),
+                 BAD_FILE, "attenuationDistance can't be negative" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"attenuationColor\": [1.5, 1, 1] } ]" ),
+                 BAD_FILE, "attenuationColor must be between 0 and 1" );
+}
+
 static void MaterialChecks( void )
 {
     CVector oNormal( 0.0, 1.0, 0.0 );
@@ -555,6 +701,8 @@ static void MaterialChecks( void )
     oFromBelow.Set( 0.3, -2.0, 0.1, 0.0, 1.0, 0.0, 1e100, 1.0, 0, 0 );
     oPlaneScene.TraceRay( oFromBelow, oResult, NULL );
     Check( oPlaneScene.ToJson() == strBefore, "shading a plane from behind leaves the plane as it was" );
+
+    AbsorptionChecks();
 }
 
     // A ray from (dX, dY, dZ) along (dI, dJ, dK), which must be a unit vector.

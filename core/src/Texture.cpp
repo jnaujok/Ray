@@ -7,6 +7,9 @@
 #include "Texture.h"
 #include "CheckerTexture.h"
 #include "ImageTexture.h"
+#include "MarbleTexture.h"
+#include "NoiseTexture.h"
+#include "WoodTexture.h"
 
 #include <string.h>
 
@@ -14,12 +17,18 @@ namespace
 {
     CTexture *CreateChecker( void ) { return new CCheckerTexture; }
     CTexture *CreateImage( void )   { return new CImageTexture; }
+    CTexture *CreateMarble( void )  { return new CMarbleTexture; }
+    CTexture *CreateWood( void )    { return new CWoodTexture; }
+    CTexture *CreateNoise( void )   { return new CNoiseTexture; }
 
         // Every texture that can be named in a scene.
     const CTexture::SType s_aoTypes[] =
     {
         { "checker", "a checkerboard of two colors, on the surface or solid", CreateChecker },
         { "image",   "an image file laid over the surface",                   CreateImage },
+        { "marble",  "solid marble: bands bent into veins by turbulence",     CreateMarble },
+        { "wood",    "solid wood: rings about an axis, wobbled by noise",     CreateWood },
+        { "noise",   "solid noise or turbulence through a ramp of colors",    CreateNoise },
     };
 }
 
