@@ -92,6 +92,8 @@ as before.
 - **The torture test** has a layer-lined orange 3DBenchy, a puzzle cube from a colored STL and a
   ring from an OBJ file on the floor in front. Its reference render, README preview and full-size
   image are regenerated.
+- `.gitignore` still ignores Visual C++ `.obj` files, but no longer OBJ models in `scenes/models/`;
+  `.gitattributes` marks STL files binary and OBJ files text.
 
 ### Fixed
 
