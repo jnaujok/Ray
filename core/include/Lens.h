@@ -137,6 +137,11 @@ class CLens
         const SPupil           &PupilFor( int nRing ) const;
             /// Works out one ring's exit pupil.
         void                    FindPupil( int nRing, SPupil &oPupil ) const;
+            /// The share of rays aimed anywhere on the rear element from a
+            /// point nKnot rings out on the sensor that get through, in a
+            /// channel; worked out if it hasn't been yet.
+        FLT                     PassFor( int nKnot, int nChannel ) const;
+        FLT                     FindPass( int nKnot, int nChannel ) const;
             /// The table for a lens set up like oLens, made if there is none.
         static std::shared_ptr<SPupilTable> SharedPupilTable( const CLens &oLens );
 

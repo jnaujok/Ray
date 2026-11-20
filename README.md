@@ -93,8 +93,9 @@ The ray tracing itself is the 1997 code.
   distortion come out of the optics. Give the glasses Abbe numbers and red, green and blue are
   traced at their own wavelengths, for chromatic aberration. Focus and exposure are worked out
   automatically; a 50 mm f/2 double Gauss is built in. Rays are aimed only at the part of the
-  rear element light gets through to each point of the sensor (the exit pupil), so few are wasted
-  on the aperture stop and the image is less grainy for the same number of rays.
+  rear element light gets through to each point of the sensor (the exit pupil), and a ray the lens
+  blocks is cast again, so no ray is wasted on the aperture stop and the lens adds almost no grain;
+  vignetting comes from the measured share of rays that get through.
 
   <img src="docs/images/lens.png" alt="scan_test through a pinhole, and through the double Gauss at f/2 focused on the glass sphere" width="650">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
