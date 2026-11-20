@@ -325,7 +325,7 @@ encoding, so `gamma` and `srgb` look washed out; `reinhard` brings back clipped 
 | [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build |
-| [`docs/`](docs) | MFC AppWizard notes and README images |
+| [`docs/`](docs) | MFC AppWizard notes, README images, and the changelog's before and after images |
 | [`legacy/`](legacy) | Visual C++ 4, 5, and 6 project files, kept for history |
 
 ## Scene files

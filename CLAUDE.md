@@ -46,6 +46,10 @@ ctest --test-dir build --output-on-failure
 - The GUI needs MSVC with MFC: `-DRAY_BUILD_GUI=ON`, then build the `Ray` target.
 - Run the tests under AddressSanitizer before changing anything in `core/`
   (`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"`); CI does.
+- **Every change that alters rendered output gets before and after images in `CHANGELOG.md`:** a
+  side-by-side PNG in `docs/images/changelog/` (before on the left, after on the right, each
+  labelled, for the scenes that changed most), linked under the change's entry with a line saying
+  what to look for. Make the "before" from the reference renders in git history.
 - If a change is meant to alter rendered output, regenerate `tests/reference/renders.tar.gz`,
   then run `tools/render_previews.py` to update the README's expected-output images
   (`docs/images/tests/`), and say so in the changelog. Otherwise a reference mismatch is a bug.

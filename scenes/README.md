@@ -7,7 +7,7 @@ when the binary format was dropped; they are in the repository's history.
 
 | Scene | Saved in 1997 as | Notes |
 |-------|------------------|-------|
-| `axis_test.ray` | version 2 | Six colored spheres along the axes |
+| `axis_test.ray` | version 2 | Six colored spheres along the axes. One is partly transparent; its index was 1.0 in 1997 and is 1.5 now |
 | `inside_sphere.ray` | version 2 | Camera inside a sphere |
 | `mat_test.ray` | version 2 | Material test |
 | `reflect_me.ray`, `reflect_test2.ray`, `reflect_test3.ray`, `reflection_test.ray` | version 2 | Reflection tests |

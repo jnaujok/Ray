@@ -2,10 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions up to
+0.2.0 followed [Semantic Versioning](https://semver.org/spec/v2.0.0.html); from 2026 they are named
+for the year, the stage and a number (`2026-alpha-0.3`).
+
+Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
+
+## [2026-alpha-0.3] - 2026-11-19
+
+The ray tracing has resumed: a corrected camera, anti-aliasing, color models, real lenses with
+chromatic aberration, meshes and the Utah teapot, textures, corrected materials, and scenes saved
+as JSON inside IASLib resource archives.
 
 ### Added
 
@@ -190,8 +199,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - The reflection direction is computed directly as V − 2(N·V)N (it was right, by way of a
     detour).
   - `scan_test`'s glass sphere had index 1.0, which looked like glass only because of the
-    refraction bug; it, and `lens_test` and `chromatic_test`, now use 1.5. Every reference render,
-    preview and README image was regenerated.
+    refraction bug; it, `lens_test`, `chromatic_test` and `axis_test`'s partly transparent sphere
+    now use 1.5. Every reference render, preview and README image was regenerated.
+
+    ![Before and after: scan_test's glass sphere, axis_test, triangle2, and the teapot's specular highlight](docs/images/changelog/material-fixes.png)
+
+    Before: the 1997 refraction, and (teapot) the old default specular index of 1.0, which left no
+    highlight. After: Snell's law, glass at 1.5, and the highlight.
 
 - Camera rays were distorted. The camera was aimed by adding the difference between its view
   direction and +Z to every ray instead of rotating the rays, which sheared the image: spheres came
@@ -204,6 +218,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a flat image plane. The vertical angle sets the field of view and the horizontal one follows from
   the image's width and height, so pixels are square.
   The reference renders in `tests/reference/renders.tar.gz` and the README images were regenerated.
+
+  ![Before and after the camera fix: axis_test, xxx and reflect_me](docs/images/changelog/camera-fix.png)
+
+  Before: the six spheres of `axis_test` sheared into ellipses, `xxx` mirrored, and `reflect_me`
+  (a camera looking straight down) smeared. After: round spheres, the right way round, and the
+  view down onto two spheres.
 
 ## [0.2.0] - 2026-11-19
 
@@ -321,6 +341,7 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.3...HEAD
+[2026-alpha-0.3]: https://github.com/jnaujok/Ray/compare/v0.2.0...2026-alpha-0.3
 [0.2.0]: https://github.com/jnaujok/Ray/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jnaujok/Ray/releases/tag/v0.1.0
