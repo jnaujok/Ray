@@ -378,6 +378,10 @@ light to edit it as JSON or delete it.
 ctest --test-dir build --output-on-failure
 ```
 
+The torture test, the Benchy close-up and the prism (and their network twins) are labelled `slow`;
+`ctest --test-dir build -LE slow` runs everything else in a minute or two. CI's Windows job skips
+them (its runners are small); the Linux, macOS and sanitizer jobs run everything.
+
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and

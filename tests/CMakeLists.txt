@@ -247,7 +247,7 @@ add_test(NAME render_prism
                  -DOUTPUT=${RENDER_DIR}/prism_test.raw
                  -DREFERENCE=${REFERENCE_DIR}/prism_test.raw
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(render_prism PROPERTIES FIXTURES_SETUP render_prism TIMEOUT 900)
+set_tests_properties(render_prism PROPERTIES FIXTURES_SETUP render_prism TIMEOUT 900 LABELS slow)
 add_test(NAME roundtrip_prism_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/prism_test.ray ${RENDER_DIR})
 
 # Model files: a puzzle cube and a gem from colored STL files (the VisCAM and
@@ -273,8 +273,11 @@ add_test(NAME render_benchy
                  -DOUTPUT=${RENDER_DIR}/benchy_test.raw
                  -DREFERENCE=${REFERENCE_DIR}/benchy_test.raw
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(render_benchy PROPERTIES FIXTURES_SETUP render_benchy TIMEOUT 900)
+set_tests_properties(render_benchy PROPERTIES FIXTURES_SETUP render_benchy TIMEOUT 900 LABELS slow)
 add_test(NAME roundtrip_benchy_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/benchy_test.ray ${RENDER_DIR})
+
+# Tests labelled "slow" take minutes (more on a small machine or under the
+# sanitizers); `ctest -LE slow` runs the rest, fixtures and all.
 
 # The torture test: every kind of object (the teapot too), reflection,
 # refraction and textures, through the double Gauss with a 5x5 stratified
@@ -288,7 +291,7 @@ add_test(NAME render_torture
                  -DREFERENCE=${REFERENCE_DIR}/torture_test.raw
                  -DSIZE=160x120
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(render_torture PROPERTIES TIMEOUT 900)
+set_tests_properties(render_torture PROPERTIES TIMEOUT 900 LABELS slow)
 add_test(NAME roundtrip_torture_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/torture_test.ray ${RENDER_DIR})
 
 add_test(NAME render_sampler_stratified
@@ -539,7 +542,7 @@ add_test(NAME network_prism
                  -DPORT=${port}
                  -DEXACT_WITH=${RENDER_DIR}/prism_test.raw
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_prism PROPERTIES FIXTURES_REQUIRED render_prism
+set_tests_properties(network_prism PROPERTIES FIXTURES_REQUIRED render_prism LABELS slow
                                        RESOURCE_LOCK ray_network TIMEOUT 900)
 
 # The engines get the model files inside the scene.
@@ -568,7 +571,7 @@ add_test(NAME network_benchy
                  -DPORT=${port}
                  -DEXACT_WITH=${RENDER_DIR}/benchy_test.raw
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_benchy PROPERTIES FIXTURES_REQUIRED render_benchy
+set_tests_properties(network_benchy PROPERTIES FIXTURES_REQUIRED render_benchy LABELS slow
                                         RESOURCE_LOCK ray_network TIMEOUT 900)
 
 # PNG and Radiance HDR output, checked with Python's own zlib.

@@ -92,12 +92,19 @@ as before.
 - **The torture test** has a layer-lined orange 3DBenchy, a puzzle cube from a colored STL and a
   ring from an OBJ file on the floor in front. Its reference render, README preview and full-size
   image are regenerated.
+- The slow render tests (`render_torture`, `render_benchy`, `network_benchy`, `render_prism`,
+  `network_prism`) carry the CTest label `slow`, so `ctest -LE slow` runs only the quick ones. CI's Windows job
+  skips them, as its runners are small; Linux, macOS and the sanitizer job still run them.
 - `.gitignore` still ignores Visual C++ `.obj` files, but no longer OBJ models in `scenes/models/`;
   `.gitattributes` marks STL files binary and OBJ files text.
 
 ### Fixed
 
 - `CMesh::Intersect` on a mesh with no faces read the first node of its empty tree; it now misses.
+- Loading 3DBenchy took minutes on Windows: the hash that joins its corners left its low bits the
+  same for every corner (a float made a double has 29 low bits of zeros), and MSVC's tables pick a
+  bucket by the low bits, so all 225,706 went in one. The hash now mixes every bit. And each mesh
+  holds the model it read, so the copies of a scene a render makes really do share one reading.
 
 ## [2026-alpha-0.10] - 2026-11-20
 
