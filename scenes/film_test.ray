@@ -1,0 +1,492 @@
+{
+  "format": "Ray scene",
+  "version": 3,
+  "settings": {
+    "imageWidth": 240,
+    "imageHeight": 180,
+    "imageFile": "film_test.out",
+    "colorDepth": 8,
+    "maximumDepth": 8,
+    "depthThreshold": 0.01
+  },
+  "background": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "camera": {
+    "position": [
+      0.0,
+      1.0,
+      -5.0
+    ],
+    "lookAt": [
+      0.0,
+      0.7,
+      0.0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "verticalAngle": 34.0,
+    "horizontalAngle": 44.2,
+    "aspectRatio": 1.333333,
+    "sampler": {
+      "type": "stratified",
+      "grid": 2,
+      "seed": 0
+    },
+    "colorModel": {
+      "type": "film",
+      "stock": "ektachrome-ms",
+      "shutter": 0.004,
+      "fStop": 11.0,
+      "width": 20.0,
+      "grain": 1.0
+    }
+  },
+  "objects": [
+    {
+      "type": "plane",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.01,
+            0.01,
+            0.01
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.3,
+            0.3,
+            0.3
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        -1.8,
+        0.25,
+        0.0
+      ],
+      "size": [
+        0.55,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.02,
+            0.02,
+            0.02
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        -1.2000000000000002,
+        0.25,
+        0.0
+      ],
+      "size": [
+        0.55,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.04,
+            0.04,
+            0.04
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        -0.6000000000000001,
+        0.25,
+        0.0
+      ],
+      "size": [
+        0.55,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.08,
+            0.08,
+            0.08
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        -2.220446049250313e-16,
+        0.25,
+        0.0
+      ],
+      "size": [
+        0.55,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.16,
+            0.16,
+            0.16
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        0.5999999999999999,
+        0.25,
+        0.0
+      ],
+      "size": [
+        0.55,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.32,
+            0.32,
+            0.32
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        1.2,
+        0.25,
+        0.0
+      ],
+      "size": [
+        0.55,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.64,
+            0.64,
+            0.64
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        1.7999999999999996,
+        0.25,
+        0.0
+      ],
+      "size": [
+        0.55,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            1.28,
+            1.28,
+            1.28
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -1.0,
+        1.0,
+        0.4
+      ],
+      "radius": 0.3,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.8,
+            0.15,
+            0.1
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.3,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.25,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        0.0,
+        1.0,
+        0.4
+      ],
+      "radius": 0.3,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.2,
+            0.7,
+            0.2
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.3,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.25,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        1.0,
+        1.0,
+        0.4
+      ],
+      "radius": 0.3,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.15,
+            0.25,
+            0.85
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.3,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.25,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        1.9,
+        1.5,
+        0.6
+      ],
+      "radius": 0.06,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            60.0,
+            50.0,
+            35.0
+          ]
+        }
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [
+        0.309426,
+        -0.721995,
+        0.618853
+      ],
+      "color": [
+        2.2,
+        2.2,
+        2.1
+      ],
+      "angle": 0.53,
+      "samples": 2
+    }
+  ]
+}

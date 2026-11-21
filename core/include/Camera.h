@@ -58,6 +58,41 @@ class CCamera : public CObjects
         BOOL                            m_bSpectral = FALSE;
         std::string                     m_strLensError;     // why the lens couldn't be prepared
     public:
+            // A Reseau plate: a glass plate pressed against the film,
+            // engraved with a grid of opaque crosses that print on every
+            // frame (the Hasselblad Data Camera's 5 by 5, 10 mm apart). The
+            // crosses block the light that would reach the film under them;
+            // the plate's glass is part of the lens's prescription.
+        struct SReseau
+        {
+            BOOL    bOn = FALSE;
+            int     nCount = 5;             // crosses on a side
+            FLT     nSpacing = 10.0;        // mm between crosses
+            FLT     nSize = 1.2;            // mm across each cross
+            FLT     nLineWidth = 0.05;      // mm
+        };
+
+            // A camera body: a lens, a format, a film and maybe a Reseau
+            // plate, for "body" in a scene file.
+        struct SBody
+        {
+            const char *strName;
+            const char *strDescription;
+            const char *strLens;            // a built-in lens prescription
+            FLT         nFormat;            // the image's width on the film, mm
+            FLT         nFStop;             // the film's default exposure stop
+            BOOL        bReseau;
+        };
+        static const SBody *GetBodies( int &nCount );
+
+            /// Whether a point on the film (mm from the frame's center) lies
+            /// under one of the Reseau plate's crosses.
+        BOOL        OnReseau( FLT nX, FLT nY ) const;
+        const SReseau &GetReseau( void ) const { return m_oReseau; }
+        void        SetReseau( const SReseau &oReseau ) { m_oReseau = oReseau; }
+    protected:
+        SReseau                         m_oReseau;
+    public:
                     CCamera( void );
                     CCamera( CVector oPosition, CVector oPointAt, FLT nVerticalAngle, FLT nHorizontalAngle, FLT nAspectRatio = 0.0, CVector *poUp = NULL );
                     CCamera( const CCamera &oSource );

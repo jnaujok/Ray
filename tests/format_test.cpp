@@ -13,6 +13,10 @@
 #include "ImageExport.h"
 #include "HdrColorModel.h"
 #include "Lens.h"
+#include "FilmColorModel.h"
+#include "RegolithMaterial.h"
+#include "SrgbColorModel.h"
+#include "Camera.h"
 #include "AdaptiveSampler.h"
 #include "ImageFile.h"
 #include "ThreadTaskMaster.h"
@@ -5280,6 +5284,182 @@ static std::string FormulaError( const char *strFormula )
     return oExpression.Compile( strFormula, aoParameters, strError ) ? std::string() : strError;
 }
 
+    // The Apollo cameras: their lenses, Sellmeier glasses, film, the Reseau
+    // plate, camera bodies and the regolith material.
+static void ApolloChecks( void )
+{
+    CScene  oScene;
+
+        // Each lens: its focal length, widest f-number and a sensor behind
+        // it, focused at infinity.
+    struct SExpected { const char *strName; double dFocal; double dFNumber; };
+    static const SExpected s_aoLenses[] =
+    {
+        { "biogon-38mm", 38.0, 4.5 }, { "biogon-60mm", 61.1, 5.6 }, { "biogon-60mm-reseau", 61.1, 5.6 },
+        { "planar-80mm", 80.0, 2.8 }, { "planar-100mm", 100.0, 3.5 }, { "uv-sonnar-105mm", 105.0, 4.3 },
+        { "sonnar-250mm", 250.0, 5.6 }, { "tele-tessar-500mm", 500.0, 8.0 },
+    };
+    for ( size_t nIndex = 0; nIndex < sizeof( s_aoLenses ) / sizeof( s_aoLenses[ 0 ] ); nIndex++ )
+    {
+        std::string strLens = std::string( "{ \"prescription\": \"" ) + s_aoLenses[ nIndex ].strName +
+                              "\", \"focusDistance\": 1e9, \"sensorWidth\": 55 }";
+        BOOL        bLoaded = ( oScene.FromJson( WithLens( strLens.c_str() ) ) == 0 ) ? TRUE : FALSE;
+        CLens      *pLens = oScene.GetCamera().GetLens();
+        std::string strWhat = std::string( s_aoLenses[ nIndex ].strName ) + " loads and has its focal length, f-number and back focus";
+
+        Check( bLoaded && pLens && ABS( pLens->GetFocalLength() - s_aoLenses[ nIndex ].dFocal ) < 0.001 * s_aoLenses[ nIndex ].dFocal &&
+               ABS( pLens->GetWideOpen() - s_aoLenses[ nIndex ].dFNumber ) < 0.03 * s_aoLenses[ nIndex ].dFNumber &&
+               pLens->GetFilmDistance() > -1e-6, strWhat.c_str() );
+    }
+        // The Reseau plate's back face lies on the film, focused at infinity.
+    Check( oScene.FromJson( WithLens( "{ \"prescription\": \"biogon-60mm-reseau\", \"focusDistance\": 1e9, \"sensorWidth\": 53 }" ) ) == 0 &&
+           oScene.GetCamera().GetLens() && ABS( oScene.GetCamera().GetLens()->GetFilmDistance() ) < 0.05,
+           "the Reseau plate lies against the film" );
+
+        // Sellmeier glasses, against their catalog indices and Abbe numbers.
+    double dSilicaD = CLens::SellmeierIndex( CLens::GLASS_FUSED_SILICA, 0.58756 );
+    double dSilicaV = ( dSilicaD - 1.0 ) / ( CLens::SellmeierIndex( CLens::GLASS_FUSED_SILICA, 0.48613 ) -
+                                             CLens::SellmeierIndex( CLens::GLASS_FUSED_SILICA, 0.65627 ) );
+    double dFluorD = CLens::SellmeierIndex( CLens::GLASS_CALCIUM_FLUORIDE, 0.58756 );
+    double dFluorV = ( dFluorD - 1.0 ) / ( CLens::SellmeierIndex( CLens::GLASS_CALCIUM_FLUORIDE, 0.48613 ) -
+                                           CLens::SellmeierIndex( CLens::GLASS_CALCIUM_FLUORIDE, 0.65627 ) );
+
+    Check( ABS( dSilicaD - 1.4585 ) < 2e-4 && ABS( dSilicaV - 67.8 ) < 0.5, "fused silica: n_d 1.4585, V 67.8" );
+    Check( ABS( dFluorD - 1.4338 ) < 2e-4 && ABS( dFluorV - 95.0 ) < 0.6, "calcium fluoride: n_d 1.4338, V 95" );
+    Check( CLens::SellmeierIndex( CLens::GLASS_FUSED_SILICA, 0.25 ) > 1.50 &&
+           CLens::SellmeierIndex( CLens::GLASS_CALCIUM_FLUORIDE, 0.25 ) > 1.46, "both bend ultraviolet more" );
+    Check( oScene.FromJson( WithLens( "{ \"surfaces\": [ { \"radius\": 60, \"thickness\": 5, \"glass\": \"calcium-fluoride\", \"aperture\": 10 },"
+                                      " { \"radius\": -60, \"thickness\": 0, \"aperture\": 10 } ], \"sensorWidth\": 36 }" ) ) == 0 &&
+           oScene.ToJson().find( "\"glass\": \"calcium-fluoride\"" ) != std::string::npos &&
+           oScene.GetCamera().GetChannels() == 3, "a surface can name a Sellmeier glass, saves it, and disperses" );
+    Check( oScene.FromJson( WithLens( "{ \"surfaces\": [ { \"radius\": 60, \"thickness\": 5, \"glass\": \"calcium-fluoride\", \"ior\": 1.5, \"aperture\": 10 },"
+                                      " { \"radius\": -60, \"thickness\": 0, \"aperture\": 10 } ] }" ) ) != 0 &&
+           oScene.FromJson( WithLens( "{ \"surfaces\": [ { \"radius\": 60, \"thickness\": 5, \"glass\": \"quartz\", \"aperture\": 10 },"
+                                      " { \"radius\": -60, \"thickness\": 0, \"aperture\": 10 } ] }" ) ) != 0,
+           "a glass and an ior, or an unknown glass, are refused" );
+
+        // Film: the curve falls through the mid density at mid gray, as
+        // steep there as the gamma, and the clear base shows white.
+    CFilmColorModel oFilm;
+    const CFilmColorModel::SStock &oStock = oFilm.GetStock();
+    double dMid = oFilm.Density( 1, 0.18 );
+    double dSlope = ( oFilm.Density( 1, 0.18 * 1.001 ) - oFilm.Density( 1, 0.18 / 1.001 ) ) / ( 2.0 * log10( 1.001 ) );
+
+    Check( ABS( dMid - oStock.nMidDensity ) < 1e-9, "mid gray develops to the stock's mid density" );
+    Check( oFilm.Density( 1, 1e-6 ) > oStock.nMaxDensity - 0.05 && oFilm.Density( 1, 1e6 ) < oStock.nMinDensity + 0.05 &&
+           oFilm.Density( 1, 0.1 ) > oFilm.Density( 1, 0.2 ), "the curve falls from the maximum density to the base" );
+    Check( dSlope < -0.6 * oStock.anGamma[ 1 ] && dSlope > -1.01 * oStock.anGamma[ 1 ], "the curve is about as steep as the gamma at mid gray" );
+    Check( ABS( oFilm.Transmission( oStock.nMinDensity ) - 1.0 ) < 1e-12, "the clear base shows white" );
+    {
+            // Sunny 16: ISO 100, 1/100 s, f/16 puts 0.18 on mid gray.
+        std::unique_ptr<IASLib::CJsonNode> pNode( RayJson::Parse( "{ \"type\": \"film\", \"stock\": \"panatomic-x\", \"iso\": 100, \"shutter\": 0.01, \"fStop\": 16 }" ) );
+        CFilmColorModel    oPan;
+        BYTE               nRed, nGreen, nBlue;
+
+        Check( pNode && oPan.FromJson( *pNode ), "a film's settings read" );
+        oPan.ToRGB( CColor( 0.18, 0.18, 0.18 ), nRed, nGreen, nBlue );
+        BYTE nExpected = (BYTE)( CSrgbColorModel::Encode( oPan.Transmission( oPan.GetStock().nMidDensity ) ) * 255.0 + 0.5 );
+        Check( nRed == nGreen && nGreen == nBlue && ABS( (int)nRed - (int)nExpected ) <= 1, "sunny 16 puts mid gray on the curve's mid density" );
+
+    }
+    {
+        std::vector<FLT> anKernel = CFilmColorModel::Kernel( 2.5 );
+        double           dSum = anKernel[ 0 ];
+
+        for ( size_t nIndex = 1; nIndex < anKernel.size(); nIndex++ )
+            dSum += 2.0 * anKernel[ nIndex ];
+        Check( ABS( dSum - 1.0 ) < 1e-12, "the spread's kernel sums to one" );
+
+            // One bright pixel in the middle: the spread keeps its light.
+        std::vector<FLT> anLayer( 61 * 61, 0.0 );
+        anLayer[ 30 * 61 + 30 ] = 100.0;
+        CFilmColorModel::Spread( anLayer, 61, 61, 0.1, 1.0, 0.05, 4.0 );
+        double dTotal = 0.0;
+        for ( size_t nIndex = 0; nIndex < anLayer.size(); nIndex++ )
+            dTotal += anLayer[ nIndex ];
+        Check( ABS( dTotal - 100.0 ) < 1e-6 && anLayer[ 30 * 61 + 30 ] > 85.0 && anLayer[ 30 * 61 + 30 ] < 90.0 && anLayer[ 30 * 61 + 34 ] > 0.0,
+               "the spread keeps the light, leaves most where it fell and carries some away" );
+    }
+    {
+            // Finishing an image twice gives the same bytes (grain is the
+            // same every time), and a dark pixel next to a bright one gets
+            // brighter.
+        CImageFile  oFirst( 32, 32 );
+        CImageFile  oSecond( 32, 32 );
+
+        oFirst.KeepLinear();
+        oSecond.KeepLinear();
+        for ( int nY = 0; nY < 32; nY++ )
+        {
+            for ( int nX = 0; nX < 32; nX++ )
+            {
+                CColor oColor = ( nX == 16 && nY == 16 ) ? CColor( 500.0, 500.0, 500.0 ) : CColor( 0.01, 0.01, 0.01 );
+
+                oFirst.PutLinear( nX, nY, oColor );
+                oSecond.PutLinear( nX, nY, oColor );
+            }
+        }
+        oFilm.SetWidth( 3.0 );      // a 3 mm piece of film, so the spread covers pixels
+        oFilm.Finish( oFirst );
+        oFilm.Finish( oSecond );
+        Check( oFirst.GetMemory() == oSecond.GetMemory(), "film grain is the same every time" );
+        CColor oNear = oFirst.GetPoint( 18, 16 );
+        CColor oFar = oFirst.GetPoint( 2, 2 );
+        Check( oNear.GetR() > oFar.GetR() + 0.05 && oNear.GetR() > oNear.GetB(), "halation lights the film around a bright point, reddest" );
+    }
+    Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"colorModel\": { \"type\": \"film\", \"stock\": \"kodachrome\" }" ) ) != 0 &&
+           oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"colorModel\": { \"type\": \"film\", \"fStop\": 0 }" ) ) != 0 &&
+           oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"colorModel\": { \"type\": \"film\", \"spread\": 10 }" ) ) != 0,
+           "an unknown stock, a zero stop and too much spread are refused" );
+
+        // The Data Camera: its body brings the Reseau lens, the format,
+        // film and the crosses; a lens without a prescription keeps it.
+    Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]",
+                                     "\"lookAt\": [0, 0, 0], \"body\": \"hasselblad-hdc\", \"lens\": { \"millimetersPerUnit\": 1000, \"focusDistance\": 5 }" ) ) == 0,
+           "a camera body loads" );
+    {
+        CCamera    &oCamera = oScene.GetCamera();
+        std::string strSaved = oScene.ToJson();
+        CScene      oReread;
+
+        Check( oCamera.GetLens() && oCamera.GetLens()->GetSensorWidth() == 53.0 &&
+               strcmp( oCamera.GetColorModel().GetName(), "film" ) == 0 && oCamera.GetReseau().bOn,
+               "the Data Camera has its 53 mm format, film and Reseau plate" );
+        Check( strSaved.find( "biogon-60mm-reseau" ) != std::string::npos && strSaved.find( "\"body\"" ) == std::string::npos &&
+               oReread.FromJson( strSaved ) == 0 && oReread.ToJson() == strSaved, "a body saves as the camera it makes, and reads back" );
+            // The crosses: 5 by 5, 10 mm apart, 1.2 mm across, lines 0.05 mm.
+        Check( oCamera.OnReseau( 0.0, 0.0 ) && oCamera.OnReseau( 10.0, 0.0 ) && oCamera.OnReseau( -20.0, 20.0 ) &&
+               oCamera.OnReseau( 0.55, 0.0 ) && oCamera.OnReseau( 20.0, -19.45 ), "the Reseau crosses are where they should be" );
+        Check( ! oCamera.OnReseau( 5.0, 5.0 ) && ! oCamera.OnReseau( 0.65, 0.0 ) && ! oCamera.OnReseau( 0.3, 0.03 ) &&
+               ! oCamera.OnReseau( 30.0, 0.0 ), "and nowhere else" );
+    }
+    Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"body\": \"leica\"" ) ) != 0 &&
+           oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"reseau\": { }" ) ) != 0 &&
+           oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]",
+                                     "\"lookAt\": [0, 0, 0], \"body\": \"hasselblad-hdc\", \"reseau\": { \"lineWidth\": 2 }" ) ) != 0,
+           "an unknown body, a Reseau without a lens and crosses thicker than they are wide are refused" );
+
+        // Regolith: exactly its color seen along the light at normal
+        // incidence, the surge falling away from opposition, no limb
+        // darkening.
+    {
+        std::unique_ptr<IASLib::CJsonNode> pNode( RayJson::Parse( "{ \"type\": \"regolith\", \"surge\": 1.0, \"width\": 0.06 }" ) );
+        CRegolithMaterial  oSoil;
+
+        Check( pNode && oSoil.FromJson( *pNode ), "a regolith material reads" );
+        Check( ABS( oSoil.Factor( 1.0, 1.0, 0.0 ) - 1.0 ) < 1e-12, "regolith seen along the light is its color" );
+        double dSide = oSoil.Factor( (FLT)cos( PI / 4.0 ), (FLT)cos( PI / 4.0 ), PI / 2.0 );
+        Check( ABS( dSide - 0.5 * ( 1.0 + 1.0 / ( 1.0 + 1.0 / 0.06 ) ) ) < 1e-9, "the opposition surge fades away from opposition" );
+        Check( ABS( oSoil.Factor( 0.5, 0.5, 0.0 ) - 1.0 ) < 1e-12 && ABS( oSoil.Factor( 1.0, 0.0, 0.0 ) - 2.0 ) < 1e-12,
+               "Lommel-Seeliger: no limb darkening, brightest seen edge-on" );
+
+        pNode.reset( RayJson::Parse( "{ \"type\": \"regolith\", \"width\": 0 }" ) );
+        CRegolithMaterial oBad;
+        Check( pNode && ! oBad.FromJson( *pNode ), "a zero surge width is refused" );
+
+    }
+}
+
 static void MathShapeChecks( void )
 {
     const double dPi = 3.14159265358979323846;
@@ -5887,6 +6067,7 @@ int main( int argc, char **argv )
         LatheChecks();
         ExtrusionChecks();
         MathShapeChecks();
+        ApolloChecks();
     }
 
     if ( g_nFailures == 0 )

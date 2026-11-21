@@ -164,6 +164,12 @@ ctest --preset full             # every test
   objects made of parts override `Occludes` to stop at the first part a shadow ray hits. The tree
   must find exactly what testing every object in order does (`ClosestHitByEachObject`), ties
   included; `format_test` checks it.
+- **New film stocks** go in the table in `core/src/FilmColorModel.cpp`, **new camera bodies** in
+  `CCamera`'s table in `core/src/Camera.cpp`, and **new Apollo lens prescriptions** in
+  `tools/apollo_lenses.py`, which writes them into `core/src/Lens.cpp` (`--write core/src/Lens.cpp`)
+  between its markers; edit the script, not the generated tables. A color model that needs the whole
+  image (grain, the spread of light) says so with `NeedsWholeImage` and does it in `Finish`, which
+  `CTaskMaster::TraceScene` calls once the image is traced.
 - **New material presets** go in the table in `core/src/Presets.cpp`: a texture as JSON and,
   unless it is a texture only, a finish (a JSON array of materials whose textures name the preset).
   Read and write textures with `CTexture::Read` and `CTexture::Write`, never `CTexture::Create`

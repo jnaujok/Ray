@@ -7,6 +7,8 @@
 #include "Scene.h"
 #include "ImageFile.h"
 #include "ImageWriter.h"
+#include "ColorModel.h"
+#include "ImageFile.h"
 #include "TaskMaster.h"
 #include "Color.h"
 #include "Threading/Thread.h"
@@ -92,6 +94,10 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
 
     m_nRaysTraced = 0;
     m_strLastError.clear();
+        // A color model that works on the whole image (film) needs every
+        // pixel's linear color.
+    if ( oScene.GetCamera().GetColorModel().NeedsWholeImage() && ! oImageFile.KeepsLinear() )
+        oImageFile.KeepLinear();
     if ( ( GetTaskCount() <= 0 ) || ( nWidth <= 0 ) || ( nHeight <= 0 ) )
     {
         m_strLastError = ( GetTaskCount() <= 0 ) ? "There are no tasks to trace with" : "The image has no pixels";
@@ -258,5 +264,7 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
     }
 
     m_bTracing = false;
+    if ( bRetVal && oScene.GetCamera().GetColorModel().NeedsWholeImage() )
+        oScene.GetCamera().GetColorModel().Finish( oImageFile );
     return bRetVal;
 }

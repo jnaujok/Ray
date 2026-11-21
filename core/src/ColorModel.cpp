@@ -10,6 +10,7 @@
 #include "SrgbColorModel.h"
 #include "ReinhardColorModel.h"
 #include "HdrColorModel.h"
+#include "FilmColorModel.h"
 #include "Color.h"
 
 #include "SceneJson.h"
@@ -23,6 +24,7 @@ namespace
     CColorModel *CreateSrgb( void )     { return new CSrgbColorModel; }
     CColorModel *CreateReinhard( void ) { return new CReinhardColorModel; }
     CColorModel *CreateHdr( void )      { return new CHdrColorModel; }
+    CColorModel *CreateFilm( void )     { return new CFilmColorModel; }
 
         // Every color model that can be chosen by name. The first is the default.
     const CColorModel::SType s_aoTypes[] =
@@ -34,6 +36,8 @@ namespace
                       "(settings: exposure, default 1; white, default none)",        CreateReinhard },
         { "hdr",      "high dynamic range: scale by exposure (default 1) and keep "
                       "every brightness for --hdr files; 8-bit files clip, then sRGB", CreateHdr },
+        { "film",     "photographic film: a Kodak stock's curve, grain and spread of light "
+                      "(settings: stock, iso, shutter, fStop, width, grain, spread, seed)", CreateFilm },
     };
 }
 

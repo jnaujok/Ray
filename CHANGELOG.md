@@ -10,6 +10,112 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.20] - 2026-11-21
+
+The Apollo cameras: the Hasselblads flown to the Moon as camera bodies, seven of their Carl Zeiss
+lenses, Kodak film with its curve, grain and spread of light, the Data Camera's Réseau plate whose
+crosses bloom away behind bright subjects, and lunar regolith, shown together at Tranquility Base.
+Scenes without the new fields render byte for byte as before.
+
+### Added
+
+- **Seven Apollo lenses**, built-in `prescription`s at their nominal focal lengths, written into
+  `core/src/Lens.cpp` by the new `tools/apollo_lenses.py`, which holds each lens's data and source,
+  traces it, and reports what it measures (Ray's own `Describe` agrees to the micron):
+
+  | Prescription | Source | Focal length | Opens to | Distortion at the corner | RMS spot |
+  |---|---|---|---|---|---|
+  | `biogon-38mm` | US 2,721,499 (L. Bertele), Example 2: 8 elements in 5 groups, f/4.5, the SWC's Biogon | 38.0 mm | f/4.55 | +0.21% | 35 µm |
+  | `biogon-60mm` | reconstruction: the same Biogon at the 61.1 mm Zeiss gave for the flight lens | 61.1 mm | f/5.64 | −0.23% | 35 µm |
+  | `biogon-60mm-reseau` | the same with the Data Camera's Réseau plate (3 mm, BK7-like glass: an assumption) | 61.1 mm | f/5.64 | −0.51% | 30 µm |
+  | `planar-80mm` | US 2,724,994 (G. Lange, Zeiss), Example I: 5 elements in 4 groups, f/2.8 | 80.0 mm | f/2.75 | −0.19% | 89 µm |
+  | `planar-100mm` | family member: Example II of US 2,724,994 at 100 mm, stopped to f/3.5 | 100.0 mm | f/3.47 | −0.10% | 34 µm |
+  | `uv-sonnar-105mm` | reconstruction: 7 air-spaced singlets of fused silica and calcium fluoride | 105.0 mm | f/4.33 | +2.97% | 55 µm |
+  | `sonnar-250mm` | reconstruction: 4 elements in 3 groups, telephoto ratio 0.94 | 250.0 mm | f/5.66 | +0.66% | 109 µm |
+  | `tele-tessar-500mm` | reconstruction: 5 elements in 3 groups, telephoto ratio 0.80 | 500.0 mm | f/8.06 | +0.47% | 45 µm |
+
+  (Spots are RMS over the field at C, d and F light at full aperture, vignetted rays left out.) The
+  patents' tables were read from the scanned PDFs; the patent numbers the planning notes gave were
+  checked, and not all held: US 2,724,994 is a 5-element Planar of the Rolleiflex kind (the
+  Hasselblad 80 mm was a later 7-element version), US 3,038,380 is an f/4 long-back-focus design,
+  US 2,720,140 an f/2 five-element Sonnar, and DE 1,447,278 a Voigtländer telephoto, so none of the
+  last three is used. Where Zeiss published no prescription (the 60 mm Biogon, the UV-Sonnar, the
+  Sonnar 250 and the Tele-Tessar 500), the script builds a layout matching the lens's published
+  construction and optimizes it (gradient descent, then Levenberg–Marquardt on the spot, with edge
+  thickness, back focus and length as constraints). Ray traces visible light only, so the UV-Sonnar
+  is modeled in the visible band.
+
+  ![The same subject through a pinhole and through each Apollo lens](docs/images/changelog/apollo-lenses.png)
+
+  The test subject from one place through each lens: the Biogons' wide fields (with the 38 mm's
+  vignetting in the corners) through to the Tele-Tessar's few degrees.
+- **Sellmeier glasses.** A lens surface can name `"glass": "fused-silica"` or `"calcium-fluoride"`
+  instead of an `ior` and `abbe`; it is traced with Malitson's Sellmeier formula in every channel
+  and at every wavelength, since these crystals disperse too little, and too unevenly, for the
+  Cauchy fit. (`CLens::SellmeierIndex`.)
+- **The `film` color model**, Kodak stocks: `ektachrome-ms` (SO-368, ISO 64), `ektachrome-ef`
+  (SO-168, ISO 160), `panatomic-x` (3400, ISO 80) and `high-speed-2485` (ISO 6000). Each layer is
+  exposed by a mix of red, green and blue, follows the stock's characteristic curve (a positive),
+  and the slide is shown sRGB-encoded. Exposure is v × 256 × `shutter` × ISO / `fStop`², so sunny 16
+  puts 0.18 on mid gray. Once the image is traced it is developed again with grain (the same every
+  run, Selwyn-scaled to the pixel) and the spread of light in the emulsion (irradiation and
+  halation, Gaussians carrying a share of the light, halation reddest in color film). That needs
+  the whole image, so color models can now say `NeedsWholeImage` and do it in `Finish`, which
+  `CTaskMaster::TraceScene` calls on the master: threads and networked engines get the same bytes.
+  The stocks' curves, color response, grain and spread are representative values, not measured
+  data.
+
+  ![film_test in sRGB and on each stock](docs/images/changelog/apollo-film.png)
+
+  Gray steps a stop apart, colored balls and an overexposed lamp: each stock's curve and contrast,
+  the red-orange halation around the lamp on Ektachrome, Panatomic-X's fine grain and 2485's coarse
+  grain and wide glow.
+- **Camera bodies and the Réseau plate.** A camera's `body` (`"hasselblad-hec"`,
+  `"hasselblad-hdc"`, `"hasselblad-lswc"`) fills in the lens, its format, a film and, for the Data
+  Camera, the Réseau plate; a `lens` without a prescription keeps the body's. `reseau` (`count` 5,
+  `spacing` 10 mm, `size` 1.2 mm, `lineWidth` 0.05 mm) prints the plate's crosses: no light reaches
+  the film under a cross, so the plate draws them, and the film's spread fills them in where the
+  picture is overexposed, as on the Apollo frames. The plate's glass is in the
+  `biogon-60mm-reseau` prescription; a lens now aims its rays at its last curved surface (or its
+  stop), so a flat plate before the film is traced through but not aimed at, which leaves every
+  existing lens unchanged.
+
+  ![reseau_test without the plate and with it](docs/images/changelog/apollo-reseau.png)
+
+  On the right, the crosses print black on the soil and the gray ball, and fade away on the bright
+  white ball, where its light spreads into them.
+- **The `regolith` material**: lunar soil after Hapke, the Lommel–Seeliger law times an opposition
+  surge (`surge` 1, `width` 0.06), so the soil brightens toward the point opposite the sun.
+- **Tranquility Base** (`tranquility_test.ray`, written with the other new scenes by
+  `tools/make_apollo_scenes.py`): a lunar module built from primitives beside a flag on regolith in
+  low sun (a 0.53° sun under a black sky), shot with the Data Camera, its Biogon, Réseau plate and
+  Ektachrome MS. It imitates the Apollo 11 views of the LM; it is not a recovered camera station,
+  and uses no NASA model.
+
+  ![Tranquility Base before and after](docs/images/changelog/apollo-tranquility.png)
+
+  On the right the regolith glows toward the bottom of the frame, opposite the sun (the opposition
+  surge), the Réseau crosses print over the scene, and the film's curve keeps the bright ascent
+  stage from clipping.
+- **Tests:** `render_`, `roundtrip_` and `network_` tests for `apollo_lenses_test`, `film_test`,
+  `reseau_test` and `tranquility_test`, with reference renders, README previews and places in the
+  Expected output table, and `ApolloChecks` in `format_test`: each lens's focal length, f-number and
+  back focus, the Réseau plate against the film, Sellmeier indices and Abbe numbers, glass naming
+  and its errors, the film curve through mid gray and its slope, sunny 16, the spread's kernel and
+  the light it keeps, grain the same every time, halation around a bright point, the Data Camera
+  body and how it saves, where the Réseau crosses are and aren't, the regolith law at known angles,
+  and the errors for each.
+
+### Changed
+
+- **Torture test:** a lump of regolith (a superquadric with a noise bump) at the front right. The camera stays a 5×5 lens camera with the clip color model: a body, film or Réseau plate would change every frame of the test. The
+  reference, preview and full-size image are regenerated; the full-size adaptive render took
+  67,301 CPU-seconds (1 h 35 min wall on a busy machine), 1% more than 0.19's 66,659.
+
+  ![The torture test at 0.19 and 0.20](docs/images/changelog/torture-regolith.png)
+
+  The regolith lump at the front right, behind the puzzle cube: dark, as lunar soil is (an albedo of 0.13), with the bump of its noise.
+
 ## [2026-alpha-0.19] - 2026-11-21
 
 Solids from mathematics: implicit surfaces given by a formula in a small built-in language with
@@ -1866,7 +1972,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.19...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20...HEAD
+[2026-alpha-0.20]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.19...2026-alpha-0.20
 [2026-alpha-0.19]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...2026-alpha-0.19
 [2026-alpha-0.18]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.17...2026-alpha-0.18
 [2026-alpha-0.17]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.16...2026-alpha-0.17

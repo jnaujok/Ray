@@ -48,6 +48,10 @@ when the binary format was dropped; they are in the repository's history.
 | `implicit_test.ray` | | Implicit surfaces: a sphere from its formula beside the sphere itself, a gyroid's labyrinth cut down to a ball by a csg, and Taubin's heart, with the `corners` sampler |
 | `blob_test.ray` | | Metaballs: five blue balls melted together, and an orange ball dented by two of negative strength, with the `corners` sampler |
 | `fractal_test.ray` | | Fractals by sphere tracing: a mandelbulb, a Menger sponge and a Sierpinski tetrahedron, with the `corners` sampler |
+| `apollo_lenses_test.ray` | | The Hasselblad Electric Camera (`body`): the 80 mm Planar at f/4 on Ektachrome MS, looking at three balls and a checkered target in sunlight, with a 3×3 stratified sampler |
+| `film_test.ray` | | Kodak Ektachrome MS (`film` color model) on a 20 mm piece of film: gray steps a stop apart from 0.02 to 1.28, red, green and blue balls, and a far overexposed lamp whose light spreads into a red-orange halo (halation), with grain |
+| `reseau_test.ray` | | The Hasselblad Data Camera's Réseau crosses (drawn wider than the plate's own, and with more spread, so they show at this size): a bright white ball blooms over the cross on it, while the cross on a gray ball stays sharp |
+| `tranquility_test.ray` | | Tranquility Base: a lunar module built from boxes, a rounded box and cylinders (gold foil on four legs) beside a flag, on `regolith` in low sunlight (a 0.53° sun) under a black sky, shot with the Data Camera, its 60 mm Biogon, Réseau plate and Ektachrome MS; an imitation of the Apollo 11 views of the LM, not a recovered camera station |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -181,7 +185,9 @@ form, so haze costs almost nothing.
 | `horizontalAngle`, `aspectRatio` | `40`, `1.333…` | Kept from 1997; not used for rendering |
 | `sampler` | `"none"` | How each pixel is sampled: `"none"` (one ray through its center), `"corners"` (five rays, at its corners and center, about two per pixel), `"box"` (four rays, halfway from the center to each corner), or `"random"` (a center ray worth half the pixel and N random rays sharing the other half), `"stratified"` (an n×n grid of equally weighted rays, each at a random point in its cell), or `"adaptive"` (more rays only where a pixel's rays disagree) |
 | `lens` | none | A real lens, below; without one the camera is a pinhole |
-| `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, `"reinhard"`, or `"hdr"` |
+| `body` | none | A camera body: `"hasselblad-hec"` (the Electric Camera: 80 mm Planar, 55 mm format), `"hasselblad-hdc"` (the Data Camera: 60 mm Biogon with its Réseau plate, 53 mm format, and the crosses) or `"hasselblad-lswc"` (the Super-Wide-Angle Camera: 38 mm Biogon). It fills in what the camera doesn't give: the lens (a `lens` without a `prescription` or `surfaces` keeps the body's and sets the rest), its `sensorWidth`, a `film` color model (Ektachrome MS, 1/250 s at f/11, or f/8 for the HEC) and the Réseau plate. A saved scene holds the camera the body made, not the body's name |
+| `reseau` | none | A Réseau plate's crosses, printed by the plate on every frame: `count` (default `5` on a side), `spacing` (`10` mm), `size` (`1.2` mm across each cross) and `lineWidth` (`0.05` mm). No light reaches the film under a cross, so the crosses come out black, but the film's spread of light (see `film`) fills them in where the picture is overexposed, as it did on the Apollo frames. Needs a lens (the crosses are placed in mm on the film). The plate's glass is part of the `biogon-60mm-reseau` prescription |
+| `colorModel` | `"clip"` | How pixel colors become bytes: `"clip"` (clip at 1, as in 1997), `"gamma"`, `"srgb"`, `"reinhard"`, `"hdr"`, or `"film"` (a Kodak film stock, below) |
 | `dispersion` | `"rgb"` | How white light splits where it disperses (glass with an `abbe` number, a chromatic lens): `"rgb"`, into red, green and blue rays, or `"spectral"`, into four single wavelengths weighed by the CIE color matching functions, which smear into a continuous rainbow over a pixel's samples (see Dispersion, below). Scenes without dispersion render the same either way |
 | `clamp` | `0` (off) | The brightest any one sample's red, green or blue may be before the sampler averages it in. A rare ray that finds a light through rough glass, off a rough mirror or from an area light can be far brighter than its pixel's other rays and show as a lone bright speck (a "firefly"); a clamp of 1.5 to 2 removes them, at the cost of a little of the brightest highlights. Can't be negative |
 
@@ -197,6 +203,36 @@ rays, then more until the standard error of its brightness, on the scale where 1
 white), or `{ "type": "hdr", "exposure": 1 }` (high dynamic range: the colors scaled by
 `exposure` go unclipped into `raythrower --hdr` files; 8-bit files get them clipped and
 sRGB-encoded).
+
+**Film.** `{ "type": "film", "stock": "ektachrome-ms", "shutter": 0.004, "fStop": 11 }` develops the
+image as a real film stock: each layer (one for black and white, three for color) is exposed by a
+mix of the red, green and blue reaching it, its density follows the stock's characteristic curve (a
+positive: a slide, or a print of a negative), and the slide is shown, sRGB-encoded, with the clear
+base as white. A linear value v gets exposure v × 256 × `shutter` × ISO / `fStop`², so by the
+"sunny 16" rule (f/16 at 1/ISO seconds) a value of 0.18 develops to the stock's mid gray. A lens
+keeps the image as bright as a pinhole whatever its own stop, so the film's `fStop` sets the
+exposure. Once the image is traced the whole of it is developed again with the film's grain
+(random in density, the same every run, its RMS growing with density and scaled from the stock's
+48 µm figure to a pixel's width) and the spread of light in the emulsion: irradiation (scatter
+between the grains) and halation (light reflected back from the base, reddest in color film), each a
+share of the light carried off in a Gaussian. A bright area overexposes its surroundings by the
+same share of its light, so the more overexposed it is, the farther its glow reaches past the
+curve's shoulder. Grain and spread are done by whatever made the image (the master, for threads
+and networked engines alike), so they need the whole image; HDR files get the linear colors.
+
+| Field | Default | |
+|-------|---------|-|
+| `stock` | `"ektachrome-ms"` | `"ektachrome-ms"` (Kodak Ektachrome MS, SO-368, ISO 64 color reversal: Apollo's workhorse), `"ektachrome-ef"` (SO-168, ISO 160 color reversal), `"panatomic-x"` (3400, ISO 80 fine-grain black and white) or `"high-speed-2485"` (2485, ISO 6000 black and white) |
+| `iso` | the stock's | The speed it is exposed (or pushed) at |
+| `shutter` | `0.004` (1/250 s) | Seconds |
+| `fStop` | `11` | The exposure's f-stop |
+| `width` | `55` | The image's width on the film, in mm (the grain and spread are in mm on the film) |
+| `grain`, `spread` | `1`, `1` | Scales on the stock's grain and on its irradiation and halation; `0` turns them off |
+| `seed` | `0` | Picks the grain |
+
+The stocks are approximations: their speeds and kinds are Kodak's, but their curves, color
+response, grain and spread are representative values, not measured data, and their spectral
+sensitivity is a mix of the renderer's red, green and blue.
 
 **`lens`.** With a lens the camera is a real camera: rays start on the sensor and are traced back
 through each glass surface out into the scene, and rays that hit the barrel or the aperture stop go
@@ -216,7 +252,7 @@ tracing.
 
 | Field | Default | |
 |-------|---------|-|
-| `prescription` | | A built-in lens: `"double-gauss-50mm"` (50 mm f/2, US patent 2,673,491, as tabulated by Kolb et al., 1995) |
+| `prescription` | | A built-in lens: `"double-gauss-50mm"` (50 mm f/2, US patent 2,673,491, as tabulated by Kolb et al., 1995) or one of the Apollo Zeiss lenses below |
 | `surfaces` | | Or the lens's own surfaces, front (scene side) to back; give one or the other |
 | `fNumber` | wide open | The aperture; can't be wider than the lens opens |
 | `focusDistance` | the look-at point | Where it focuses, in scene units from the front of the lens |
@@ -230,7 +266,25 @@ Each surface: `radius` of curvature in mm (positive when its center of curvature
 sensor; `0` for flat), `thickness` to the next surface in mm (the last one's is ignored: focusing
 places the sensor), `ior` of what follows it (default `1`, air), `aperture`, its semi-aperture
 (radius) in mm, `stop: true` for the aperture stop, which must be flat, and `abbe`, the Abbe number
-of the glass that follows (leave it out for no dispersion).
+of the glass that follows (leave it out for no dispersion). Instead of `ior` and `abbe`, `glass`
+names a crystal traced with its own Sellmeier formula: `"fused-silica"` or `"calcium-fluoride"`
+(Malitson, 1965 and 1963), which disperse too little, and too unevenly, for a Cauchy fit.
+
+**The Apollo lenses.** The Carl Zeiss lenses of the Apollo Hasselblads, at their nominal focal
+lengths, written by `tools/apollo_lenses.py`, which says where each comes from and measures them:
+
+| `prescription` | Lens | Source |
+|----------------|------|--------|
+| `biogon-38mm` | Biogon 38 mm f/4.5 (the SWC's) | US patent 2,721,499 (L. Bertele), Example 2: 8 elements in 5 groups, f/4.5, over 90° |
+| `biogon-60mm` | Biogon 60 mm f/5.6 (the Data Camera's) | A reconstruction: no prescription was published, so the same Biogon at the 61.1 mm focal length Zeiss gave for the flight lens |
+| `biogon-60mm-reseau` | the same with the Data Camera's Réseau plate | The plate is 3 mm of BK7-like glass (an assumption) whose back face lies 0.02 mm in front of the film at infinity |
+| `planar-80mm` | Planar 80 mm f/2.8 | US patent 2,724,994 (G. Lange, Zeiss), Example I: the 5-element, 4-group Planar formula; the Hasselblad lens was a later 7-element version |
+| `planar-100mm` | Planar 100 mm f/3.5 | A family member: Example II of the same patent at 100 mm, opening to f/3.5 |
+| `uv-sonnar-105mm` | UV-Sonnar 105 mm f/4.3 | A reconstruction: seven air-spaced singlets of fused silica and calcium fluoride, four before the stop and three after, optimized for the visible band |
+| `sonnar-250mm` | Sonnar 250 mm f/5.6 | A reconstruction: 4 elements in 3 groups (a collective lens, a cemented doublet, the stop, a dispersive meniscus), about 0.91 as long as its focal length |
+| `tele-tessar-500mm` | Tele-Tessar 500 mm f/8 | A reconstruction: 5 elements in 3 groups (a cemented doublet, a meniscus, the stop and a cemented telephoto doublet), about 0.71 as long as its focal length |
+
+Ray traces visible light only (380–720 nm), so the UV-Sonnar is modeled in the visible band.
 
 **Chromatic aberration.** Glass bends short wavelengths more than long ones. Each glass's index is
 fitted to a Cauchy curve, n = A + B/λ², through its `ior` (at the d line, 587.6 nm) and its Abbe
@@ -522,6 +576,7 @@ make the shape smooth (`"smooth": false` with them is an error).
 |--------|--------------|
 | `ambient` | none |
 | `diffuse` | `diffuseCast` (default `false`) |
+| `regolith` | Lunar soil after Hapke: the Lommel-Seeliger law (light scattered back toward where it came from, with no limb darkening) times an opposition surge that brightens it where the viewer looks along the light. `surge` (default `1`, Hapke's B0) is the surge's strength and `width` (default `0.06`, his h) its angular width; seen along the light at normal incidence it is exactly `color` (default `[0.12, 0.12, 0.12]`, about the Moon's albedo) |
 | `specular` | A Cook–Torrance highlight. `power` (default `1`) is the surface's Beckmann roughness: smaller is a smaller, sharper highlight (0.1–0.3 is glossy; 1 is very rough). `indexOfRefraction` (default `1.5`) sets the Fresnel reflection, stronger at grazing angles; `materialHighlight` (default `false`) |
 | `reflective` | A mirror reflection, tinted by `color` with `filterReflection` (default `false`); `diffuseReflectivity` (default `0`). `roughness` (default `0`, a perfect mirror; up to `1`) blurs the reflection, as of brushed or satin metal: each ray reflects about a microfacet normal drawn from a GGX distribution of that roughness (0.05 is satin, 0.3 very rough) |
 | `transparent` | Light passing through, bent by Snell's law at `indexOfRefraction` (default `1`, which doesn't bend; glass is about 1.5), and reflected inside past the critical angle; tinted by `color` at each surface it crosses. `attenuationColor` (default `[1, 1, 1]`, each 0 to 1) and `attenuationDistance` (default `0`, off) absorb light by how far it goes inside: after `attenuationDistance` it is `attenuationColor`, after twice that the color squared (Beer–Lambert). `roughness` (default `0`, clear; up to `1`) frosts the glass: each ray bends through a microfacet normal drawn from a GGX distribution of that roughness, so what is behind is blurred (0.05 lightly frosted, 0.3 heavily). `abbe` (default `0`, no dispersion; otherwise at least 5) is the glass's Abbe number: a ray splits into red, green and blue at the glass, each bent by its own index from a Cauchy curve through `indexOfRefraction` (green, the d line) and the Abbe number, as a real lens's glass is (crown glass is about 60, flint 30 to 40, very dense flint 20) |

@@ -248,7 +248,22 @@ The ray tracing itself is the 1997 code.
 
   <img src="docs/images/lens.png" alt="scan_test through a pinhole, and through the double Gauss at f/2 focused on the glass sphere" width="650">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
-  look, and the default), `gamma`, `srgb`, `reinhard` tone mapping, and `hdr`.
+  look, and the default), `gamma`, `srgb`, `reinhard` tone mapping, `hdr`, and `film`.
+- **The Apollo cameras:** the Hasselblads flown to the Moon, as camera `body` presets: the Electric
+  Camera (80 mm Planar), the Data Camera (60 mm Biogon and its Réseau plate) and the
+  Super-Wide-Angle Camera (38 mm Biogon). Seven Carl Zeiss lenses are built in, from the Biogon
+  38 mm to the Tele-Tessar 500 mm: patent examples where Zeiss published one (US 2,721,499 for the
+  Biogon, US 2,724,994 for the Planar) and labelled reconstructions where it didn't, including the
+  UV-Sonnar's fused silica and calcium fluoride, traced with their Sellmeier formulas
+  (`tools/apollo_lenses.py` measures every one). The `film` color model develops the image as a
+  Kodak stock (Ektachrome MS and EF, Panatomic-X, High Speed Recording 2485): its characteristic
+  curve, color response, grain, and the spread of light in the emulsion (irradiation and
+  halation), with exposure from ISO, shutter and f-stop. The Data Camera's Réseau plate prints its
+  5 × 5 crosses on every frame, and overexposed subjects bloom over them as on the real frames. A
+  `regolith` material (Lommel-Seeliger with Hapke's opposition surge) lights lunar soil, and
+  `tranquility_test.ray` shoots a lunar module on it with the Data Camera.
+
+  <img src="docs/images/changelog/apollo-tranquility.png" alt="A lunar module on regolith in low sun, before (diffuse soil, sRGB) and after (regolith, the Data Camera's Biogon and Réseau crosses, Ektachrome MS)" width="650">
 - **Image output:** PNG (`--png`) and PPM (`--ppm`) beside the original raw format, and high
   dynamic range: `--hdr` writes every pixel's linear color, unclipped, as a Radiance HDR file
   that image editors, Blender and HDR viewers open. With the `hdr` color model, its `exposure`
@@ -406,6 +421,13 @@ raythrower scenes/scan_test.ray --color reinhard --ppm scan_test.ppm
 raythrower scenes/lens_test.ray --aa stratified:grid=8 --ppm lens.ppm
 ```
 
+**Shoot with an Apollo Hasselblad** (a camera `body`; see
+[`scenes/tranquility_test.ray`](scenes/tranquility_test.ray)):
+
+```sh
+raythrower scenes/tranquility_test.ray --size 1024x1024 --png tranquility.png
+```
+
 **Render the Utah teapot** (6,320 triangles):
 
 ```sh
@@ -437,7 +459,7 @@ where they disagree), which is much cleaner and takes about eight times as long 
 raythrower scenes/torture_test.ray --aa adaptive:min=25,max=256,threshold=0.004 --png torture.png
 ```
 
-<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, a lump of regolith, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
 
 **Bring in a model**: name an STL or OBJ file in a mesh, and place it (here a printable model,
 which stands on z, turned to stand on y, 2 units across, on the floor):
@@ -529,7 +551,7 @@ The tests render every sample scene and compare it with a reference render (four
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, the Apollo cameras (a Hasselblad and its lens, Kodak film with grain and halation, the Réseau crosses blooming over, and Tranquility Base on regolith), and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -594,7 +616,8 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/volume_test.png" alt="render_volume" width="260"><br><code>render_volume</code></td><td align="center"><img src="docs/images/tests/shapes_test.png" alt="render_shapes" width="260"><br><code>render_shapes</code></td><td align="center"><img src="docs/images/tests/text_test.png" alt="render_text" width="260"><br><code>render_text</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/patches_test.png" alt="render_patches" width="260"><br><code>render_patches</code></td><td align="center"><img src="docs/images/tests/nurbs_test.png" alt="render_nurbs" width="260"><br><code>render_nurbs</code></td><td align="center"><img src="docs/images/tests/lathe_test.png" alt="render_lathe" width="260"><br><code>render_lathe</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/extrusion_test.png" alt="render_extrusion" width="260"><br><code>render_extrusion</code></td><td align="center"><img src="docs/images/tests/implicit_test.png" alt="render_implicit" width="260"><br><code>render_implicit</code></td><td align="center"><img src="docs/images/tests/blob_test.png" alt="render_blob" width="260"><br><code>render_blob</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/fractal_test.png" alt="render_fractal" width="260"><br><code>render_fractal</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/fractal_test.png" alt="render_fractal" width="260"><br><code>render_fractal</code></td><td align="center"><img src="docs/images/tests/apollo_lenses_test.png" alt="render_apollo_lenses" width="160"><br><code>render_apollo_lenses</code></td><td align="center"><img src="docs/images/tests/film_test.png" alt="render_film" width="240"><br><code>render_film</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/reseau_test.png" alt="render_reseau" width="260"><br><code>render_reseau</code></td><td align="center"><img src="docs/images/tests/tranquility_test.png" alt="render_tranquility" width="192"><br><code>render_tranquility</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -689,7 +712,8 @@ light setting, textures inside glass, tori, discs, quadrics, superquadrics and r
 from TrueType fonts, Bézier patches and B-spline and NURBS surfaces traced exactly, solids turned on a lathe, extrusions
 and sweeps along a path, implicit surfaces from formulas, metaballs and fractals, and JSON scenes
 so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both
-editors reach every feature through JSON editing; next up are the Apollo cameras: real lenses, film and the Réseau plate.
+editors reach every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
+seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and lunar regolith.
 
 ## Changelog
 

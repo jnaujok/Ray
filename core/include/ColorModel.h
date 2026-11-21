@@ -19,6 +19,7 @@
 #include "Globals.h"
 
 class CColor;
+class CImageFile;
 
 namespace IASLib
 {
@@ -50,6 +51,12 @@ class CColorModel
             /// file (Radiance HDR): unclipped and unencoded. The default is
             /// the color as it is; a model with an exposure applies it.
         virtual CColor          ToLinear( const CColor &oColor ) const;
+            /// Whether the model works on the whole image once it is traced
+            /// (film grain and the spread of light in an emulsion): the
+            /// image then keeps every pixel's linear color (the one ToLinear
+            /// gives), and Finish rewrites its bytes from them.
+        virtual BOOL            NeedsWholeImage( void ) const { return FALSE; }
+        virtual void            Finish( CImageFile &oImage ) const { (void)oImage; }
 
             /// Writes the model's settings, if it has any, into a scene file's
             /// JSON object for it (which already holds its "type").
