@@ -96,7 +96,7 @@
             "depth": 0.12,
             "align": "center",
             "lineSpacing": 1.1,
-            "position": [-1.8, 0.75, -1.6],
+            "position": [-1.45, 0.75, -1.6],
             "rotation": [0.0, -20.0, 0.0],
             "color": [0.5, 0.5, 0.5],
             "materials": [
