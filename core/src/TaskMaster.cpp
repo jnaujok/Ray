@@ -150,6 +150,28 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
             return;
         }
 
+            // Near the end, the last big tiles would leave tasks idle while
+            // one or two finish, so the tiles still waiting are split into
+            // quarters (down to 8 pixels) as they're handed out. A pixel
+            // comes out the same in any tile, so the image doesn't change.
+        int nLive = (int)std::count( m_abLive.begin(), m_abLive.end(), (char)1 );
+
+        while ( (int)aoTiles.size() < 2 * nLive && ( aoTiles.front().nWidth > 8 || aoTiles.front().nHeight > 8 ) )
+        {
+            STile oBig = aoTiles.front();
+            int   nW1 = ( oBig.nWidth > 8 ) ? oBig.nWidth / 2 : oBig.nWidth;
+            int   nH1 = ( oBig.nHeight > 8 ) ? oBig.nHeight / 2 : oBig.nHeight;
+
+            aoTiles.pop_front();
+            if ( oBig.nHeight > nH1 && oBig.nWidth > nW1 )
+                aoTiles.push_front( { oBig.nLeft + nW1, oBig.nTop + nH1, oBig.nWidth - nW1, oBig.nHeight - nH1 } );
+            if ( oBig.nHeight > nH1 )
+                aoTiles.push_front( { oBig.nLeft, oBig.nTop + nH1, nW1, oBig.nHeight - nH1 } );
+            if ( oBig.nWidth > nW1 )
+                aoTiles.push_front( { oBig.nLeft + nW1, oBig.nTop, oBig.nWidth - nW1, nH1 } );
+            aoTiles.push_front( { oBig.nLeft, oBig.nTop, nW1, nH1 } );
+        }
+
         STile oTile = aoTiles.front();
 
         aoTiles.pop_front();
