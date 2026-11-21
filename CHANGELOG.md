@@ -44,7 +44,8 @@ before; only the torture test changes.
 - **Adaptive sampling that trusts a few rays only when they agree** (opt-in; existing `adaptive`
   settings sample exactly as before): `confidence` stops once Student's t for that confidence times
   the standard error is under `threshold`, so four rays that happen to agree must agree about three
-  times more closely than the plain rule asks before they are believed, and `min` can be 4;
+  times more closely than the plain rule asks before they are believed (though `min` should stay
+  near 16, below);
   `"channels": "rgb"` measures red, green and blue apart. `raythrower --ray-count heat.png` writes a
   heat map of each pixel's rays (threads only). Measured with the new `tools/adaptive_sweep.py` at
   240×180 against 256 rays a pixel (CPU seconds on a machine running other work):
@@ -53,7 +54,8 @@ before; only the torture test changes.
   |---|---|---|---|---|
   | `min=25,max=256,threshold=0.004` (the 0.20 command) | 25.1 | 466 | 9.78 | 20.95 |
   | `min=4,max=256,threshold=0.004,confidence=0.95,channels=rgb` | 85.4 | 1,529 | 6.21 | 14.56 |
-  | **`min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb`** | **71.1** | **1,061** | **5.70** | **14.76** |
+  | `min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 71.1 | 1,061 | 5.70 | 14.76 |
+  | **`min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb`** | **71.8** | **1,273** | **4.94** | **12.07** |
   | `min=4,max=100,threshold=0.006,confidence=0.95,channels=rgb` | 38.9 | 545 | 9.28 | 22.24 |
   | `min=4,max=64,threshold=0.006,confidence=0.9,channels=rgb` | 27.3 | 399 | 11.14 | 27.01 |
   | `min=9,max=100,threshold=0.004` (the plain rule) | 9.4 | 148 | 15.92 | 33.89 |
@@ -61,9 +63,25 @@ before; only the torture test changes.
   On the sharpened torture test the plain rule believes nearly every pixel at its first 25 rays
   (25.1 on average) though they are still noisy (9.78), which is the trap the confidence factor is
   for: with it, pixels whose rays only seem to agree keep going. The bold row is the new full-size
-  torture command: 42% less error than the 0.20 command for 2.3 times its rays. A cap of 100
-  measured better than 256 at fewer rays, since a pixel's wavelength strata are counted out of the
-  cap and a pixel that stops early covers more of them when the cap is near what it uses.
+  torture command: half the error of the 0.20 command (4.94 against 9.78) for 2.9 times its rays.
+  A cap of 100 measured better than 256 at fewer rays, since a pixel's wavelength strata are
+  counted out of the cap and a pixel that stops early covers more of them when the cap is near what
+  it uses. **Starting at 4 rays is not safe, though:** on the soft test (frosted glass and area
+  lights) and the chessboard, `min=4` gave about twice the error of the plain rule at similar rays,
+  because four rays that happen to agree have no spread at all, and no confidence factor can widen
+  a zero. Minimum 16 with the confidence factor fixed both:
+
+  | Scene, sampler | Rays a pixel | RMS, whole | RMS, worst tenth |
+  |---|---|---|---|
+  | soft, `min=25,max=256,threshold=0.004` (plain) | 114.2 | 2.49 | 7.19 |
+  | soft, `min=9,max=100,threshold=0.004` (plain) | 44.7 | 3.71 | 10.79 |
+  | soft, `min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 48.3 | 5.52 | 16.76 |
+  | soft, `min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 56.6 | 3.28 | 9.57 |
+  | chess, `min=25,max=256,threshold=0.004` (plain) | 89.7 | 2.17 | 6.22 |
+  | chess, `min=9,max=100,threshold=0.004` (plain) | 39.0 | 4.21 | 12.68 |
+  | chess, `min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 56.3 | 4.67 | 14.43 |
+
+  So the confidence factor and per-channel errors earn their keep, but `min` stays at 16.
 
   ![The torture test's rays a pixel under the old and new adaptive settings](docs/images/changelog/adaptive-rays.png)
 
@@ -75,7 +93,7 @@ before; only the torture test changes.
   Nbd7 11.g4 b5, played out by python-chess in the new `tools/make_showcase_scenes.py`, on a full
   board with Poly Haven's Chess Set (CC0, its glTF committed unmodified), through the double Gauss
   wide open and focused on Black's e5 pawn, with lights behind the board blurring into bokeh discs.
-  The README's lens section shows it at 1024×768 (with `--aa adaptive:min=4,max=256,threshold=0.004,confidence=0.95,channels=rgb`: 112 rays a pixel on average, 6,087 CPU-seconds).
+  The README's lens section shows it at 1024×768 (with `--aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb`: 3,131 CPU-seconds).
 
   ![The Najdorf chessboard in depth of field](docs/images/chess_dof.png)
 - **A recreation of NASA photograph AS11-40-5903** (`as11_40_5903_test.ray`): Aldrin in a white
@@ -123,12 +141,13 @@ before; only the torture test changes.
   with 200 mm a unit (the scene stands for a set four times larger), so everything from the front
   row to the mirror is sharp, where at f/2 the front row was a blur. Its gold torus is the `metal`
   material. The reference render, README preview and full-size image are regenerated; the
-  full-size image now uses `--aa adaptive:min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb` (TORTURE_TIME, against 67,301 CPU-seconds for 0.20).
+  full-size image now uses `--aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb` (19,329 CPU-seconds, 69.4 rays a pixel on average; 43 minutes on a machine busy with other work, about 20 idle on 16 cores; against 67,301 CPU-seconds for 0.20).
 
   ![The torture test at 0.20 and 0.20.1](docs/images/changelog/torture-sharp.png)
 
   Look at the front row (the goblet, queen, star, spring and torus), which is sharp now, and the
-  gold torus, which reflects as gold does.
+  gold torus, which reflects as gold does. The frame is brighter at the edges too: stopped down,
+  the lens vignettes far less.
 - **Tests:** `render_`, `roundtrip_` and `network_` tests for the two showcase scenes, and
   `ShowcaseChecks` in `format_test`: a hand-built `.glb` (a padded stride, unsigned short indices,
   a parent's translation and a child's rotation, a base color), the same as a `.gltf` with its

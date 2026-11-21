@@ -86,7 +86,7 @@ ctest --preset full             # every test
   same change, and regenerate its reference render, README preview and the full-size
   `docs/images/torture_test.png`. Render the full-size image with a Release build and the adaptive
   sampler, always the same way: `raythrower scenes/torture_test.ray --aa
-  adaptive:min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb --png docs/images/torture_test.png` (the `render_torture`
+  adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb --png docs/images/torture_test.png` (the `render_torture`
   test keeps the scene's own 5×5 stratified sampler at 160×120). Report its time in the changelog.
   The `render_torture` test is labelled `torture`, and CI leaves it out (`ctest -LE torture`):
   run it locally (the `full` preset does) before every merge.

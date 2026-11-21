@@ -30,7 +30,8 @@
 *        error, is under "threshold". With few rays t is large (12.7 at  *
 *        2 rays, 3.18 at 4 for 95%), so a handful of rays that happen to *
 *        agree must agree much more closely before they are trusted,     *
-*        and "min" can be as low as 4.                                   *
+*        though "min" should stay near 16: rays that agree exactly have  *
+*        no spread for t to widen (measured in 2026-alpha-0.20.1).       *
 *     "channels" ("brightness", the default, or "rgb"): measure the      *
 *        error in red, green and blue apart and use the largest, so a    *
 *        pixel whose color varies but whose brightness doesn't (a        *

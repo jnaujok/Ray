@@ -237,8 +237,8 @@ The ray tracing itself is the 1997 code.
   the pixel plus N random rays), `stratified` (an n×n grid of equally weighted rays, each at a
   random point in its cell; best for real lenses), or `adaptive` (at least 9 rays a pixel, then
   more only where they disagree: on the torture test, 28% less error than a 5×5 grid for the same
-  rays; with `confidence` it trusts a few agreeing rays only once Student's t says they agree, so it
-  can start at 4, and with `"channels": "rgb"` it watches color as well as brightness). Random points
+  rays; with `confidence` it trusts agreeing rays only once Student's t says they really agree, which
+  halves the torture test's error (for about three times the rays), and with `"channels": "rgb"` it watches color as well as brightness). Random points
   are reproducible, so every run gives the same image. `raythrower --ray-count heat.png` draws how
   many rays each pixel took.
 - **Camera:** pinhole camera with position, look-at point, up vector, and vertical field of view;
@@ -259,7 +259,7 @@ The ray tracing itself is the 1997 code.
   Depth of field through the double Gauss wide open: the Najdorf Sicilian (English Attack, after
   11...b5) on a full board, Poly Haven's chess set, focused on Black's e5 pawn, with lights behind
   the board blurring into bokeh discs (`scenes/chess_dof_test.ray` at 1024×768 with `--aa
-  adaptive:min=4,max=256,threshold=0.004,confidence=0.95,channels=rgb`):
+  adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb`):
 
   <img src="docs/images/chess_dof.png" alt="A chessboard in the Najdorf Sicilian through a wide-open lens: the near white pieces blurred, the pieces in the middle of the board sharp, the far ones softening, and warm lights behind the board blurred into discs" width="720">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
@@ -455,7 +455,7 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
 **Render the torture test**, every kind of object (the teapot too, in marble, traced from its 32 Bézier patches, and a layer-lined
-3DBenchy, a colored-STL puzzle cube, an OBJ ring, a gold torus, "RAY" in beveled letters set in
+3DBenchy, a colored-STL puzzle cube, an OBJ ring, a gold torus that reflects as gold does (the `metal` material), "RAY" in beveled letters set in
 Lato Bold on top of the mirror frame, a glass goblet and a black queen turned on a lathe, a twisted, tapered star, a steel spring
 and a purple cluster of metaballs), mirrors, glass
 (the cube with green swirls inside, the ball frosted, the mirror frosted in patches, a flint prism fanning colors into a spectrum), a die with drilled
@@ -471,12 +471,13 @@ full 1024×768 takes about eight and a half minutes on an idle 16-core machine w
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
-The image below is rendered with the adaptive sampler instead (at least 25 rays a pixel, up to 256
-where they disagree), which is much cleaner and takes about eight times as long (about 68 minutes on an idle
-16-core machine):
+The image below is rendered with the adaptive sampler instead (at least 16 rays a pixel, up to 100
+where Student's t says they don't yet agree, watching red, green and blue apart), which is much
+cleaner: 69 rays a pixel on average, about 20 minutes on an idle 16-core machine (19,329
+CPU-seconds):
 
 ```sh
-raythrower scenes/torture_test.ray --aa adaptive:min=25,max=256,threshold=0.004 --png torture.png
+raythrower scenes/torture_test.ray --aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb --png torture.png
 ```
 
 <img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, a lump of regolith, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">

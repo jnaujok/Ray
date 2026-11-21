@@ -201,8 +201,8 @@ rays, then more until the standard error of its brightness, on the scale where 1
 `threshold`, or it has `max`; rays follow a low-discrepancy sequence, reproducible like the others;
 two opt-in refinements, added in 2026-alpha-0.20.1: `"confidence": 0.95` (default `0`, off; else 0.5
 to 0.999) stops once Student's t for that confidence times the standard error is under `threshold`,
-so a few rays that happen to agree must agree much more closely (t is 3.18 at 4 rays) and `min` can
-be as low as 4, and `"channels": "rgb"` (default `"brightness"`) measures red, green and blue apart
+so a few rays that happen to agree must agree much more closely (t is 3.18 at 4 rays; keep `min` at
+about 16 all the same, since rays that agree exactly have no spread for t to widen), and `"channels": "rgb"` (default `"brightness"`) measures red, green and blue apart
 and uses the worst, so a pixel that changes color but not brightness keeps sampling),
 `{ "type": "gamma", "gamma": 2.2 }`, or
 `{ "type": "reinhard", "exposure": 1, "white": 4 }`
