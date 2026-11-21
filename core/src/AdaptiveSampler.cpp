@@ -117,6 +117,9 @@ BOOL CAdaptiveSampler::NextRay( CScene &oScene, CRay &oRay )
     dU -= floor( dU );
     dV -= floor( dV );
     oRay.CreateRayAt( oScene, nX + (FLT)dU, nY + (FLT)dV, nX, nY );
+        // Of at most m_nMaximum: a pixel that stops early has taken some of
+        // the strata, in a shuffled order, so its wavelengths still spread.
+    oRay.SetSampleIndex( m_nRays, m_nMaximum );
     return TRUE;
 }
 

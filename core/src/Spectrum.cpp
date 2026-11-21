@@ -95,13 +95,3 @@ FLT RaySpectrum::PartWavelength( int nPart, FLT nWhere )
 {
     return SHORTEST + ( ( ( nPart + nWhere ) / PARTS ) * ( LONGEST - SHORTEST ) );
 }
-
-FLT RaySpectrum::WhereInPart( FLT nU, FLT nV )
-{
-        // Across the sample square at an angle, so a grid of samples (5 by 5,
-        // say) gives as many different wavelengths as samples.
-    FLT nWhere = nU + ( nV * 0.6180339887498949 );
-
-    nWhere -= floor( nWhere );
-    return ( nWhere < 1.0 ) ? nWhere : 0.0;
-}

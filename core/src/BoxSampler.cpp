@@ -44,6 +44,7 @@ BOOL CBoxSampler::NextRay( CScene &oScene, CRay &oRay )
     int nJ = m_nRay >> 1;
 
     oRay.CreateRayAt( oScene, nX + 0.25 + ( 0.5 * nI ), nY + 0.25 + ( 0.5 * nJ ), ( 2 * nX ) + nI, ( 2 * nY ) + nJ );
+    oRay.SetSampleIndex( m_nRay, 4 );
 
     if ( ++m_nRay == 4 )
     {

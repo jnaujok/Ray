@@ -74,6 +74,7 @@ BOOL CStratifiedSampler::NextRay( CScene &oScene, CRay &oRay )
     FLT nV = ( ( m_nRay / m_nGrid ) + Unit( Mix( nKey ) ) ) / m_nGrid;
 
     oRay.CreateRayAt( oScene, nX + nU, nY + nV, ( nX * m_nGrid * m_nGrid ) + m_nRay, nY );
+    oRay.SetSampleIndex( m_nRay, m_nGrid * m_nGrid );
 
     if ( ++m_nRay == m_nGrid * m_nGrid )
     {

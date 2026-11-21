@@ -52,6 +52,12 @@ class CRay
         FLT             m_nSampleU;
         FLT             m_nSampleV;
         uint64_t        m_nSampleKey;
+            // Which of its pixel's samples the primary ray was (0 up to
+            // m_nSampleCount), when the sampler says (SetSampleIndex); a count
+            // of 0 means it didn't. Spectral dispersion spreads a pixel's
+            // wavelengths over the range by it (WavelengthOffset).
+        uint32_t        m_nSampleIndex;
+        uint32_t        m_nSampleCount;
             // The wavelength the ray is traced at (CLens::EChannel): 0, every
             // channel at once, or one of red, green and blue. A chromatic
             // lens makes rays in one channel; dispersive glass splits a ray
@@ -105,6 +111,21 @@ class CRay
             /// purpose. Over a pixel's rays the points stay as evenly spread
             /// as the sampler made them.
         void            SamplePoint( uint64_t nPurpose, FLT &nU, FLT &nV ) const;
+            /// Tells the ray which of its pixel's nCount samples it is
+            /// (samplers call this after CreateRayAt). Rays made from it
+            /// keep it.
+        void            SetSampleIndex( int nIndex, int nCount );
+        int             GetSampleIndex( void ) const { return (int)m_nSampleIndex; }
+        int             GetSampleCount( void ) const { return (int)m_nSampleCount; }
+        void            CopySampleIndex( const CRay &oFrom ) { m_nSampleIndex = oFrom.m_nSampleIndex; m_nSampleCount = oFrom.m_nSampleCount; }
+            /// Where in each part of the spectrum this ray's wavelengths fall
+            /// (0 up to 1; see Spectrum.h). With a sample index, a pixel's
+            /// samples take one each of as many equal strata, in an order
+            /// shuffled by a hash of the pixel, so the wavelengths spread
+            /// evenly over the range and have nothing to do with where in the
+            /// pixel each sample falls. Without one, a hash of its sample
+            /// point. Always the same for the same ray.
+        FLT             WavelengthOffset( void ) const;
 
 };
 
