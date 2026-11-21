@@ -2,6 +2,7 @@
 #include "Tessellator.h"
 
 #include "Mesh.h"
+#include "LocalShape.h"
 #include "Objects.h"
 #include "Scene.h"
 #include "SceneJson.h"
@@ -388,7 +389,40 @@ namespace RayEditor
                 return false;
             FlatTriangle( oMesh, a, b, c );
         }
-        else if ( strType == "mesh" )
+        else if ( strType == "torus" || strType == "disc" || strType == "annulus" || strType == "paraboloid" ||
+                  strType == "hyperboloid" || strType == "superquadric" || strType == "roundedBox" )
+        {
+                // The core draws its own shapes (a csg part has no object of
+                // its own here, so one is made from its JSON).
+            std::unique_ptr<CObjects> pMade;
+            CLocalShape              *pShape = dynamic_cast<CLocalShape *>( pObject );
+
+            if ( ! pShape )
+            {
+                CDynList oTypes;
+
+                pMade.reset( oTypes.Create( strType.c_str() ) );
+                pShape = dynamic_cast<CLocalShape *>( pMade.get() );
+                if ( ! pShape || ! pShape->FromJson( oObject ) )
+                    return false;
+            }
+
+            std::vector<FLT> anPositions, anNormals;
+
+            pShape->Triangles( nSegments, anPositions, anNormals );
+            for ( size_t n = 0; n + 8 < anPositions.size(); n += 9 )
+            {
+                SVec3 p[ 3 ], q[ 3 ];
+
+                for ( int k = 0; k < 3; k++ )
+                {
+                    p[ k ] = SVec3( anPositions[ n + 3 * k ], anPositions[ n + 3 * k + 1 ], anPositions[ n + 3 * k + 2 ] );
+                    q[ k ] = SVec3( anNormals[ n + 3 * k ], anNormals[ n + 3 * k + 1 ], anNormals[ n + 3 * k + 2 ] );
+                }
+                Triangle( oMesh, p[ 0 ], p[ 1 ], p[ 2 ], q[ 0 ], q[ 1 ], q[ 2 ] );
+            }
+        }
+        else if ( strType == "mesh" || strType == "text" )
         {
             CMesh *pMesh = dynamic_cast<CMesh *>( pObject );
 

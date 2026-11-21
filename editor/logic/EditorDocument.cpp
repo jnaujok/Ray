@@ -352,7 +352,8 @@ namespace RayEditor
 
     std::vector<std::string> CEditorDocument::ObjectTypes( void )
     {
-        return { "sphere", "box", "plane", "cylinder", "cone", "triangle" };
+        return { "sphere", "box", "plane", "cylinder", "cone", "triangle", "torus", "disc", "annulus", "paraboloid", "hyperboloid",
+                 "superquadric", "roundedBox" };
     }
 
     std::vector<std::string> CEditorDocument::LightTypes( void )
@@ -375,6 +376,20 @@ namespace RayEditor
             return std::string( "{ \"type\": \"cone\", \"base\": [0.0, 0.0, 0.0], \"top\": [0.0, 2.0, 0.0], \"baseRadius\": 0.7, \"topRadius\": 0.0, \"capped\": true, " ) + MATERIALS;
         if ( strType == "triangle" )
             return std::string( "{ \"type\": \"triangle\", \"corners\": [[-1.0, 0.0, 0.0], [0.0, 1.5, 0.0], [1.0, 0.0, 0.0]], \"doubleSided\": true, " ) + MATERIALS;
+        if ( strType == "torus" )
+            return std::string( "{ \"type\": \"torus\", \"center\": [0.0, 0.3, 0.0], \"majorRadius\": 1.0, \"minorRadius\": 0.3, " ) + MATERIALS;
+        if ( strType == "disc" )
+            return std::string( "{ \"type\": \"disc\", \"center\": [0.0, 0.01, 0.0], \"radius\": 1.0, " ) + MATERIALS;
+        if ( strType == "annulus" )
+            return std::string( "{ \"type\": \"annulus\", \"center\": [0.0, 0.01, 0.0], \"radius\": 1.0, \"innerRadius\": 0.5, " ) + MATERIALS;
+        if ( strType == "paraboloid" )
+            return std::string( "{ \"type\": \"paraboloid\", \"center\": [0.0, 0.0, 0.0], \"radius\": 1.0, \"height\": 1.0, \"capped\": false, " ) + MATERIALS;
+        if ( strType == "hyperboloid" )
+            return std::string( "{ \"type\": \"hyperboloid\", \"center\": [0.0, 1.0, 0.0], \"radius\": 0.5, \"topRadius\": 0.8, \"height\": 2.0, \"capped\": true, " ) + MATERIALS;
+        if ( strType == "superquadric" )
+            return std::string( "{ \"type\": \"superquadric\", \"center\": [0.0, 1.0, 0.0], \"radius\": 1.0, \"e1\": 0.5, \"e2\": 0.5, " ) + MATERIALS;
+        if ( strType == "roundedBox" )
+            return std::string( "{ \"type\": \"roundedBox\", \"center\": [0.0, 0.5, 0.0], \"size\": 1.0, \"radius\": 0.15, " ) + MATERIALS;
 
         strList = "lights";
         if ( strType == "point" )
