@@ -71,7 +71,8 @@ ctest --preset full             # every test
   - Before merging, run every test once (`ctest --preset full`) and the fast tier under the
     sanitizers (`ctest --preset asan-fast`) when the change touches `core/`. Don't rerun a suite
     that passed unless the code changed since.
-  - CI runs every test on every system, and every test under the sanitizers; a change merges only
+  - CI runs every test on every system, and every test under the sanitizers, except the torture
+    test (labelled `torture`, too heavy for the runners); a change merges only
     when all its jobs pass.
   - Tests that take minutes get `LABELS slow`. Keep new tests small: a render test needs only an
     image big enough to show its feature, and a networked test compares engines with threads at
@@ -85,8 +86,10 @@ ctest --preset full             # every test
   same change, and regenerate its reference render, README preview and the full-size
   `docs/images/torture_test.png`. Render the full-size image with a Release build and the adaptive
   sampler, always the same way: `raythrower scenes/torture_test.ray --aa
-  adaptive:min=25,max=256,threshold=0.004 --png docs/images/torture_test.png` (the `render_torture`
+  TORTURE_SAMPLER --png docs/images/torture_test.png` (the `render_torture`
   test keeps the scene's own 5×5 stratified sampler at 160×120). Report its time in the changelog.
+  The `render_torture` test is labelled `torture`, and CI leaves it out (`ctest -LE torture`):
+  run it locally (the `full` preset does) before every merge.
 - **Every release updates the release gallery** (the claude.ai artifact
   https://claude.ai/artifact/XScoVjKwNUscrc3fhGN35Z): add the release's full-size torture test to its
   comparison slider and a section with the release's summary and changelog before and after images,
@@ -164,6 +167,12 @@ ctest --preset full             # every test
   objects made of parts override `Occludes` to stop at the first part a shadow ray hits. The tree
   must find exactly what testing every object in order does (`ClosestHitByEachObject`), ties
   included; `format_test` checks it.
+- **New metals** go in the table in `core/src/MetalMaterial.cpp` (n and k at about 650, 550 and
+  450 nm, with their source).
+- **Model files** are read in `core/src/ModelFile.cpp` (STL, OBJ) and `core/src/GltfFile.cpp`
+  (glTF 2.0); a mesh reads every file a model names (a `.gltf`'s buffers) through
+  `RayJson::ReadSceneFile` and writes it back with `RayJson::SceneFileName`, so it goes into the
+  archive and to engines.
 - **New film stocks** go in the table in `core/src/FilmColorModel.cpp`, **new camera bodies** in
   `CCamera`'s table in `core/src/Camera.cpp`, and **new Apollo lens prescriptions** in
   `tools/apollo_lenses.py`, which writes them into `core/src/Lens.cpp` (`--write core/src/Lens.cpp`)
