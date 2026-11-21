@@ -115,6 +115,7 @@ set(RAY_CORE_SOURCES
     core/src/RectangleLight.cpp
     core/src/ReflectiveMaterial.cpp
     core/src/RegolithMaterial.cpp
+    core/src/MetalMaterial.cpp
     core/src/ReinhardColorModel.cpp
     core/src/Scene.cpp
     core/src/SceneJson.cpp

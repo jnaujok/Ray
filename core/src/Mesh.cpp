@@ -66,7 +66,7 @@ namespace
 
     std::shared_ptr<const ModelFile::SModel> ReadModelOnce( const std::string &strData, const std::string &strName,
                                                             const ModelFile::SGltfFiles &oFiles, const std::string &strNode,
-                                                            std::string &strError )
+                                                            const std::string &strMaterial, std::string &strError )
     {
         SModelKey oKey;
         uint64_t  nHash = 1469598103934665603ULL;
@@ -80,6 +80,9 @@ namespace
         nHash = ( nHash ^ 0x23 ) * 1099511628211ULL;
         for ( size_t nIndex = 0; nIndex < strNode.size(); nIndex++ )
             nHash = ( nHash ^ (unsigned char)strNode[ nIndex ] ) * 1099511628211ULL;
+        nHash = ( nHash ^ 0x24 ) * 1099511628211ULL;
+        for ( size_t nIndex = 0; nIndex < strMaterial.size(); nIndex++ )
+            nHash = ( nHash ^ (unsigned char)strMaterial[ nIndex ] ) * 1099511628211ULL;
         for ( const auto &oFile : oFiles.aoFiles )
         {
             for ( char chNext : oFile.first )
@@ -100,7 +103,7 @@ namespace
 
         std::shared_ptr<ModelFile::SModel> pModel( new ModelFile::SModel );
 
-        BOOL bRead = ModelFile::IsGltf( strData, strName ) ? ModelFile::ReadGltf( strData, &oFiles, strNode, *pModel, strError )
+        BOOL bRead = ModelFile::IsGltf( strData, strName ) ? ModelFile::ReadGltf( strData, &oFiles, strNode, strMaterial, *pModel, strError )
                                                            : ModelFile::Read( strData, strName, *pModel, strError );
 
         if ( ! bRead )
@@ -142,7 +145,7 @@ namespace
 
 BOOL CMesh::LoadModel( const std::string &strData, const std::string &strName, std::string &strError )
 {
-    std::shared_ptr<const ModelFile::SModel> pModel = ReadModelOnce( strData, strName, m_oGltfFiles, m_strNode, strError );
+    std::shared_ptr<const ModelFile::SModel> pModel = ReadModelOnce( strData, strName, m_oGltfFiles, m_strNode, m_strGltfMaterial, strError );
 
     if ( ! pModel )
         return FALSE;
@@ -1426,6 +1429,8 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
         }
         if ( ! m_strNode.empty() )
             oNode.put( "node", m_strNode.c_str() );
+        if ( ! m_strGltfMaterial.empty() )
+            oNode.put( "gltfMaterial", m_strGltfMaterial.c_str() );
         if ( ! m_oGltfFiles.aoFiles.empty() )
         {
                 // A .gltf's buffers and images go into an archive beside it,
@@ -1606,7 +1611,9 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
     const IASLib::CJsonNode    *pData = oNode.get( "data" );
 
     m_strNode.clear();
-    if ( ! RayJson::GetString( oNode, "node", m_strNode, FALSE ) )
+    m_strGltfMaterial.clear();
+    if ( ! RayJson::GetString( oNode, "node", m_strNode, FALSE ) ||
+         ! RayJson::GetString( oNode, "gltfMaterial", m_strGltfMaterial, FALSE ) )
         return FALSE;
 
     if ( pData )
@@ -1663,8 +1670,8 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
             m_astrGltfPaths.push_back( strPath );
         }
     }
-    else if ( ! m_strNode.empty() || oNode.get( "files" ) )
-        return RayJson::Fail( "\"node\" and \"files\" are for glTF models" );
+    else if ( ! m_strNode.empty() || ! m_strGltfMaterial.empty() || oNode.get( "files" ) )
+        return RayJson::Fail( "\"node\", \"gltfMaterial\" and \"files\" are for glTF models" );
 
     m_bSmooth = bSmooth;
     m_bDoubleSided = bDoubleSided;
@@ -1677,8 +1684,8 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
 BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "vertices", "faces", "normals", "uvs", "uvMap", "smooth", "doubleSided", "color", "materials", "bump",
-                                              "file", "data", "scale", "fitSize", "rotation", "align", "translation", "node", "files", NULL };
-    static const char *const astrModelOnly[] = { "data", "scale", "fitSize", "rotation", "align", "translation", "node", "files", NULL };
+                                              "file", "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files", NULL };
+    static const char *const astrModelOnly[] = { "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files", NULL };
     static const char *const astrInlineOnly[] = { "vertices", "faces", "normals", "uvs", NULL };
     std::vector<CVector>    aoVertices;
     std::vector<int>        anFaces;

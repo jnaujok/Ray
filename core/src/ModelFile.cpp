@@ -539,7 +539,7 @@ BOOL Read( const std::string &strData, const std::string &strName, SModel &oMode
     std::string strLower = Lower( strName );
 
     if ( IsGltf( strData, strName ) )
-        return ReadGltf( strData, NULL, "", oModel, strError );
+        return ReadGltf( strData, NULL, "", "", oModel, strError );
 
     if ( EndsWith( strLower, ".stl" ) )
         return ReadStl( strData, oModel, strError );

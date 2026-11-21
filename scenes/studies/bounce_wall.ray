@@ -1,0 +1,232 @@
+{
+  "format": "Ray scene",
+  "version": 3,
+  "settings": {
+    "imageWidth": 160,
+    "imageHeight": 120,
+    "imageFile": "bounce_wall.out",
+    "colorDepth": 8,
+    "maximumDepth": 8,
+    "depthThreshold": 0.01,
+    "indirect": {
+      "method": "objects",
+      "bounces": 1,
+      "samples": 4,
+      "objects": 8,
+      "distance": 10.0,
+      "strength": 1.0
+    }
+  },
+  "background": [
+    0.25,
+    0.32,
+    0.45
+  ],
+  "camera": {
+    "position": [
+      0,
+      2.2,
+      -7
+    ],
+    "lookAt": [
+      0,
+      1,
+      0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "verticalAngle": 40.0,
+    "horizontalAngle": 51.0,
+    "aspectRatio": 1.333333,
+    "sampler": {
+      "type": "stratified",
+      "grid": 2,
+      "seed": 0
+    },
+    "colorModel": "clip"
+  },
+  "objects": [
+    {
+      "type": "plane",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.75,
+            0.75,
+            0.75
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        -2.2,
+        2.0,
+        0.5
+      ],
+      "size": [
+        0.2,
+        4.0,
+        6.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.8,
+            0.12,
+            0.1
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -0.8,
+        0.9,
+        0.0
+      ],
+      "radius": 0.9,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.75,
+            0.75,
+            0.75
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        1.2,
+        0.7,
+        0.8
+      ],
+      "size": [
+        1.4,
+        1.4,
+        1.4
+      ],
+      "rotation": [
+        0,
+        30,
+        0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.9,
+          "color": [
+            0.75,
+            0.75,
+            0.75
+          ],
+          "diffuseCast": false
+        }
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [
+        0.4,
+        -0.75,
+        0.53
+      ],
+      "color": [
+        1.0,
+        0.97,
+        0.9
+      ],
+      "angle": 1.0,
+      "samples": 2
+    }
+  ]
+}

@@ -62,6 +62,7 @@ class CMesh : public CObjects
         std::string             m_strFilePath;      // where on the disk it came from (empty: the archive or the scene)
         std::shared_ptr<const std::string> m_pFileData;
         std::string             m_strNode;          // a glTF model's node to read, or empty for its scene
+        std::string             m_strGltfMaterial;  // only a glTF model's primitives with this material, or empty
             // The other files a .gltf names, by its URI, with where each came from.
         ModelFile::SGltfFiles   m_oGltfFiles;
         std::vector<std::string> m_astrGltfPaths;

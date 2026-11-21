@@ -94,9 +94,10 @@ namespace ModelFile
         /// Whether a file is glTF: by the .glb magic, or a .gltf or .glb name.
     BOOL        IsGltf( const std::string &strData, const std::string &strName );
         /// Reads glTF. pFiles holds the files a .gltf names (NULL: none);
-        /// strNode, if not empty, picks one node.
-    BOOL        ReadGltf( const std::string &strData, const SGltfFiles *pFiles, const std::string &strNode, SModel &oModel,
-                          std::string &strError );
+        /// strNode, if not empty, picks one node, and strMaterial, if not
+        /// empty, only the primitives whose material has that name.
+    BOOL        ReadGltf( const std::string &strData, const SGltfFiles *pFiles, const std::string &strNode,
+                          const std::string &strMaterial, SModel &oModel, std::string &strError );
         /// The files a glTF model names besides itself: its buffers' and its
         /// PNG images' URIs (data: URIs left out). FALSE for a URI that leaves
         /// its folder, or JSON that isn't glTF.

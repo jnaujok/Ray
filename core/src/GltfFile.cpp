@@ -101,6 +101,7 @@ namespace
             ~CGltfReader( void ) { delete m_pRoot; }
 
             BOOL Read( const std::string &strData, const std::string &strNode );
+            std::string                     m_strMaterial;   // only primitives with this material, if set
 
         private:
             const ModelFile::SGltfFiles    *m_pFiles;
@@ -538,6 +539,15 @@ namespace
 
         if ( Number( &oPrimitive, "material", dMaterial ) )
             bColored = BaseColor( (int)dMaterial, oFactor, nImage, nTexCoord );
+        if ( ! m_strMaterial.empty() )
+        {
+            const IASLib::CJsonNode *pMaterials = Array( "materials" );
+            const IASLib::CJsonNode *pMaterial = ( pMaterials && dMaterial >= 0.0 ) ? pMaterials->get( (int)dMaterial ) : NULL;
+            const IASLib::CJsonNode *pName = pMaterial ? pMaterial->get( "name" ) : NULL;
+
+            if ( pName == NULL || ! pName->isTextual() || pName->textString() != m_strMaterial )
+                return TRUE;
+        }
 
         BOOL   bHasNormals = Number( pAttributes, "NORMAL", dNormal );
         std::string strCoord = "TEXCOORD_" + std::to_string( nTexCoord );
@@ -842,7 +852,7 @@ namespace
         }
 
         if ( m_oModel.anFaces.empty() )
-            return Fail( "has no triangles" );
+            return Fail( m_strMaterial.empty() ? "has no triangles" : "has no triangles with the material \"" + m_strMaterial + "\"" );
         if ( m_bNormals )
             m_oModel.aoNormals = m_aoNormals;
         if ( m_bCoords )
@@ -870,11 +880,12 @@ BOOL IsGltf( const std::string &strData, const std::string &strName )
            ( strLower.size() >= 4 && strLower.compare( strLower.size() - 4, 4, ".glb" ) == 0 );
 }
 
-BOOL ReadGltf( const std::string &strData, const SGltfFiles *pFiles, const std::string &strNode, SModel &oModel,
-               std::string &strError )
+BOOL ReadGltf( const std::string &strData, const SGltfFiles *pFiles, const std::string &strNode,
+               const std::string &strMaterial, SModel &oModel, std::string &strError )
 {
     CGltfReader oReader( pFiles, oModel, strError );
 
+    oReader.m_strMaterial = strMaterial;
     oModel = SModel();
     return oReader.Read( strData, strNode );
 }
