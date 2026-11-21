@@ -402,14 +402,14 @@ that projects dappled caustics onto the teapot, and a low sun under drifting clo
 HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
 light haze, through the double Gauss lens, each ray traced at four wavelengths (spectral
 dispersion) and clamped at 1.5. With the scene's own 5×5 stratified sampler (25 rays a pixel), its
-full 1024×768 takes about four and a half minutes on an idle 16-core machine with a Release build:
+full 1024×768 takes about five minutes on an idle 16-core machine with a Release build:
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
 The image below is rendered with the adaptive sampler instead (at least 25 rays a pixel, up to 256
-where they disagree), which is much cleaner and takes about seven and a half times as long (about 37 minutes on an idle
+where they disagree), which is much cleaner and takes about seven and a half times as long (about 44 minutes on an idle
 16-core machine):
 
 ```sh

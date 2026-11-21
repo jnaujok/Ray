@@ -10,6 +10,91 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.17] - 2026-11-21
+
+Curved surfaces: Bézier patches and B-spline and NURBS surfaces, traced exactly rather than cut into
+triangles, and the Utah teapot as Martin Newell's own 32 patches, now the teapot in the torture
+test. Scenes without the new objects render byte for byte as before.
+
+### Added
+
+- **Bézier patches (`bezier`).** A surface of Bézier patches of any degree from 1 to 15 each way
+  (bicubic is the usual), rational ones too: a control point may carry a weight, `[x, y, z, w]`.
+  Patches are listed in the scene, each with its own `points` or with `indices` into the shape's
+  own `points` (the way the teapot is usually written), or read from a `.bpt` file (`file`), which
+  goes into a saved scene's archive and to networked engines inside the scene (as `data`), like a
+  model file. `degree` is needed only when a patch's points aren't a square number; `uv`
+  (`[u0, v0, u1, v1]`, default the unit square) lets a texture run across several patches; `scale`
+  (a number or `[x, y, z]`), `center` (default the origin) and `rotation` place it; `closed`
+  (default false) says the patches enclose a volume, normals outward, so a csg can use them.
+  - **How a ray finds it.** Each patch is split by de Casteljau's algorithm until every piece is
+    within 0.02% of the shape's size of flat, and the pieces' boxes (a patch lies inside the box of
+    its control points) go in a tree. For each piece a ray reaches, the ray is crossed with the
+    triangles of the piece's corners, which gives a starting (u, v, t) close to the surface, and
+    Newton's method solves where it meets the patch itself (from the piece's middle too, if that
+    start fails). A solution anywhere on the patch counts, not only inside the piece that found
+    it, so no ray slips through the seams between pieces or between patches; the tree is walked
+    nearer box first, and shadow rays stop at the first hit.
+  - **Normals** are the cross product of the surface's slopes. Where it vanishes, at an edge that
+    shrinks to a point (the teapot's knob and base), it is taken a hair inside the patch.
+    Patches are open and shaded on the side a ray sees, unless `closed`.
+  - **Cost.** The patch teapot alone takes about 28% more CPU than the 6,320-triangle mesh teapot
+    (14.2 s against 11.1 s for 640×480 at 16 rays a pixel, one thread).
+- **B-spline and NURBS surfaces (`bspline`).** A control net (`points`: rows along v, each an
+  array along u, with weights for a NURBS surface), a `degree` each way (default `[3, 3]`) and knot
+  vectors (`knotsU`, `knotsV`; default clamped and evenly spaced). It is traced as Bézier patches:
+  knots are inserted by Boehm's algorithm, in homogeneous coordinates so the weights carry through,
+  until every knot in the surface's range repeats as often as the degree, which cuts it into
+  rational Bézier patches that are exactly the same surface, traced as above. Unclamped knot
+  vectors work too. Surface coordinates run from 0 to 1 across the whole surface.
+- **The Utah teapot as patches.** `scenes/models/teapot.bpt` holds Martin Newell's 1975 data, 32
+  bicubic patches, public domain, without Blinn's later vertical squash: z up, the spout along +x,
+  so `"rotation": [-90, 0, 0]` stands it like the mesh teapot. `tools/make_teapot_bpt.py` writes it
+  from the copy of the data in three.js (credited in `NOTICE` and `scenes/models/README.md`).
+
+  ![Before and after: the mesh teapot's lid rim and spout (left), faceted at the silhouette, and the teapot traced from its Bezier patches (right), smooth](docs/images/changelog/bezier-teapot.png)
+
+  The same views of the mesh teapot and the patch teapot, lit the same way: the lid's rim and the
+  spout, and, below, the spout's lip enlarged. The mesh's silhouette is a chain of straight edges;
+  the patches' is the curve itself, at any size.
+- **`scenes/patches_test.ray`** (the mesh teapot beside the patch teapot) and
+  **`scenes/nurbs_test.ray`** (a NURBS torus made of rational quadratic circles in front of the
+  analytic `torus` of the same size, and a waved bicubic sheet with `textures/uv_grid.ppm` running
+  across all its patches and a noise bump), each with render, round-trip and network tests,
+  references, README previews and places in the README's Expected output table.
+- **New `format_test` checks:** rays down the seam between two patches, corners included, all hit;
+  rays just past a patch's edge miss; 400 rays aimed at points worked out straight from a curved,
+  turned patch meet it there with its own normal; surface coordinates are a patch's (u, v) for a
+  point it didn't just hit; a finite unit normal where an edge shrinks to a point; a closed box of
+  six patches is hit with outward normals and works in a csg with a sphere; a B-spline with uneven
+  knots and a rational one with unclamped knots become patches that match the B-spline point for
+  point (de Boor's algorithm) within 1e-12; every point of a NURBS torus is exactly the tube's
+  radius from its center circle; shared points, indices, weights, degrees, `uv` and `scale` round
+  trip; eleven error messages; `.bpt` reading and its mistakes. With `--textures`: the teapot's 32
+  patches read and every corner has a unit normal, knob and base included; 600 rays from all round
+  agree with a fine mesh of the patches; rays aimed at points on every patch's seams all hit.
+- **Editors.** `ray-editor` draws patches in its preview and picks them with the ray tracer's own
+  test; they are added through the JSON tab (the *Add* menu has no patch entry). The MFC editor
+  lists them in its tree.
+
+### Changed
+
+- **The torture test's teapot is the patch teapot,** in the same polished marble under the same
+  spot light and caustics, instead of the inline mesh. The scene file shrinks from 10,759 lines to
+  1,195. Its reference render, README preview and full-size image are regenerated.
+
+  ![Before and after: the torture test at 2026-alpha-0.16 with the mesh teapot (left) and at 2026-alpha-0.17 with the patch teapot (right), and a full-size crop of each](docs/images/changelog/torture-patches.png)
+
+  Look at the teapot's silhouette, its spout and its lid in the crop below: smooth now, where the
+  mesh's edges showed. The knob's flared underside is darker: the exact surface faces down there,
+  away from the lights, which the mesh's averaged normals didn't show.
+  - The test render (160×120, 5×5 stratified) takes about 12% more CPU (90 s against 80 s on a
+    busy machine). The full-size image, rendered as `CLAUDE.md` says with the adaptive sampler, took
+    42,865 CPU-seconds (58.7 minutes wall on a busy machine, about 44 minutes idle), 20% more than
+    0.16's 35,724.
+- A local shape can make `center` optional (`CLocalShape::CenterRequired`); patches whose points
+  are already where they belong need none.
+
 ## [2026-alpha-0.16] - 2026-11-21
 
 More shapes, and letters: tori, discs and annuli, paraboloids, hyperboloids, superquadrics and
@@ -1625,7 +1710,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.16...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.17...HEAD
+[2026-alpha-0.17]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.16...2026-alpha-0.17
 [2026-alpha-0.16]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.15...2026-alpha-0.16
 [2026-alpha-0.15]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14.1...2026-alpha-0.15
 [2026-alpha-0.14.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14...2026-alpha-0.14.1
