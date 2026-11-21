@@ -79,7 +79,7 @@ FLT CLight::ProfileFactor( FLT nCos, FLT nAngle, FLT nFalloff ) const
         return nEdge;
 
         // The beam's shape inside the cone, by the angle from the axis.
-    FLT nTheta = (FLT)( acos( (double)std::min( (FLT)1.0, nCos ) ) * 180.0 / PI );
+    FLT nTheta = (FLT)( acos( (double)(std::min)( (FLT)1.0, nCos ) ) * 180.0 / PI );
     FLT nShape = 1.0;
 
     switch ( m_nProfile )
@@ -147,7 +147,7 @@ void CLight::FilterAt( const CVector &oPoint, const CVector &oToLight, STextureP
     oFromLight.Normalize();
     oAt.oPoint = oFromLight * m_nFilterSize;
     oAt.nU = (FLT)( ( atan2( (double)oFromLight.GetZ(), (double)oFromLight.GetX() ) / ( 2.0 * PI ) ) + 0.5 );
-    oAt.nV = (FLT)( acos( (double)std::max( (FLT)-1.0, std::min( (FLT)1.0, oFromLight.GetY() ) ) ) / PI );
+    oAt.nV = (FLT)( acos( (double)(std::max)( (FLT)-1.0, (std::min)( (FLT)1.0, oFromLight.GetY() ) ) ) / PI );
     oAt.bHasUV = TRUE;
 }
 
@@ -158,7 +158,7 @@ CColor CLight::ShadeAt( const CVector &oPoint, const CVector &oToLight )
     if ( m_nAttenuation != ATTENUATION_NONE )
     {
         CVector oTo( oToLight );
-        FLT     nRatio = m_nDistance / std::max( oTo.Magnitude(), (FLT)1.0e-9 );
+        FLT     nRatio = m_nDistance / (std::max)( oTo.Magnitude(), (FLT)1.0e-9 );
 
         oLight = oLight * ( ( m_nAttenuation == ATTENUATION_INVERSE ) ? nRatio : ( nRatio * nRatio ) );
     }

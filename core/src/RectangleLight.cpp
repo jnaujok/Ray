@@ -138,7 +138,7 @@ BOOL CRectangleLight::FromJson( const IASLib::CJsonNode &oNode )
         return FALSE;
     if ( ! ( m_nAngle >= 0.0 && m_nAngle < 90.0 ) )
         return RayJson::Fail( "angle must be from 0 up to 90 degrees" );
-    if ( ! ( m_nFalloff >= 0.0 && m_nFalloff <= std::max( m_nAngle, (FLT)0.0 ) ) )
+    if ( ! ( m_nFalloff >= 0.0 && m_nFalloff <= (std::max)( m_nAngle, (FLT)0.0 ) ) )
         return RayJson::Fail( "falloff must be from 0 to the angle" );
 
     CVector oFacing( m_oEdge1.Cross( m_oEdge2 ) );

@@ -69,7 +69,7 @@ void CSpotLight::FilterAt( const CVector &oPoint, const CVector &oToLight, SText
     oFromLight.Normalize();
     RaySampling::Basis( oAxis, oFirst, oSecond );
 
-    FLT nAlong = std::max( oAxis.Dot( oFromLight ), (FLT)1.0e-9 );
+    FLT nAlong = (std::max)( oAxis.Dot( oFromLight ), (FLT)1.0e-9 );
     FLT nEdge = (FLT)tan( (double)( m_nAngle * PI / 180.0 ) );
     FLT nX = ( oFirst.Dot( oFromLight ) / nAlong ) / nEdge;
     FLT nY = ( oSecond.Dot( oFromLight ) / nAlong ) / nEdge;

@@ -67,7 +67,7 @@ FLT CCausticsTexture::Pattern( FLT nX, FLT nY, FLT nZ ) const
         FLT nV = nY + 7.3;
         FLT nW = ( 0.60 * nX ) + ( 0.80 * nZ ) - 4.9;
 
-        nValue = std::max( nValue, 0.6 * Lines( nU * 1.7, nV * 1.7, nW * 1.7 ) );
+        nValue = (std::max)( nValue, 0.6 * Lines( nU * 1.7, nV * 1.7, nW * 1.7 ) );
     }
     if ( m_nLayers >= 3 )
     {
@@ -75,7 +75,7 @@ FLT CCausticsTexture::Pattern( FLT nX, FLT nY, FLT nZ ) const
         FLT nV = nY - 3.1;
         FLT nW = ( -0.96 * nX ) + ( 0.28 * nZ ) + 9.4;
 
-        nValue = std::max( nValue, 0.35 * Lines( nU * 2.9, nV * 2.9, nW * 2.9 ) );
+        nValue = (std::max)( nValue, 0.35 * Lines( nU * 2.9, nV * 2.9, nW * 2.9 ) );
     }
     return nValue;
 }
