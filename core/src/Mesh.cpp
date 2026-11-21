@@ -103,8 +103,14 @@ namespace
 
         std::shared_ptr<ModelFile::SModel> pModel( new ModelFile::SModel );
 
-        BOOL bRead = ModelFile::IsGltf( strData, strName ) ? ModelFile::ReadGltf( strData, &oFiles, strNode, strMaterial, *pModel, strError )
-                                                           : ModelFile::Read( strData, strName, *pModel, strError );
+        BOOL bRead;
+
+        if ( ModelFile::IsGltf( strData, strName ) )
+            bRead = ModelFile::ReadGltf( strData, &oFiles, strNode, strMaterial, *pModel, strError );
+        else if ( ModelFile::IsBlend( strData, strName ) )
+            bRead = ModelFile::ReadBlend( strData, strNode, *pModel, strError );
+        else
+            bRead = ModelFile::Read( strData, strName, *pModel, strError );
 
         if ( ! bRead )
             return std::shared_ptr<const ModelFile::SModel>();
@@ -1670,8 +1676,13 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
             m_astrGltfPaths.push_back( strPath );
         }
     }
+    else if ( ModelFile::IsBlend( strData, m_strFile ) )
+    {
+        if ( ! m_strGltfMaterial.empty() || oNode.get( "files" ) )
+            return RayJson::Fail( "\"gltfMaterial\" and \"files\" are for glTF models" );
+    }
     else if ( ! m_strNode.empty() || ! m_strGltfMaterial.empty() || oNode.get( "files" ) )
-        return RayJson::Fail( "\"node\", \"gltfMaterial\" and \"files\" are for glTF models" );
+        return RayJson::Fail( "\"node\" is for glTF and Blender models, and \"gltfMaterial\" and \"files\" for glTF ones" );
 
     m_bSmooth = bSmooth;
     m_bDoubleSided = bDoubleSided;

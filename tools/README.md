@@ -75,9 +75,16 @@ AS11-40-5903 recreation) and the indirect-light study scenes in `scenes/studies/
 
 ## `gltf_decompress.py`
 
-Writes a Draco-compressed `.glb` back out with plain accessors, so Ray's glTF reader can load it
-(`pip install DracoPy numpy`). NASA's 3D Resources models are Draco-compressed; the copies in
-`scenes/models/apollo/` were made with it.
+Writes a Draco-compressed `.glb` back out with plain accessors (`pip install DracoPy numpy`). Ray
+decodes Draco itself since 2026-alpha-0.20.2, so this is only needed to edit a model's vertices with
+a plain script: `pose_astronaut.py` works on its output.
+
+## `make_blend_fixtures.py`
+
+Writes the small Blender files in `scenes/models/` (`blend_legacy.blend` and `blend_modern.blend`,
+one in each of Blender's mesh layouts, and their gzip and Zstandard copies) for `format_test` and
+`blend_test.ray`: a header, blocks and a structure catalog the way Blender writes them, the same
+every time. Zstandard needs `pip install zstandard`.
 
 ## `pose_astronaut.py`
 

@@ -42,6 +42,11 @@ class CPngImage
             /// inflate to more than nLimit bytes.
         static BOOL     Inflate( const BYTE *pData, size_t nSize, std::vector<BYTE> &anOut, size_t nLimit,
                                  std::string &strError );
+            /// Inflates raw deflate data (RFC 1951, no zlib header or
+            /// checksum), as gzip holds it; *pnConsumed, if given, is how
+            /// many bytes it took.
+        static BOOL     InflateRaw( const BYTE *pData, size_t nSize, std::vector<BYTE> &anOut, size_t nLimit,
+                                    std::string &strError, size_t *pnConsumed );
 };
 
 #endif // __PNGIMAGE_H__

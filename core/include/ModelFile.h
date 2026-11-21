@@ -105,6 +105,12 @@ namespace ModelFile
         /// A URI with its %XX escapes decoded, as a file name.
     std::string UnescapeUri( const std::string &strUri );
     BOOL        ReadObj( const std::string &strData, SModel &oModel, std::string &strError );
+        /// Whether a file is a Blender .blend file: by its "BLENDER" header,
+        /// or (compressed) a .blend name.
+    BOOL        IsBlend( const std::string &strData, const std::string &strName );
+        /// Reads every mesh object in a .blend file (or only the one named
+        /// strObject), gzip- or Zstandard-compressed or not.
+    BOOL        ReadBlend( const std::string &strData, const std::string &strObject, SModel &oModel, std::string &strError );
 }
 
 #endif // __MODELFILE_H__

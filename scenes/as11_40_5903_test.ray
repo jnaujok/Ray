@@ -9,10 +9,9 @@
     "maximumDepth": 6,
     "depthThreshold": 0.01,
     "indirect": {
-      "method": "objects",
+      "method": "hemisphere",
       "bounces": 1,
-      "samples": 1,
-      "objects": 2,
+      "samples": 4,
       "distance": 6.0,
       "strength": 1.0
     }

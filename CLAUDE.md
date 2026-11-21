@@ -169,8 +169,10 @@ ctest --preset full             # every test
   included; `format_test` checks it.
 - **New metals** go in the table in `core/src/MetalMaterial.cpp` (n and k at about 650, 550 and
   450 nm, with their source).
-- **Model files** are read in `core/src/ModelFile.cpp` (STL, OBJ) and `core/src/GltfFile.cpp`
-  (glTF 2.0); a mesh reads every file a model names (a `.gltf`'s buffers) through
+- **Model files** are read in `core/src/ModelFile.cpp` (STL, OBJ), `core/src/GltfFile.cpp`
+  (glTF 2.0, with Draco through `core/src/DracoDecoder.cpp`) and `core/src/BlendFile.cpp` (Blender
+  `.blend`, unpacked by `core/src/Decompress.cpp`). New formats are read in Ray, not by converting
+  them with a script; a mesh reads every file a model names (a `.gltf`'s buffers) through
   `RayJson::ReadSceneFile` and writes it back with `RayJson::SceneFileName`, so it goes into the
   archive and to engines.
 - **New film stocks** go in the table in `core/src/FilmColorModel.cpp`, **new camera bodies** in
