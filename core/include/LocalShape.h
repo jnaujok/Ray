@@ -63,6 +63,9 @@ class CLocalShape : public CObjects
             // Triangles approximating the shape in its own frame (three
             // corners each, with normals), for the editor's preview.
         virtual void        LocalTriangles( int nSegments, std::vector<FLT> &anPositions, std::vector<FLT> &anNormals ) = 0;
+            // Whether the scene must give "center" (a shape made of patches
+            // whose points are where they are needs none).
+        virtual BOOL        CenterRequired( void ) { return TRUE; }
 
     public:
                             CLocalShape( void );

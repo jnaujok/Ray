@@ -76,6 +76,15 @@ The ray tracing itself is the 1997 code.
   a saved scene's archive and to networked engines inside the scene.
 
   <img src="docs/images/tests/text_test.png" alt="Beveled gold letters reading Ray 0.16, two blue lines reading Typeset in Lato Bold, and the word CSG carved into a gray slab" width="320">
+- **Bézier patches and B-spline surfaces:** a `bezier` object is made of Bézier patches of any
+  degree, rational ones too, listed in the scene or read from a `.bpt` file; a `bspline` object is
+  a B-spline or NURBS surface (so circles, spheres and tori come out exact), cut into Bézier
+  patches by knot insertion. They are traced exactly, not as triangles: each patch is split into
+  nearly flat pieces kept in a tree of boxes, and Newton's method finds where a ray meets the
+  surface itself, with nothing slipping through the seams. The Utah teapot comes as Martin
+  Newell's 32 bicubic patches (`scenes/models/teapot.bpt`), smooth at any size.
+
+  <img src="docs/images/tests/patches_test.png" alt="Two red Utah teapots side by side: the mesh teapot and the teapot traced from its 32 Bezier patches" width="320"> <img src="docs/images/tests/nurbs_test.png" alt="A gold NURBS torus in front of an analytic torus, and a waved B-spline sheet with a rainbow grid texture across it" width="320">
 - **More about the primitives:**
   Cylinders and cones run between any two points, capped or open (an open one can be seen into and
   shadows itself inside); a cone can be cut off flat at the top, and a box can be any size along
@@ -89,7 +98,7 @@ The ray tracing itself is the 1997 code.
   in one too (planes, which are infinite, are tested every time), and shadow rays stop at the
   first thing in the way.
 - **Constructive solid geometry:** a `csg` object combines closed shapes (spheres, boxes, tori,
-  superquadrics, rounded boxes, capped cylinders, cones and quadrics, text, closed meshes, and other
+  superquadrics, rounded boxes, capped cylinders, cones and quadrics, text, closed patches, closed meshes, and other
   csgs) by union, intersection or difference: a lens
   blank from two balls, a bowl from a ball with a ball taken out, a die with drilled pips. It shades
   as one object with its own materials, or with each shape's own (`childMaterials`), shadows and
@@ -383,7 +392,7 @@ raythrower scenes/lens_test.ray --aa stratified:grid=8 --ppm lens.ppm
 raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
-**Render the torture test**, every kind of object (the teapot too, in marble, and a layer-lined
+**Render the torture test**, every kind of object (the teapot too, in marble, traced from its 32 Bézier patches, and a layer-lined
 3DBenchy, a colored-STL puzzle cube, an OBJ ring, a gold torus, and "RAY" in beveled letters set in
 Lato Bold on top of the mirror frame), mirrors, glass
 (the cube with green swirls inside, the ball frosted, the mirror frosted in patches, a flint prism fanning colors into a spectrum), a die with drilled
@@ -393,14 +402,14 @@ that projects dappled caustics onto the teapot, and a low sun under drifting clo
 HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
 light haze, through the double Gauss lens, each ray traced at four wavelengths (spectral
 dispersion) and clamped at 1.5. With the scene's own 5×5 stratified sampler (25 rays a pixel), its
-full 1024×768 takes about four and a half minutes on an idle 16-core machine with a Release build:
+full 1024×768 takes about five minutes on an idle 16-core machine with a Release build:
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
 The image below is rendered with the adaptive sampler instead (at least 25 rays a pixel, up to 256
-where they disagree), which is much cleaner and takes about seven and a half times as long (about 37 minutes on an idle
+where they disagree), which is much cleaner and takes about seven and a half times as long (about 44 minutes on an idle
 16-core machine):
 
 ```sh
@@ -562,6 +571,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/haze_test.png" alt="render_haze (160x120)" width="160"><br><code>render_haze (160x120)</code></td><td align="center"><img src="docs/images/tests/materials_test.png" alt="render_materials" width="260"><br><code>render_materials</code></td><td align="center"><img src="docs/images/tests/projector_test.png" alt="render_projector" width="260"><br><code>render_projector</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/underwater_test.png" alt="render_underwater" width="260"><br><code>render_underwater</code></td><td align="center"><img src="docs/images/tests/bounce_hemisphere_test.png" alt="render_bounce_hemisphere (160x120)" width="160"><br><code>render_bounce_hemisphere (160x120)</code></td><td align="center"><img src="docs/images/tests/maps_test.png" alt="render_maps" width="260"><br><code>render_maps</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/volume_test.png" alt="render_volume" width="260"><br><code>render_volume</code></td><td align="center"><img src="docs/images/tests/shapes_test.png" alt="render_shapes" width="260"><br><code>render_shapes</code></td><td align="center"><img src="docs/images/tests/text_test.png" alt="render_text" width="260"><br><code>render_text</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/patches_test.png" alt="render_patches" width="260"><br><code>render_patches</code></td><td align="center"><img src="docs/images/tests/nurbs_test.png" alt="render_nurbs" width="260"><br><code>render_nurbs</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -653,9 +663,10 @@ dispersive glass with spectral dispersion, STL and OBJ model files with printed 
 lean, shared meshes, light bounced between surfaces, haze, a library of natural material presets,
 beam profiles, attenuation and projected light filters, texture maps for every material and
 light setting, textures inside glass, tori, discs, quadrics, superquadrics and rounded boxes, 3D text
-from TrueType fonts, and JSON scenes so far, and a cross-platform scene editor
-with a shaded OpenGL view and progressive rendering. Both editors reach every feature through JSON
-editing; next up are Bézier patches and B-spline surfaces.
+from TrueType fonts, Bézier patches and B-spline and NURBS surfaces traced exactly, and JSON scenes
+so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both
+editors reach every feature through JSON editing; next up are solids of revolution and extruded
+solids.
 
 ## Changelog
 

@@ -23,6 +23,18 @@ section. It needs only Python 3. Run it from the repository root whenever the re
 tools/render_previews.py
 ```
 
+## `make_teapot_bpt.py`
+
+Writes `scenes/models/teapot.bpt`, the Utah teapot's 32 Bezier patches, from the copy of Martin
+Newell's data in three.js's `TeapotGeometry.js` (release r160): the coordinates as they are, in the
+`.bpt` format the `bezier` object reads. It needs only Python 3, and the file once written needs
+nothing:
+
+```sh
+curl -sLO https://raw.githubusercontent.com/mrdoob/three.js/r160/examples/jsm/geometries/TeapotGeometry.js
+tools/make_teapot_bpt.py TeapotGeometry.js scenes/models/teapot.bpt
+```
+
 ## `bounce_sweep.py`
 
 Measures indirect light's noise and render time against its number of rays. It renders a scene
