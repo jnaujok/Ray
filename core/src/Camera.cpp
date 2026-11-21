@@ -7,6 +7,7 @@
 #endif
 
 #include "Camera.h"
+#include "FilmColorModel.h"
 #include "CenterSampler.h"
 #include "ClipColorModel.h"
 #include "SceneJson.h"
@@ -60,6 +61,7 @@ CCamera::CCamera( const CCamera &oSource )
     m_nAspectRatio = oSource.m_nAspectRatio;
     m_nClamp = oSource.m_nClamp;
     m_bSpectral = oSource.m_bSpectral;
+    m_oReseau = oSource.m_oReseau;
     m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
     m_pColorModel.reset( oSource.m_pColorModel ? oSource.m_pColorModel->Clone() : NULL );
     m_pLens.reset( oSource.m_pLens ? oSource.m_pLens->Clone() : NULL );
@@ -76,6 +78,7 @@ CCamera &CCamera::operator =( const CCamera &oSource )
     m_nAspectRatio = oSource.m_nAspectRatio;
     m_nClamp = oSource.m_nClamp;
     m_bSpectral = oSource.m_bSpectral;
+    m_oReseau = oSource.m_oReseau;
     if ( this != &oSource )
     {
         m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
@@ -163,6 +166,19 @@ BOOL CCamera::PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, 
 
     nLensU -= (FLT)floor( (double)nLensU );
     nLensV -= (FLT)floor( (double)nLensV );
+        // A Reseau cross lies on the film itself: no light reaches the film
+        // under it, whatever the lens does.
+    if ( m_oReseau.bOn )
+    {
+        FLT nHalf = m_pLens->GetSensorWidth() * 0.5;
+
+        if ( OnReseau( nScreenX * nHalf, nScreenY * nHalf / nAspect ) )
+        {
+            oOrigin = m_oPosition;
+            oDirection = m_oForward;
+            return FALSE;
+        }
+    }
     if ( ! m_pLens->RayFor( nScreenX, nScreenY, nAspect, nLensU, nLensV, anOrigin, anDirection, nChannel, pnWeight ) )
     {
         oOrigin = m_oPosition;
@@ -189,6 +205,48 @@ BOOL CCamera::PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, 
     oDirection = oDirection + oDirBack;
     oDirection.Normalize();
     return TRUE;
+}
+
+BOOL CCamera::OnReseau( FLT nX, FLT nY ) const
+{
+    if ( ! m_oReseau.bOn || m_oReseau.nCount <= 0 )
+        return FALSE;
+
+    FLT nFirst = -0.5 * (FLT)( m_oReseau.nCount - 1 ) * m_oReseau.nSpacing;
+    FLT nArm = 0.5 * m_oReseau.nSize;
+    FLT nLine = 0.5 * m_oReseau.nLineWidth;
+
+        // The nearest cross in each direction.
+    int nColumn = (int)floor( (double)( ( nX - nFirst ) / m_oReseau.nSpacing ) + 0.5 );
+    int nRow = (int)floor( (double)( ( nY - nFirst ) / m_oReseau.nSpacing ) + 0.5 );
+
+    if ( nColumn < 0 || nColumn >= m_oReseau.nCount || nRow < 0 || nRow >= m_oReseau.nCount )
+        return FALSE;
+
+    FLT nDX = ABS( nX - ( nFirst + (FLT)nColumn * m_oReseau.nSpacing ) );
+    FLT nDY = ABS( nY - ( nFirst + (FLT)nRow * m_oReseau.nSpacing ) );
+
+    return ( ( nDX <= nArm && nDY <= nLine ) || ( nDY <= nArm && nDX <= nLine ) ) ? TRUE : FALSE;
+}
+
+namespace
+{
+        // The Apollo Hasselblads.
+    const CCamera::SBody s_aoBodies[] =
+    {
+        { "hasselblad-hec", "Hasselblad Electric Camera (500EL): 80 mm Planar, 6x6 on 70 mm film",
+          "planar-80mm", 55.0, 8.0, FALSE },
+        { "hasselblad-hdc", "Hasselblad Data Camera (500EL): 60 mm Biogon and Reseau plate, the lunar surface camera",
+          "biogon-60mm-reseau", 53.0, 11.0, TRUE },
+        { "hasselblad-lswc", "Hasselblad Lunar Surface Super-Wide-Angle Camera (SWC): fixed 38 mm Biogon",
+          "biogon-38mm", 55.0, 11.0, FALSE },
+    };
+}
+
+const CCamera::SBody *CCamera::GetBodies( int &nCount )
+{
+    nCount = (int)( sizeof( s_aoBodies ) / sizeof( s_aoBodies[ 0 ] ) );
+    return s_aoBodies;
 }
 
 DYNAMIC_IMPLEMENTS( CCamera, "camera" );
@@ -338,13 +396,23 @@ void CCamera::ToJson( IASLib::CObjectNode &oNode )
         oNode.put( "dispersion", "spectral" );
     if ( m_pLens )
         m_pLens->ToJson( *oNode.putObject( "lens" ) );
+    if ( m_oReseau.bOn )
+    {
+        IASLib::CObjectNode *pReseau = oNode.putObject( "reseau" );
+
+        pReseau->put( "count", m_oReseau.nCount );
+        RayJson::PutNumber( *pReseau, "spacing", m_oReseau.nSpacing );
+        RayJson::PutNumber( *pReseau, "size", m_oReseau.nSize );
+        RayJson::PutNumber( *pReseau, "lineWidth", m_oReseau.nLineWidth );
+    }
 }
 
 BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "position", "lookAt", "up", "verticalAngle",
                                               "horizontalAngle", "aspectRatio",
-                                              "sampler", "colorModel", "clamp", "dispersion", "lens", NULL };
+                                              "sampler", "colorModel", "clamp", "dispersion", "lens",
+                                              "body", "reseau", NULL };
     CPixelSampler  *pSampler;
     CColorModel    *pColorModel;
     FLT             nClamp = 0.0;
@@ -379,24 +447,91 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
     if ( pSampler )
         SetSampler( pSampler );
 
+        // A body fills in what the scene doesn't give: the lens's
+        // prescription and format, a film, and the Reseau plate.
+    std::string     strBody;
+    const SBody    *pBody = NULL;
+
+    if ( ! RayJson::GetString( oNode, "body", strBody, FALSE ) )
+        return FALSE;
+    if ( oNode.get( "body" ) != NULL )
+    {
+        int         nCount;
+        const SBody *aoBodies = GetBodies( nCount );
+
+        for ( int nIndex = 0; nIndex < nCount; nIndex++ )
+        {
+            if ( strBody == aoBodies[ nIndex ].strName )
+                pBody = &aoBodies[ nIndex ];
+        }
+        if ( pBody == NULL )
+        {
+            RayJson::CWhere oWhere( "body" );
+
+            return RayJson::Fail( "unknown camera body \"" + strBody + "\"" );
+        }
+    }
+
     if ( ! GetModel( oNode, "colorModel", pColorModel, "color model" ) )
         return FALSE;
     if ( pColorModel )
         SetColorModel( pColorModel );
+    else if ( pBody )
+    {
+        CFilmColorModel *pFilm = new CFilmColorModel;
+
+        pFilm->SetWidth( pBody->nFormat );
+        pFilm->SetExposure( 1.0 / 250.0, pBody->nFStop );
+        SetColorModel( pFilm );
+    }
 
     const IASLib::CJsonNode *pLens = oNode.get( "lens" );
 
-    if ( pLens )
+    if ( pLens || pBody )
     {
         RayJson::CWhere         oWhere( "lens" );
         std::unique_ptr<CLens>  pNewLens( new CLens );
 
-        if ( ! pNewLens->FromJson( *pLens ) )
+        if ( pBody )
+        {
+            pNewLens->SetPrescription( pBody->strLens );
+            pNewLens->SetSensorWidth( pBody->nFormat );
+        }
+        if ( pLens && ! pNewLens->FromJson( *pLens, pBody != NULL ) )
             return FALSE;
         m_pLens.reset( pNewLens.release() );
     }
     else
         m_pLens.reset();
+
+    const IASLib::CJsonNode *pReseau = oNode.get( "reseau" );
+
+    m_oReseau = SReseau();
+    if ( pBody && pBody->bReseau )
+        m_oReseau.bOn = TRUE;
+    if ( pReseau )
+    {
+        static const char *const astrReseau[] = { "count", "spacing", "size", "lineWidth", NULL };
+        RayJson::CWhere oWhere( "reseau" );
+
+        m_oReseau.bOn = TRUE;
+        if ( ! RayJson::OnlyFields( *pReseau, astrReseau ) ||
+             ! RayJson::GetInt( *pReseau, "count", m_oReseau.nCount, 1, 99, FALSE ) ||
+             ! RayJson::GetNumber( *pReseau, "spacing", m_oReseau.nSpacing, FALSE ) ||
+             ! RayJson::GetNumber( *pReseau, "size", m_oReseau.nSize, FALSE ) ||
+             ! RayJson::GetNumber( *pReseau, "lineWidth", m_oReseau.nLineWidth, FALSE ) )
+            return FALSE;
+        if ( ! ( m_oReseau.nSpacing > 0.0 ) || ! ( m_oReseau.nSize > 0.0 ) || ! ( m_oReseau.nLineWidth > 0.0 ) )
+            return RayJson::Fail( "spacing, size and lineWidth (in mm on the film) must be positive" );
+        if ( m_oReseau.nLineWidth >= m_oReseau.nSize )
+            return RayJson::Fail( "a cross's lineWidth must be less than its size" );
+    }
+    if ( m_oReseau.bOn && ! m_pLens )
+    {
+        RayJson::CWhere oWhere( "reseau" );
+
+        return RayJson::Fail( "a Reseau plate needs a lens (its crosses are placed in mm on the film)" );
+    }
 
     CalcRotate();
     if ( ! m_strLensError.empty() )

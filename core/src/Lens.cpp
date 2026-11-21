@@ -65,10 +65,172 @@ namespace
         { -39.73,  0.0,   1.0,   10.0,  FALSE, 0.0  },
     };
 
+        // The Apollo Hasselblads' Carl Zeiss lenses, at their nominal focal
+        // lengths, written by tools/apollo_lenses.py (which says where each
+        // comes from): patent examples where Zeiss published one, and
+        // reconstructions where it didn't. Glasses are (nd, Vd), or fused
+        // silica and calcium fluoride by their Sellmeier formulas.
+    // BEGIN APOLLO LENSES (tools/apollo_lenses.py --write)
+        // Zeiss Biogon 38 mm f/4.5 (US 2,721,499 Ex. 2, Bertele): the SWC's lens (patent example).
+    const CLens::SSurface s_aoBiogon38mm[] =
+    {
+        {    41.4500,   1.4052, 1.50380,  20.557, FALSE, 66.70, CLens::GLASS_NONE },
+        {    19.9882,   5.0132, 1.00000,  16.693, FALSE,  0.00, CLens::GLASS_NONE },
+        {    41.8715,   1.4052, 1.48697,  16.651, FALSE, 70.30, CLens::GLASS_NONE },
+        {    19.2628,  13.2925, 1.00000,  14.321, FALSE,  0.00, CLens::GLASS_NONE },
+        {    21.3592,  11.1278, 1.72050,  10.418, FALSE, 50.30, CLens::GLASS_NONE },
+        {     9.6352,   5.0512, 1.60739,   5.720, FALSE, 59.50, CLens::GLASS_NONE },
+        {   -74.0281,   0.8925, 1.00000,   5.605, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,   0.8925, 1.00000,   5.276, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -95.9722,   1.0634, 1.56993,   5.485, FALSE, 57.50, CLens::GLASS_NONE },
+        {    11.6177,   9.0010, 1.62500,   5.433, FALSE, 53.30, CLens::GLASS_NONE },
+        {    -9.6884,   6.9121, 1.71966,   7.017, FALSE, 29.30, CLens::GLASS_NONE },
+        {   -21.7922,  14.8117, 1.00000,  10.124, FALSE,  0.00, CLens::GLASS_NONE },
+        {   -15.2484,   3.7219, 1.64200,  13.615, FALSE, 58.10, CLens::GLASS_NONE },
+        {   -38.9813,   0.0000, 1.00000,  18.730, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+        // Zeiss Biogon 60 mm f/5.6 (HDC): a reconstruction from the Biogon of US 2,721,499 (reconstruction).
+    const CLens::SSurface s_aoBiogon60mm[] =
+    {
+        {    66.6472,   2.2594, 1.50380,  23.804, FALSE, 66.70, CLens::GLASS_NONE },
+        {    32.1389,   8.0607, 1.00000,  20.874, FALSE,  0.00, CLens::GLASS_NONE },
+        {    67.3250,   2.2594, 1.48697,  19.316, FALSE, 70.30, CLens::GLASS_NONE },
+        {    30.9726,  21.3730, 1.00000,  17.512, FALSE,  0.00, CLens::GLASS_NONE },
+        {    34.3434,  17.8923, 1.72050,  12.590, FALSE, 50.30, CLens::GLASS_NONE },
+        {    15.4924,   8.1217, 1.60739,   7.278, FALSE, 59.50, CLens::GLASS_NONE },
+        {  -119.0294,   1.4350, 1.00000,   7.210, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,   1.4350, 1.00000,   6.817, TRUE ,  0.00, CLens::GLASS_NONE },
+        {  -154.3132,   1.7098, 1.56993,   7.052, FALSE, 57.50, CLens::GLASS_NONE },
+        {    18.6800,  14.4726, 1.62500,   6.996, FALSE, 53.30, CLens::GLASS_NONE },
+        {   -15.5779,  11.1140, 1.71966,   8.791, FALSE, 29.30, CLens::GLASS_NONE },
+        {   -35.0395,  23.8156, 1.00000,  12.185, FALSE,  0.00, CLens::GLASS_NONE },
+        {   -24.5179,   5.9844, 1.64200,  16.936, FALSE, 58.10, CLens::GLASS_NONE },
+        {   -62.6779,   0.0000, 1.00000,  21.142, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+        // Zeiss Biogon 60 mm f/5.6 with the Hasselblad Data Camera's Reseau plate (3 mm, assumed BK7) (reconstruction).
+    const CLens::SSurface s_aoBiogon60mmReseau[] =
+    {
+        {    66.6472,   2.2594, 1.50380,  23.804, FALSE, 66.70, CLens::GLASS_NONE },
+        {    32.1389,   8.0607, 1.00000,  20.874, FALSE,  0.00, CLens::GLASS_NONE },
+        {    67.3250,   2.2594, 1.48697,  19.316, FALSE, 70.30, CLens::GLASS_NONE },
+        {    30.9726,  21.3730, 1.00000,  17.512, FALSE,  0.00, CLens::GLASS_NONE },
+        {    34.3434,  17.8923, 1.72050,  12.590, FALSE, 50.30, CLens::GLASS_NONE },
+        {    15.4924,   8.1217, 1.60739,   7.278, FALSE, 59.50, CLens::GLASS_NONE },
+        {  -119.0294,   1.4350, 1.00000,   7.210, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,   1.4350, 1.00000,   6.817, TRUE ,  0.00, CLens::GLASS_NONE },
+        {  -154.3132,   1.7098, 1.56993,   7.052, FALSE, 57.50, CLens::GLASS_NONE },
+        {    18.6800,  14.4726, 1.62500,   6.996, FALSE, 53.30, CLens::GLASS_NONE },
+        {   -15.5779,  11.1140, 1.71966,   8.791, FALSE, 29.30, CLens::GLASS_NONE },
+        {   -35.0395,  23.8156, 1.00000,  12.185, FALSE,  0.00, CLens::GLASS_NONE },
+        {   -24.5179,   5.9844, 1.64200,  16.936, FALSE, 58.10, CLens::GLASS_NONE },
+        {   -62.6779,  28.1642, 1.00000,  21.142, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,   3.0000, 1.51680,  38.932, FALSE, 64.17, CLens::GLASS_NONE },
+        {     0.0000,   0.0000, 1.00000,  39.963, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+        // Zeiss Planar 80 mm f/2.8 (US 2,724,994 Ex. I, Lange): 5 elements, 4 groups (patent example).
+    const CLens::SSurface s_aoPlanar80mm[] =
+    {
+        {    35.4269,   1.4976, 1.62536,  18.885, FALSE, 35.60, CLens::GLASS_NONE },
+        {    21.4086,   6.2904, 1.62041,  16.785, FALSE, 60.30, CLens::GLASS_NONE },
+        {    77.0610,   0.1000, 1.00000,  16.492, FALSE,  0.00, CLens::GLASS_NONE },
+        {    23.3390,   9.3455, 1.76182,  14.173, FALSE, 26.50, CLens::GLASS_NONE },
+        {    15.1559,   5.0160, 1.00000,  10.192, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,  11.4631, 1.00000,   9.721, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -14.3079,   2.0968, 1.76182,  11.509, FALSE, 26.50, CLens::GLASS_NONE },
+        {   -18.8071,   0.1000, 1.00000,  13.591, FALSE,  0.00, CLens::GLASS_NONE },
+        {   -90.2793,   6.2304, 1.62041,  17.546, FALSE, 60.30, CLens::GLASS_NONE },
+        {   -22.3526,   0.0000, 1.00000,  17.570, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+        // Zeiss Planar 100 mm f/3.5: the Planar of US 2,724,994 Ex. II at 100 mm and f/3.5 (patent family).
+    const CLens::SSurface s_aoPlanar100mm[] =
+    {
+        {    44.3409,   2.6240, 1.69895,  19.468, FALSE, 30.10, CLens::GLASS_NONE },
+        {    29.2120,   6.9980, 1.69347,  17.740, FALSE, 53.50, CLens::GLASS_NONE },
+        {    84.7329,   0.1250, 1.00000,  16.461, FALSE,  0.00, CLens::GLASS_NONE },
+        {    29.6350,  11.5970, 1.69895,  14.968, FALSE, 30.10, CLens::GLASS_NONE },
+        {    18.9690,   6.2700, 1.00000,  10.358, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,  14.2250, 1.00000,   9.805, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -17.9080,   2.4370, 1.76182,  12.294, FALSE, 26.50, CLens::GLASS_NONE },
+        {   -23.5390,   0.2500, 1.00000,  14.174, FALSE,  0.00, CLens::GLASS_NONE },
+        {  -111.3798,   7.5360, 1.62041,  16.744, FALSE, 60.30, CLens::GLASS_NONE },
+        {   -27.5770,   0.0000, 1.00000,  17.975, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+        // Zeiss UV-Sonnar 105 mm f/4.3: a reconstruction, 7 air-spaced silica and CaF2 singlets (reconstruction).
+    const CLens::SSurface s_aoUvSonnar105mm[] =
+    {
+        {    56.4181,   5.5762, 1.43385,  20.569, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        { -13971.7251,   0.4182, 1.00000,  19.823, FALSE,  0.00, CLens::GLASS_NONE },
+        {    35.3194,   5.5762, 1.43385,  17.120, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {   148.0516,   0.8364, 1.00000,  15.809, FALSE,  0.00, CLens::GLASS_NONE },
+        {   351.9545,   2.2305, 1.45846,  15.484, FALSE,  0.00, CLens::GLASS_FUSED_SILICA },
+        {    25.8695,   2.7882, 1.00000,  12.776, FALSE,  0.00, CLens::GLASS_NONE },
+        {    43.2072,   4.1823, 1.43385,  12.101, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {    98.9418,   8.3644, 1.00000,  10.692, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,   8.3644, 1.00000,   9.031, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -33.2809,   1.9517, 1.45846,   9.125, FALSE,  0.00, CLens::GLASS_FUSED_SILICA },
+        {    72.3483,   1.1152, 1.00000,  10.723, FALSE,  0.00, CLens::GLASS_NONE },
+        {   141.4637,   4.4610, 1.43385,  11.386, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {   -35.0826,   0.4182, 1.00000,  12.296, FALSE,  0.00, CLens::GLASS_NONE },
+        {  -314.4022,   3.3457, 1.43385,  13.406, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {   -54.6954,   0.0000, 1.00000,  14.065, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+        // Zeiss Sonnar 250 mm f/5.6: a reconstruction, 4 elements in 3 groups (reconstruction).
+    const CLens::SSurface s_aoSonnar250mm[] =
+    {
+        {   137.8564,   8.7060, 1.51680,  24.783, FALSE, 64.17, CLens::GLASS_NONE },
+        {   340.6072,   1.0882, 1.00000,  23.548, FALSE,  0.00, CLens::GLASS_NONE },
+        {    74.6359,  10.8822, 1.61272,  22.748, FALSE, 58.63, CLens::GLASS_NONE },
+        {  -258.1013,   4.3530, 1.62004,  21.189, FALSE, 36.37, CLens::GLASS_NONE },
+        {   109.1308,  32.6469, 1.00000,  20.169, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,  38.0881, 1.00000,  15.793, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -46.6768,   3.8087, 1.67270,  15.326, FALSE, 32.21, CLens::GLASS_NONE },
+        {   -56.8795,   0.0000, 1.00000,  16.241, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+        // Zeiss Tele-Tessar 500 mm f/8: a reconstruction, 5 elements in 3 groups (reconstruction).
+    const CLens::SSurface s_aoTeleTessar500mm[] =
+    {
+        {   180.8716,   8.8270, 1.62041,  32.759, FALSE, 60.32, CLens::GLASS_NONE },
+        {  -235.3161,   3.5305, 1.62004,  32.288, FALSE, 36.37, CLens::GLASS_NONE },
+        {   493.9751,   1.3240, 1.00000,  31.504, FALSE,  0.00, CLens::GLASS_NONE },
+        {   106.0275,   7.0615, 1.51680,  30.970, FALSE, 64.17, CLens::GLASS_NONE },
+        {   158.2060,  88.2680, 1.00000,  30.156, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,  61.7880, 1.00000,  18.640, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -76.8825,   3.5305, 1.67270,  15.179, FALSE, 32.21, CLens::GLASS_NONE },
+        {   140.0795,   6.1790, 1.61272,  15.844, FALSE, 58.63, CLens::GLASS_NONE },
+        {  -154.5125,   0.0000, 1.00000,  16.405, FALSE,  0.00, CLens::GLASS_NONE },
+    };
+
+    // END APOLLO LENSES
+
     const CLens::SPrescription s_aoPrescriptions[] =
     {
         { "double-gauss-50mm", "50 mm f/2 double Gauss (US 2,673,491, Tronnier), a classic standard lens",
           s_aoDoubleGauss50, (int)( sizeof( s_aoDoubleGauss50 ) / sizeof( s_aoDoubleGauss50[ 0 ] ) ) },
+        // BEGIN APOLLO ENTRIES
+        { "biogon-38mm", "Zeiss Biogon 38 mm f/4.5 (US 2,721,499 Ex. 2, Bertele): the SWC's lens",
+          s_aoBiogon38mm, (int)( sizeof( s_aoBiogon38mm ) / sizeof( s_aoBiogon38mm[ 0 ] ) ) },
+        { "biogon-60mm", "Zeiss Biogon 60 mm f/5.6 (HDC): a reconstruction from the Biogon of US 2,721,499",
+          s_aoBiogon60mm, (int)( sizeof( s_aoBiogon60mm ) / sizeof( s_aoBiogon60mm[ 0 ] ) ) },
+        { "biogon-60mm-reseau", "Zeiss Biogon 60 mm f/5.6 with the Hasselblad Data Camera's Reseau plate (3 mm, assumed BK7)",
+          s_aoBiogon60mmReseau, (int)( sizeof( s_aoBiogon60mmReseau ) / sizeof( s_aoBiogon60mmReseau[ 0 ] ) ) },
+        { "planar-80mm", "Zeiss Planar 80 mm f/2.8 (US 2,724,994 Ex. I, Lange): 5 elements, 4 groups",
+          s_aoPlanar80mm, (int)( sizeof( s_aoPlanar80mm ) / sizeof( s_aoPlanar80mm[ 0 ] ) ) },
+        { "planar-100mm", "Zeiss Planar 100 mm f/3.5: the Planar of US 2,724,994 Ex. II at 100 mm and f/3.5",
+          s_aoPlanar100mm, (int)( sizeof( s_aoPlanar100mm ) / sizeof( s_aoPlanar100mm[ 0 ] ) ) },
+        { "uv-sonnar-105mm", "Zeiss UV-Sonnar 105 mm f/4.3: a reconstruction, 7 air-spaced silica and CaF2 singlets",
+          s_aoUvSonnar105mm, (int)( sizeof( s_aoUvSonnar105mm ) / sizeof( s_aoUvSonnar105mm[ 0 ] ) ) },
+        { "sonnar-250mm", "Zeiss Sonnar 250 mm f/5.6: a reconstruction, 4 elements in 3 groups",
+          s_aoSonnar250mm, (int)( sizeof( s_aoSonnar250mm ) / sizeof( s_aoSonnar250mm[ 0 ] ) ) },
+        { "tele-tessar-500mm", "Zeiss Tele-Tessar 500 mm f/8: a reconstruction, 5 elements in 3 groups",
+          s_aoTeleTessar500mm, (int)( sizeof( s_aoTeleTessar500mm ) / sizeof( s_aoTeleTessar500mm[ 0 ] ) ) },
+        // END APOLLO ENTRIES
     };
 
         // Another point in the unit square for a ray's nTry-th cast, from
@@ -174,6 +336,12 @@ BOOL CLens::SetPrescription( const char *strName )
                                  aoPrescriptions[ nIndex ].aoSurfaces + aoPrescriptions[ nIndex ].nSurfaces );
             m_strPrescription = strName;
             m_bPrepared = FALSE;
+                // A Sellmeier glass's d-line index, exactly as traced.
+            for ( size_t nSurface = 0; nSurface < m_aoSurfaces.size(); nSurface++ )
+            {
+                if ( m_aoSurfaces[ nSurface ].nGlass != GLASS_NONE )
+                    m_aoSurfaces[ nSurface ].nIor = SellmeierIndex( m_aoSurfaces[ nSurface ].nGlass, WAVELENGTH_D );
+            }
             for ( int nChannel = 0; nChannel < 4; nChannel++ )
                 m_anIorTable[ nChannel ].clear();
             return TRUE;
@@ -213,7 +381,58 @@ FLT CLens::WorkOutIor( int nIndex, int nChannel ) const
 
     if ( ! m_bChromatic )
         return oSurface.nIor;
+    if ( oSurface.nGlass != GLASS_NONE )
+    {
+            // Green, and every channel traced together, are at the d line,
+            // which is the surface's nIor.
+        if ( nChannel == CHANNEL_ALL || nChannel == CHANNEL_GREEN )
+            return oSurface.nIor;
+        if ( IsSpectral( nChannel ) )
+            return SellmeierIndex( oSurface.nGlass, ChannelWavelength( nChannel ) / 1000.0 );
+        return SellmeierIndex( oSurface.nGlass, ( nChannel == CHANNEL_RED ) ? WAVELENGTH_C : WAVELENGTH_F );
+    }
     return DispersedIndex( oSurface.nIor, oSurface.nAbbe, nChannel );
+}
+
+FLT CLens::SellmeierIndex( int nGlass, FLT nMicrometers )
+{
+        // I. H. Malitson, JOSA 55 (1965), fused silica, 0.21-3.71 um, and
+        // Applied Optics 2 (1963), calcium fluoride, 0.23-9.7 um.
+    static const double s_aadCoefficients[ 2 ][ 6 ] =
+    {
+        { 0.6961663, 0.4079426, 0.8974794, 0.0684043, 0.1162414, 9.896161 },
+        { 0.5675888, 0.4710914, 3.8484723, 0.050263605, 0.1003909, 34.649040 },
+    };
+
+    if ( nGlass != GLASS_FUSED_SILICA && nGlass != GLASS_CALCIUM_FLUORIDE )
+        return 1.0;
+
+    const double   *adC = s_aadCoefficients[ nGlass - 1 ];
+    double          dSquare = (double)nMicrometers * (double)nMicrometers;
+    double          dSum = 1.0;
+
+    for ( int nTerm = 0; nTerm < 3; nTerm++ )
+        dSum += adC[ nTerm ] * dSquare / ( dSquare - adC[ nTerm + 3 ] * adC[ nTerm + 3 ] );
+    return (FLT)sqrt( dSum );
+}
+
+const char *CLens::GlassName( int nGlass )
+{
+    switch ( nGlass )
+    {
+        case GLASS_FUSED_SILICA:        return "fused-silica";
+        case GLASS_CALCIUM_FLUORIDE:    return "calcium-fluoride";
+        default:                        return NULL;
+    }
+}
+
+int CLens::GlassByName( const std::string &strName )
+{
+    if ( strName == "fused-silica" )
+        return GLASS_FUSED_SILICA;
+    if ( strName == "calcium-fluoride" )
+        return GLASS_CALCIUM_FLUORIDE;
+    return GLASS_NONE;
 }
 
 int CLens::WavelengthChannel( FLT nNanometers )
@@ -247,7 +466,8 @@ BOOL CLens::IsChromatic( void ) const
         return FALSE;
     for ( size_t nIndex = 0; nIndex < m_aoSurfaces.size(); nIndex++ )
     {
-        if ( m_aoSurfaces[ nIndex ].nAbbe > 0.0 && m_aoSurfaces[ nIndex ].nIor != 1.0 )
+        if ( ( m_aoSurfaces[ nIndex ].nAbbe > 0.0 && m_aoSurfaces[ nIndex ].nIor != 1.0 ) ||
+             m_aoSurfaces[ nIndex ].nGlass != GLASS_NONE )
             return TRUE;
     }
     return FALSE;
@@ -530,7 +750,7 @@ BOOL CLens::Prepare( FLT nDefaultFocus, std::string &strError )
         // Exposure: the share of rays from the sensor's center to the rear
         // element that get through.
     {
-        FLT nRear = m_aoSurfaces.back().nAperture;
+        FLT nRear = m_aoSurfaces[ AimIndex() ].nAperture;
         int nTried = 0;
         int nPassed = 0;
 
@@ -545,7 +765,7 @@ BOOL CLens::Prepare( FLT nDefaultFocus, std::string &strError )
                     continue;
 
                 FLT anOrigin[ 3 ] = { 0.0, 0.0, m_nSensorZ };
-                FLT anDirection[ 3 ] = { nX, nY, m_anVertexZ.back() - m_nSensorZ };
+                FLT anDirection[ 3 ] = { nX, nY, m_anVertexZ[ AimIndex() ] - m_nSensorZ };
 
                 Normalize( anDirection );
                 nTried++;
@@ -583,7 +803,7 @@ BOOL CLens::Prepare( FLT nDefaultFocus, std::string &strError )
 
 void CLens::FindPupil( int nRing, SPupil &oPupil ) const
 {
-    FLT                 nRear = m_aoSurfaces.back().nAperture;
+    FLT                 nRear = m_aoSurfaces[ AimIndex() ].nAperture;
     FLT                 nCell = ( 2.0 * nRear ) / PUPIL_GRID;
     int                 anChannels[ 3 ] = { CHANNEL_ALL, CHANNEL_ALL, CHANNEL_ALL };
     int                 nChannels = 1;
@@ -621,7 +841,7 @@ void CLens::FindPupil( int nRing, SPupil &oPupil ) const
                     for ( int nChannel = 0; ! bPassed && nChannel < nChannels; nChannel++ )
                     {
                         FLT anOrigin[ 3 ] = { nSensorX, 0.0, m_nSensorZ };
-                        FLT anDirection[ 3 ] = { nX - nSensorX, nY, m_anVertexZ.back() - m_nSensorZ };
+                        FLT anDirection[ 3 ] = { nX - nSensorX, nY, m_anVertexZ[ AimIndex() ] - m_nSensorZ };
 
                         Normalize( anDirection );
                         bPassed = Trace( anOrigin, anDirection, FALSE, m_nStopRadius, anChannels[ nChannel ] );
@@ -833,6 +1053,8 @@ std::string CLens::TablesKey( void ) const
         PutBigEndian( anBytes, (double)m_aoSurfaces[ nIndex ].nAperture );
         PutBigEndian( anBytes, m_aoSurfaces[ nIndex ].bStop ? 1.0 : 0.0 );
         PutBigEndian( anBytes, (double)m_aoSurfaces[ nIndex ].nAbbe );
+        if ( m_aoSurfaces[ nIndex ].nGlass != GLASS_NONE )
+            PutBigEndian( anBytes, 100.0 + (double)m_aoSurfaces[ nIndex ].nGlass );
     }
     PutBigEndian( anBytes, (double)m_nStopRadius );
     PutBigEndian( anBytes, (double)m_nSensorZ );
@@ -899,7 +1121,7 @@ void CLens::BuildTables( void )
 
 FLT CLens::FindPass( int nKnot, int nChannel ) const
 {
-    FLT nRear = m_aoSurfaces.back().nAperture;
+    FLT nRear = m_aoSurfaces[ AimIndex() ].nAperture;
     FLT nSensorX = ( (FLT)nKnot / PUPIL_RINGS ) * m_nPupilReach;
     int nTried = 0;
     int nPassed = 0;
@@ -917,7 +1139,7 @@ FLT CLens::FindPass( int nKnot, int nChannel ) const
                 continue;
 
             FLT anOrigin[ 3 ] = { nSensorX, 0.0, m_nSensorZ };
-            FLT anDirection[ 3 ] = { nX - nSensorX, nY, m_anVertexZ.back() - m_nSensorZ };
+            FLT anDirection[ 3 ] = { nX - nSensorX, nY, m_anVertexZ[ AimIndex() ] - m_nSensorZ };
 
             Normalize( anDirection );
             nTried++;
@@ -938,7 +1160,7 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
 
     FLT nHalfWidth = m_nSensorWidth / 2.0;
     FLT nHalfHeight = nHalfWidth / nAspect;
-    FLT nRear = m_aoSurfaces.back().nAperture;
+    FLT nRear = m_aoSurfaces[ AimIndex() ].nAperture;
     FLT nX = 0.0;
     FLT nY = 0.0;
 
@@ -999,7 +1221,7 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
             anOrigin[ 2 ] = anStart[ 2 ];
             anDirection[ 0 ] = nX - anOrigin[ 0 ];
             anDirection[ 1 ] = nY - anOrigin[ 1 ];
-            anDirection[ 2 ] = m_anVertexZ.back() - anOrigin[ 2 ];
+            anDirection[ 2 ] = m_anVertexZ[ AimIndex() ] - anOrigin[ 2 ];
             Normalize( anDirection );
             if ( Trace( anOrigin, anDirection, FALSE, m_nStopRadius, nChannel ) )
             {
@@ -1034,7 +1256,7 @@ BOOL CLens::RayFor( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nLensU, FLT nLe
 
     anDirection[ 0 ] = nX - anOrigin[ 0 ];
     anDirection[ 1 ] = nY - anOrigin[ 1 ];
-    anDirection[ 2 ] = m_anVertexZ.back() - anOrigin[ 2 ];
+    anDirection[ 2 ] = m_anVertexZ[ AimIndex() ] - anOrigin[ 2 ];
     Normalize( anDirection );
 
     return Trace( anOrigin, anDirection, FALSE, m_nStopRadius, nChannel );
@@ -1075,11 +1297,14 @@ void CLens::ToJson( IASLib::CObjectNode &oNode ) const
 
             RayJson::PutNumber( *pSurface, "radius", oSurface.nRadius );
             RayJson::PutNumber( *pSurface, "thickness", oSurface.nThickness );
-            RayJson::PutNumber( *pSurface, "ior", oSurface.nIor );
+            if ( oSurface.nGlass == GLASS_NONE )
+                RayJson::PutNumber( *pSurface, "ior", oSurface.nIor );
             RayJson::PutNumber( *pSurface, "aperture", oSurface.nAperture );
             if ( oSurface.bStop )
                 RayJson::PutBool( *pSurface, "stop", TRUE );
-            if ( oSurface.nAbbe > 0.0 )
+            if ( oSurface.nGlass != GLASS_NONE )
+                pSurface->put( "glass", GlassName( oSurface.nGlass ) );
+            else if ( oSurface.nAbbe > 0.0 )
                 RayJson::PutNumber( *pSurface, "abbe", oSurface.nAbbe );
         }
     }
@@ -1104,11 +1329,11 @@ void CLens::ToJson( IASLib::CObjectNode &oNode ) const
     }
 }
 
-BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
+BOOL CLens::FromJson( const IASLib::CJsonNode &oNode, BOOL bHasLens )
 {
     static const char *const astrFields[] = { "prescription", "surfaces", "fNumber", "focusDistance", "sensorWidth",
                                               "millimetersPerUnit", "seed", "chromatic", "exitPupil", NULL };
-    static const char *const astrSurface[] = { "radius", "thickness", "ior", "aperture", "stop", "abbe", NULL };
+    static const char *const astrSurface[] = { "radius", "thickness", "ior", "aperture", "stop", "abbe", "glass", NULL };
     std::string             strPrescription;
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
@@ -1153,6 +1378,8 @@ BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
 
     const IASLib::CJsonNode *pSurfaces = oNode.get( "surfaces" );
 
+    if ( bHasLens && pSurfaces == NULL && strPrescription.empty() && ! m_aoSurfaces.empty() )
+        return TRUE;
     if ( ( pSurfaces != NULL ) == ! strPrescription.empty() )
         return RayJson::Fail( "a lens needs a \"prescription\" (a built-in lens's name) or its \"surfaces\", but not both" );
 
@@ -1173,7 +1400,8 @@ BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
     {
         RayJson::CWhere             oElement( "", nIndex );
         const IASLib::CJsonNode    &oSurfaceNode = *pSurfaces->get( nIndex );
-        SSurface                    oSurface = { 0.0, 0.0, 1.0, 0.0, FALSE, 0.0 };
+        SSurface                    oSurface = { 0.0, 0.0, 1.0, 0.0, FALSE, 0.0, GLASS_NONE };
+        std::string                 strGlass;
 
         if ( ! RayJson::OnlyFields( oSurfaceNode, astrSurface ) ||
              ! RayJson::GetNumber( oSurfaceNode, "radius", oSurface.nRadius, TRUE ) ||
@@ -1181,8 +1409,20 @@ BOOL CLens::FromJson( const IASLib::CJsonNode &oNode )
              ! RayJson::GetNumber( oSurfaceNode, "ior", oSurface.nIor, FALSE ) ||
              ! RayJson::GetNumber( oSurfaceNode, "aperture", oSurface.nAperture, TRUE ) ||
              ! RayJson::GetBool( oSurfaceNode, "stop", oSurface.bStop, FALSE ) ||
-             ! RayJson::GetNumber( oSurfaceNode, "abbe", oSurface.nAbbe, FALSE ) )
+             ! RayJson::GetNumber( oSurfaceNode, "abbe", oSurface.nAbbe, FALSE ) ||
+             ! RayJson::GetString( oSurfaceNode, "glass", strGlass, FALSE ) )
             return FALSE;
+        if ( oSurfaceNode.get( "glass" ) != NULL )
+        {
+            RayJson::CWhere oGlass( "glass" );
+
+            if ( oSurfaceNode.get( "ior" ) != NULL || oSurfaceNode.get( "abbe" ) != NULL )
+                return RayJson::Fail( "a surface gives a glass by name or its ior and abbe, not both" );
+            oSurface.nGlass = GlassByName( strGlass );
+            if ( oSurface.nGlass == GLASS_NONE )
+                return RayJson::Fail( "unknown glass \"" + strGlass + "\" (fused-silica or calcium-fluoride)" );
+            oSurface.nIor = SellmeierIndex( oSurface.nGlass, WAVELENGTH_D );
+        }
         if ( oSurface.nAbbe < 0.0 )
             return RayJson::Fail( "abbe can't be negative" );
         if ( oSurface.nThickness < 0.0 )

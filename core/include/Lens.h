@@ -24,6 +24,9 @@
 *                   opening follows the f-number                         *
 *       abbe        the Abbe number of the glass that follows (0: no     *
 *                   dispersion)                                          *
+*       glass       or a crystal or glass by name, traced with its own   *
+*                   Sellmeier formula: fused silica or calcium fluoride  *
+*                   (they disperse too little for a Cauchy fit to hold)  *
 *                                                                        *
 *   Chromatic aberration: glass bends short wavelengths more than long   *
 *   ones. With Abbe numbers, each glass's index is fitted to a Cauchy    *
@@ -79,7 +82,18 @@ class CLens
             FLT                 nAperture;
             BOOL                bStop;
             FLT                 nAbbe;          // 0: the glass doesn't disperse
+            int                 nGlass;         // a Sellmeier glass (GLASS_*), or 0 for nIor and nAbbe
         };
+
+            // Glasses traced with their Sellmeier formulas.
+        enum EGlass { GLASS_NONE = 0, GLASS_FUSED_SILICA = 1, GLASS_CALCIUM_FLUORIDE = 2 };
+
+            /// A Sellmeier glass's index at a wavelength in micrometers.
+        static FLT              SellmeierIndex( int nGlass, FLT nMicrometers );
+            /// A glass's name in scene files ("fused-silica"), or NULL.
+        static const char      *GlassName( int nGlass );
+            /// The glass of that name, or GLASS_NONE.
+        static int              GlassByName( const std::string &strName );
 
             // An exit pupil: an ellipse on the rear element (in mm, for a
             // point of the sensor on the +x axis) around everywhere rays get
@@ -174,6 +188,19 @@ class CLens
             /// point nKnot rings out on the sensor that get through.
         FLT                     FindPass( int nKnot, int nChannel ) const;
 
+            // The surface rays from the sensor are aimed at: the last
+            // curved one or the stop, so a flat plate in front of the film
+            // (a Reseau plate) is traced through but not aimed at.
+        size_t                  AimIndex( void ) const
+        {
+            for ( size_t nIndex = m_aoSurfaces.size(); nIndex > 0; nIndex-- )
+            {
+                if ( m_aoSurfaces[ nIndex - 1 ].nRadius != 0.0 || m_aoSurfaces[ nIndex - 1 ].bStop )
+                    return nIndex - 1;
+            }
+            return m_aoSurfaces.empty() ? 0 : m_aoSurfaces.size() - 1;
+        }
+
             // Traces a ray through the surfaces, forward (toward the
             // sensor) or backward. The ray is changed in place; FALSE if it
             // is blocked or totally internally reflected.
@@ -196,6 +223,8 @@ class CLens
         void                    SetSurfaces( const std::vector<SSurface> &aoSurfaces );
         void                    SetFNumber( FLT nFNumber ) { m_nFNumber = nFNumber; m_bPrepared = FALSE; }
         void                    SetFocusDistance( FLT nDistance ) { m_nFocusDistance = nDistance; m_bPrepared = FALSE; }
+        void                    SetSensorWidth( FLT nMillimeters ) { m_nSensorWidth = nMillimeters; m_bPrepared = FALSE; }
+        FLT                     GetSensorWidth( void ) const { return m_nSensorWidth; }
 
             /// Works out the lens's focal length, widest f-number, where the
             /// sensor goes to focus at the focus distance (nDefaultFocus, in
@@ -245,7 +274,9 @@ class CLens
         std::string             Describe( void ) const;
 
         void                    ToJson( IASLib::CObjectNode &oNode ) const;
-        BOOL                    FromJson( const IASLib::CJsonNode &oNode );
+            /// Reads the lens. With bHasLens (a camera body gave one), the
+            /// prescription and surfaces may be left out to keep it.
+        BOOL                    FromJson( const IASLib::CJsonNode &oNode, BOOL bHasLens = FALSE );
 
             /// The built-in lenses.
         static const SPrescription *GetPrescriptions( int &nCount );

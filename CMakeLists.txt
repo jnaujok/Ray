@@ -86,6 +86,7 @@ set(RAY_CORE_SOURCES
     core/src/ImageFile.cpp
     core/src/ImageWriter.cpp
     core/src/ImageTexture.cpp
+    core/src/FilmColorModel.cpp
     core/src/LayersTexture.cpp
     core/src/Lens.cpp
     core/src/Light.cpp
@@ -111,6 +112,7 @@ set(RAY_CORE_SOURCES
     core/src/RaySettings.cpp
     core/src/RectangleLight.cpp
     core/src/ReflectiveMaterial.cpp
+    core/src/RegolithMaterial.cpp
     core/src/ReinhardColorModel.cpp
     core/src/Scene.cpp
     core/src/SceneJson.cpp
