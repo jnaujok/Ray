@@ -5,6 +5,9 @@
 //   format_test                   the wire and JSON checks
 //   format_test <scene.ray> <dir> load, save, load, save; the two saves must match
 #include "Globals.h"
+#include "Decompress.h"
+#include "DracoDecoder.h"
+#include "ModelFile.h"
 #include "WireProtocol.h"
 #include "Mesh.h"
 #include "Cone.h"
@@ -4532,6 +4535,226 @@ static void MapChecks( void )
                  BAD_FILE, "intensity: must be 0 or more" );
 }
 
+    // Draco-compressed glTF (KHR_draco_mesh_compression): NASA's Lunar
+    // Module, decoded in Ray, against what Google's decoder makes of it
+    // (counts, bounds and sums taken from a copy DracoPy decompressed), and
+    // the errors for data that isn't Draco or is cut short.
+static void DracoChecks( const char *strScenes )
+{
+    std::string strLm = ReadFile( std::string( strScenes ) + "/models/apollo/apollo_lunar_module.glb" );
+    ModelFile::SModel oModel;
+    std::string strError;
+
+    Check( ModelFile::ReadGltf( strLm, NULL, "", "", oModel, strError ) == TRUE, "NASA's Draco-compressed Lunar Module reads" );
+    Check( oModel.aoVertices.size() == 64787 && oModel.anFaces.size() == 97588 * 3,
+           "the Lunar Module decodes to Google's 64,787 vertices and 97,588 faces" );
+    Check( oModel.aoNormals.size() == oModel.aoVertices.size() && oModel.aoFaceColors.size() == 97588,
+           "the Lunar Module keeps its normals and every face's material color" );
+
+    double adMin[ 3 ] = { 1e300, 1e300, 1e300 }, adMax[ 3 ] = { -1e300, -1e300, -1e300 }, dSum = 0.0, dNormalSum = 0.0;
+
+    for ( size_t i = 0; i < oModel.aoVertices.size(); i++ )
+    {
+        CVector v = oModel.aoVertices[ i ];
+        double         ad[ 3 ] = { v.GetX(), v.GetY(), v.GetZ() };
+
+        for ( int k = 0; k < 3; k++ )
+        {
+            adMin[ k ] = (std::min)( adMin[ k ], ad[ k ] );
+            adMax[ k ] = (std::max)( adMax[ k ], ad[ k ] );
+        }
+        dSum += ad[ 0 ] + 2.0 * ad[ 1 ] + 3.0 * ad[ 2 ];
+        if ( i < oModel.aoNormals.size() )
+            dNormalSum += oModel.aoNormals[ i ].GetX() + 2.0 * oModel.aoNormals[ i ].GetY() + 3.0 * oModel.aoNormals[ i ].GetZ();
+    }
+
+    static const double s_adMin[ 3 ] = { -3.21450496, 0.102631003, -3.21093345 };
+    static const double s_adMax[ 3 ] = { 3.21288991, 5.1154232, 3.21567702 };
+    bool bBounds = true;
+
+    for ( int k = 0; k < 3; k++ )
+    {
+        if ( fabs( adMin[ k ] - s_adMin[ k ] ) > 1e-6 || fabs( adMax[ k ] - s_adMax[ k ] ) > 1e-6 )
+            bBounds = false;
+    }
+    Check( bBounds, "the decoded Lunar Module has Google's bounds" );
+    Check( fabs( dSum - 290219.958138 ) < 1e-3 && fabs( dNormalSum - 2165.48721766 ) < 1e-4,
+           "the decoded positions and normals add up to Google's, to the last digits" );
+
+        // Damaged and foreign data are refused, not crashed on.
+    Draco::SMesh oMesh;
+    std::string  strWhy;
+
+    Check( ! Draco::Decode( (const unsigned char *)"not draco data", 14, oMesh, strWhy ) && strWhy.find( "isn't Draco" ) != std::string::npos,
+           "data that isn't Draco is refused" );
+
+    unsigned char anOld[ 16 ] = { 'D', 'R', 'A', 'C', 'O', 1, 3, 1, 1, 0, 0, 0, 0, 0, 0, 0 };
+
+    Check( ! Draco::Decode( anOld, sizeof anOld, oMesh, strWhy ) && strWhy.find( "1.3" ) != std::string::npos,
+           "an older Draco bitstream is refused by its version" );
+
+    size_t nFirst = strLm.find( "DRACO" );
+    bool   bCutShort = nFirst != std::string::npos;
+
+    for ( size_t nLength = 11; bCutShort && nLength < 2000; nLength += 37 )
+    {
+        if ( Draco::Decode( (const unsigned char *)strLm.data() + nFirst, nLength, oMesh, strWhy ) )
+            bCutShort = false;
+    }
+    Check( bCutShort, "Draco data cut short anywhere is refused" );
+}
+
+    // Blender .blend files: the two fixtures tools/make_blend_fixtures.py
+    // writes, one in each of Blender's mesh layouts, plain and compressed.
+static void BlendChecks( const char *strScenes )
+{
+    std::string strModels = std::string( strScenes ) + "/models/";
+    std::string strLegacy = ReadFile( strModels + "blend_legacy.blend" );
+    std::string strModern = ReadFile( strModels + "blend_modern.blend" );
+    std::string strError;
+
+    auto Has = [ & ]( const ModelFile::SModel &oModel, double x, double y, double z ) -> bool
+    {
+        for ( CVector v : oModel.aoVertices )
+        {
+            if ( fabs( v.GetX() - x ) < 1e-5 && fabs( v.GetY() - y ) < 1e-5 && fabs( v.GetZ() - z ) < 1e-5 )
+                return true;
+        }
+        return false;
+    };
+    auto Colors = [ & ]( const ModelFile::SModel &oModel, double r, double g, double b ) -> int
+    {
+        int nCount = 0;
+
+        for ( size_t i = 0; i < oModel.aoFaceColors.size(); i++ )
+        {
+            CColor c = oModel.aoFaceColors[ i ];
+
+            if ( oModel.abHasColor[ i ] && fabs( c.GetR() - r ) < 1e-6 && fabs( c.GetG() - g ) < 1e-6 && fabs( c.GetB() - b ) < 1e-6 )
+                nCount++;
+        }
+        return nCount;
+    };
+
+        // Blender 2.93's layout, with stored world matrices.
+    ModelFile::SModel oLegacy;
+
+    Check( ModelFile::IsBlend( strLegacy, "x.bin" ) == TRUE && ModelFile::IsBlend( "", "Model.BLEND" ) == TRUE,
+           "a .blend file is told by its header, or by its name when compressed" );
+    Check( ModelFile::ReadBlend( strLegacy, "", oLegacy, strError ) == TRUE, ".blend in Blender 2.93's layout reads" );
+    Check( oLegacy.anFaces.size() == 13 * 3, "the cube's six quads and the triangle make 13 triangles" );
+        // Cube corner (1, 1, 1): scaled by 2, turned 90 degrees about z,
+        // moved to (1, 2, 3): (-1, 4, 5) in Blender, (-1, 5, 4) in Ray.
+    Check( Has( oLegacy, -1.0, 5.0, 4.0 ) && Has( oLegacy, 3.0, 1.0, 0.0 ), "the cube is moved, turned and scaled by its world matrix" );
+    Check( Has( oLegacy, 1.0, -5.0, 0.0 ) && Has( oLegacy, 0.0, -5.0, 1.0 ), "Blender's z up becomes Ray's y up" );
+    Check( Colors( oLegacy, 0.8, 0.1, 0.1 ) == 4 && Colors( oLegacy, 0.1, 0.2, 0.9 ) == 8,
+           "each face takes its material's color (two red faces, four blue)" );
+    Check( Colors( oLegacy, 0.1, 0.7, 0.2 ) == 1, "an object's own material overrides its mesh's" );
+    Check( oLegacy.anUVs.size() == oLegacy.aoVertices.size() * 2, "the MLoopUV layer gives surface coordinates" );
+
+        // Faces keep their outward side: the cube's top face (y = 5) faces
+        // up in a Ray mesh built from what was read.
+    {
+        CMesh oMesh;
+        bool  bUp = false, bAny = false;
+
+        oMesh.SetGeometry( oLegacy.aoVertices, oLegacy.anFaces, FALSE, FALSE );
+        for ( size_t f = 0; f + 2 < oLegacy.anFaces.size(); f += 3 )
+        {
+            CVector a = oLegacy.aoVertices[ (size_t)oLegacy.anFaces[ f ] ];
+            CVector b = oLegacy.aoVertices[ (size_t)oLegacy.anFaces[ f + 1 ] ];
+            CVector c = oLegacy.aoVertices[ (size_t)oLegacy.anFaces[ f + 2 ] ];
+
+            if ( fabs( a.GetY() - 5.0 ) < 1e-6 && fabs( b.GetY() - 5.0 ) < 1e-6 && fabs( c.GetY() - 5.0 ) < 1e-6 )
+            {
+                CVector oMiddle( ( a.GetX() + b.GetX() + c.GetX() ) / 3.0, 5.0, ( a.GetZ() + b.GetZ() + c.GetZ() ) / 3.0 );
+                CVector oNormal = oMesh.FaceNormalAt( (int)( f / 3 ), oMiddle );
+
+                bAny = true;
+                bUp = ( oNormal.GetY() > 0.5 );
+            }
+        }
+        Check( bAny && bUp, "faces keep their outward side through the change of handedness" );
+    }
+
+        // Blender 4.2's layout: attributes, face offsets, no world matrix.
+    ModelFile::SModel oModern;
+
+    Check( ModelFile::ReadBlend( strModern, "", oModern, strError ) == TRUE, ".blend in Blender 4.2's attribute layout reads" );
+    Check( oModern.anFaces.size() == 7 * 3, "the pentagon is cut into three triangles, beside the tetrahedron's four" );
+    Check( Has( oModern, 1.0, 1.0, 0.0 ), "the pentagon's object is moved up by its location" );
+        // Child: turned 90 degrees about x, moved to (0, 0, 2), parented to
+        // Base at (0, 0, 1): vertex (0, 0, 1) goes to (0, -1, 3) in
+        // Blender, (0, 3, -1) in Ray.
+    Check( Has( oModern, 0.0, 3.0, -1.0 ) && Has( oModern, 0.0, 4.0, 0.0 ) && Has( oModern, 1.0, 3.0, 0.0 ),
+           "a world matrix is built from location, rotation, scale and the parent" );
+    Check( Colors( oModern, 0.9, 0.7, 0.2 ) == 4 && Colors( oModern, 0.5, 0.5, 0.5 ) == 3,
+           "the material_index face attribute picks each face's material" );
+
+    bool bSecondMap = ! oModern.anUVs.empty();
+
+    for ( size_t i = 0; i < oModern.anUVs.size(); i += 2 )
+    {
+        if ( oModern.anUVs[ i + 1 ] != 0.5 && oModern.anUVs[ i + 1 ] != 0.75 )
+            bSecondMap = false;
+    }
+    Check( bSecondMap, "the active UV map is used, and Blender's hidden float2 layers aren't" );
+
+        // One object by name, and the errors.
+    ModelFile::SModel oOne;
+
+    Check( ModelFile::ReadBlend( strLegacy, "Tri", oOne, strError ) == TRUE && oOne.anFaces.size() == 3,
+           "\"node\" picks one object of a .blend file by name" );
+    Check( ! ModelFile::ReadBlend( strLegacy, "Nope", oOne, strError ) && strError.find( "Nope" ) != std::string::npos,
+           "a missing object is reported by name" );
+    Check( ! ModelFile::ReadBlend( "not a blend file at all", "", oOne, strError ) && strError.find( "isn't a Blender file" ) != std::string::npos,
+           "a file that isn't a .blend file is refused" );
+    Check( ! ModelFile::ReadBlend( "BLENDER17-01v0500" + std::string( 64, '\0' ), "", oOne, strError ) &&
+           strError.find( "Blender 5" ) != std::string::npos,
+           "a Blender 5 file is refused with a reason" );
+
+    bool bCut = true;
+
+    for ( size_t nLength = 12; nLength < strLegacy.size(); nLength += 97 )
+    {
+        if ( ModelFile::ReadBlend( strLegacy.substr( 0, nLength ), "", oOne, strError ) )
+            bCut = false;
+    }
+    Check( bCut, "a .blend file cut short anywhere is refused" );
+
+        // Compressed: gzip (Blender 2.x) and Zstandard frames (3.0 on).
+    for ( const char *strName : { "blend_legacy", "blend_modern" } )
+    {
+        std::string strRaw = ReadFile( strModels + strName + ".blend" );
+        std::string strGz = ReadFile( strModels + strName + "_gz.blend" );
+        std::string strZst = ReadFile( strModels + strName + "_zst.blend" );
+        std::string strOut, strWhy;
+        std::string strWhat = std::string( strName ) + ": ";
+
+        Check( Decompress::IsGzip( strGz ) && Decompress::Gunzip( strGz, strOut, strWhy, (size_t)1 << 30 ) && strOut == strRaw,
+               ( strWhat + "gzip unpacks to the file byte for byte" ).c_str() );
+        Check( Decompress::IsZstd( strZst ) && Decompress::Unzstd( strZst, strOut, strWhy, (size_t)1 << 30 ) && strOut == strRaw,
+               ( strWhat + "Zstandard frames and a skippable seek table unpack to the file byte for byte" ).c_str() );
+
+        ModelFile::SModel oPlain, oPacked;
+
+        Check( ModelFile::ReadBlend( strRaw, "", oPlain, strError ) && ModelFile::ReadBlend( strZst, "", oPacked, strError ) &&
+               oPlain.aoVertices.size() == oPacked.aoVertices.size() && oPlain.anFaces == oPacked.anFaces,
+               ( strWhat + "a compressed .blend file reads like the plain one" ).c_str() );
+
+        std::string strDamaged( strZst );
+
+        strDamaged.resize( strDamaged.size() / 2 );
+        Check( ! Decompress::Unzstd( strDamaged, strOut, strWhy, (size_t)1 << 30 ), ( strWhat + "Zstandard data cut short is refused" ).c_str() );
+        Check( ! Decompress::Unzstd( strZst, strOut, strWhy, 100 ), ( strWhat + "Zstandard data larger than the limit is refused" ).c_str() );
+        strDamaged = strGz;
+        strDamaged[ strDamaged.size() / 2 ] ^= 0x55;
+        Check( ! Decompress::Gunzip( strDamaged.substr( 0, strDamaged.size() / 2 ), strOut, strWhy, (size_t)1 << 30 ),
+               ( strWhat + "gzip data cut short is refused" ).c_str() );
+    }
+}
+
+
 static void ModelFileChecks( const char *strScenes, const char *strDir )
 {
     CScene oBenchy;
@@ -5472,12 +5695,20 @@ static void ShowcaseChecks( void )
                "a glTF sparse accessor replaces the elements it lists" );
 
             // Refusals.
+        std::string strMeshopt = strText;
+
+        strMeshopt.replace( strMeshopt.find( "\"scene\":0" ), 9, "\"extensionsRequired\":[\"EXT_meshopt_compression\"],\"scene\":0" );
+        Check( ModelFile::Read( MakeGlb( strMeshopt, strBinary ), "m.glb", oModel, strError ) == FALSE &&
+               strError.find( "EXT_meshopt_compression" ) != std::string::npos,
+               "a meshopt-compressed glTF is refused, naming the extension" );
+
+            // Draco is decoded now: requiring it is no reason to refuse a
+            // file whose primitives don't use it.
         std::string strDraco = strText;
 
         strDraco.replace( strDraco.find( "\"scene\":0" ), 9, "\"extensionsRequired\":[\"KHR_draco_mesh_compression\"],\"scene\":0" );
-        Check( ModelFile::Read( MakeGlb( strDraco, strBinary ), "d.glb", oModel, strError ) == FALSE &&
-               strError.find( "Draco" ) == std::string::npos && strError.find( "KHR_draco_mesh_compression" ) != std::string::npos,
-               "a Draco-compressed glTF is refused, naming the extension" );
+        Check( ModelFile::Read( MakeGlb( strDraco, strBinary ), "d.glb", oModel, strError ) == TRUE,
+               "a glTF that requires KHR_draco_mesh_compression is read" );
 
         std::string strVersion1 = strGlb;
 
@@ -6317,6 +6548,8 @@ int main( int argc, char **argv )
         SceneTreeChecks( argv[ 2 ] );
         LensTableChecks( argv[ 2 ] );
         ModelFileChecks( argv[ 2 ], argv[ 3 ] );
+        DracoChecks( argv[ 2 ] );
+        BlendChecks( argv[ 2 ] );
         TextChecks( argv[ 2 ] );
         PatchFileChecks( argv[ 2 ] );
     }

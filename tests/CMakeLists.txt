@@ -561,13 +561,28 @@ endforeach()
 ray_network_test(sampler_random4 ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray AA random:samples=4)
 ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray AA adaptive)
 
+# Models read straight from Blender .blend files, in both of Blender's mesh
+# layouts, Zstandard- and gzip-compressed.
+foreach(scene IN ITEMS blend)
+    add_test(NAME render_${scene}
+             COMMAND ${CMAKE_COMMAND}
+                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                     -DCOMPARE=$<TARGET_FILE:compare_images>
+                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray
+                     -DOUTPUT=${RENDER_DIR}/${scene}_test.raw
+                     -DREFERENCE=${REFERENCE_DIR}/${scene}_test.raw
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+    set_tests_properties(render_${scene} PROPERTIES FIXTURES_SETUP render_${scene} TIMEOUT 300)
+    add_test(NAME roundtrip_${scene}_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray ${RENDER_DIR})
+endforeach()
+
 # The channel a ray is traced in travels in its tag; it must come back from
 # networked engines intact. Engines get texture images, PNGs, the sky and
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
                        patches nurbs lathe extrusion implicit blob fractal apollo_lenses film reseau tranquility
-                       chess_dof as11_40_5903)
+                       chess_dof as11_40_5903 blend)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

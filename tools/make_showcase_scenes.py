@@ -194,7 +194,11 @@ def as11_scene():
     extra = {"indirect": None}
     s = scene(128, 128, camera, objects, lights, background=(0.0, 0.0, 0.0), name="as11_40_5903_test")
     s["settings"]["maximumDepth"] = 6
-    s["settings"]["indirect"] = {"method": "objects", "bounces": 1, "samples": 1, "objects": 2, "distance": 6.0, "strength": 1.0}
+    # The hemisphere method: with "objects", the suit's own mesh holds every
+    # point on it, so it was gathered over the whole half-sphere by one ray,
+    # and a leg in shadow found the other, sunlit leg in a few rays only,
+    # each counting heavily: bright specks all over the shadows.
+    s["settings"]["indirect"] = {"method": "hemisphere", "bounces": 1, "samples": 4, "distance": 6.0, "strength": 1.0}
     del extra
     return s
 
