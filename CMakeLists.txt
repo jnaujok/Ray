@@ -138,6 +138,11 @@ set(RAY_CORE_SOURCES
     core/src/FontFile.cpp
     core/src/Outline.cpp
     core/src/Text.cpp
+    core/src/Extruder.cpp
+    core/src/Profile.cpp
+    core/src/Lathe.cpp
+    core/src/Extrusion.cpp
+    core/src/Sweep.cpp
     core/src/SrgbColorModel.cpp
     core/src/StratifiedSampler.cpp
     core/src/Texture.cpp

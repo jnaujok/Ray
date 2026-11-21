@@ -349,8 +349,11 @@ add_test(NAME roundtrip_text_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scen
 
 # Bezier patches: the Utah teapot as its 32 patches beside the mesh teapot.
 # NURBS: a rational torus beside the analytic one, and a B-spline sheet with
-# a texture and a bump map across it.
-foreach(scene IN ITEMS patches nurbs)
+# a texture and a bump map across it. Lathes: chess pieces, a glass goblet, an
+# open vase and a cut-away orange. Extrusions: a tapered star, a twisted
+# column, a beveled frame with a hole, and sweeps (a spring, a closed loop and
+# a square rail).
+foreach(scene IN ITEMS patches nurbs lathe extrusion)
     add_test(NAME render_${scene}
              COMMAND ${CMAKE_COMMAND}
                      -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -543,7 +546,7 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
-                       patches nurbs)
+                       patches nurbs lathe extrusion)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

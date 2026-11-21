@@ -81,6 +81,20 @@ It needs only Python 3, and writes the same files every time:
 tools/make_models.py
 ```
 
+## `make_shape_scenes.py`
+
+Writes `scenes/lathe_test.ray` and `scenes/extrusion_test.ray` from `shapes_test.ray`'s settings
+(camera, lights, floor): chess pieces, a goblet, a vase and a cut orange turned on a lathe, and a
+tapered star, a twisted column, a beveled frame, a spring, a closed loop and a rail. The star's
+points, the spring's helix and the loop are worked out here. It needs only Python 3; re-save each
+scene with `raythrower` afterwards so it is written the way Ray writes scenes:
+
+```sh
+tools/make_shape_scenes.py
+build/raythrower scenes/lathe_test.ray --save-json scenes/lathe_test.ray
+build/raythrower scenes/extrusion_test.ray --save-json scenes/extrusion_test.ray
+```
+
 ## `obj_to_ray.py`
 
 Turns a Wavefront OBJ model into a Ray mesh object (JSON), ready to put in a scene's `objects`
