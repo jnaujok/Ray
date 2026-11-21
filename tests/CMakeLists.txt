@@ -368,8 +368,10 @@ endforeach()
 
 # The Apollo cameras: the Hasselblad Electric Camera with its 80 mm Planar,
 # Kodak film (its curve, grain and halation), the Data Camera's Reseau
-# crosses blooming over by a bright sphere, and Tranquility Base on regolith.
-foreach(scene IN ITEMS apollo_lenses film reseau tranquility)
+# crosses blooming over by a bright sphere, and Tranquility Base on regolith;
+# the Najdorf chessboard through the double Gauss wide open (glTF pieces), and
+# NASA frame AS11-40-5903 recreated (glTF astronaut and lunar module, a gold visor).
+foreach(scene IN ITEMS apollo_lenses film reseau tranquility chess_dof as11_40_5903)
     add_test(NAME render_${scene}
              COMMAND ${CMAKE_COMMAND}
                      -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -564,7 +566,8 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
-                       patches nurbs lathe extrusion implicit blob fractal apollo_lenses film reseau tranquility)
+                       patches nurbs lathe extrusion implicit blob fractal apollo_lenses film reseau tranquility
+                       chess_dof as11_40_5903)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 
