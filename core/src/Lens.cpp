@@ -125,9 +125,9 @@ namespace
         {   -15.5779,  11.1140, 1.71966,   8.791, FALSE, 29.30, CLens::GLASS_NONE },
         {   -35.0395,  23.8156, 1.00000,  12.185, FALSE,  0.00, CLens::GLASS_NONE },
         {   -24.5179,   5.9844, 1.64200,  16.936, FALSE, 58.10, CLens::GLASS_NONE },
-        {   -62.6779,  28.1642, 1.00000,  21.142, FALSE,  0.00, CLens::GLASS_NONE },
-        {     0.0000,   3.0000, 1.51680,  38.932, FALSE, 64.17, CLens::GLASS_NONE },
-        {     0.0000,   0.0000, 1.00000,  39.963, FALSE,  0.00, CLens::GLASS_NONE },
+        {   -62.6779,  28.1442, 1.00000,  21.142, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,   3.0000, 1.51680,  38.921, FALSE, 64.17, CLens::GLASS_NONE },
+        {     0.0000,   0.0000, 1.00000,  39.951, FALSE,  0.00, CLens::GLASS_NONE },
     };
 
         // Zeiss Planar 80 mm f/2.8 (US 2,724,994 Ex. I, Lange): 5 elements, 4 groups (patent example).
@@ -163,48 +163,48 @@ namespace
         // Zeiss UV-Sonnar 105 mm f/4.3: a reconstruction, 7 air-spaced silica and CaF2 singlets (reconstruction).
     const CLens::SSurface s_aoUvSonnar105mm[] =
     {
-        {    56.4181,   5.5762, 1.43385,  20.569, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
-        { -13971.7251,   0.4182, 1.00000,  19.823, FALSE,  0.00, CLens::GLASS_NONE },
-        {    35.3194,   5.5762, 1.43385,  17.120, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
-        {   148.0516,   0.8364, 1.00000,  15.809, FALSE,  0.00, CLens::GLASS_NONE },
-        {   351.9545,   2.2305, 1.45846,  15.484, FALSE,  0.00, CLens::GLASS_FUSED_SILICA },
-        {    25.8695,   2.7882, 1.00000,  12.776, FALSE,  0.00, CLens::GLASS_NONE },
-        {    43.2072,   4.1823, 1.43385,  12.101, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
-        {    98.9418,   8.3644, 1.00000,  10.692, FALSE,  0.00, CLens::GLASS_NONE },
-        {     0.0000,   8.3644, 1.00000,   9.031, TRUE ,  0.00, CLens::GLASS_NONE },
-        {   -33.2809,   1.9517, 1.45846,   9.125, FALSE,  0.00, CLens::GLASS_FUSED_SILICA },
-        {    72.3483,   1.1152, 1.00000,  10.723, FALSE,  0.00, CLens::GLASS_NONE },
-        {   141.4637,   4.4610, 1.43385,  11.386, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
-        {   -35.0826,   0.4182, 1.00000,  12.296, FALSE,  0.00, CLens::GLASS_NONE },
-        {  -314.4022,   3.3457, 1.43385,  13.406, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
-        {   -54.6954,   0.0000, 1.00000,  14.065, FALSE,  0.00, CLens::GLASS_NONE },
+        {    54.5009,   5.4284, 1.43385,  19.813, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        { -1717.0898,   0.0511, 1.00000,  19.101, FALSE,  0.00, CLens::GLASS_NONE },
+        {    35.5205,   5.4284, 1.43385,  16.686, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {   150.0824,   4.3967, 1.00000,  15.356, FALSE,  0.00, CLens::GLASS_NONE },
+        {   305.5709,   2.1714, 1.45846,  11.912, FALSE,  0.00, CLens::GLASS_FUSED_SILICA },
+        {    24.7485,   2.5099, 1.00000,   9.865, FALSE,  0.00, CLens::GLASS_NONE },
+        {    45.1191,   4.0714, 1.43385,   9.786, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {    84.2113,   3.0320, 1.00000,   9.428, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,   6.7024, 1.00000,   8.821, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -31.5643,   1.9000, 1.45846,   8.653, FALSE,  0.00, CLens::GLASS_FUSED_SILICA },
+        {    70.7389,   4.7040, 1.00000,   9.925, FALSE,  0.00, CLens::GLASS_NONE },
+        {   129.9417,   4.3427, 1.43385,  13.958, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {   -34.5025,   0.0511, 1.00000,  14.307, FALSE,  0.00, CLens::GLASS_NONE },
+        {  -307.3190,   3.2570, 1.43385,  15.481, FALSE,  0.00, CLens::GLASS_CALCIUM_FLUORIDE },
+        {   -54.9856,   0.0000, 1.00000,  15.940, FALSE,  0.00, CLens::GLASS_NONE },
     };
 
         // Zeiss Sonnar 250 mm f/5.6: a reconstruction, 4 elements in 3 groups (reconstruction).
     const CLens::SSurface s_aoSonnar250mm[] =
     {
-        {   137.8564,   8.7060, 1.51680,  24.783, FALSE, 64.17, CLens::GLASS_NONE },
-        {   340.6072,   1.0882, 1.00000,  23.548, FALSE,  0.00, CLens::GLASS_NONE },
-        {    74.6359,  10.8822, 1.61272,  22.748, FALSE, 58.63, CLens::GLASS_NONE },
-        {  -258.1013,   4.3530, 1.62004,  21.189, FALSE, 36.37, CLens::GLASS_NONE },
-        {   109.1308,  32.6469, 1.00000,  20.169, FALSE,  0.00, CLens::GLASS_NONE },
-        {     0.0000,  38.0881, 1.00000,  15.793, TRUE ,  0.00, CLens::GLASS_NONE },
-        {   -46.6768,   3.8087, 1.67270,  15.326, FALSE, 32.21, CLens::GLASS_NONE },
-        {   -56.8795,   0.0000, 1.00000,  16.241, FALSE,  0.00, CLens::GLASS_NONE },
+        {    69.3792,   4.1771, 1.51680,  22.924, FALSE, 64.17, CLens::GLASS_NONE },
+        {   106.4639,   0.0600, 1.00000,  22.596, FALSE,  0.00, CLens::GLASS_NONE },
+        {    49.1698,   5.2212, 1.61272,  22.409, FALSE, 58.63, CLens::GLASS_NONE },
+        {   252.7009,   2.0886, 1.62004,  22.159, FALSE, 36.37, CLens::GLASS_NONE },
+        {    55.5050,  35.9424, 1.00000,  21.020, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,  24.7546, 1.00000,  16.552, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -21.4267,   1.8273, 1.67270,  14.822, FALSE, 32.21, CLens::GLASS_NONE },
+        {   -22.8450,   0.0000, 1.00000,  15.341, FALSE,  0.00, CLens::GLASS_NONE },
     };
 
         // Zeiss Tele-Tessar 500 mm f/8: a reconstruction, 5 elements in 3 groups (reconstruction).
     const CLens::SSurface s_aoTeleTessar500mm[] =
     {
-        {   180.8716,   8.8270, 1.62041,  32.759, FALSE, 60.32, CLens::GLASS_NONE },
-        {  -235.3161,   3.5305, 1.62004,  32.288, FALSE, 36.37, CLens::GLASS_NONE },
-        {   493.9751,   1.3240, 1.00000,  31.504, FALSE,  0.00, CLens::GLASS_NONE },
-        {   106.0275,   7.0615, 1.51680,  30.970, FALSE, 64.17, CLens::GLASS_NONE },
-        {   158.2060,  88.2680, 1.00000,  30.156, FALSE,  0.00, CLens::GLASS_NONE },
-        {     0.0000,  61.7880, 1.00000,  18.640, TRUE ,  0.00, CLens::GLASS_NONE },
-        {   -76.8825,   3.5305, 1.67270,  15.179, FALSE, 32.21, CLens::GLASS_NONE },
-        {   140.0795,   6.1790, 1.61272,  15.844, FALSE, 58.63, CLens::GLASS_NONE },
-        {  -154.5125,   0.0000, 1.00000,  16.405, FALSE,  0.00, CLens::GLASS_NONE },
+        {   169.5291,   7.7600, 1.62041,  33.579, FALSE, 60.32, CLens::GLASS_NONE },
+        {  -205.7221,   3.1035, 1.62004,  33.318, FALSE, 36.37, CLens::GLASS_NONE },
+        {   344.2272,   0.2200, 1.00000,  32.424, FALSE,  0.00, CLens::GLASS_NONE },
+        {    96.4665,   6.2075, 1.51680,  31.862, FALSE, 64.17, CLens::GLASS_NONE },
+        {   132.5401,  98.6090, 1.00000,  30.889, FALSE,  0.00, CLens::GLASS_NONE },
+        {     0.0000,  41.7590, 1.00000,  18.959, TRUE ,  0.00, CLens::GLASS_NONE },
+        {   -67.2490,   3.1035, 1.67270,  15.039, FALSE, 32.21, CLens::GLASS_NONE },
+        {   -56.7160,   5.4320, 1.61272,  15.107, FALSE, 58.63, CLens::GLASS_NONE },
+        {  -106.1150,   0.0000, 1.00000,  15.540, FALSE,  0.00, CLens::GLASS_NONE },
     };
 
     // END APOLLO LENSES

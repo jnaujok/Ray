@@ -1,0 +1,181 @@
+{
+  "format": "Ray scene",
+  "version": 3,
+  "settings": {
+    "imageWidth": 320,
+    "imageHeight": 320,
+    "imageFile": "reseau_test.out",
+    "colorDepth": 8,
+    "maximumDepth": 8,
+    "depthThreshold": 0.01
+  },
+  "background": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "camera": {
+    "position": [
+      0.0,
+      1.0,
+      -7.0
+    ],
+    "lookAt": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "body": "hasselblad-hdc",
+    "sampler": {
+      "type": "stratified",
+      "grid": 3,
+      "seed": 0
+    },
+    "lens": {
+      "focusDistance": 7.0,
+      "millimetersPerUnit": 1000.0
+    },
+    "reseau": {
+      "count": 5,
+      "spacing": 10.0,
+      "size": 2.0,
+      "lineWidth": 0.12
+    },
+    "colorModel": {
+      "type": "film",
+      "stock": "ektachrome-ms",
+      "shutter": 0.004,
+      "fStop": 11.0,
+      "width": 53.0,
+      "spread": 2.5
+    }
+  },
+  "objects": [
+    {
+      "type": "plane",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "regolith",
+          "influence": 1.0,
+          "color": [
+            0.12,
+            0.11639999999999999,
+            0.1116
+          ],
+          "surge": 1.0,
+          "width": 0.06
+        }
+      ],
+      "bump": {
+        "mode": "height",
+        "texture": {
+          "type": "noise",
+          "scale": 0.35,
+          "octaves": 5,
+          "turbulence": 0.0,
+          "seed": 11
+        },
+        "depth": 0.015,
+        "step": 0.002
+      }
+    },
+    {
+      "type": "sphere",
+      "center": [
+        1.15,
+        1.6,
+        0.0
+      ],
+      "radius": 0.75,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            8.0,
+            8.0,
+            8.0
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.95,
+            0.95,
+            0.95
+          ],
+          "diffuseCast": false
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -1.15,
+        1.15,
+        0.0
+      ],
+      "radius": 0.55,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "diffuse",
+          "influence": 1.0,
+          "color": [
+            0.12,
+            0.12,
+            0.12
+          ],
+          "diffuseCast": false
+        }
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [
+        -0.496292,
+        -0.446663,
+        0.744438
+      ],
+      "color": [
+        5.0,
+        5.0,
+        4.9
+      ],
+      "angle": 0.53,
+      "samples": 4
+    }
+  ]
+}

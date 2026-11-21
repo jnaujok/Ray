@@ -366,6 +366,22 @@ foreach(scene IN ITEMS patches nurbs lathe extrusion implicit blob fractal)
     add_test(NAME roundtrip_${scene}_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray ${RENDER_DIR})
 endforeach()
 
+# The Apollo cameras: the Hasselblad Electric Camera with its 80 mm Planar,
+# Kodak film (its curve, grain and halation), the Data Camera's Reseau
+# crosses blooming over by a bright sphere, and Tranquility Base on regolith.
+foreach(scene IN ITEMS apollo_lenses film reseau tranquility)
+    add_test(NAME render_${scene}
+             COMMAND ${CMAKE_COMMAND}
+                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                     -DCOMPARE=$<TARGET_FILE:compare_images>
+                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray
+                     -DOUTPUT=${RENDER_DIR}/${scene}_test.raw
+                     -DREFERENCE=${REFERENCE_DIR}/${scene}_test.raw
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+    set_tests_properties(render_${scene} PROPERTIES FIXTURES_SETUP render_${scene} TIMEOUT 300)
+    add_test(NAME roundtrip_${scene}_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray ${RENDER_DIR})
+endforeach()
+
 # An environment map: an HDR sky behind the scene, in a mirror ball and
 # through a glass one, lighting the diffuse surfaces (image-based lighting).
 add_test(NAME render_environment
@@ -546,7 +562,7 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
-                       patches nurbs lathe extrusion implicit blob fractal)
+                       patches nurbs lathe extrusion implicit blob fractal apollo_lenses film reseau tranquility)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

@@ -140,46 +140,45 @@ UVSONNAR_START = [
     S(-150.0, 2.4, "caf2"), S(-45.0, 0.0),
 ]
 
-# The results of --optimize (f = 100), written back here.
+# The results of --optimize and then --lm (f = 100), written back here.
 SONNAR = [
-    S(55.1428, 3.4824, (1.5168, 64.17), False),
-    S(136.2435, 0.4353, None, False),
-    S(29.8545, 4.3529, (1.61272, 58.63), False),
-    S(-103.2410, 1.7412, (1.62004, 36.37), False),
-    S(43.6525, 13.0588, None, False),
-    S(0.0000, 15.2353, None, True),
-    S(-18.6708, 1.5235, (1.6727, 32.21), False),
-    S(-22.7519, 0.0000, None, False),
+    S(27.7508, 1.6708, (1.5168, 64.17), False),
+    S(42.5842, 0.0240, None, False),
+    S(19.6673, 2.0884, (1.61272, 58.63), False),
+    S(101.0771, 0.8354, (1.62004, 36.37), False),
+    S(22.2013, 14.3765, None, False),
+    S(0.0000, 9.9015, None, True),
+    S(-8.5704, 0.7309, (1.6727, 32.21), False),
+    S(-9.1377, 0.0000, None, False),
 ]
 TELETESSAR = [
-    S(36.1743, 1.7654, (1.62041, 60.32), False),
-    S(-47.0632, 0.7061, (1.62004, 36.37), False),
-    S(98.7950, 0.2648, None, False),
-    S(21.2055, 1.4123, (1.5168, 64.17), False),
-    S(31.6412, 17.6536, None, False),
-    S(0.0000, 12.3576, None, True),
-    S(-15.3765, 0.7061, (1.6727, 32.21), False),
-    S(28.0159, 1.2358, (1.61272, 58.63), False),
-    S(-30.9025, 0.0000, None, False),
+    S(33.9058, 1.5520, (1.62041, 60.32), False),
+    S(-41.1444, 0.6207, (1.62004, 36.37), False),
+    S(68.8454, 0.0440, None, False),
+    S(19.2933, 1.2415, (1.5168, 64.17), False),
+    S(26.5080, 19.7218, None, False),
+    S(0.0000, 8.3518, None, True),
+    S(-13.4498, 0.6207, (1.6727, 32.21), False),
+    S(-11.3432, 1.0864, (1.61272, 58.63), False),
+    S(-21.2230, 0.0000, None, False),
 ]
 UVSONNAR = [
-    S(53.7315, 5.3107, 'caf2', False),
-    S(-13306.4019, 0.3983, None, False),
-    S(33.6375, 5.3107, 'caf2', False),
-    S(141.0015, 0.7966, None, False),
-    S(335.1947, 2.1243, 'silica', False),
-    S(24.6376, 2.6554, None, False),
-    S(41.1497, 3.9831, 'caf2', False),
-    S(94.2303, 7.9661, None, False),
-    S(0.0000, 7.9661, None, True),
-    S(-31.6961, 1.8588, 'silica', False),
-    S(68.9031, 1.0621, None, False),
-    S(134.7273, 4.2486, 'caf2', False),
-    S(-33.4120, 0.3983, None, False),
-    S(-299.4306, 3.1864, 'caf2', False),
-    S(-52.0908, 0.0000, None, False),
+    S(51.9056, 5.1699, 'caf2', False),
+    S(-1635.3231, 0.0487, None, False),
+    S(33.8290, 5.1699, 'caf2', False),
+    S(142.9356, 4.1873, None, False),
+    S(291.0198, 2.0680, 'silica', False),
+    S(23.5700, 2.3904, None, False),
+    S(42.9706, 3.8775, 'caf2', False),
+    S(80.2012, 2.8876, None, False),
+    S(0.0000, 6.3832, None, True),
+    S(-30.0612, 1.8095, 'silica', False),
+    S(67.3704, 4.4800, None, False),
+    S(123.7540, 4.1359, 'caf2', False),
+    S(-32.8595, 0.0487, None, False),
+    S(-292.6847, 3.1019, 'caf2', False),
+    S(-52.3672, 0.0000, None, False),
 ]
-
 
 # --- Ray tracing -----------------------------------------------------------
 
@@ -628,7 +627,7 @@ def with_plate(surfs, thickness, glass):
     plane (a Reseau plate pressed against the film)."""
     _, bfd = paraxial(surfs)
     n = glass[0]
-    gap = bfd - thickness / n
+    gap = bfd - thickness / n - 0.02     # the film lies 0.02 mm behind the plate at infinity
     out = [list(s) for s in surfs]
     out[-1][1] = gap
     out.append(S(0.0, thickness, glass))
