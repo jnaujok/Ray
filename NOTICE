@@ -20,3 +20,8 @@ Lukasz Dziedzic, with Reserved Font Name "Lato", from the Google Fonts
 repository (https://github.com/google/fonts, ofl/lato), included unmodified.
 It is licensed under the SIL Open Font License, Version 1.1 (its full text is
 in scenes/fonts/OFL.txt) and is not covered by the Apache License.
+
+scenes/models/teapot.bpt is the Utah teapot, Martin Newell's 1975 Bezier patch
+data, which is in the public domain. It was transcribed from the copy in
+three.js (https://github.com/mrdoob/three.js, release r160,
+examples/jsm/geometries/TeapotGeometry.js) by tools/make_teapot_bpt.py.

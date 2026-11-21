@@ -22,7 +22,7 @@ v3.0. It is made of four programs and a shared core:
 
 | Part | Location | Platform |
 |------|----------|----------|
-| Ray tracing core: scene, objects (including meshes), materials, samplers, color models, JSON scene files, wire protocol, task masters | `core/` | all |
+| Ray tracing core: scene, objects (including meshes, Bezier patches and B-spline surfaces), materials, samplers, color models, JSON scene files, wire protocol, task masters | `core/` | all |
 | `raythrower`: command-line master (threads, or engines over TCP) | `raythrower/` | Windows, Linux, macOS |
 | `rayengine`: networked tracing task | `rayengine/` | Windows, Linux, macOS |
 | `ray-editor`: cross-platform scene editor (wxWidgets) | `editor/` (`logic/` toolkit-free, `gui/` wxWidgets) | Windows, Linux, macOS |

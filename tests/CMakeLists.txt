@@ -347,6 +347,22 @@ add_test(NAME render_text
 set_tests_properties(render_text PROPERTIES FIXTURES_SETUP render_text TIMEOUT 300)
 add_test(NAME roundtrip_text_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/text_test.ray ${RENDER_DIR})
 
+# Bezier patches: the Utah teapot as its 32 patches beside the mesh teapot.
+# NURBS: a rational torus beside the analytic one, and a B-spline sheet with
+# a texture and a bump map across it.
+foreach(scene IN ITEMS patches nurbs)
+    add_test(NAME render_${scene}
+             COMMAND ${CMAKE_COMMAND}
+                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                     -DCOMPARE=$<TARGET_FILE:compare_images>
+                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray
+                     -DOUTPUT=${RENDER_DIR}/${scene}_test.raw
+                     -DREFERENCE=${REFERENCE_DIR}/${scene}_test.raw
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+    set_tests_properties(render_${scene} PROPERTIES FIXTURES_SETUP render_${scene} TIMEOUT 300)
+    add_test(NAME roundtrip_${scene}_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray ${RENDER_DIR})
+endforeach()
+
 # An environment map: an HDR sky behind the scene, in a mirror ball and
 # through a glass one, lighting the diffuse surfaces (image-based lighting).
 add_test(NAME render_environment
@@ -526,7 +542,8 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 # networked engines intact. Engines get texture images, PNGs, the sky and
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
-                       materials projector underwater environment csg prism models benchy maps volume shapes text)
+                       materials projector underwater environment csg prism models benchy maps volume shapes text
+                       patches nurbs)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

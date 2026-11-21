@@ -127,6 +127,8 @@ set(RAY_CORE_SOURCES
     core/src/Haze.cpp
     core/src/LocalShape.cpp
     core/src/Torus.cpp
+    core/src/Bezier.cpp
+    core/src/BSpline.cpp
     core/src/Disc.cpp
     core/src/Annulus.cpp
     core/src/Paraboloid.cpp

@@ -54,6 +54,8 @@
 #include "FontFile.h"
 #include "Outline.h"
 #include "Text.h"
+#include "Bezier.h"
+#include "BSpline.h"
 #include <map>
 
 
@@ -4604,6 +4606,527 @@ static void ModelFileChecks( const char *strScenes, const char *strDir )
     remove( strArchive.c_str() );
 }
 
+    // A small deterministic generator for the patch checks.
+static double PatchRandom( unsigned int &nState )
+{
+    nState = ( nState * 1664525u ) + 1013904223u;
+    return ( nState >> 8 ) / 16777216.0;
+}
+
+    // A cube of six flat patches (degree 1), [-1, 1] on each axis, every
+    // patch's normal (the u slope crossed with the v slope) outward.
+static std::string PatchCube( void )
+{
+    std::string strPatches;
+
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+    {
+        for ( int nSign = -1; nSign <= 1; nSign += 2 )
+        {
+            int nU = ( nSign > 0 ) ? ( nAxis + 1 ) % 3 : ( nAxis + 2 ) % 3;
+            int nV = ( nSign > 0 ) ? ( nAxis + 2 ) % 3 : ( nAxis + 1 ) % 3;
+
+            strPatches += strPatches.empty() ? "" : ", ";
+            strPatches += "{ \"points\": [";
+            for ( int t = 0; t <= 1; t++ )
+            {
+                for ( int u = 0; u <= 1; u++ )
+                {
+                    int an[ 3 ] = { 0, 0, 0 };
+
+                    an[ nAxis ] = nSign;
+                    an[ nU ] = ( 2 * u ) - 1;
+                    an[ nV ] = ( 2 * t ) - 1;
+                    strPatches += ( u + t > 0 ) ? ", " : "";
+                    strPatches += "[" + std::to_string( an[ 0 ] ) + ", " + std::to_string( an[ 1 ] ) + ", " + std::to_string( an[ 2 ] ) + "]";
+                }
+            }
+            strPatches += "] }";
+        }
+    }
+    return "{ \"type\": \"bezier\", \"closed\": true, \"patches\": [ " + strPatches + " ] }";
+}
+
+    // A point of a patch turned and moved as the hump below is.
+static void HumpToScene( const double anLocal[ 3 ], FLT anScene[ 3 ], bool bDirection )
+{
+    FLT nToRadians = PI / 180.0;
+
+    anScene[ 0 ] = anLocal[ 0 ];
+    anScene[ 1 ] = anLocal[ 1 ];
+    anScene[ 2 ] = anLocal[ 2 ];
+    CLocalShape::RotateXYZ( anScene, 10 * nToRadians, 25 * nToRadians, -5 * nToRadians );
+    if ( ! bDirection )
+    {
+        anScene[ 0 ] += 0.3;
+        anScene[ 1 ] += -0.2;
+        anScene[ 2 ] += 0.1;
+    }
+}
+
+static void PatchChecks( void )
+{
+    CScene      oScene;
+    CObjects   *pObject;
+
+        // Two flat bicubic patches side by side on y = 0, x from 0 to 2: a
+        // ray straight down the seam between them must not slip through.
+    std::string strFlat = "{ \"type\": \"bezier\", \"patches\": [ { \"points\": [";
+
+    for ( int nPatch = 0; nPatch < 2; nPatch++ )
+    {
+        if ( nPatch == 1 )
+            strFlat += "] }, { \"points\": [";
+        for ( int j = 0; j <= 3; j++ )
+        {
+            for ( int i = 0; i <= 3; i++ )
+                strFlat += std::string( ( i + j > 0 ) ? ", " : "" ) + "[" + std::to_string( nPatch + i / 3.0 ) + ", 0, " + std::to_string( j / 3.0 ) + "]";
+        }
+    }
+    strFlat += "] } ] }";
+    pObject = FirstObject( oScene, strFlat.c_str() );
+    if ( pObject )
+    {
+        CRay    oDown = RayFrom( 0.5, 5, 0.5, 0, -1, 0 );
+        CVector oHit, oNormal;
+
+        Check( pObject->Intersect( oDown, oHit ) && ABS( oDown.GetT() - 5.0 ) < 1e-9 && pObject->SurfaceNormal( oHit, oNormal ) &&
+               ABS( ABS( oNormal.GetY() ) - 1.0 ) < 1e-9, "a ray hits a flat patch, where its normal is straight up or down" );
+
+        bool bSeam = true;
+
+        for ( int n = 0; n <= 20 && bSeam; n++ )
+        {
+            CRay oRay = RayFrom( 1.0, 3.0, n / 20.0, 0.0, -1.0, 0.0 );
+
+            bSeam = pObject->Intersect( oRay, oHit ) && ABS( oRay.GetT() - 3.0 ) < 1e-9;
+        }
+        Check( bSeam, "rays straight down the seam between two patches, corners included, all hit it" );
+        Check( Misses( *pObject, RayFrom( 2.01, 3.0, 0.5, 0, -1, 0 ) ) && Misses( *pObject, RayFrom( 0.5, 3.0, 1.01, 0, -1, 0 ) ),
+               "rays just past a patch's edges miss it" );
+        Check( ! pObject->IsClosed(), "patches are open unless they say they are closed" );
+    }
+
+        // A curved bicubic patch, turned and moved: rays aimed at points
+        // worked out straight from the patch, from either side, meet it
+        // exactly there, with the normal the patch's own slopes give.
+    std::string strHump = "{ \"type\": \"bezier\", \"center\": [0.3, -0.2, 0.1], \"rotation\": [10, 25, -5], \"patches\": [ { \"points\": [";
+    double      anHeights[ 16 ] = { 0, 0.2, 0.1, 0, 0.3, 1.2, 0.9, 0.2, 0.1, 1.0, 1.4, 0.3, 0, 0.2, 0.4, 0.1 };
+
+    for ( int n = 0; n < 16; n++ )
+        strHump += std::string( n ? ", " : "" ) + "[" + std::to_string( ( n % 4 ) / 3.0 ) + ", " + std::to_string( anHeights[ n ] ) + ", " +
+                   std::to_string( ( n / 4 ) / 3.0 ) + "]";
+    strHump += "] } ] }";
+    pObject = FirstObject( oScene, strHump.c_str() );
+
+    CBezier *pHump = dynamic_cast<CBezier *>( pObject );
+
+    if ( pHump )
+    {
+        const CBezier::SPatch &oPatch = pHump->GetPatches()[ 0 ];
+        unsigned int           nState = 12345u;
+        int                    nRight = 0, nTotal = 400;
+
+        for ( int n = 0; n < nTotal; n++ )
+        {
+            double u = PatchRandom( nState ), v = PatchRandom( nState );
+            double anLocal[ 3 ], anDu[ 3 ], anDv[ 3 ], anNormal[ 3 ];
+            FLT    anPoint[ 3 ], anTurned[ 3 ];
+
+            CBezier::Evaluate( oPatch, u, v, anLocal, anDu, anDv );
+            CBezier::Normal( oPatch, u, v, anNormal );
+            HumpToScene( anLocal, anPoint, false );
+            HumpToScene( anNormal, anTurned, true );
+
+                // From the side the normal faces, or the other, at a slant.
+            double nSide = ( PatchRandom( nState ) < 0.5 ) ? 1.0 : -1.0;
+            double anFrom[ 3 ];
+
+            for ( int c = 0; c < 3; c++ )
+                anFrom[ c ] = anPoint[ c ] + ( nSide * 3.0 * anTurned[ c ] ) + ( PatchRandom( nState ) - 0.5 );
+
+            CRay    oRay = RayFrom( anFrom[ 0 ], anFrom[ 1 ], anFrom[ 2 ], anPoint[ 0 ] - anFrom[ 0 ], anPoint[ 1 ] - anFrom[ 1 ],
+                                    anPoint[ 2 ] - anFrom[ 2 ] );
+            CVector oHit, oNormal;
+
+            if ( ! pObject->Intersect( oRay, oHit ) )
+                continue;
+
+            double nMiss = sqrt( ( ( oHit.GetX() - anPoint[ 0 ] ) * ( oHit.GetX() - anPoint[ 0 ] ) ) +
+                                 ( ( oHit.GetY() - anPoint[ 1 ] ) * ( oHit.GetY() - anPoint[ 1 ] ) ) +
+                                 ( ( oHit.GetZ() - anPoint[ 2 ] ) * ( oHit.GetZ() - anPoint[ 2 ] ) ) );
+
+                // The same point with the patch's normal; or the ray met the
+                // patch on its way there (a fold), which is right too.
+            if ( nMiss < 1e-8 && pObject->SurfaceNormal( oHit, oNormal ) &&
+                 ABS( ABS( ( oNormal.GetX() * anTurned[ 0 ] ) + ( oNormal.GetY() * anTurned[ 1 ] ) + ( oNormal.GetZ() * anTurned[ 2 ] ) ) - 1.0 ) < 1e-9 )
+                nRight++;
+            else if ( oRay.GetT() < 1.0 - 1e-9 )
+                nRight++;
+        }
+        Check( nRight == nTotal, "rays aimed at 400 points of a curved, turned patch meet it there, with its own normal" );
+
+            // Surface coordinates are the patch's (u, v), even for a point
+            // it didn't just hit.
+        double  anLocal[ 3 ], anDu[ 3 ], anDv[ 3 ];
+        FLT     anPoint[ 3 ], nU, nV;
+        CVector oPoint;
+
+        CBezier::Evaluate( oPatch, 0.25, 0.75, anLocal, anDu, anDv );
+        HumpToScene( anLocal, anPoint, false );
+        oPoint.Set( anPoint[ 0 ], anPoint[ 1 ], anPoint[ 2 ] );
+        Check( pObject->SurfaceCoords( oPoint, nU, nV ) && ABS( nU - 0.25 ) < 1e-6 && ABS( nV - 0.75 ) < 1e-6,
+               "a patch's surface coordinates are its (u, v)" );
+    }
+
+        // A patch whose edge shrinks to a point still has a normal there.
+    {
+        CBezier::SPatch oCone;
+        double          anNormal[ 3 ];
+
+        oCone.anPoints.clear();
+        for ( int j = 0; j <= 3; j++ )
+        {
+            for ( int i = 0; i <= 3; i++ )
+            {
+                double a = ( PI / 2.0 ) * i / 3.0, r = j / 3.0;
+
+                oCone.anPoints.push_back( r * cos( a ) );
+                oCone.anPoints.push_back( 1.0 - r );
+                oCone.anPoints.push_back( r * sin( a ) );
+                oCone.anPoints.push_back( 1.0 );
+            }
+        }
+        CBezier::Normal( oCone, 0.5, 0.0, anNormal );
+
+        double nLength = sqrt( ( anNormal[ 0 ] * anNormal[ 0 ] ) + ( anNormal[ 1 ] * anNormal[ 1 ] ) + ( anNormal[ 2 ] * anNormal[ 2 ] ) );
+
+        Check( nLength == nLength && ABS( nLength - 1.0 ) < 1e-9, "a patch has a finite, unit normal where an edge shrinks to a point" );
+    }
+
+        // A closed box of patches is a solid: a csg can use it.
+    pObject = FirstObject( oScene, PatchCube().c_str() );
+    if ( pObject )
+    {
+        Check( pObject->IsClosed() && ShapeHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ),
+               "a box of six patches, closed, is hit on its near face with an outward normal" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, 0, 1, 0, 0 ), 1.0, 1, 0, 0 ), "a ray from inside the closed patches leaves by a wall" );
+    }
+    pObject = FirstObject( oScene, CsgOf( "intersection", ( PatchCube() + ", { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1.2 }" ).c_str() ).c_str() );
+    if ( pObject )
+    {
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a csg of closed patches and a sphere meets the patches' face" );
+        Check( Misses( *pObject, RayFrom( 0.9, 0.9, -5, 0, 0, 1 ) ), "the corners of the patch box outside the sphere are cut away" );
+    }
+
+        // B-spline surfaces become Bezier patches that are the same surface:
+        // a bicubic net with uneven knots, and a rational one with
+        // unclamped, evenly spaced knots.
+    for ( int nCase = 0; nCase < 2; nCase++ )
+    {
+        CBSpline            oSurface;
+        std::vector<double> anNet, anKnotsU, anKnotsV;
+        unsigned int        nState = 777u + nCase;
+        int                 nU = 7, nV = 6;
+
+        for ( int n = 0; n < nU * nV; n++ )
+        {
+            double w = ( nCase == 0 ) ? 1.0 : 0.5 + PatchRandom( nState );
+
+            anNet.push_back( ( ( n % nU ) + ( PatchRandom( nState ) * 0.3 ) ) * w );
+            anNet.push_back( PatchRandom( nState ) * w );
+            anNet.push_back( ( ( n / nU ) + ( PatchRandom( nState ) * 0.3 ) ) * w );
+            anNet.push_back( w );
+        }
+        if ( nCase == 0 )
+        {
+            double anU[] = { 0, 0, 0, 0, 0.3, 0.5, 0.5, 1, 1, 1, 1 };
+            double anV[] = { 0, 0, 0, 0, 0.6, 1, 1, 1, 1, 1 };
+
+            anKnotsU.assign( anU, anU + 11 );
+            anKnotsV.assign( anV, anV + 10 );
+        }
+        else
+        {
+            for ( int n = 0; n < nU + 4; n++ )
+                anKnotsU.push_back( n );
+            for ( int n = 0; n < nV + 4; n++ )
+                anKnotsV.push_back( n * 0.5 );
+        }
+        Check( oSurface.SetSurface( 3, 3, nU, nV, anNet, anKnotsU, anKnotsV ) ? true : false,
+               nCase ? "a rational B-spline with unclamped knots is cut into patches" : "a B-spline with uneven knots is cut into patches" );
+
+        double                              anRange[ 4 ], nWorst = 0.0;
+        const std::vector<CBezier::SPatch> &aoPatches = oSurface.GetPatches();
+
+        oSurface.Range( anRange );
+        for ( int n = 0; n < 200; n++ )
+        {
+            double s = PatchRandom( nState ), t = PatchRandom( nState );
+            double anExact[ 3 ], anPoint[ 3 ], anDu[ 3 ], anDv[ 3 ];
+
+            oSurface.SurfacePoint( anRange[ 0 ] + ( s * ( anRange[ 1 ] - anRange[ 0 ] ) ), anRange[ 2 ] + ( t * ( anRange[ 3 ] - anRange[ 2 ] ) ), anExact );
+            for ( size_t nPatch = 0; nPatch < aoPatches.size(); nPatch++ )
+            {
+                const CBezier::SPatch &oPatch = aoPatches[ nPatch ];
+
+                if ( s < oPatch.anUV[ 0 ] || s > oPatch.anUV[ 2 ] || t < oPatch.anUV[ 1 ] || t > oPatch.anUV[ 3 ] )
+                    continue;
+                CBezier::Evaluate( oPatch, ( s - oPatch.anUV[ 0 ] ) / ( oPatch.anUV[ 2 ] - oPatch.anUV[ 0 ] ),
+                                   ( t - oPatch.anUV[ 1 ] ) / ( oPatch.anUV[ 3 ] - oPatch.anUV[ 1 ] ), anPoint, anDu, anDv );
+                for ( int c = 0; c < 3; c++ )
+                    nWorst = ( ABS( anPoint[ c ] - anExact[ c ] ) > nWorst ) ? ABS( anPoint[ c ] - anExact[ c ] ) : nWorst;
+                break;
+            }
+        }
+        Check( nWorst < 1e-12, nCase ? "its patches match the rational B-spline exactly, point for point" :
+                                       "its patches match the B-spline exactly, point for point" );
+    }
+
+        // A NURBS torus (rational quadratic circles both ways) is a torus:
+        // every point is exactly the tube's radius from its center circle.
+    {
+        CBSpline            oTorus;
+        std::vector<double> anNet, anKnots;
+        double              s = sqrt( 0.5 );
+        double              anCircle[ 9 ][ 3 ] = { { 1, 0, 1 }, { 1, 1, s }, { 0, 1, 1 }, { -1, 1, s }, { -1, 0, 1 },
+                                                   { -1, -1, s }, { 0, -1, 1 }, { 1, -1, s }, { 1, 0, 1 } };
+        double              anK[] = { 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4 };
+
+        for ( int j = 0; j < 9; j++ )
+        {
+            for ( int i = 0; i < 9; i++ )
+            {
+                double nRadius = 2.0 + ( 0.5 * anCircle[ j ][ 0 ] ), w = anCircle[ j ][ 2 ] * anCircle[ i ][ 2 ];
+
+                anNet.push_back( nRadius * anCircle[ i ][ 0 ] * w );
+                anNet.push_back( 0.5 * anCircle[ j ][ 1 ] * w );
+                anNet.push_back( nRadius * anCircle[ i ][ 1 ] * w );
+                anNet.push_back( w );
+            }
+        }
+        anKnots.assign( anK, anK + 12 );
+        Check( oTorus.SetSurface( 2, 2, 9, 9, anNet, anKnots, anKnots ) && oTorus.GetPatches().size() == 16,
+               "a NURBS torus is cut into sixteen rational patches" );
+
+        unsigned int nState = 99u;
+        double       nWorst = 0.0;
+
+        for ( size_t nPatch = 0; nPatch < oTorus.GetPatches().size(); nPatch++ )
+        {
+            for ( int n = 0; n < 20; n++ )
+            {
+                double anPoint[ 3 ], anDu[ 3 ], anDv[ 3 ];
+
+                CBezier::Evaluate( oTorus.GetPatches()[ nPatch ], PatchRandom( nState ), PatchRandom( nState ), anPoint, anDu, anDv );
+
+                double nAcross = sqrt( ( anPoint[ 0 ] * anPoint[ 0 ] ) + ( anPoint[ 2 ] * anPoint[ 2 ] ) ) - 2.0;
+                double nOff = ABS( sqrt( ( nAcross * nAcross ) + ( anPoint[ 1 ] * anPoint[ 1 ] ) ) - 0.5 );
+
+                nWorst = ( nOff > nWorst ) ? nOff : nWorst;
+            }
+        }
+        Check( nWorst < 1e-12, "every point of the NURBS torus is exactly the tube's radius from its center circle" );
+
+        CRay    oDown = RayFrom( 2.0, 5.0, 0.0, 0.0, -1.0, 0.0 );
+        CVector oHit;
+
+        Check( oTorus.Intersect( oDown, oHit ) && ABS( oDown.GetT() - 4.5 ) < 1e-9, "a ray down onto the NURBS torus's tube hits its top" );
+    }
+
+        // Saving keeps the patches as they came: shared points, indices,
+        // weights, a degree and a uv rectangle.
+    {
+        const char *strShared = "{ \"type\": \"bezier\", \"points\": [[0, 0, 0], [1, 0, 0], [2, 0, 0], [0, 1, 0], [1, 1, 0, 2], [2, 1, 0],"
+                                " [0, 0, 1], [1, 0, 1], [2, 0, 1]], \"patches\": [ { \"degree\": [2, 2], \"indices\": [0, 1, 2, 3, 4, 5, 6, 7, 8],"
+                                " \"uv\": [0, 0, 0.5, 1] }, { \"degree\": [2, 1], \"points\": [[0, 2, 0], [1, 2, 0], [2, 2, 0], [0, 3, 0], [1, 3, 0], [2, 3, 0]] } ],"
+                                " \"scale\": 2, \"closed\": false }";
+        CScene      oFirst, oSecond, oThird;
+
+        pObject = FirstObject( oFirst, strShared );
+        if ( pObject )
+        {
+            std::string strSaved = oFirst.ToJson();
+
+            Check( oSecond.FromJson( strSaved ) == 0 && oSecond.ToJson() == strSaved, "patches given as shared points and indices round-trip" );
+            Check( strSaved.find( "\"indices\"" ) != std::string::npos && strSaved.find( "\"uv\"" ) != std::string::npos &&
+                   strSaved.find( "\"scale\": 2" ) != std::string::npos, "saving keeps the indices, the uv rectangle and the scale" );
+        }
+
+        const char *strSpline = "{ \"type\": \"bspline\", \"degree\": [2, 1], \"points\": [ [[0, 0, 0], [1, 1, 0, 0.5], [2, 0, 0]],"
+                                " [[0, 0, 1], [1, 1, 1], [2, 0, 1]] ], \"knotsU\": [0, 0, 0, 2, 2, 2] }";
+
+        pObject = FirstObject( oThird, strSpline );
+        if ( pObject )
+        {
+            std::string strSaved = oThird.ToJson();
+
+            Check( oSecond.FromJson( strSaved ) == 0 && oSecond.ToJson() == strSaved, "a B-spline surface round-trips" );
+        }
+    }
+
+        // What's wrong is reported.
+    const char *strSphere = "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1";
+
+    ExpectError( Minimal( strSphere, "\"type\": \"bezier\"" ), BAD_FILE, "needs patches" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bezier\", \"patches\": [ { \"points\": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [2, 2, 2]] } ]" ),
+                 BAD_FILE, "not a square number" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bezier\", \"patches\": [ { \"degree\": [2, 2], \"points\": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]] } ]" ),
+                 BAD_FILE, "needs 9 points" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bezier\", \"points\": [[0, 0, 0]], \"patches\": [ { \"indices\": [0, 0, 0, 1] } ]" ),
+                 BAD_FILE, "indices must be whole numbers from 0 to 0" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bezier\", \"patches\": [ { \"points\": [[0, 0, 0], [1, 0, 0, 0], [0, 1, 0], [1, 1, 0]] } ]" ),
+                 BAD_FILE, "a weight must be more than 0" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bezier\", \"file\": \"x.bpt\", \"patches\": []" ), BAD_FILE, "either a file or patches" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bezier\", \"scale\": 0, \"patches\": [ { \"points\": [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]] } ]" ),
+                 BAD_FILE, "scale: must be more than 0" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bspline\", \"points\": [ [[0, 0, 0], [1, 0, 0]], [[0, 1, 0], [1, 1, 0], [2, 1, 0]] ]" ), BAD_FILE,
+                 "every row needs the same number of points" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bspline\", \"degree\": 1, \"points\": [ [[0, 0, 0], [1, 0, 0]], [[0, 1, 0], [1, 1, 0]] ],"
+                                     " \"knotsU\": [0, 0, 1]" ), BAD_FILE, "knotsU needs 4 knots" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bspline\", \"degree\": 1, \"points\": [ [[0, 0, 0], [1, 0, 0]], [[0, 1, 0], [1, 1, 0]] ],"
+                                     " \"knotsV\": [0, 1, 0, 1]" ), BAD_FILE, "knotsV must never decrease" );
+    ExpectError( Minimal( strSphere, "\"type\": \"bspline\", \"points\": [ [[0, 0, 0], [1, 0, 0]], [[0, 1, 0], [1, 1, 0]] ]" ), BAD_FILE,
+                 "needs at least degree + 1 points each way" );
+
+        // A .bpt file's text, and its mistakes.
+    std::vector<CBezier::SPatch> aoRead;
+    std::string                  strError;
+
+    Check( CBezier::ReadBpt( "1\n1 1\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n", aoRead, strError ) && aoRead.size() == 1 && aoRead[ 0 ].nDegreeU == 1,
+           "a .bpt file of one bilinear patch reads" );
+    Check( ! CBezier::ReadBpt( "2\n1 1\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n", aoRead, strError ) && strError.find( "ends before patch 2" ) != std::string::npos,
+           "a .bpt file that ends early is refused" );
+    Check( ! CBezier::ReadBpt( "1\n1 1\n0 0 0\n1 0 0\n0 1 0\n1 1 0\nextra\n", aoRead, strError ), "a .bpt file with more after its last patch is refused" );
+}
+
+    // The Utah teapot's own patches, against a fine mesh of them.
+static void PatchFileChecks( const char *strScenes )
+{
+    std::string                  strText = ReadFile( std::string( strScenes ) + "/models/teapot.bpt" );
+    std::vector<CBezier::SPatch> aoPatches;
+    std::string                  strError;
+    CBezier                      oTeapot;
+
+    Check( CBezier::ReadBpt( strText, aoPatches, strError ) && aoPatches.size() == 32, "the Utah teapot's 32 patches read" );
+    if ( aoPatches.size() != 32 || ! oTeapot.SetPatches( aoPatches ) )
+    {
+        Check( false, "the teapot's patches set up" );
+        return;
+    }
+
+        // Its knob and base: every patch has a finite, unit normal at every
+        // corner, edges that shrink to a point included.
+    bool bNormals = true;
+
+    for ( size_t nPatch = 0; nPatch < aoPatches.size(); nPatch++ )
+    {
+        for ( int nCorner = 0; nCorner < 4; nCorner++ )
+        {
+            double anNormal[ 3 ];
+
+            CBezier::Normal( aoPatches[ nPatch ], ( nCorner & 1 ) ? 1.0 : 0.0, ( nCorner & 2 ) ? 1.0 : 0.0, anNormal );
+
+            double nLength = sqrt( ( anNormal[ 0 ] * anNormal[ 0 ] ) + ( anNormal[ 1 ] * anNormal[ 1 ] ) + ( anNormal[ 2 ] * anNormal[ 2 ] ) );
+
+            bNormals = bNormals && ( nLength == nLength ) && ABS( nLength - 1.0 ) < 1e-9;
+        }
+    }
+    Check( bNormals, "every corner of the teapot's patches, its knob and base included, has a unit normal" );
+
+        // Rays at the teapot from all around agree with a fine mesh of its
+        // patches: the same hits, at nearly the same distance, except for a
+        // few rays grazing an edge. (The data has z up.)
+    std::vector<FLT> anTriangles, anNormals;
+
+    oTeapot.Triangles( 48, anTriangles, anNormals );
+
+    unsigned int nState = 4242u;
+    int          nAgree = 0, nTotal = 600, nHits = 0;
+
+    for ( int n = 0; n < nTotal; n++ )
+    {
+        double a = PatchRandom( nState ) * 2.0 * PI, b = ( PatchRandom( nState ) - 0.5 ) * PI;
+        double anFrom[ 3 ] = { 10.0 * cos( a ) * cos( b ), 10.0 * sin( a ) * cos( b ), 1.5 + ( 10.0 * sin( b ) ) };
+        double anAt[ 3 ] = { ( PatchRandom( nState ) - 0.5 ) * 6.0, ( PatchRandom( nState ) - 0.5 ) * 4.0, PatchRandom( nState ) * 3.3 };
+        double anDirection[ 3 ] = { anAt[ 0 ] - anFrom[ 0 ], anAt[ 1 ] - anFrom[ 1 ], anAt[ 2 ] - anFrom[ 2 ] };
+        CRay   oRay = RayFrom( anFrom[ 0 ], anFrom[ 1 ], anFrom[ 2 ], anDirection[ 0 ], anDirection[ 1 ], anDirection[ 2 ] );
+        CVector oHit;
+        bool   bHit = oTeapot.Intersect( oRay, oHit ) ? true : false;
+        double nT = bHit ? oRay.GetT() : 0.0;
+        double nMeshT = 1e300;
+
+        for ( size_t k = 0; k + 8 < anTriangles.size(); k += 9 )
+        {
+            double e1[ 3 ], e2[ 3 ], s[ 3 ], p[ 3 ], q[ 3 ];
+
+            for ( int c = 0; c < 3; c++ )
+            {
+                e1[ c ] = anTriangles[ k + 3 + c ] - anTriangles[ k + c ];
+                e2[ c ] = anTriangles[ k + 6 + c ] - anTriangles[ k + c ];
+                s[ c ] = anFrom[ c ] - anTriangles[ k + c ];
+            }
+            p[ 0 ] = ( anDirection[ 1 ] * e2[ 2 ] ) - ( anDirection[ 2 ] * e2[ 1 ] );
+            p[ 1 ] = ( anDirection[ 2 ] * e2[ 0 ] ) - ( anDirection[ 0 ] * e2[ 2 ] );
+            p[ 2 ] = ( anDirection[ 0 ] * e2[ 1 ] ) - ( anDirection[ 1 ] * e2[ 0 ] );
+
+            double nDet = ( e1[ 0 ] * p[ 0 ] ) + ( e1[ 1 ] * p[ 1 ] ) + ( e1[ 2 ] * p[ 2 ] );
+
+            if ( ABS( nDet ) < 1e-14 )
+                continue;
+
+            double u = ( ( s[ 0 ] * p[ 0 ] ) + ( s[ 1 ] * p[ 1 ] ) + ( s[ 2 ] * p[ 2 ] ) ) / nDet;
+
+            q[ 0 ] = ( s[ 1 ] * e1[ 2 ] ) - ( s[ 2 ] * e1[ 1 ] );
+            q[ 1 ] = ( s[ 2 ] * e1[ 0 ] ) - ( s[ 0 ] * e1[ 2 ] );
+            q[ 2 ] = ( s[ 0 ] * e1[ 1 ] ) - ( s[ 1 ] * e1[ 0 ] );
+
+            double v = ( ( anDirection[ 0 ] * q[ 0 ] ) + ( anDirection[ 1 ] * q[ 1 ] ) + ( anDirection[ 2 ] * q[ 2 ] ) ) / nDet;
+            double t = ( ( e2[ 0 ] * q[ 0 ] ) + ( e2[ 1 ] * q[ 1 ] ) + ( e2[ 2 ] * q[ 2 ] ) ) / nDet;
+
+            if ( u >= 0 && v >= 0 && u + v <= 1 && t > 1e-9 && t < nMeshT )
+                nMeshT = t;
+        }
+
+        bool bMeshHit = nMeshT < 1e300;
+
+        nHits += bHit ? 1 : 0;
+        if ( bHit == bMeshHit && ( ! bHit || ABS( nT - nMeshT ) < 2e-3 ) )
+            nAgree++;
+    }
+    if ( nAgree < nTotal - 6 )
+        fprintf( stderr, "  patch teapot against its mesh: %d of %d agree, %d hits\n", nAgree, nTotal, nHits );
+    Check( nHits > nTotal / 3 && nAgree >= nTotal - 6, "600 rays at the patch teapot agree with a fine mesh of it (all but a few grazing rays)" );
+
+        // Rays aimed at points on the seams between its patches all hit:
+        // there or nearer.
+    bool bSeams = true;
+
+    for ( size_t nPatch = 0; nPatch < aoPatches.size() && bSeams; nPatch++ )
+    {
+        for ( int n = 0; n <= 8 && bSeams; n++ )
+        {
+            double anPoint[ 3 ], anDu[ 3 ], anDv[ 3 ], anNormal[ 3 ];
+            double u = ( n % 2 ) ? n / 8.0 : 0.0, v = ( n % 2 ) ? 0.0 : n / 8.0;
+
+            CBezier::Evaluate( aoPatches[ nPatch ], u, v, anPoint, anDu, anDv );
+            CBezier::Normal( aoPatches[ nPatch ], u, v, anNormal );
+
+            double anFrom[ 3 ];
+
+            for ( int c = 0; c < 3; c++ )
+                anFrom[ c ] = anPoint[ c ] + ( 2.0 * anNormal[ c ] );
+
+            CRay    oRay = RayFrom( anFrom[ 0 ], anFrom[ 1 ], anFrom[ 2 ], -anNormal[ 0 ], -anNormal[ 1 ], -anNormal[ 2 ] );
+            CVector oHit;
+
+            bSeams = oTeapot.Intersect( oRay, oHit ) && oRay.GetT() <= 2.0 + 1e-7;
+        }
+    }
+    Check( bSeams, "rays aimed at points on the seams between the teapot's patches all hit" );
+    Check( oTeapot.PieceCount() > 32, "the teapot's patches are split into flat pieces" );
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -4619,6 +5142,7 @@ int main( int argc, char **argv )
         LensTableChecks( argv[ 2 ] );
         ModelFileChecks( argv[ 2 ], argv[ 3 ] );
         TextChecks( argv[ 2 ] );
+        PatchFileChecks( argv[ 2 ] );
     }
     else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
@@ -4651,6 +5175,7 @@ int main( int argc, char **argv )
         SceneEditChecks();
         MapChecks();
         ShapeChecks();
+        PatchChecks();
     }
 
     if ( g_nFailures == 0 )

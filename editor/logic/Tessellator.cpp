@@ -390,7 +390,8 @@ namespace RayEditor
             FlatTriangle( oMesh, a, b, c );
         }
         else if ( strType == "torus" || strType == "disc" || strType == "annulus" || strType == "paraboloid" ||
-                  strType == "hyperboloid" || strType == "superquadric" || strType == "roundedBox" )
+                  strType == "hyperboloid" || strType == "superquadric" || strType == "roundedBox" ||
+                  strType == "bezier" || strType == "bspline" )
         {
                 // The core draws its own shapes (a csg part has no object of
                 // its own here, so one is made from its JSON).

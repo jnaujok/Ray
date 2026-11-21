@@ -22,7 +22,7 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), a polished gold torus standing on its rim, the word "RAY" in beveled red letters (Lato Bold) standing on top of the mirror frame, on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble, the Utah teapot's own 32 Bezier patches traced exactly) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), a polished gold torus standing on its rim, the word "RAY" in beveled red letters (Lato Bold) standing on top of the mirror frame, on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
@@ -41,6 +41,8 @@ when the binary format was dropped; they are in the repository's history.
 | `benchy_test.ray` | | 3DBenchy (`models/3DBenchy.stl`, 225,706 triangles) printed in orange plastic, close up on its bow, its 0.1 mm layer lines a `layers` texture for both its color and its bump map, with a 3×3 stratified sampler |
 | `shapes_test.ray` | | The shapes of 0.16: a red torus tilted toward the camera, a gold disc standing up, a blue annulus on the floor, an open mirror-polished paraboloid (a dish), a capped green hyperboloid, a purple superquadric that is nearly a rounded cube (`e1` and `e2` 0.35), an orange pinched star (both 2.6) and a rounded box, with the `corners` sampler |
 | `text_test.ray` | | Text from a TrueType font (`fonts/Lato-Bold.ttf`): "Ray 0.16" in beveled gold letters, "Typeset in / Lato Bold" in two centered lines, turned, and "CSG" carved out of a rounded slab (a csg difference), with the `corners` sampler |
+| `patches_test.ray` | | Bezier patches: the Utah teapot as Martin Newell's 32 bicubic patches (`models/teapot.bpt`, traced exactly) on the right, beside the mesh teapot made from them on the left, in the same red glaze, with the `corners` sampler |
+| `nurbs_test.ray` | | B-spline and NURBS surfaces: a gold torus made of rational quadratic circles both ways (a `bspline` with weights) in front of the analytic `torus` of the same size, and a bicubic B-spline sheet, gently waved, with `textures/uv_grid.ppm` running across all its patches and a fine noise bump, with the `corners` sampler |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -256,6 +258,8 @@ color, not used in shading), `materials` (default: one diffuse material), and op
 | `superquadric` | `center` (required); `radius` (required): one number, or `[x, y, z]`; `e1` and `e2` (default `1`, from 0.05 to 10): its shape from pole to pole and around; `rotation` |
 | `roundedBox` | `center` (required); `size` (required): one number for a cube, or `[x, y, z]`; `radius` (required): the edges' and corners', more than 0 and at most half the smallest size; `rotation` |
 | `text` | `string` (required, UTF-8; `\n` starts a new line); `font` (required): a TrueType font file; `size` (default `1`): the em in scene units; `depth` (default `0.2`); `bevel` (default `0`, less than `depth`); `align` (default `"left"`, or `"center"` or `"right"`); `lineSpacing` (default `1`); `kerning` (default `true`); `position` (default `[0, 0, 0]`); `rotation` |
+| `bezier` | `patches` (required, unless `file`): each `{ "points": [...] }` (u varies fastest) or `{ "indices": [...] }` into the shape's own `points`, with `degree` (`[u, v]`, from 1 to 15; needed unless the points are a square number: 16 is bicubic) and `uv` (default `[0, 0, 1, 1]`); or `file`: a `.bpt` file of patches; `points`: the shared points for `indices`; a point is `[x, y, z]` or `[x, y, z, weight]`; `scale` (default `1`): a number or `[x, y, z]`; `closed` (default `false`); `center` (default `[0, 0, 0]`); `rotation` |
+| `bspline` | `points` (required): rows of points along v, each an array along u, `[x, y, z]` or `[x, y, z, weight]`; `degree` (default `[3, 3]`, or one number for both); `knotsU`, `knotsV` (default clamped and evenly spaced): points in a row (or rows) + degree + 1 numbers, never decreasing; `scale`; `closed`; `center` (default `[0, 0, 0]`); `rotation` |
 
 A cylinder or cone points from `base` to `top`, any way. Capped, its ends are closed with flat discs
 and it is a solid; with `"capped": false` it is an open shell, seen into from its ends, and it
@@ -308,10 +312,41 @@ networked engines inside the scene (as `data`), like a model file. Surface coord
 the text's plane, one unit per em. `text_test.ray` uses Lato Bold (`scenes/fonts/`, SIL Open Font
 License 1.1).
 
+**Bezier patches and B-spline surfaces.** A `bezier` is a surface of Bezier patches, each with a
+degree in u and v (bicubic, 3 by 3, is the usual) and (u degree + 1) × (v degree + 1) control
+points, row by row with u varying fastest. A point with a weight (`[x, y, z, w]`, more than 0)
+makes its patch rational. Patches can be listed with their own `points`, or as `indices` into the
+shape's own `points`, as the Utah teapot is usually written; or read from a `file` in the `.bpt`
+format: the number of patches, then for each its two degrees and its points, `x y z` a line.
+`models/teapot.bpt` holds Martin Newell's 1975 teapot (32 bicubic patches, z up, the spout along
++x), so `"rotation": [-90, 0, 0]` stands it on y like the mesh teapot. A patch file goes into a
+saved scene's archive and to networked engines inside the scene (as `data`), like a model file.
+The points are in the shape's own frame: scaled by `scale`, turned by `rotation` and moved to
+`center`.
+
+The patches are traced exactly, not cut into triangles: each is split by de Casteljau's algorithm
+until every piece is within 0.02% of the shape's size of flat; a tree of the pieces' boxes finds
+the ones a ray passes near; a start from the triangles of each piece's corners and Newton's method
+find where the ray meets the surface itself. A hit anywhere on a patch counts, not only inside the
+piece that found it, so nothing slips through the seams between pieces or patches. The normal is
+the cross product of the surface's slopes; where it vanishes (an edge that shrinks to a point, as
+at the teapot's knob and base) it is taken a hair inside the patch. Patches are open and shaded on
+the side a ray sees, unless `"closed": true` says they enclose a volume with their normals outward,
+so a csg can use them. Surface coordinates are each patch's own (u, v), from 0 to 1, or across its
+`uv` rectangle (`[u0, v0, u1, v1]`), so a texture can run across several patches.
+
+A `bspline` is a B-spline surface, or with weights a NURBS surface (circles, spheres and tori come
+out exact): `points` is its control net, rows along v, each row along u, with a `degree` each way
+and a knot vector each way (`knotsU`, `knotsV`; left out, they are clamped, so the surface reaches
+its corner points, and evenly spaced). It is traced as Bezier patches: knots are inserted (Boehm's
+algorithm, with weights carried along) until every knot in its range repeats as often as the
+degree, which cuts it into patches that are the same surface exactly. Its surface coordinates run
+from 0 to 1 across the whole surface. Bump maps, textures and maps work on both.
+
 **Constructive solid geometry.** A `csg` is a solid made from others: a `"union"` is inside any of
 them, an `"intersection"` inside all of them, and a `"difference"` inside the first and none of the
 rest. Its `objects` are written as in the scene's own list, and can be any closed shapes: spheres, tori, superquadrics, rounded boxes,
-boxes, capped cylinders, cones, paraboloids and hyperboloids, text, meshes (which must be closed; a mesh with holes gives wrong
+boxes, capped cylinders, cones, paraboloids and hyperboloids, text, closed patches, meshes (which must be closed; a mesh with holes gives wrong
 results) and other csgs. Planes, triangles and open cylinders and cones are refused. A csg has
 its own `materials` and `bump`, and shades as one object, so glass made of parts is entered and
 left as one piece; its parts' materials and bump maps are ignored. With `"childMaterials": true`
@@ -678,7 +713,8 @@ same image, and networked engines give exactly the same as threads.
   texture's `stretch`, and lights' `attenuation`, `filter` and beam `profile` (2026-alpha-0.14),
   and texture maps for material, bump and light settings, and a transparent material's
   `attenuationStep` (2026-alpha-0.15), and the `torus`, `disc`, `annulus`, `paraboloid`, `hyperboloid`,
-  `superquadric`, `roundedBox` and `text` objects (2026-alpha-0.16).
+  `superquadric`, `roundedBox` and `text` objects (2026-alpha-0.16), and the `bezier` and `bspline`
+  objects (2026-alpha-0.17).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

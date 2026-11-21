@@ -309,7 +309,7 @@ BOOL CLocalShape::FromJson( const IASLib::CJsonNode &oNode )
     astrFields.push_back( NULL );
 
     return RayJson::OnlyFields( oNode, &astrFields[ 0 ] ) &&
-           RayJson::GetVector( oNode, "center", m_oCenter, TRUE ) &&
+           RayJson::GetVector( oNode, "center", m_oCenter, CenterRequired() ) &&
            RayJson::GetVector( oNode, "rotation", m_oRotation, FALSE ) &&
            RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
            ShapeFromJson( oNode ) &&
