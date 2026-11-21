@@ -209,8 +209,8 @@ The ray tracing itself is the 1997 code.
   scenes keep the name and the changes.
 
   <img src="docs/images/tests/materials_test.png" alt="Thirty spheres, one of each material preset: marbles, granites, stones, woods, gems and brushed metals" width="320">
-- **Model files and printed plastic:** a mesh can load an STL, OBJ or glTF 2.0 (`.gltf` or
-  `.glb`) `file` and place it with a
+- **Model files and printed plastic:** a mesh can load an STL, OBJ, glTF 2.0 (`.gltf` or
+  `.glb`, Draco-compressed or not) or Blender `.blend` `file` and place it with a
   `scale` (or `fitSize`), `rotation`, `align` and `translation`; the file goes into the saved scene
   and, inside the scene, to networked engines. Colored STL files (the VisCAM/SolidView and
   Materialise Magics conventions) give each face its color through the `faceColors` texture. The
@@ -219,9 +219,12 @@ The ray tracing itself is the 1997 code.
   model), so the layers follow its print axis however it is turned. glTF models bring their node
   transforms and their materials' base colors (through `faceColors`), and a mesh can pick one `node`
   (a chess piece from a whole set) or one material's primitives (`gltfMaterial`: a visor apart from
-  its suit); Draco-compressed files are refused (`tools/gltf_decompress.py` writes them back out
-  plain). The sample scenes include [#3DBenchy](https://3dbenchy.com) (225,706 triangles), Poly
-  Haven's chess set and NASA's lunar module and astronaut.
+  its suit). Draco-compressed glTF (`KHR_draco_mesh_compression`, as most of NASA's 3D Resources
+  are) is decoded by Ray's own decoder. Blender `.blend` files from 2.8 to 4.x are read directly,
+  gzip- or Zstandard-compressed or not: every mesh object (or one, by its `node` name) with its world
+  placement, active UV map and material colors. The sample scenes include
+  [#3DBenchy](https://3dbenchy.com) (225,706 triangles), Poly Haven's chess set and NASA's lunar
+  module and astronaut.
 
   <img src="docs/images/tests/benchy_test.png" alt="3DBenchy in orange plastic, close up on its bow, with the layer lines of a print" width="320"> <img src="docs/images/tests/models_test.png" alt="A puzzle cube and a gem from colored STL files and a textured ring from an OBJ file on a checkered floor" width="320">
 - **Bump and normal maps:** an object's `bump` tilts the normal it is shaded with, so it looks
@@ -576,7 +579,7 @@ The tests render every sample scene and compare it with a reference render (four
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, the Apollo cameras (a Hasselblad and its lens, Kodak film with grain and halation, the Réseau crosses blooming over, and Tranquility Base on regolith), a chessboard in depth of field from glTF pieces, the AS11-40-5903 recreation with a gold metal visor, and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, the Apollo cameras (a Hasselblad and its lens, Kodak film with grain and halation, the Réseau crosses blooming over, and Tranquility Base on regolith), a chessboard in depth of field from glTF pieces, the AS11-40-5903 recreation with a gold metal visor, models read from Blender .blend files, and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -643,7 +646,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/extrusion_test.png" alt="render_extrusion" width="260"><br><code>render_extrusion</code></td><td align="center"><img src="docs/images/tests/implicit_test.png" alt="render_implicit" width="260"><br><code>render_implicit</code></td><td align="center"><img src="docs/images/tests/blob_test.png" alt="render_blob" width="260"><br><code>render_blob</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/fractal_test.png" alt="render_fractal" width="260"><br><code>render_fractal</code></td><td align="center"><img src="docs/images/tests/apollo_lenses_test.png" alt="render_apollo_lenses" width="160"><br><code>render_apollo_lenses</code></td><td align="center"><img src="docs/images/tests/film_test.png" alt="render_film" width="240"><br><code>render_film</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/reseau_test.png" alt="render_reseau" width="260"><br><code>render_reseau</code></td><td align="center"><img src="docs/images/tests/tranquility_test.png" alt="render_tranquility" width="192"><br><code>render_tranquility</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/chess_dof_test.png" alt="render_chess_dof" width="260"><br><code>render_chess_dof</code></td><td align="center"><img src="docs/images/tests/as11_40_5903_test.png" alt="render_as11_40_5903" width="192"><br><code>render_as11_40_5903</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/chess_dof_test.png" alt="render_chess_dof" width="260"><br><code>render_chess_dof</code></td><td align="center"><img src="docs/images/tests/as11_40_5903_test.png" alt="render_as11_40_5903" width="192"><br><code>render_as11_40_5903</code></td><td align="center"><img src="docs/images/tests/blend_test.png" alt="render_blend" width="260"><br><code>render_blend</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -740,7 +743,8 @@ and sweeps along a path, implicit surfaces from formulas, metaballs and fractals
 so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both
 editors reach every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
 seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and lunar regolith,
-and a recreation of AS11-40-5903. Models load from glTF as well as STL and OBJ.
+and a recreation of AS11-40-5903. Models load from glTF (Draco-compressed too) and Blender
+`.blend` files as well as STL and OBJ.
 
 ## Changelog
 

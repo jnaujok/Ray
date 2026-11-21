@@ -54,6 +54,7 @@ when the binary format was dropped; they are in the repository's history.
 | `tranquility_test.ray` | | Tranquility Base: a lunar module built from boxes, a rounded box and cylinders (gold foil on four legs) beside a flag, on `regolith` in low sunlight (a 0.53° sun) under a black sky, shot with the Data Camera, its 60 mm Biogon, Réseau plate and Ektachrome MS; an imitation of the Apollo 11 views of the LM, not a recovered camera station |
 | `chess_dof_test.ray` | | Depth of field: a full chessboard in the Najdorf Sicilian, English Attack, after 1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 6.Be3 e5 7.Nb3 Be6 8.f3 Be7 9.Qd2 O-O 10.O-O-O Nbd7 11.g4 b5 (FEN `r2q1rk1/3nbppp/p2pbn2/1p2p3/4P1P1/1NN1BP2/PPPQ3P/2KR1B1R w - - 0 12`), played out by python-chess, the pieces Poly Haven's Chess Set (CC0) read from its glTF (`node` picks each piece), polished boxwood and ebony on an inlaid board, through the double Gauss wide open (f/2.02) focused on Black's pawn on e5, with twelve small lights behind the board that blur into bokeh discs; 160×120, a 3×3 stratified sampler. Written by `tools/make_showcase_scenes.py` |
 | `as11_40_5903_test.ray` | | A recreation of NASA photograph AS11-40-5903: Buzz Aldrin (NASA's public-domain astronaut model, its arms lowered by `tools/pose_astronaut.py`) in a white suit with a gold `metal` visor that reflects Neil Armstrong (a second copy, behind the camera) and the lunar module (NASA's model, its glTF base colors through `faceColors`), the Solar Wind Composition foil and the flag (from ALSJ dimensions), on regolith under a 15° sun and a black sky, with Earth small and high; shot on the Data Camera with its 60 mm Biogon, Réseau plate and Ektachrome MS, one bounce of indirect light; 128×128. Written by `tools/make_showcase_scenes.py`. The camera was placed by eye against the photograph, not from a recovered camera station |
+| `blend_test.ray` | | Models read straight from Blender `.blend` files: the red and blue cube of `models/blend_legacy_zst.blend` (Blender 2.93's mesh layout, Zstandard-compressed, its one object named by `node`) and the gold pentagon with its tetrahedron child from `models/blend_modern_gz.blend` (Blender 4.2's attribute layout, gzip-compressed), colored by their materials through `faceColors` |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -551,13 +552,34 @@ scene each networked engine gets) the same way:
   colors show through the `faceColors` texture, as a colored STL's do. Metallic and roughness,
   normal maps, cameras, lights, skins, morph targets and animation are ignored. glTF is right-handed
   and Ray's scenes are left-handed, so z is negated and each face turned back round: the model isn't
-  mirrored. Draco- and meshopt-compressed files are refused with the extension's name;
-  `tools/gltf_decompress.py` writes a Draco `.glb` back out plain. A `.gltf`'s buffers and PNG images
+  mirrored. Draco-compressed primitives (`KHR_draco_mesh_compression`, added in
+  2026-alpha-0.20.2) are decoded by Ray: Draco bitstream 2.2, sequential or EdgeBreaker connectivity
+  (standard or valence traversal), and every prediction scheme Draco writes (difference,
+  parallelogram, multi-parallelogram, portable texture coordinates, geometric normals); each corner
+  of the decoded mesh becomes a vertex, joined where all its values match. meshopt-compressed files
+  are refused with the extension's name. A `.gltf`'s buffers and PNG images
   go into a saved scene's archive beside it, under the names it gives them, and into a networked
   engine's copy of the scene (as `files`, an object of base64 data by URI); a URI that leaves the
   model's folder is refused.
 
-A file is named `.stl` or `.obj`; another name is told apart by its contents. The model is placed
+- **Blender** (added in 2026-alpha-0.20.2): `.blend` files saved by Blender 2.80 to 4.x (Blender
+  5 changed how meshes are stored and is refused with a reason), plain, gzip-compressed (Blender 2.x)
+  or Zstandard-compressed (3.0 and later). Every mesh object in the file is read (or only the one a
+  mesh's `node` names, without Blender's `OB` prefix), each at its world placement: the matrix the
+  file stores, or, for files from 4.2 on, which store none, the one built from its location,
+  rotation (any Euler order, quaternion or axis-angle), scale, delta location and scale, and parent
+  (an object parent, with its parent inverse). Both of Blender's mesh layouts are read: up to 3.x,
+  MVert, MPoly and MLoop arrays and MLoopUV layers; from 3.5 on, the `position` attribute, face
+  offsets, `.corner_vert`, float2 UV maps and the `material_index` face attribute. Faces of any size
+  are cut into fans of triangles. The active UV map gives surface coordinates, and each material
+  slot's viewport color (`Material` `r`, `g`, `b`; not its node tree) colors its faces through
+  `faceColors`, an object's own material taking a slot where the object says so. Modifiers,
+  constraints, drivers, animation, bone parents, curves, text, metaballs, instancing and linked
+  library data are not evaluated or followed; Blender is z up and right-handed, so (x, y, z) becomes
+  (x, z, y) and each face is turned back round.
+
+A file is named `.stl`, `.obj`, `.gltf`, `.glb` or `.blend`; another name is told apart by its
+contents. The model is placed
 by these fields, in this order:
 
 | Field | Default | |
@@ -567,7 +589,7 @@ by these fields, in this order:
 | `rotation` | `[0, 0, 0]` | Degrees about x, then y, then z, as a box turns. Most printable models stand on z: `[-90, 0, 0]` stands them on y |
 | `align` | `"none"` | `"center"` centers the turned model's box on the origin; `"bottom"` centers it in x and z with its lowest point at y = 0 |
 | `translation` | `[0, 0, 0]` | Moves it, last |
-| `node` | | glTF only: read just the node with this `name` and its children, in that node's own frame (its own and its parents' placement left out), as for one piece of a chess set |
+| `node` | | glTF: read just the node with this `name` and its children, in that node's own frame (its own and its parents' placement left out), as for one piece of a chess set. Blender: read just the mesh object with this name, at its world placement |
 | `gltfMaterial` | | glTF only: read just the primitives whose material has this `name`, so one part of a model (a visor) can wear different materials from the rest |
 
 `smooth`, `doubleSided`, `uvMap`, `materials` and `bump` work as for any mesh. Textures and bump

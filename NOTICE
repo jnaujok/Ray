@@ -34,8 +34,8 @@ Universal and is not covered by the Apache License.
 
 scenes/models/apollo/apollo_lunar_module.glb and astronaut.glb are from NASA's
 3D Resources (https://github.com/nasa/NASA-3D-Resources, "Apollo Lunar Module"
-and "Astronaut"), which NASA offers free and without copyright. Both were
-written back out without their Draco compression by tools/gltf_decompress.py,
-and the astronaut's arms lowered by tools/pose_astronaut.py; NASA does not
-endorse this project. The comparison image of NASA photograph AS11-40-5903 in
+and "Astronaut"), which NASA offers free and without copyright. The lunar
+module is included unmodified; the astronaut was written back out without its
+Draco compression by tools/gltf_decompress.py and its arms lowered by
+tools/pose_astronaut.py. NASA does not endorse this project. The comparison image of NASA photograph AS11-40-5903 in
 docs/images/changelog/ is a NASA image, in the public domain.

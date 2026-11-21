@@ -10,6 +10,98 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.20.2] - 2026-11-21
+
+Model files from more places: Ray decodes Draco-compressed glTF itself, as most of NASA's 3D
+Resources are, and reads Blender `.blend` files from 2.8 to 4.x directly, gzip- or
+Zstandard-compressed or not. And the AS11-40-5903 recreation loses its speckles. Every other render
+is byte for byte as before.
+
+### Added
+
+- **Draco decoding in the glTF reader** (`core/src/DracoDecoder.cpp`): a primitive with
+  `KHR_draco_mesh_compression` is decoded in Ray instead of refused. Written from the Draco bitstream
+  specification (version 2.2, the one glTF files carry) and, where the 2017 specification and
+  Google's decoder disagree, after the decoder: bits read least significant first, values decoded
+  even without prediction, the octahedron transforms' center value, the valence traversal's mode
+  byte, and a vertex on a boundary when its left-most corner can't swing left.
+  - Connectivity: sequential (raw or entropy-coded indices) and EdgeBreaker, with the standard and
+    the valence traversals, topology splits and attribute seams (UV and normal seams split a
+    position vertex into attribute vertices).
+  - Attributes: the depth-first and prediction-degree traversals; integer, quantized and
+    octahedral-normal values, raw or rANS-coded (raw and tagged symbols); the difference,
+    parallelogram, constrained multi-parallelogram, portable texture coordinate and geometric
+    normal predictions with the wrap and both octahedron transforms.
+  - Checked against Google's decoder: NASA's Lunar Module decodes to exactly the triangles, normals
+    and colors DracoPy gives (all 97,588 triangles, at 1e-3), and the astronaut matches DracoPy's
+    copy in every vertex its pose script didn't move, positions, normals and texture coordinates
+    alike. Fourteen other NASA models picked at random decode without error and look right.
+  - `format_test` holds the Lunar Module to Google's counts, bounds and sums, and refuses data that
+    isn't Draco, an older bitstream (by its version) and Draco data cut short anywhere.
+  - Point clouds, bitstreams before 2.2 and Draco's deprecated predictions are refused with a reason.
+- **A Blender `.blend` reader** (`core/src/BlendFile.cpp`): a mesh's `file` can be a `.blend` file
+  saved by Blender 2.80 to 4.x. The reader finds every field by name in the file's own structure
+  catalog (SDNA), so it doesn't depend on any one version's layout.
+  - Both of Blender's mesh layouts: MVert, MPoly, MLoop and MLoopUV arrays up to 3.x; the `position`
+    attribute, face offsets, `.corner_vert`, float2 UV maps and `material_index` from 3.5 on.
+  - Every mesh object in the file, or the one a mesh's `node` names, at its world placement: the
+    stored matrix, or for files from 4.2 on (which store none) the matrix built from location,
+    rotation (every Euler order, quaternions, axis-angle), scale, deltas and the parent.
+  - The active UV map, and each material slot's viewport color through `faceColors`, an object's
+    own material overriding its mesh's slot where it says so.
+  - Checked on 29 real Blender files from glTF-Blender-IO's test scenes (Apache-2.0; read for
+    checking, not committed), saved by Blender 2.78 to 5: the 27 that hold their own meshes read
+    (2.78 to 4.02), the one that links its meshes from another `.blend` file and the Blender 5 one
+    are refused with the reason, and the matrices built from location, rotation, scale and parent
+    match the stored ones everywhere but 24 of `A.blend`'s 2,132 triangles, placed by something Ray
+    doesn't evaluate (a constraint or bone parent).
+- **gzip and Zstandard decompression** (`core/src/Decompress.cpp`), for compressed `.blend` files:
+  gzip through the PNG decoder's inflate (now also offered raw, `CPngImage::InflateRaw`), and a
+  Zstandard decoder of Ray's own after RFC 8878: frames and skippable frames (Blender's seek table),
+  raw, RLE and compressed blocks, literals raw, RLE or Huffman-coded in one or four streams (or with
+  the last table), and sequences with predefined, RLE, FSE-described or repeated tables and the
+  three repeat offsets. Files packed at levels from -5 to 22, and Blender's several-frame files, unpack byte
+  for byte.
+- **`tools/make_blend_fixtures.py`** writes `scenes/models/blend_legacy.blend` and
+  `blend_modern.blend` (one in each mesh layout) and their gzip and Zstandard copies, the way
+  Blender writes them, the same every time.
+- **Tests:** `render_blend`, `roundtrip_blend_test` and `network_blend` for `scenes/blend_test.ray`
+  (both fixtures, compressed), with a reference render, a README preview and a place in the
+  Expected output table; and `DracoChecks` and `BlendChecks` in `format_test --textures`: the Lunar
+  Module against Google's decoder; each layout's positions, world placement (moved, turned, scaled,
+  parented), z up turned to y up, faces' outward side, material colors and overrides, the active UV
+  map; one object by name; gzip and Zstandard unpacking byte for byte; and the errors (not a
+  `.blend`, Blender 5, a missing object, files and compressed data cut short, a size limit).
+
+  ![A cube and a pentagon read from Blender's two mesh layouts, Suzanne from a Blender 2.93 file, and NASA's Lunar Module decoded from Draco](docs/images/changelog/blend-draco.png)
+
+  The new test scene; Suzanne read from a Blender 2.93 file (glTF-Blender-IO's `A.blend`, for
+  checking only); and NASA's Lunar Module straight from its original Draco-compressed `.glb`.
+
+### Changed
+
+- **NASA's Lunar Module is committed as NASA ships it**, Draco-compressed (717 KB instead of the
+  4.0 MB plain copy). The astronaut stays the copy with its arms lowered, since posing it is a change
+  to its vertices; `tools/gltf_decompress.py` stays for that. A glTF that requires
+  `KHR_draco_mesh_compression` is no longer refused.
+
+### Fixed
+
+- **The speckles on the AS11-40-5903 astronaut.** They weren't a geometry bug or a shadow
+  offset: they were the noise of the `"objects"` indirect-light method at one ray an object. The
+  suit's own mesh holds every point on it, so it was gathered over the whole half-sphere by a single
+  ray, and a leg in shadow found the other, sunlit leg in only a few of its rays, each counting
+  heavily; the ground's disc lost half its rays below the suit's horizon. The scene now uses the
+  `"hemisphere"` method with four rays, as 2026-alpha-0.20.1's studies recommend for ordinary
+  scenes (at 256×256, 52 CPU-seconds against 38). Only this scene's reference changes.
+
+  ![The AS11-40-5903 recreation before and after](docs/images/changelog/as11-speckles.png)
+
+  Look at the shadowed side of the suit: the white specks are gone and the shadows fill in
+  smoothly.
+
+  ![The recreation beside NASA's AS11-40-5903](docs/images/changelog/as11-40-5903.png)
+
 ## [2026-alpha-0.20.1] - 2026-11-21
 
 Studies and showcases: the torture test sharpened and out of CI, the adaptive sampler able to trust
@@ -2119,7 +2211,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.1...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.2...HEAD
+[2026-alpha-0.20.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.1...2026-alpha-0.20.2
 [2026-alpha-0.20.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20...2026-alpha-0.20.1
 [2026-alpha-0.20]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.19...2026-alpha-0.20
 [2026-alpha-0.19]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...2026-alpha-0.19
