@@ -125,6 +125,17 @@ set(RAY_CORE_SOURCES
     core/src/DirectionalLight.cpp
     core/src/Environment.cpp
     core/src/Haze.cpp
+    core/src/LocalShape.cpp
+    core/src/Torus.cpp
+    core/src/Disc.cpp
+    core/src/Annulus.cpp
+    core/src/Paraboloid.cpp
+    core/src/Hyperboloid.cpp
+    core/src/Superquadric.cpp
+    core/src/RoundedBox.cpp
+    core/src/FontFile.cpp
+    core/src/Outline.cpp
+    core/src/Text.cpp
     core/src/SrgbColorModel.cpp
     core/src/StratifiedSampler.cpp
     core/src/Texture.cpp

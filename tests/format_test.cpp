@@ -50,6 +50,11 @@
 #include "CausticsTexture.h"
 #include "CheckerTexture.h"
 #include "Light.h"
+#include "LocalShape.h"
+#include "FontFile.h"
+#include "Outline.h"
+#include "Text.h"
+#include <map>
 
 
 #include <math.h>
@@ -3924,6 +3929,425 @@ static void SceneEditChecks( void )
     // The model files in scenes/models: Benchy, the colored STLs and the OBJ
     // ring, the mesh tree on Benchy, and a scene's models going into an
     // archive and out beside a JSON file.
+    // The new primitives: hits and normals against worked-out answers, from
+    // outside and inside, far from the origin, in a csg, and saved.
+static bool ShapeHitsAt( CObjects &oObject, CRay oRay, double dT, double dNX, double dNY, double dNZ, double dTolerance = 1e-9 )
+{
+    CVector oHit, oNormal;
+
+    if ( ! oObject.Intersect( oRay, oHit ) || ABS( oRay.GetT() - dT ) > dTolerance || ! oObject.SurfaceNormal( oHit, oNormal ) )
+        return false;
+    return ABS( oNormal.GetX() - dNX ) < 1e-6 && ABS( oNormal.GetY() - dNY ) < 1e-6 && ABS( oNormal.GetZ() - dNZ ) < 1e-6;
+}
+
+static void ShapeChecks( void )
+{
+    CScene      oScene;
+    CObjects   *pObject;
+
+        // The root finder: (x - 1)(x - 2)(x - 3)(x - 4).
+    double anQuartic[ 5 ] = { 24.0, -50.0, 35.0, -10.0, 1.0 };
+    double anRoots[ 4 ];
+    int    nRoots = CLocalShape::PolynomialRoots( anQuartic, 4, 0.0, 5.0, anRoots );
+
+    Check( nRoots == 4 && ABS( anRoots[ 0 ] - 1 ) < 1e-12 && ABS( anRoots[ 1 ] - 2 ) < 1e-12 && ABS( anRoots[ 2 ] - 3 ) < 1e-12 &&
+           ABS( anRoots[ 3 ] - 4 ) < 1e-12, "a quartic's four roots are found exactly, in order" );
+    Check( CLocalShape::PolynomialRoots( anQuartic, 4, 4.5, 9.0, anRoots ) == 0, "no root is found outside the range asked" );
+
+        // A ring of radius 1 and tube 0.25, around y.
+    const char *strTorus = "{ \"type\": \"torus\", \"center\": [0, 0, 0], \"majorRadius\": 1, \"minorRadius\": 0.25 }";
+
+    pObject = FirstObject( oScene, strTorus );
+    if ( pObject )
+    {
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 3.75, 0, 0, -1 ), "a ray hits a torus's outer rim" );
+        Check( Misses( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ) ), "a ray down a torus's hole misses it" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 1, 5, 0, 0, -1, 0 ), 4.75, 0, 1, 0 ), "a ray down onto a torus's tube hits its top" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 1, 0, 0, 1, 0, 0 ), 0.25, 1, 0, 0 ), "a ray from inside a torus's tube leaves by its wall" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 3.75, 0, 0, -1 ) && pObject->IsClosed(), "a torus is a solid" );
+
+            // Leaving the outer rim inward, ignoring itself, it crosses the
+            // tube and the hole to the tube's far wall.
+        CRay    oIn = RayFrom( 0, 0, -1.25, 0, 0, 1 );
+        CVector oHit;
+
+        Check( pObject->Intersect( oIn, oHit, pObject ) && ABS( oIn.GetT() - 0.5 ) < 1e-9,
+               "a ray leaving a torus, ignoring it, meets the tube again" );
+    }
+
+        // The same far from the origin, seen from far away.
+    pObject = FirstObject( oScene, "{ \"type\": \"torus\", \"center\": [100000, 200000, -300000], \"majorRadius\": 1, \"minorRadius\": 0.25 }" );
+    if ( pObject )
+    {
+        Check( ShapeHitsAt( *pObject, RayFrom( 100000, 200000, -1300000, 0, 0, 1 ), 999998.75, 0, 0, -1, 1e-6 ),
+               "a torus far from the origin, seen from a million units away, is hit where it should be" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 100001, 200005, -300000, 0, -1, 0 ), 4.75, 0, 1, 0, 1e-8 ),
+               "a torus far from the origin keeps its precision" );
+    }
+
+        // A torus taken out of a slab: the slab is cut through where the
+        // tube was.
+    pObject = FirstObject( oScene, CsgOf( "difference", "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": [3, 0.3, 3] },"
+                                                        "{ \"type\": \"torus\", \"center\": [0, 0, 0], \"majorRadius\": 1, \"minorRadius\": 0.25 }" ).c_str() );
+    if ( pObject )
+    {
+        Check( Misses( *pObject, RayFrom( 1, 5, 0, 0, -1, 0 ) ), "a slab with a torus taken out is open where the tube was" );
+        Check( CsgHitsAt( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ), 4.85, 0, 1, 0 ), "the slab is whole in the torus's hole" );
+    }
+
+        // Discs and rings.
+    pObject = FirstObject( oScene, "{ \"type\": \"annulus\", \"center\": [0, 0, 0], \"radius\": 1, \"innerRadius\": 0.5 }" );
+    if ( pObject )
+    {
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.75, 5, 0, 0, -1, 0 ), 5.0, 0, 1, 0 ), "a ray hits a ring between its edges" );
+        Check( Misses( *pObject, RayFrom( 0.25, 5, 0, 0, -1, 0 ) ) && Misses( *pObject, RayFrom( 1.2, 5, 0, 0, -1, 0 ) ),
+               "a ray through a ring's hole, or past its rim, misses it" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.75, -5, 0, 0, 1, 0 ), 5.0, 0, 1, 0 ), "a ring is hit from below too" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"disc\", \"center\": [0, 0, 0], \"radius\": 1, \"rotation\": [90, 0, 0] }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.2, 0.3, -5, 0, 0, 1 ), 5.0, 0, 0, 1 ), "a disc turned 90 degrees about x faces +z" );
+
+        // A bowl of radius 1 and height 1, capped.
+    pObject = FirstObject( oScene, "{ \"type\": \"paraboloid\", \"center\": [0, 0, 0], \"radius\": 1, \"height\": 1, \"capped\": true }" );
+    if ( pObject )
+    {
+        double dZ = sqrt( 0.5 ), dL = sqrt( 1.0 + 2.0 );
+
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ), 4.0, 0, 1, 0 ), "a ray hits a capped paraboloid's cap" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, -5, 0, 0, 1, 0 ), 5.0, 0, -1, 0 ), "a ray from below hits a paraboloid's vertex" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0.5, -5, 0, 0, 1 ), 5.0 - dZ, 0, -1.0 / dL, -sqrt( 2.0 ) / dL ),
+               "a ray hits a paraboloid's side, with the normal it should have" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0.5, 0, 0, 0, 1 ), dZ, 0, -1.0 / dL, sqrt( 2.0 ) / dL ),
+               "a ray from inside a paraboloid leaves by its side" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"paraboloid\", \"center\": [0, 0, 0], \"radius\": 1, \"height\": 1 }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ), 5.0, 0, -1, 0 ) && ! pObject->IsClosed(),
+               "an open paraboloid is seen into, down to its vertex" );
+
+        // A hyperboloid with waist 1, ends 2 and height 2 (so k = 3).
+    pObject = FirstObject( oScene, "{ \"type\": \"hyperboloid\", \"center\": [0, 0, 0], \"radius\": 1, \"topRadius\": 2, \"height\": 2, \"capped\": true }" );
+    if ( pObject )
+    {
+        double dL = sqrt( 4.0 + 9.0 );
+
+        Check( ShapeHitsAt( *pObject, RayFrom( -5, 0, 0, 1, 0, 0 ), 4.0, -1, 0, 0 ), "a ray hits a hyperboloid at its waist" );
+        Check( ShapeHitsAt( *pObject, RayFrom( -5, 0.999999, 0, 1, 0, 0 ), 5.0 - sqrt( 1.0 + ( 3.0 * 0.999999 * 0.999999 ) ),
+                            -sqrt( 1.0 + ( 3.0 * 0.999999 * 0.999999 ) ) / sqrt( 1.0 + ( 3.0 * 0.999999 * 0.999999 ) + ( 9.0 * 0.999999 * 0.999999 ) ),
+                            -3.0 * 0.999999 / sqrt( 1.0 + ( 3.0 * 0.999999 * 0.999999 ) + ( 9.0 * 0.999999 * 0.999999 ) ), 0 ),
+               "a ray near a hyperboloid's end hits its flared side" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ), 4.0, 0, 1, 0 ), "a ray hits a capped hyperboloid's top" );
+        (void)dL;
+    }
+
+        // A superquadric with both exponents 1 is a sphere.
+    pObject = FirstObject( oScene, "{ \"type\": \"superquadric\", \"center\": [0, 0, 0], \"radius\": 1, \"e1\": 1, \"e2\": 1 }" );
+    if ( pObject )
+    {
+        double dS = 1.0 / sqrt( 3.0 );
+
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.3, 0.2, -5, 0, 0, 1 ), 5.0 - sqrt( 0.87 ), 0.3, 0.2, -sqrt( 0.87 ) ),
+               "a superquadric with both exponents 1 is a sphere" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, 0, dS, dS, dS ), 1.0, dS, dS, dS ), "a ray from a superquadric's center leaves it" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0.9999, -5, 0, 0, 1 ), 5.0 - sqrt( 1.0 - ( 0.9999 * 0.9999 ) ), 0, 0.9999,
+                            -sqrt( 1.0 - ( 0.9999 * 0.9999 ) ), 1e-9 ),
+               "a ray grazing a superquadric is found (golden-section search)" );
+        Check( Misses( *pObject, RayFrom( 0, 1.0001, -5, 0, 0, 1 ) ), "a ray just past a superquadric misses it" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"superquadric\", \"center\": [0, 0, 0], \"radius\": [1, 2, 1], \"e1\": 0.1, \"e2\": 0.1 }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.3, 0.4, -5, 0, 0, 1 ), 4.0, 0, 0, -1, 1e-6 ),
+               "a superquadric with small exponents is nearly a box, with flat faces" );
+    pObject = FirstObject( oScene, "{ \"type\": \"superquadric\", \"center\": [0, 0, 0], \"radius\": 1, \"e1\": 3, \"e2\": 3 }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( -5, 0, 0, 1, 0, 0 ), 4.0, -1, 0, 0, 1e-9 ) && Misses( *pObject, RayFrom( -5, 0.6, 0.6, 1, 0, 0 ) ),
+               "a pinched superquadric reaches its tips and is thin between them" );
+
+        // A rounded box of size 2 and radius 0.5.
+    pObject = FirstObject( oScene, "{ \"type\": \"roundedBox\", \"center\": [0, 0, 0], \"size\": 2, \"radius\": 0.5 }" );
+    if ( pObject )
+    {
+        double dS = 1.0 / sqrt( 3.0 ), dH = 1.0 / sqrt( 2.0 );
+
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.1, 0.2, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a ray hits a rounded box's flat face" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 5, 5, 5, -dS, -dS, -dS ), sqrt( 75.0 ) - ( sqrt( 0.75 ) + 0.5 ), dS, dS, dS ),
+               "a ray hits a rounded box's corner, which is round" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 5, 5, 0.2, -dH, -dH, 0 ), sqrt( 50.0 ) - ( sqrt( 0.5 ) + 0.5 ), dH, dH, 0 ),
+               "a ray hits a rounded box's edge, which is a quarter cylinder" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, 0, 1, 0, 0 ), 1.0, 1, 0, 0 ), "a ray from inside a rounded box leaves by a face" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"roundedBox\", \"center\": [0, 0, 0], \"size\": 2, \"radius\": 1 }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.3, 0.2, -5, 0, 0, 1 ), 5.0 - sqrt( 0.87 ), 0.3, 0.2, -sqrt( 0.87 ) ),
+               "a rounded box rounded to half its size is a sphere" );
+
+        // Each closed new shape inside a large box (a csg intersection) is
+        // itself: the same hits, from outside and in.
+    const char *astrClosed[] =
+    {
+        "{ \"type\": \"torus\", \"center\": [0, 0, 0], \"majorRadius\": 1, \"minorRadius\": 0.4 }",
+        "{ \"type\": \"paraboloid\", \"center\": [0, -0.5, 0], \"radius\": 1, \"height\": 1, \"capped\": true }",
+        "{ \"type\": \"hyperboloid\", \"center\": [0, 0, 0], \"radius\": 0.6, \"topRadius\": 1, \"height\": 1.5, \"capped\": true }",
+        "{ \"type\": \"superquadric\", \"center\": [0, 0, 0], \"radius\": [1, 0.8, 1.2], \"e1\": 0.5, \"e2\": 1.5 }",
+        "{ \"type\": \"roundedBox\", \"center\": [0, 0, 0], \"size\": [2, 1.5, 1], \"radius\": 0.3, \"rotation\": [10, 20, 30] }",
+    };
+
+    for ( const char *strShape : astrClosed )
+    {
+        CScene      oAlone;
+        CObjects   *pAlone = FirstObject( oAlone, strShape );
+        CObjects   *pInCsg = FirstObject( oScene, CsgOf( "intersection", ( std::string( strShape ) +
+                                                         ", { \"type\": \"box\", \"center\": [0, 0, 0], \"size\": 10 }" ).c_str() ).c_str() );
+        bool        bSame = pAlone && pInCsg && pAlone->IsClosed();
+
+        for ( int nRay = 0; bSame && nRay < 40; nRay++ )
+        {
+            double  dA = nRay * 0.7, dB = nRay * 1.3;
+            CRay    oFirst = RayFrom( 3.0 * cos( dA ), 0.4 * sin( dB ), 3.0 * sin( dA ), -cos( dA ), -0.1 * sin( dB ), -sin( dA ) );
+            CRay    oSecond = oFirst;
+            CVector oHit1, oHit2;
+            bool    bHit1 = pAlone->Intersect( oFirst, oHit1 ) ? true : false;
+            bool    bHit2 = pInCsg->Intersect( oSecond, oHit2 ) ? true : false;
+
+            bSame = ( bHit1 == bHit2 ) && ( ! bHit1 || ABS( oFirst.GetT() - oSecond.GetT() ) < 1e-9 );
+        }
+        Check( bSame, "a closed new shape works in a csg, hit where it is hit alone" );
+    }
+
+        // Every new shape saves and reads back as it was.
+    const char *astrAll[] =
+    {
+        "{ \"type\": \"torus\", \"center\": [1, 2, 3], \"majorRadius\": 1, \"minorRadius\": 0.25, \"rotation\": [10, 0, 5] }",
+        "{ \"type\": \"disc\", \"center\": [0, 1, 0], \"radius\": 2 }",
+        "{ \"type\": \"annulus\", \"center\": [0, 1, 0], \"radius\": 2, \"innerRadius\": 1 }",
+        "{ \"type\": \"paraboloid\", \"center\": [0, 0, 0], \"radius\": 1, \"height\": 2, \"capped\": true }",
+        "{ \"type\": \"hyperboloid\", \"center\": [0, 0, 0], \"radius\": 1, \"topRadius\": 1.5, \"height\": 2 }",
+        "{ \"type\": \"superquadric\", \"center\": [0, 0, 0], \"radius\": [1, 2, 3], \"e1\": 0.5, \"e2\": 2 }",
+        "{ \"type\": \"roundedBox\", \"center\": [0, 0, 0], \"size\": [1, 2, 3], \"radius\": 0.25 }",
+    };
+
+    for ( const char *strShape : astrAll )
+    {
+        CScene oAgain;
+
+        if ( FirstObject( oScene, strShape ) )
+        {
+            std::string strSaved = oScene.ToJson();
+
+            Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "a new shape reads back as it was saved" );
+        }
+    }
+
+        // Bad settings are reported.
+    std::string strObjects = "\"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 } ]";
+
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"torus\", \"center\": [0, 0, 0], \"majorRadius\": 1, \"minorRadius\": 0 } ]" ),
+                 BAD_FILE, "minorRadius must be more than 0" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"annulus\", \"center\": [0, 0, 0], \"radius\": 1 } ]" ),
+                 BAD_FILE, "innerRadius" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"disc\", \"center\": [0, 0, 0], \"radius\": 1, \"innerRadius\": 2 } ]" ),
+                 BAD_FILE, "innerRadius must be at least 0 and less than the radius" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"hyperboloid\", \"center\": [0, 0, 0], \"radius\": 2, \"topRadius\": 1, \"height\": 1 } ]" ),
+                 BAD_FILE, "topRadius must be at least the radius" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"superquadric\", \"center\": [0, 0, 0], \"radius\": 1, \"e1\": 0 } ]" ),
+                 BAD_FILE, "e1 and e2 must be from 0.05 to 10" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"roundedBox\", \"center\": [0, 0, 0], \"size\": 1, \"radius\": 0.6 } ]" ),
+                 BAD_FILE, "at most half the smallest size" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"torus\", \"center\": [0, 0, 0], \"majorRadius\": 1, \"minorRadius\": 0.2, \"spin\": 1 } ]" ),
+                 BAD_FILE, "spin" );
+}
+
+    // Fonts and text: glyphs read from the scene's font, outlines filled
+    // exactly, extruded text closed, and fonts Ray can't read refused.
+static void TextChecks( const char *strScenes )
+{
+    std::string strFontFile = std::string( strScenes ) + "/fonts/Lato-Bold.ttf";
+    std::string strData = ReadFile( strFontFile );
+    CFontFile   oFont;
+    std::string strError;
+
+    Check( oFont.Load( strData, strError ), "the scene font loads" );
+    if ( strError.empty() )
+    {
+        int nA = oFont.GlyphIndex( 'A' ), nV = oFont.GlyphIndex( 'V' ), nO = oFont.GlyphIndex( 'o' ), nB = oFont.GlyphIndex( 'B' );
+        std::vector<CFontFile::Contour> aoContours;
+
+        Check( oFont.UnitsPerEm() == 2000 && nA > 0 && oFont.Advance( nA ) > 0, "Lato's em and the A's advance are read" );
+        Check( oFont.GlyphIndex( 0x10FFFF ) == 0, "a character the font lacks gives the missing glyph" );
+        Check( oFont.Outline( nO, aoContours, strError ) && aoContours.size() == 2, "an o is two outlines: its bowl and its counter" );
+        Check( oFont.Outline( nB, aoContours, strError ) && aoContours.size() == 3, "a B is three outlines" );
+        Check( oFont.HasKerning() && oFont.Kerning( nA, nV ) < 0, "A and V are kerned closer (GPOS pair kerning)" );
+        Check( oFont.Outline( oFont.GlyphIndex( ' ' ), aoContours, strError ) && aoContours.empty(), "a space has no outline" );
+
+            // Every glyph of a sample fills exactly: its triangles' area is
+            // the area its outlines enclose, holes taken out.
+        bool bExact = true;
+
+        for ( const char *p = "ABOR8g%@&Qeaj"; *p && bExact; p++ )
+        {
+            std::vector<Outline::Polygon> aoOutlines;
+            Outline::SShape               oShape;
+            double                        dLoops = 0.0, dTriangles = 0.0;
+
+            if ( ! oFont.Outline( oFont.GlyphIndex( (uint32_t)*p ), aoContours, strError ) )
+            {
+                bExact = false;
+                break;
+            }
+            for ( const CFontFile::Contour &oContour : aoContours )
+                aoOutlines.push_back( Outline::Flatten( oContour, 2.0 ) );
+            if ( ! Outline::Fill( aoOutlines, oShape, strError ) )
+            {
+                bExact = false;
+                break;
+            }
+            for ( const std::vector<int> &anLoop : oShape.aanLoops )
+            {
+                Outline::Polygon oLoop;
+
+                for ( int i : anLoop )
+                    oLoop.push_back( oShape.aoPoints[ (size_t)i ] );
+                dLoops += Outline::SignedArea2( oLoop );
+            }
+            for ( size_t t = 0; t + 2 < oShape.anTriangles.size(); t += 3 )
+            {
+                const Outline::SPoint &a = oShape.aoPoints[ (size_t)oShape.anTriangles[ t ] ];
+                const Outline::SPoint &b = oShape.aoPoints[ (size_t)oShape.anTriangles[ t + 1 ] ];
+                const Outline::SPoint &c = oShape.aoPoints[ (size_t)oShape.anTriangles[ t + 2 ] ];
+                double                 dArea = ( ( b.x - a.x ) * ( c.y - a.y ) ) - ( ( b.y - a.y ) * ( c.x - a.x ) );
+
+                if ( dArea < 0.0 )
+                    bExact = false;
+                dTriangles += dArea;
+            }
+            if ( ! ( dLoops > 0.0 ) || ABS( dTriangles - dLoops ) > 1e-9 * dLoops )
+            {
+                fprintf( stderr, "  glyph %c: outlines %.6f, triangles %.6f\n", *p, dLoops, dTriangles );
+                bExact = false;
+            }
+        }
+        Check( bExact, "glyphs are cut into triangles that cover exactly the area their outlines enclose" );
+    }
+
+        // Where to aim through letters: the left tenth of the R (its stem)
+        // and the middle of the I, in ems, from their outlines.
+    double dStemR = 0.12, dStemI = 0.15;
+
+    for ( int nLetter = 0; nLetter < 2 && strError.empty(); nLetter++ )
+    {
+        std::vector<CFontFile::Contour> aoContours;
+        double                          dLow = 1e300, dHigh = -1e300;
+
+        if ( oFont.Outline( oFont.GlyphIndex( nLetter ? 'I' : 'R' ), aoContours, strError ) )
+        {
+            for ( const CFontFile::Contour &oContour : aoContours )
+            {
+                for ( const CFontFile::SPoint &oPoint : oContour )
+                {
+                    dLow = ( std::min )( dLow, oPoint.x );
+                    dHigh = ( std::max )( dHigh, oPoint.x );
+                }
+            }
+            if ( nLetter )
+                dStemI = ( dLow + dHigh ) / 2.0 / oFont.UnitsPerEm();
+            else
+                dStemR = ( dLow + ( 0.1 * ( dHigh - dLow ) ) ) / oFont.UnitsPerEm();
+        }
+    }
+
+        // Fonts Ray can't read are refused with a reason.
+    CFontFile   oBad;
+    std::string strCff( "OTTO\0\0\0\0\0\0\0\0", 12 );
+
+    Check( ! oBad.Load( strCff, strError ) && strError.find( "CFF" ) != std::string::npos, "a font with CFF outlines is refused, saying why" );
+    Check( ! oBad.Load( strData.substr( 0, 200 ), strError ), "a cut-off font is refused" );
+    Check( ! oBad.Load( "not a font at all", strError ), "something that isn't a font is refused" );
+
+        // Extruded text is a closed mesh: every edge (by position) is shared
+        // by exactly two faces.
+    CScene      oScene;
+    std::string strText = "{ \"type\": \"text\", \"string\": \"Ray 8%\", \"font\": \"" + strFontFile + "\", \"size\": 1, \"depth\": 0.25 }";
+    CText      *pText = dynamic_cast<CText *>( FirstObject( oScene, strText.c_str() ) );
+
+    Check( pText != NULL && pText->GetFaceCount() > 100, "text loads, extruded into a mesh" );
+    if ( pText && pText->GetGeometry() )
+    {
+        const CMesh::SGeometry                     &oGeometry = *pText->GetGeometry();
+        std::map< std::vector<long long>, int >     oEdges;
+        auto                                        Key = [ &oGeometry ]( int a, int b )
+        {
+            std::vector<long long> anKey;
+            CVector                oA( oGeometry.aoVertices[ (size_t)a ] ), oB( oGeometry.aoVertices[ (size_t)b ] );
+            long long              anA[ 3 ] = { llround( oA.GetX() * 1e7 ), llround( oA.GetY() * 1e7 ), llround( oA.GetZ() * 1e7 ) };
+            long long              anB[ 3 ] = { llround( oB.GetX() * 1e7 ), llround( oB.GetY() * 1e7 ), llround( oB.GetZ() * 1e7 ) };
+
+            if ( std::lexicographical_compare( anB, anB + 3, anA, anA + 3 ) )
+                std::swap( anA, anB );
+            anKey.assign( anA, anA + 3 );
+            anKey.insert( anKey.end(), anB, anB + 3 );
+            return anKey;
+        };
+
+        for ( size_t f = 0; f + 2 < oGeometry.anKept.size(); f += 3 )
+        {
+            for ( int k = 0; k < 3; k++ )
+                oEdges[ Key( oGeometry.anKept[ f + (size_t)k ], oGeometry.anKept[ f + (size_t)( ( k + 1 ) % 3 ) ] ) ]++;
+        }
+
+        size_t nOpen = 0;
+
+        for ( const auto &oEdge : oEdges )
+            nOpen += ( oEdge.second != 2 ) ? 1 : 0;
+        Check( nOpen == 0, "extruded text is watertight: every edge joins exactly two faces" );
+
+            // A ray through the stem of the R hits its face; one through the
+            // counter of the 8 passes through.
+        CRay    oStem = RayFrom( dStemR, 0.35, -5, 0, 0, 1 );
+        CVector oHit, oNormal;
+
+        BOOL      bFlip = FALSE;
+        CObjects *pFace = pText->Intersect( oStem, oHit ) ? pText->HitPart( bFlip ) : NULL;
+
+        Check( pFace && ABS( oStem.GetT() - 5.0 ) < 1e-9 && pFace->SurfaceNormal( oHit, oNormal ) && oNormal.GetZ() < -0.999,
+               "a ray hits the face of a letter, facing the viewer" );
+    }
+
+        // Text saves and reads back, and it works in a csg.
+    if ( pText )
+    {
+        std::string strSaved = oScene.ToJson();
+        CScene      oAgain;
+
+        Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "text reads back as it was saved" );
+    }
+
+    std::string strCarved = CsgOf( "difference", ( "{ \"type\": \"box\", \"center\": [0.3, 0.35, 0], \"size\": [1, 1, 0.2] }, "
+                                                   "{ \"type\": \"text\", \"string\": \"I\", \"font\": \"" + strFontFile +
+                                                   "\", \"size\": 1, \"depth\": 1, \"position\": [0, 0, -0.5] }" ).c_str() );
+    CObjects   *pCarved = FirstObject( oScene, strCarved.c_str() );
+
+    if ( pCarved && pText )
+    {
+            // The I's stem: from its outline, about x = 0.08 to 0.22 em.
+        Check( Misses( *pCarved, RayFrom( dStemI, 0.35, -5, 0, 0, 1 ) ), "a letter taken out of a slab with a csg leaves a hole through it" );
+        Check( CsgHitsAt( *pCarved, RayFrom( 0.6, 0.35, -5, 0, 0, 1 ), 4.9, 0, 0, -1 ), "the slab is whole beside the letter" );
+    }
+
+        // Bad settings are reported.
+    std::string strObjects = "\"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 } ]";
+    std::string strFont = "\"font\": \"" + strFontFile + "\"";
+
+    ExpectError( Minimal( strObjects.c_str(), ( "\"objects\": [ { \"type\": \"text\", \"string\": \"A\", " + strFont + ", \"align\": \"middle\" } ]" ).c_str() ),
+                 BAD_FILE, "unknown align" );
+    ExpectError( Minimal( strObjects.c_str(), ( "\"objects\": [ { \"type\": \"text\", \"string\": \"   \", " + strFont + " } ]" ).c_str() ),
+                 BAD_FILE, "nothing to draw" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"text\", \"string\": \"A\", \"font\": \"no/such/font.ttf\" } ]" ),
+                 BAD_FILE, "can't open the font" );
+    ExpectError( Minimal( strObjects.c_str(), ( "\"objects\": [ { \"type\": \"text\", \"string\": \"A\", " + strFont + ", \"bevel\": 0.5, \"depth\": 0.2 } ]" ).c_str() ),
+                 BAD_FILE, "bevel must be at least 0 and less than the depth" );
+}
+
     // A solid checker of black and white cells strSize across, as JSON.
 static std::string Checker( const char *strSize = "1" )
 {
@@ -4194,6 +4618,7 @@ int main( int argc, char **argv )
         SceneTreeChecks( argv[ 2 ] );
         LensTableChecks( argv[ 2 ] );
         ModelFileChecks( argv[ 2 ], argv[ 3 ] );
+        TextChecks( argv[ 2 ] );
     }
     else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );
@@ -4225,6 +4650,7 @@ int main( int argc, char **argv )
         ModelChecks();
         SceneEditChecks();
         MapChecks();
+        ShapeChecks();
     }
 
     if ( g_nFailures == 0 )

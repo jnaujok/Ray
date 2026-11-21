@@ -2,6 +2,7 @@
 #include "Tessellator.h"
 
 #include "Mesh.h"
+#include "LocalShape.h"
 #include "Objects.h"
 #include "Scene.h"
 #include "SceneJson.h"
@@ -91,7 +92,7 @@ namespace RayEditor
 
         void Sphere( SDrawMesh &oMesh, const SVec3 &c, double r, int nSegments )
         {
-            int nRings = std::max( 4, nSegments / 2 );
+            int nRings = (std::max)( 4, nSegments / 2 );
 
             for ( int j = 0; j < nRings; j++ )
             {
@@ -238,9 +239,9 @@ namespace RayEditor
                 if ( strType == "diffuse" && ! pChosen )
                     pChosen = pMaterial;
                 else if ( strType == "transparent" )
-                    nTransparent = std::max( nTransparent, Number( *pMaterial, "influence", 0.0 ) );
+                    nTransparent = (std::max)( nTransparent, Number( *pMaterial, "influence", 0.0 ) );
                 else if ( strType == "reflective" )
-                    nReflective = std::max( nReflective, Number( *pMaterial, "influence", 0.0 ) );
+                    nReflective = (std::max)( nReflective, Number( *pMaterial, "influence", 0.0 ) );
             }
             if ( ! pChosen && nTransparent <= 0.5 && nReflective <= 0.5 )
             {
@@ -316,7 +317,7 @@ namespace RayEditor
             anColor[ 3 ] = 0.35f;
         }
         for ( int i = 0; i < 3; i++ )
-            anColor[ i ] = std::min( 1.0f, std::max( 0.0f, anColor[ i ] ) );
+            anColor[ i ] = (std::min)( 1.0f, (std::max)( 0.0f, anColor[ i ] ) );
     }
 
     bool TessellateObject( const IASLib::CJsonNode &oObject, CObjects *pObject, int nObject, double nPlane,
@@ -388,7 +389,40 @@ namespace RayEditor
                 return false;
             FlatTriangle( oMesh, a, b, c );
         }
-        else if ( strType == "mesh" )
+        else if ( strType == "torus" || strType == "disc" || strType == "annulus" || strType == "paraboloid" ||
+                  strType == "hyperboloid" || strType == "superquadric" || strType == "roundedBox" )
+        {
+                // The core draws its own shapes (a csg part has no object of
+                // its own here, so one is made from its JSON).
+            std::unique_ptr<CObjects> pMade;
+            CLocalShape              *pShape = dynamic_cast<CLocalShape *>( pObject );
+
+            if ( ! pShape )
+            {
+                CDynList oTypes;
+
+                pMade.reset( oTypes.Create( strType.c_str() ) );
+                pShape = dynamic_cast<CLocalShape *>( pMade.get() );
+                if ( ! pShape || ! pShape->FromJson( oObject ) )
+                    return false;
+            }
+
+            std::vector<FLT> anPositions, anNormals;
+
+            pShape->Triangles( nSegments, anPositions, anNormals );
+            for ( size_t n = 0; n + 8 < anPositions.size(); n += 9 )
+            {
+                SVec3 p[ 3 ], q[ 3 ];
+
+                for ( int k = 0; k < 3; k++ )
+                {
+                    p[ k ] = SVec3( anPositions[ n + 3 * k ], anPositions[ n + 3 * k + 1 ], anPositions[ n + 3 * k + 2 ] );
+                    q[ k ] = SVec3( anNormals[ n + 3 * k ], anNormals[ n + 3 * k + 1 ], anNormals[ n + 3 * k + 2 ] );
+                }
+                Triangle( oMesh, p[ 0 ], p[ 1 ], p[ 2 ], q[ 0 ], q[ 1 ], q[ 2 ] );
+            }
+        }
+        else if ( strType == "mesh" || strType == "text" )
         {
             CMesh *pMesh = dynamic_cast<CMesh *>( pObject );
 
@@ -454,12 +488,12 @@ namespace RayEditor
     {
         std::string strType = Text( oLight, "type" );
         SVec3       p, d, c;
-        double      s = std::max( 1e-3, nSize * 0.08 );
+        double      s = (std::max)( 1e-3, nSize * 0.08 );
 
         oOut.nLight = nLight;
         if ( JsonVector( Get( oLight, "color" ), c ) )
         {
-            double nMax = std::max( c.x, std::max( c.y, c.z ) );
+            double nMax = (std::max)( c.x, (std::max)( c.y, c.z ) );
 
             if ( nMax > 0.0 )
             {
@@ -529,7 +563,7 @@ namespace RayEditor
 
                 double nAngle = Number( oLight, "angle", 30.0 );
                 double nLength = nSize * 0.3;
-                double r = nLength * std::tan( std::min( 89.0, nAngle ) * EDITOR_PI / 180.0 );
+                double r = nLength * std::tan( (std::min)( 89.0, nAngle ) * EDITOR_PI / 180.0 );
                 SVec3  u = Perpendicular( d ), v = d.Cross( u ).Normalized();
                 SVec3  oEnd = p + ( d * nLength );
 
@@ -602,8 +636,8 @@ namespace RayEditor
                 }
                 else
                 {
-                    oOut.oMinimum = SVec3( std::min( oOut.oMinimum.x, a.x ), std::min( oOut.oMinimum.y, a.y ), std::min( oOut.oMinimum.z, a.z ) );
-                    oOut.oMaximum = SVec3( std::max( oOut.oMaximum.x, b.x ), std::max( oOut.oMaximum.y, b.y ), std::max( oOut.oMaximum.z, b.z ) );
+                    oOut.oMinimum = SVec3( (std::min)( oOut.oMinimum.x, a.x ), (std::min)( oOut.oMinimum.y, a.y ), (std::min)( oOut.oMinimum.z, a.z ) );
+                    oOut.oMaximum = SVec3( (std::max)( oOut.oMaximum.x, b.x ), (std::max)( oOut.oMaximum.y, b.y ), (std::max)( oOut.oMaximum.z, b.z ) );
                 }
             }
         }
@@ -614,7 +648,7 @@ namespace RayEditor
         }
 
         SVec3   oCenter = ( oOut.oMinimum + oOut.oMaximum ) * 0.5;
-        double  nSize = std::max( 1.0, ( oOut.oMaximum - oOut.oMinimum ).Length() );
+        double  nSize = (std::max)( 1.0, ( oOut.oMaximum - oOut.oMinimum ).Length() );
 
         for ( int i = 0; i < oScene.GetObjectCount(); i++ )
         {

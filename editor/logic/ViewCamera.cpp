@@ -14,7 +14,7 @@ namespace RayEditor
         m_oEye = oEye;
         m_oTarget = oTarget;
         m_oUp = ( oUp.Length() > 0.0 ) ? oUp.Normalized() : SVec3( 0.0, 1.0, 0.0 );
-        m_nFovY = std::min( 170.0, std::max( 1.0, nFovY ) );
+        m_nFovY = (std::min)( 170.0, (std::max)( 1.0, nFovY ) );
         if ( ( m_oTarget - m_oEye ).Length() <= 0.0 )
             m_oTarget = m_oEye + SVec3( 0.0, 0.0, 1.0 );
     }
@@ -51,8 +51,8 @@ namespace RayEditor
         oOffset = oAlong + ( oAcross * std::cos( nYawRad ) ) + ( oSide * std::sin( nYawRad ) );
 
             // Pitch: toward or away from the up direction, short of it.
-        double nElevation = std::asin( std::max( -1.0, std::min( 1.0, oOffset.Normalized().Dot( oUp ) ) ) ) * 180.0 / EDITOR_PI;
-        double nNew = std::max( -89.0, std::min( 89.0, nElevation + nPitch ) );
+        double nElevation = std::asin( (std::max)( -1.0, (std::min)( 1.0, oOffset.Normalized().Dot( oUp ) ) ) ) * 180.0 / EDITOR_PI;
+        double nNew = (std::max)( -89.0, (std::min)( 89.0, nElevation + nPitch ) );
         SVec3  oFlat = ( oOffset - ( oUp * oOffset.Dot( oUp ) ) ).Normalized();
 
         if ( oFlat.Length() <= 0.0 )
@@ -87,8 +87,8 @@ namespace RayEditor
     void CViewCamera::Frame( const SVec3 &oMinimum, const SVec3 &oMaximum )
     {
         SVec3   oCenter = ( oMinimum + oMaximum ) * 0.5;
-        double  nRadius = std::max( 1e-3, ( oMaximum - oMinimum ).Length() * 0.5 );
-        double  nDistance = nRadius / std::sin( std::min( 80.0, m_nFovY * 0.5 ) * EDITOR_PI / 180.0 );
+        double  nRadius = (std::max)( 1e-3, ( oMaximum - oMinimum ).Length() * 0.5 );
+        double  nDistance = nRadius / std::sin( (std::min)( 80.0, m_nFovY * 0.5 ) * EDITOR_PI / 180.0 );
         SVec3   oBack = ( m_oEye - m_oTarget ).Normalized();
 
         if ( oBack.Length() <= 0.0 )

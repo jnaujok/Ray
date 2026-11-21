@@ -22,7 +22,7 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), a polished gold torus standing on its rim, the word "RAY" in beveled red letters (Lato Bold) standing on top of the mirror frame, on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
@@ -39,6 +39,8 @@ when the binary format was dropped; they are in the repository's history.
 | `maps_test.ray` | | Texture maps: a glass ball frosted in patches (its `roughness` a `cells` texture), a mirror ball polished in patches (`noise` roughness), a glass ball whose index wanders from 1.1 to 1.9, a lace panel of clear glass and blue paint in a solid checker (each material's `influence` a texture), a floor bumped by noise whose `depth` varies by `cells`, and a spot light whose `tint` is a `marble` texture and whose `intensity` is `cells`, both read at the point it lights; a 3×3 stratified sampler |
 | `volume_test.ray` | | Textures inside glass (`attenuationColor` as a texture): art glass with blue and red `marble` swirls, smoky quartz (`noise`), amber with dark flecks (`cells`), and gray veins floating in a clear block (`marble`); a 3×3 stratified sampler |
 | `benchy_test.ray` | | 3DBenchy (`models/3DBenchy.stl`, 225,706 triangles) printed in orange plastic, close up on its bow, its 0.1 mm layer lines a `layers` texture for both its color and its bump map, with a 3×3 stratified sampler |
+| `shapes_test.ray` | | The shapes of 0.16: a red torus tilted toward the camera, a gold disc standing up, a blue annulus on the floor, an open mirror-polished paraboloid (a dish), a capped green hyperboloid, a purple superquadric that is nearly a rounded cube (`e1` and `e2` 0.35), an orange pinched star (both 2.6) and a rounded box, with the `corners` sampler |
+| `text_test.ray` | | Text from a TrueType font (`fonts/Lato-Bold.ttf`): "Ray 0.16" in beveled gold letters, "Typeset in / Lato Bold" in two centered lines, turned, and "CSG" carved out of a rounded slab (a csg difference), with the `corners` sampler |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -246,6 +248,14 @@ color, not used in shading), `materials` (default: one diffuse material), and op
 | `triangle` | `corners` (required): three points; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each corner; `uvs`: a `[u, v]` for each corner |
 | `mesh` | `vertices` (required): points; `faces` (required): three vertex indices each, from 0; `doubleSided` (default `false`); `smooth` (default `false`, or `true` with `normals`); `normals`: one for each vertex; `uvs`: one for each vertex, or `uvMap` (below). Or, instead of `vertices`, `faces`, `normals` and `uvs`, a model `file` (an STL or OBJ file) and its placement: see *Model files* below |
 | `csg` | `operation` (required): `"union"`, `"intersection"` or `"difference"`; `objects` (required): two or more closed shapes; `childMaterials` (default `false`) |
+| `torus` | `center` (required); `majorRadius` (required): from the center to the middle of the tube; `minorRadius` (required): the tube's radius; `rotation` |
+| `disc` | `center` (required); `radius` (required); `innerRadius` (default `0`, less than `radius`): a hole in the middle; `rotation` |
+| `annulus` | a `disc` whose `innerRadius` (required) is more than 0 |
+| `paraboloid` | `center` (required): the bowl's lowest point; `radius` (required): its rim's; `height` (required); `capped` (default `false`); `rotation` |
+| `hyperboloid` | `center` (required); `radius` (required): at its waist; `topRadius` (required, at least `radius`): at both ends; `height` (required); `capped` (default `false`); `rotation` |
+| `superquadric` | `center` (required); `radius` (required): one number, or `[x, y, z]`; `e1` and `e2` (default `1`, from 0.05 to 10): its shape from pole to pole and around; `rotation` |
+| `roundedBox` | `center` (required); `size` (required): one number for a cube, or `[x, y, z]`; `radius` (required): the edges' and corners', more than 0 and at most half the smallest size; `rotation` |
+| `text` | `string` (required, UTF-8; `\n` starts a new line); `font` (required): a TrueType font file; `size` (default `1`): the em in scene units; `depth` (default `0.2`); `bevel` (default `0`, less than `depth`); `align` (default `"left"`, or `"center"` or `"right"`); `lineSpacing` (default `1`); `kerning` (default `true`); `position` (default `[0, 0, 0]`); `rotation` |
 
 A cylinder or cone points from `base` to `top`, any way. Capped, its ends are closed with flat discs
 and it is a solid; with `"capped": false` it is an open shell, seen into from its ends, and it
@@ -253,10 +263,55 @@ shadows and reflects itself inside. A cone's radii can't be negative or both 0, 
 `top` can't be the same point. A box is centered on `center`, `size` long along its own axes, which
 `rotation` turns from the scene's x, y and z.
 
+**Tori, discs, quadrics, superquadrics and rounded boxes.** These stand on their own +y before
+their `rotation` (default `[0, 0, 0]`: degrees about x, then y, then z, as a box's) turns them, and
+are centered on `center`:
+
+- A **torus** lies around +y: the circle of `minorRadius` swept around at `majorRadius`. A ray meets
+  it where a quartic is zero; the quartic is set up from where the ray enters the torus's bounding
+  sphere, so it keeps its precision far from the origin and far from the camera, and each root is
+  found by bisection between its turning points. Surface coordinates: u around +y, v around the tube.
+- A **disc** (or an **annulus**, with a hole of `innerRadius`) faces +y and is shaded on whichever
+  side a ray sees. Surface coordinates: u around, v from the inner edge to the rim.
+- A **paraboloid** is a bowl, x² + z² = (radius² / height) y, from its lowest point at the center up
+  to its rim. A **hyperboloid** (of one sheet, like a cooling tower) runs `height` along +y, half
+  above the center and half below, `radius` wide at its waist and `topRadius` at both ends (equal,
+  it is a cylinder). Open (the default), either is a shell seen from both sides; `"capped": true`
+  closes its ends with flat discs. Surface coordinates: u around, v from bottom to top; a cap holds
+  the unit square.
+- A **superquadric** (a superellipsoid) is ( |x/a|^(2/e2) + |z/c|^(2/e2) )^(e2/e1) + |y/b|^(2/e1)
+  ≤ 1, with `radius` a, b, c. `e1` shapes it from pole to pole and `e2` around: both 1 is an
+  ellipsoid (a sphere for equal radii), near 0 a box with sharp edges, 2 a double cone or an
+  octahedron, above 2 a pinched star. With both at most 2 it is convex and a ray finds it exactly,
+  grazing rays too; above 2 the ray steps 256 times through its box, which can miss parts thinner
+  than a step.
+- A **rounded box** is a box of `size` whose edges and corners are rounded to `radius` (half every
+  size is a sphere). It is exactly a smaller box grown by the radius, found with no stepping.
+
+The torus, the superquadric, the rounded box, and a capped paraboloid or hyperboloid are solids, so a
+csg can use them; discs and open quadrics can't. Bump maps, textures and maps work on all of them.
+
+**Text.** A `text` object sets its `string` in a TrueType `font` (a `.ttf`, or an `.otf` with
+TrueType outlines; fonts with CFF outlines and font collections are refused, saying why) and
+extrudes it into a closed mesh, so it takes any material, works in a csg (letters carved out of a
+slab) and casts and catches shadows. The text lies in its own x–y plane with y up: the first
+line's baseline starts at `position` (`"left"`), is centered on it (`"center"`) or ends at it
+(`"right"`), and each line below the last by the font's line height times `lineSpacing`. The face is
+at z = 0 facing −z, and the letters run `depth` back along +z; then `rotation` turns them about
+`position`. `size` is the font's em (a capital letter is about 0.7 of it). Curves are flattened to
+within 0.15% of the em, holes found from how a glyph's outlines nest (so either winding works),
+and the face cut into triangles; the sides are smooth around curves and sharp at corners of more
+than 35°. `bevel` cuts the front edges at 45°, `bevel` deep (a stroke too thin for it is left
+square). Kerning comes from the font, its `kern` table or its OpenType GPOS pair kerning, unless
+`"kerning": false`. Hinting is ignored. The font file goes into a saved scene's archive, and to
+networked engines inside the scene (as `data`), like a model file. Surface coordinates: x and y in
+the text's plane, one unit per em. `text_test.ray` uses Lato Bold (`scenes/fonts/`, SIL Open Font
+License 1.1).
+
 **Constructive solid geometry.** A `csg` is a solid made from others: a `"union"` is inside any of
 them, an `"intersection"` inside all of them, and a `"difference"` inside the first and none of the
-rest. Its `objects` are written as in the scene's own list, and can be any closed shapes: spheres,
-boxes, capped cylinders and cones, meshes (which must be closed; a mesh with holes gives wrong
+rest. Its `objects` are written as in the scene's own list, and can be any closed shapes: spheres, tori, superquadrics, rounded boxes,
+boxes, capped cylinders, cones, paraboloids and hyperboloids, text, meshes (which must be closed; a mesh with holes gives wrong
 results) and other csgs. Planes, triangles and open cylinders and cones are refused. A csg has
 its own `materials` and `bump`, and shades as one object, so glass made of parts is entered and
 left as one piece; its parts' materials and bump maps are ignored. With `"childMaterials": true`
@@ -622,7 +677,8 @@ same image, and networked engines give exactly the same as threads.
   (`"preset"` in a texture or a materials entry), the `cells` and `caustics` textures, a solid
   texture's `stretch`, and lights' `attenuation`, `filter` and beam `profile` (2026-alpha-0.14),
   and texture maps for material, bump and light settings, and a transparent material's
-  `attenuationStep` (2026-alpha-0.15).
+  `attenuationStep` (2026-alpha-0.15), and the `torus`, `disc`, `annulus`, `paraboloid`, `hyperboloid`,
+  `superquadric`, `roundedBox` and `text` objects (2026-alpha-0.16).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

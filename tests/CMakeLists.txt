@@ -44,6 +44,11 @@ set(RAY_COLOR_SCENE scan_test)
 
 add_test(NAME ray_stream_format COMMAND format_test)
 
+# Windows headers make min and max macros; this catches calls that would break
+# the Windows build, on every platform.
+add_test(NAME lint_minmax
+         COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/LintMinMax.cmake)
+
 foreach(scene IN LISTS RAY_TEST_SCENES)
     set(scene_file "${PROJECT_SOURCE_DIR}/scenes/${scene}.ray")
 
@@ -316,6 +321,32 @@ add_test(NAME render_volume
 set_tests_properties(render_volume PROPERTIES FIXTURES_SETUP render_volume TIMEOUT 300)
 add_test(NAME roundtrip_volume_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/volume_test.ray ${RENDER_DIR})
 
+# The shapes of 0.16: a torus, a disc and an annulus, an open paraboloid, a
+# capped hyperboloid, a rounded and a pinched superquadric, and a rounded box.
+add_test(NAME render_shapes
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/shapes_test.ray
+                 -DOUTPUT=${RENDER_DIR}/shapes_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/shapes_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_shapes PROPERTIES FIXTURES_SETUP render_shapes TIMEOUT 300)
+add_test(NAME roundtrip_shapes_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/shapes_test.ray ${RENDER_DIR})
+
+# Text from a TrueType font: beveled gold letters, two lines set centered,
+# and a word carved out of a rounded slab with a csg.
+add_test(NAME render_text
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/text_test.ray
+                 -DOUTPUT=${RENDER_DIR}/text_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/text_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_text PROPERTIES FIXTURES_SETUP render_text TIMEOUT 300)
+add_test(NAME roundtrip_text_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/text_test.ray ${RENDER_DIR})
+
 # An environment map: an HDR sky behind the scene, in a mirror ball and
 # through a glass one, lighting the diffuse surfaces (image-based lighting).
 add_test(NAME render_environment
@@ -495,7 +526,7 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 # networked engines intact. Engines get texture images, PNGs, the sky and
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
-                       materials projector underwater environment csg prism models benchy maps volume)
+                       materials projector underwater environment csg prism models benchy maps volume shapes text)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 
