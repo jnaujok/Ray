@@ -43,6 +43,8 @@ when the binary format was dropped; they are in the repository's history.
 | `text_test.ray` | | Text from a TrueType font (`fonts/Lato-Bold.ttf`): "Ray 0.16" in beveled gold letters, "Typeset in / Lato Bold" in two centered lines, turned, and "CSG" carved out of a rounded slab (a csg difference), with the `corners` sampler |
 | `patches_test.ray` | | Bezier patches: the Utah teapot as Martin Newell's 32 bicubic patches (`models/teapot.bpt`, traced exactly) on the right, beside the mesh teapot made from them on the left, in the same red glaze, with the `corners` sampler |
 | `nurbs_test.ray` | | B-spline and NURBS surfaces: a gold torus made of rational quadratic circles both ways (a `bspline` with weights) in front of the analytic `torus` of the same size, and a bicubic B-spline sheet, gently waved, with `textures/uv_grid.ppm` running across all its patches and a fine noise bump, with the `corners` sampler |
+| `lathe_test.ray` | | Solids of revolution: a black pawn and a white rook (profiles of lines and curves), a black queen (a smooth profile through points), a glass goblet, an open terracotta vase (the `terracotta` preset; an open profile, a shell) and an orange with a quarter cut away (`sweep` 270), with the `corners` sampler |
+| `extrusion_test.ray` | | Extrusions and sweeps: a gold star tapered to a point, a blue square column twisted 120 degrees, a red frame with a round hole beveled front and back, a steel spring and a green closed loop of tube (sweeps along smooth paths) and a brown zigzag rail with a square cross-section, with the `corners` sampler |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -258,6 +260,9 @@ color, not used in shading), `materials` (default: one diffuse material), and op
 | `superquadric` | `center` (required); `radius` (required): one number, or `[x, y, z]`; `e1` and `e2` (default `1`, from 0.05 to 10): its shape from pole to pole and around; `rotation` |
 | `roundedBox` | `center` (required); `size` (required): one number for a cube, or `[x, y, z]`; `radius` (required): the edges' and corners', more than 0 and at most half the smallest size; `rotation` |
 | `text` | `string` (required, UTF-8; `\n` starts a new line); `font` (required): a TrueType font file; `size` (default `1`): the em in scene units; `depth` (default `0.2`); `bevel` (default `0`, less than `depth`); `align` (default `"left"`, or `"center"` or `"right"`); `lineSpacing` (default `1`); `kerning` (default `true`); `position` (default `[0, 0, 0]`); `rotation` |
+| `lathe` | `profile` (required): a path in r and y (see below), r at least 0; `smooth` (default `false`): a smooth curve through the profile's points; `capped` (default `false`): closes open ends with flat discs in to the axis; `sweep` (default `360`, more than 0): degrees around, from +x toward +z; `center` (required); `rotation` |
+| `extrusion` | `outline` (one) or `outlines` (several; holes worked out from how they nest): closed paths (see below); `smooth` (default `false`); `depth` (default `1`); `bevel`, `backBevel` (default `0`; together less than `depth`); `taper` (default `1`, more than 0): the scale at the back; `twist` (default `0`): degrees; `position` (default `[0, 0, 0]`); `rotation` |
+| `sweep` | `path` (required): two or more points `[x, y, z]` in the scene; `smooth` (default `true`): a curve through them (else straight from point to point); `closed` (default `false`); `radius` (default `0.1`) or `outline`: a closed path (see below) as the cross-section; `segments` (default `24`, 3 to 256) around a round tube; `steps` (default `12`, 1 to 256) along each span of a smooth path; `capped` (default `true`) |
 | `bezier` | `patches` (required, unless `file`): each `{ "points": [...] }` (u varies fastest) or `{ "indices": [...] }` into the shape's own `points`, with `degree` (`[u, v]`, from 1 to 15; needed unless the points are a square number: 16 is bicubic) and `uv` (default `[0, 0, 1, 1]`); or `file`: a `.bpt` file of patches; `points`: the shared points for `indices`; a point is `[x, y, z]` or `[x, y, z, weight]`; `scale` (default `1`): a number or `[x, y, z]`; `closed` (default `false`); `center` (default `[0, 0, 0]`); `rotation` |
 | `bspline` | `points` (required): rows of points along v, each an array along u, `[x, y, z]` or `[x, y, z, weight]`; `degree` (default `[3, 3]`, or one number for both); `knotsU`, `knotsV` (default clamped and evenly spaced): points in a row (or rows) + degree + 1 numbers, never decreasing; `scale`; `closed`; `center` (default `[0, 0, 0]`); `rotation` |
 
@@ -311,6 +316,44 @@ square). Kerning comes from the font, its `kern` table or its OpenType GPOS pair
 networked engines inside the scene (as `data`), like a model file. Surface coordinates: x and y in
 the text's plane, one unit per em. `text_test.ray` uses Lato Bold (`scenes/fonts/`, SIL Open Font
 License 1.1).
+
+**Paths.** A lathe's profile, an extrusion's outlines and a sweep's cross-section are paths: arrays
+whose entries are points `[x, y]` (a straight line to there), `{ "quadratic": [ [cx, cy], [x, y] ] }`
+(a curve to x, y pulled toward the control point) or `{ "cubic": [ [c1x, c1y], [c2x, c2y], [x, y] ] }`
+(a curve with two control points). The first entry is where the path starts, so it must be a point.
+An outline (an extrusion's, a sweep's) is closed: it runs back to its start. With `"smooth": true`
+every entry must be a point, and the path is a smooth curve through them all (uniform Catmull-Rom;
+an outline wraps around, a lathe's profile starts and ends at its first and last points). A path is
+saved as it was given.
+
+**Lathes.** A `lathe` spins its profile (r the distance from the axis, y the height) around its own
++y, centered on `center` and turned by `rotation` as a box is. It is traced as it is: each piece of
+the profile, spun around, meets a ray where a polynomial in the piece's own parameter is zero (of
+degree 2 for a line, which makes a cone or a flat ring, up to 6 for a cubic), found by bisection
+between its turning points and polished by Newton's method, so curved profiles stay smooth at any
+size and nothing slips through where pieces join or at the axis. A profile that starts and ends on
+the axis (r = 0) encloses a solid, and so does any profile with `"capped": true`, whose open ends
+are closed by flat discs in to the axis; its normals point out of the solid whichever way the
+profile runs. An open profile is a shell, shaded on whichever side a ray sees. `sweep` turns the
+profile only part way round, from +x toward +z; a solid is then closed by flat faces at both ends of
+the cut. A solid lathe works in a csg. Surface coordinates: u around (0 to 1 over the sweep), v
+along the profile by length (0 to 1, the caps included).
+
+**Extrusions and sweeps.** An `extrusion` is built like text's letters: its outlines' curves are
+flattened to within 0.1% of their size, holes found from how they nest, the face (at z = 0, facing
+−z) cut into triangles, and the shape pushed `depth` back along +z into a closed mesh, the sides
+smooth around curves and sharp at corners of more than 35°; then `rotation` turns it and `position`
+moves it. `bevel` and `backBevel` cut the front and back edges at 45°. `taper` scales the shape
+toward the back and `twist` turns it (counterclockwise seen from the front), both about the
+outline's origin; the sides of a twisted extrusion are cut into slices along the depth, one each 2°
+of twist. Bevels can't be used with a taper or a twist. Surface coordinates: x and y of the
+outline. A `sweep` carries a circle of `radius`, or any `outline`, along its `path`, turning it as
+little as it can (a rotation-minimizing frame, by double reflection) so the tube doesn't twist; a
+closed path's frame is evened out so the tube meets itself. It is built into a smooth mesh: `steps`
+pieces along each span of a smooth path (or one a segment of a straight one) and `segments` around
+a round tube, and an open path's ends are closed with flat caps unless `capped` is false. Surface
+coordinates: u around the cross-section, v along the path by length. Both work in a csg and take
+any material. `tools/make_shape_scenes.py` writes `lathe_test.ray` and `extrusion_test.ray`.
 
 **Bezier patches and B-spline surfaces.** A `bezier` is a surface of Bezier patches, each with a
 degree in u and v (bicubic, 3 by 3, is the usual) and (u degree + 1) × (v degree + 1) control

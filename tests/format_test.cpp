@@ -56,6 +56,9 @@
 #include "Text.h"
 #include "Bezier.h"
 #include "BSpline.h"
+#include "Lathe.h"
+#include "Extrusion.h"
+#include "Sweep.h"
 #include <map>
 
 
@@ -5001,6 +5004,369 @@ static void PatchChecks( void )
 }
 
     // The Utah teapot's own patches, against a fine mesh of them.
+    // How many edges of a mesh (matched by position) don't join exactly two
+    // faces: 0 for a watertight mesh.
+static size_t OpenEdges( const CMesh::SGeometry &oGeometry )
+{
+    std::map< std::vector<long long>, int > oEdges;
+    auto                                    Key = [ &oGeometry ]( int a, int b )
+    {
+        std::vector<long long> anKey;
+        CVector                oA( oGeometry.aoVertices[ (size_t)a ] ), oB( oGeometry.aoVertices[ (size_t)b ] );
+        long long              anA[ 3 ] = { llround( oA.GetX() * 1e7 ), llround( oA.GetY() * 1e7 ), llround( oA.GetZ() * 1e7 ) };
+        long long              anB[ 3 ] = { llround( oB.GetX() * 1e7 ), llround( oB.GetY() * 1e7 ), llround( oB.GetZ() * 1e7 ) };
+
+        if ( std::lexicographical_compare( anB, anB + 3, anA, anA + 3 ) )
+            std::swap( anA, anB );
+        anKey.assign( anA, anA + 3 );
+        anKey.insert( anKey.end(), anB, anB + 3 );
+        return anKey;
+    };
+
+    for ( size_t f = 0; f + 2 < oGeometry.anKept.size(); f += 3 )
+    {
+        for ( int k = 0; k < 3; k++ )
+            oEdges[ Key( oGeometry.anKept[ f + (size_t)k ], oGeometry.anKept[ f + (size_t)( ( k + 1 ) % 3 ) ] ) ]++;
+    }
+
+    size_t nOpen = 0;
+
+    for ( const auto &oEdge : oEdges )
+        nOpen += ( oEdge.second != 2 ) ? 1 : 0;
+    return nOpen;
+}
+
+    // A point of a cubic piece (four control points in r and y) at s.
+static void PiecePoint( const double ( &anPiece )[ 4 ][ 2 ], double s, double &dR, double &dY )
+{
+    double u = 1.0 - s;
+
+    dR = ( u * u * u * anPiece[ 0 ][ 0 ] ) + ( 3 * u * u * s * anPiece[ 1 ][ 0 ] ) + ( 3 * u * s * s * anPiece[ 2 ][ 0 ] ) +
+         ( s * s * s * anPiece[ 3 ][ 0 ] );
+    dY = ( u * u * u * anPiece[ 0 ][ 1 ] ) + ( 3 * u * u * s * anPiece[ 1 ][ 1 ] ) + ( 3 * u * s * s * anPiece[ 2 ][ 1 ] ) +
+         ( s * s * s * anPiece[ 3 ][ 1 ] );
+}
+
+    // How far (r, y) is from a profile of cubic pieces: a hit on a lathe
+    // lies on its surface when this is 0.
+static double OffProfile( double dR, double dY, const double ( *anPieces )[ 4 ][ 2 ], int nPieces )
+{
+    double dBest = 1e300;
+
+    for ( int n = 0; n < nPieces; n++ )
+    {
+            // Coarse to fine search of the piece's parameter.
+        double dLow = 0.0, dHigh = 1.0;
+
+        for ( int nPass = 0; nPass < 8; nPass++ )
+        {
+            double dBestS = dLow, dBestHere = 1e300;
+
+            for ( int k = 0; k <= 64; k++ )
+            {
+                double s = dLow + ( ( dHigh - dLow ) * k / 64.0 ), r, y;
+
+                PiecePoint( anPieces[ n ], s, r, y );
+
+                double d = hypot( r - dR, y - dY );
+
+                if ( d < dBestHere )
+                {
+                    dBestHere = d;
+                    dBestS = s;
+                }
+            }
+            if ( dBestHere < dBest )
+                dBest = dBestHere;
+
+            double dStep = ( dHigh - dLow ) / 64.0;
+
+            dLow = ( dBestS - dStep > 0.0 ) ? dBestS - dStep : 0.0;
+            dHigh = ( dBestS + dStep < 1.0 ) ? dBestS + dStep : 1.0;
+        }
+    }
+    return dBest;
+}
+
+static const char *s_strSphereObject = "\"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1";
+
+static void LatheChecks( void )
+{
+    CScene      oScene;
+    CObjects   *pObject;
+    CVector     oHit;
+
+        // A straight profile makes a capped cylinder of radius 1, y 0 to 2.
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 0], [1, 0], [1, 2], [0, 2] ] }" );
+    if ( pObject )
+    {
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 1, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a ray hits a lathe cylinder's side" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.5, 5, 0, 0, -1, 0 ), 3.0, 0, 1, 0 ), "a ray hits a lathe cylinder's top" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.5, -5, 0, 0, 1, 0 ), 5.0, 0, -1, 0 ), "a ray hits a lathe cylinder's base" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 1, 0, 1, 0, 0 ), 1.0, 1, 0, 0 ), "a ray from inside a lathe cylinder leaves by its side" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ), 3.0, 0, 1, 0 ), "a ray down the axis hits a lathe's top at the axis" );
+
+        CRay oRim = RayFrom( 1, 5, 0, 0, -1, 0 );
+
+        Check( pObject->Intersect( oRim, oHit ) && ABS( oRim.GetT() - 3.0 ) < 1e-9,
+               "a ray down onto a lathe's rim, where two pieces join, hits it" );
+        Check( Misses( *pObject, RayFrom( 0, 2.5, -5, 0, 0, 1 ) ), "a ray over a lathe cylinder misses it" );
+        Check( Misses( *pObject, RayFrom( 1.01, 1, -5, 0, 0, 1 ) ), "a ray just beside a lathe cylinder misses it" );
+        Check( pObject->IsClosed(), "a profile from the axis back to the axis makes a solid" );
+    }
+
+        // The same profile run the other way round: the normals still point out.
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 2], [1, 2], [1, 0], [0, 0] ] }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 1, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a lathe's normals point out whichever way its profile runs" );
+
+        // A cone: from radius 1 at y = 0 to the axis at y = 1.
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 0], [1, 0], [0, 1] ] }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0.5, -5, 0, 0, 1 ), 4.5, 0, sqrt( 0.5 ), -sqrt( 0.5 ) ),
+               "a ray hits a lathe cone's side where its radius is right, with the slanted normal" );
+
+        // An open wall is a shell, not a solid; capped closes it.
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [1, 0], [1, 1] ] }" );
+    if ( pObject )
+    {
+        Check( ! pObject->IsClosed(), "an open lathe profile is a shell" );
+        Check( Misses( *pObject, RayFrom( 0.5, 5, 0, 0, -1, 0 ) ), "an open lathe shell is open at its ends" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [1, 0], [1, 1] ], \"capped\": true }" );
+    if ( pObject )
+    {
+        Check( pObject->IsClosed(), "a capped lathe is a solid" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.5, 5, 0, 0, -1, 0 ), 4.0, 0, 1, 0 ), "a capped lathe's top is closed by a flat disc" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.5, -5, 0, 0, 1, 0 ), 5.0, 0, -1, 0 ), "a capped lathe's base is closed by a flat disc" );
+    }
+
+        // A curved profile (a ball from two cubics): rays aimed at points of
+        // it along the normal there hit those points, at the joint and the
+        // poles too, and every hit lies on the surface.
+    static const double anBall[ 2 ][ 4 ][ 2 ] = { { { 0, 0 }, { 0.36, 0 }, { 0.62, 0.22 }, { 0.62, 0.5 } },
+                                                  { { 0.62, 0.5 }, { 0.62, 0.78 }, { 0.36, 1.0 }, { 0, 1.0 } } };
+
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 0], "
+                                   "{ \"cubic\": [ [0.36, 0], [0.62, 0.22], [0.62, 0.5] ] }, "
+                                   "{ \"cubic\": [ [0.62, 0.78], [0.36, 1.0], [0, 1.0] ] } ] }" );
+    if ( pObject )
+    {
+        double dWorst = 0.0;
+        int    nMissed = 0, nWrongT = 0;
+
+        for ( int n = 0; n < 400; n++ )
+        {
+            int    nPiece = n % 2;
+            double s = ( n % 20 ) / 19.0, a = n * 2.399963, r, y, r1, y1, r2, y2;
+
+                // The normal from the slope, taken just inside at the poles.
+            double sa = ( s < 0.5 ) ? s : s - 1e-6, sb = ( s < 0.5 ) ? s + 1e-6 : s;
+
+            PiecePoint( anBall[ nPiece ], s, r, y );
+            PiecePoint( anBall[ nPiece ], sa, r1, y1 );
+            PiecePoint( anBall[ nPiece ], sb, r2, y2 );
+
+            double l = hypot( r2 - r1, y2 - y1 ), nr = ( y2 - y1 ) / l, ny = -( r2 - r1 ) / l;
+            double px = r * cos( a ), pz = r * sin( a ), nx = nr * cos( a ), nz = nr * sin( a );
+            CRay   oRay = RayFrom( px + ( 3 * nx ), y + ( 3 * ny ), pz + ( 3 * nz ), -nx, -ny, -nz );
+
+            if ( ! pObject->Intersect( oRay, oHit ) )
+            {
+                nMissed++;
+                continue;
+            }
+            if ( ABS( oRay.GetT() - 3.0 ) > 1e-6 )
+                nWrongT++;
+
+            double dOff = OffProfile( hypot( oHit.GetX(), oHit.GetZ() ), oHit.GetY(), anBall, 2 );
+
+            dWorst = ( dOff > dWorst ) ? dOff : dWorst;
+        }
+        Check( nMissed == 0, "rays aimed at a curved lathe, its joints and its poles, all hit it" );
+        Check( nWrongT == 0, "each hits a curved lathe where it was aimed" );
+        Check( dWorst < 1e-8, "every hit on a curved lathe lies on its surface" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ), 4.0, 0, 1, 0 ), "a ray down the axis hits a curved lathe's pole" );
+    }
+
+        // A quarter turn of the cylinder: the end faces close it.
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"sweep\": 90, "
+                                   "\"profile\": [ [0, 0], [1, 0], [1, 2], [0, 2] ] }" );
+    if ( pObject )
+    {
+        Check( ShapeHitsAt( *pObject, RayFrom( 0.5, 1, -5, 0, 0, 1 ), 5.0, 0, 0, -1 ), "a ray hits a partial lathe's first end face" );
+        Check( ShapeHitsAt( *pObject, RayFrom( -5, 1, 0.5, 1, 0, 0 ), 5.0, -1, 0, 0 ), "a ray hits a partial lathe's last end face" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 5, 1, 0.5, -1, 0, 0 ), 5.0 - sqrt( 0.75 ), sqrt( 0.75 ), 0, 0.5 ),
+               "a ray hits a partial lathe's side within its sweep" );
+        Check( Misses( *pObject, RayFrom( -0.5, 1, -5, 0, 0, 1 ) ), "a ray through the part a partial lathe leaves out misses it" );
+        Check( pObject->IsClosed(), "a partial lathe of a closed profile is a solid" );
+    }
+
+        // A lathe in a csg: a slab with a lathe's cylinder taken out.
+    pObject = FirstObject( oScene, CsgOf( "difference", "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": [3, 0.4, 3] },"
+                                                        "{ \"type\": \"lathe\", \"center\": [0, -1, 0], "
+                                                        "\"profile\": [ [0, 0], [0.5, 0], [0.5, 2], [0, 2] ] }" ).c_str() );
+    if ( pObject )
+    {
+        Check( Misses( *pObject, RayFrom( 0, 5, 0, 0, -1, 0 ) ), "a slab with a lathe taken out is open there" );
+        Check( CsgHitsAt( *pObject, RayFrom( 1, 5, 0, 0, -1, 0 ), 4.8, 0, 1, 0 ), "the slab is whole beside the lathe's hole" );
+    }
+
+        // Saving keeps the profile as it was given.
+    pObject = FirstObject( oScene, "{ \"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 0], [1, 0], "
+                                   "{ \"quadratic\": [ [1.5, 0.5], [0.5, 1] ] }, [0, 1] ], \"sweep\": 180, \"capped\": true }" );
+    if ( pObject )
+    {
+        std::string strSaved = oScene.ToJson();
+        CScene      oAgain;
+
+        Check( strSaved.find( "\"quadratic\"" ) != std::string::npos && strSaved.find( "\"sweep\"" ) != std::string::npos,
+               "a lathe saves its curves and sweep as given" );
+        Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "a lathe saved and loaded again is the same" );
+    }
+
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [-1, 0], [1, 1] ]" ),
+                 BAD_FILE, "can't be below 0" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 0], [1, 1] ], \"sweep\": 400" ),
+                 BAD_FILE, "sweep must be more than 0" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"lathe\", \"center\": [0, 0, 0]" ), BAD_FILE, "profile" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ { \"quadratic\": [ [1, 0], [1, 1] ] } ]" ),
+                 BAD_FILE, "must start with a point" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"lathe\", \"center\": [0, 0, 0], \"smooth\": true, "
+                                             "\"profile\": [ [0, 0], { \"quadratic\": [ [1, 0], [1, 1] ] } ]" ),
+                 BAD_FILE, "takes only points" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 0], [1] ]" ),
+                 BAD_FILE, "profile[1]: a point must be [x, y]" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"lathe\", \"center\": [0, 0, 0], \"profile\": [ [0, 0], [0, 1] ]" ),
+                 BAD_FILE, "lies on the axis" );
+}
+
+    // A mesh is hit at t = dT (its normals are blended, so only the place is
+    // checked).
+static bool MeshHitsAt( CObjects &oObject, CRay oRay, double dT )
+{
+    CVector oHit;
+
+    return oObject.Intersect( oRay, oHit ) && ABS( oRay.GetT() - dT ) < 1e-9;
+}
+
+static void ExtrusionChecks( void )
+{
+    CScene      oScene;
+    CObjects   *pObject;
+    CVector     oHit;
+    std::string strSquare = "[ [-1, -1], [1, -1], [1, 1], [-1, 1] ]";
+    std::string strHole = "[ [-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5] ]";
+
+        // A square pushed back 2 along +z: a box from z = 0 to 2.
+    pObject = FirstObject( oScene, ( "{ \"type\": \"extrusion\", \"outline\": " + strSquare + ", \"depth\": 2 }" ).c_str() );
+    if ( pObject )
+    {
+        Check( MeshHitsAt( *pObject, RayFrom( 0.2, 0.3, -5, 0, 0, 1 ), 5.0 ), "a ray hits an extrusion's face" );
+        Check( MeshHitsAt( *pObject, RayFrom( 5, 0.2, 1, -1, 0, 0 ), 4.0 ), "a ray hits an extrusion's side, square at a corner" );
+        Check( MeshHitsAt( *pObject, RayFrom( 0.2, 0.3, 5, 0, 0, -1 ), 3.0 ), "a ray hits an extrusion's back" );
+        Check( pObject->IsClosed(), "an extrusion is a solid" );
+    }
+
+        // A hole, worked out from the nesting; the edges beveled front and back.
+    pObject = FirstObject( oScene, ( "{ \"type\": \"extrusion\", \"outlines\": [ " + strSquare + ", " + strHole +
+                                     " ], \"depth\": 1, \"bevel\": 0.1, \"backBevel\": 0.1 }" ).c_str() );
+    if ( pObject )
+    {
+        CExtrusion *pExtrusion = dynamic_cast<CExtrusion *>( pObject );
+
+        Check( Misses( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ) ), "a ray through an extrusion's hole passes through" );
+        Check( MeshHitsAt( *pObject, RayFrom( 0.75, 0, -5, 0, 0, 1 ), 5.0 ), "a ray onto an extrusion's frame hits its face" );
+        Check( pExtrusion && pExtrusion->GetGeometry() && OpenEdges( *pExtrusion->GetGeometry() ) == 0,
+               "a beveled extrusion with a hole is watertight" );
+    }
+
+        // Tapered to half: the sides lean in, as planes.
+    pObject = FirstObject( oScene, ( "{ \"type\": \"extrusion\", \"outline\": " + strSquare + ", \"depth\": 1, \"taper\": 0.5 }" ).c_str() );
+    if ( pObject )
+    {
+        CExtrusion *pExtrusion = dynamic_cast<CExtrusion *>( pObject );
+        double      dL = sqrt( 1.25 );
+
+        Check( MeshHitsAt( *pObject, RayFrom( 5, 0, 0.5, -1, 0, 0 ), 4.25 ),
+               "a tapered extrusion's side is where its taper puts it, leaning back" );
+        Check( pExtrusion && pExtrusion->GetGeometry() && OpenEdges( *pExtrusion->GetGeometry() ) == 0, "a tapered extrusion is watertight" );
+    }
+
+        // Twisted a quarter turn: halfway back the square has turned 45
+        // degrees, so its corner reaches out along x.
+    pObject = FirstObject( oScene, ( "{ \"type\": \"extrusion\", \"outline\": " + strSquare + ", \"depth\": 1, \"twist\": 90 }" ).c_str() );
+    if ( pObject )
+    {
+        CExtrusion *pExtrusion = dynamic_cast<CExtrusion *>( pObject );
+        CRay        oRay = RayFrom( 5, 0.01, 0.5, -1, 0, 0 );
+        bool        bHit = pObject->Intersect( oRay, oHit );
+
+        Check( bHit && ABS( oHit.GetX() - sqrt( 2.0 ) ) < 0.02, "a twisted extrusion has turned halfway back" );
+        Check( MeshHitsAt( *pObject, RayFrom( 0.5, 0.5, 5, 0, 0, -1 ), 4.0 ), "a twisted extrusion's back face is turned square" );
+        Check( pExtrusion && pExtrusion->GetGeometry() && OpenEdges( *pExtrusion->GetGeometry() ) == 0, "a twisted extrusion is watertight" );
+    }
+
+        // A straight round tube along z, capped.
+    pObject = FirstObject( oScene, "{ \"type\": \"sweep\", \"path\": [ [0, 0, 0], [0, 0, 2] ], \"smooth\": false, \"radius\": 0.5 }" );
+    if ( pObject )
+    {
+        CSweep *pSweep = dynamic_cast<CSweep *>( pObject );
+        CRay    oRay = RayFrom( 0, 5, 1, 0, -1, 0 );
+
+        Check( pObject->Intersect( oRay, oHit ) && oRay.GetT() >= 4.5 - 1e-9 && oRay.GetT() <= 5.0 - ( 0.5 * cos( PI / 24 ) ) + 1e-9,
+               "a ray hits a sweep's tube between its inner and outer radius" );
+        Check( MeshHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 5.0 ), "a sweep's open end is capped" );
+        Check( pSweep && pSweep->GetGeometry() && OpenEdges( *pSweep->GetGeometry() ) == 0, "a capped sweep is watertight" );
+    }
+
+        // A spring, capped, and a tube round a closed path, whose frame
+        // carried round meets itself, so it is watertight with no caps.
+    std::string strHelix = "[";
+
+    for ( int n = 0; n <= 36; n++ )
+        strHelix += ( n ? ", [" : " [" ) + std::to_string( cos( n * PI / 6 ) ) + ", " + std::to_string( n * 0.05 ) + ", " +
+                    std::to_string( sin( n * PI / 6 ) ) + "]";
+    strHelix += " ]";
+    pObject = FirstObject( oScene, ( "{ \"type\": \"sweep\", \"path\": " + strHelix + ", \"radius\": 0.08 }" ).c_str() );
+    if ( pObject )
+    {
+        CSweep *pSweep = dynamic_cast<CSweep *>( pObject );
+
+        Check( pSweep && pSweep->GetGeometry() && OpenEdges( *pSweep->GetGeometry() ) == 0, "a capped spring is watertight" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"sweep\", \"closed\": true, \"radius\": 0.2, "
+                                   "\"path\": [ [1, 0, 0], [0, 0.3, 1], [-1, 0, 0], [0, -0.3, -1] ] }" );
+    if ( pObject )
+    {
+        CSweep *pSweep = dynamic_cast<CSweep *>( pObject );
+
+        Check( pSweep && pSweep->GetGeometry() && OpenEdges( *pSweep->GetGeometry() ) == 0, "a sweep round a closed path meets itself" );
+    }
+
+        // An extrusion in a csg: a slab with a square hole through it.
+    pObject = FirstObject( oScene, CsgOf( "difference", "{ \"type\": \"box\", \"center\": [0, 0, 1], \"size\": [3, 3, 0.5] },"
+                                                        "{ \"type\": \"extrusion\", \"outline\": [ [-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5] ], "
+                                                        "\"depth\": 2 }" ).c_str() );
+    if ( pObject )
+    {
+        Check( Misses( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ) ), "a slab with an extrusion taken out is open there" );
+        Check( CsgHitsAt( *pObject, RayFrom( 1, 0, -5, 0, 0, 1 ), 5.75, 0, 0, -1 ), "the slab is whole beside the extrusion's hole" );
+    }
+
+    ExpectError( Minimal( s_strSphereObject, ( "\"type\": \"extrusion\", \"outline\": " + strSquare + ", \"bevel\": 0.1, \"taper\": 0.5" ).c_str() ),
+                 BAD_FILE, "can't be used with a taper or a twist" );
+    ExpectError( Minimal( s_strSphereObject, ( "\"type\": \"extrusion\", \"outline\": " + strSquare + ", \"depth\": 0" ).c_str() ),
+                 BAD_FILE, "depth must be more than 0" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"extrusion\", \"outline\": [ [0, 0], [1, 0] ]" ), BAD_FILE, "at least three points" );
+    ExpectError( Minimal( s_strSphereObject, ( "\"type\": \"extrusion\", \"outline\": " + strSquare + ", \"outlines\": [ " + strSquare + " ]" ).c_str() ),
+                 BAD_FILE, "either outline" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"sweep\", \"path\": [ [0, 0, 0], [0, 0, 1] ], \"radius\": 0.1, "
+                                             "\"outline\": [ [0, 0], [1, 0], [0, 1] ]" ),
+                 BAD_FILE, "either radius" );
+    ExpectError( Minimal( s_strSphereObject, "\"type\": \"sweep\", \"path\": [ [0, 0, 0] ]" ), BAD_FILE, "at least two points" );
+}
+
 static void PatchFileChecks( const char *strScenes )
 {
     std::string                  strText = ReadFile( std::string( strScenes ) + "/models/teapot.bpt" );
@@ -5176,6 +5542,8 @@ int main( int argc, char **argv )
         MapChecks();
         ShapeChecks();
         PatchChecks();
+        LatheChecks();
+        ExtrusionChecks();
     }
 
     if ( g_nFailures == 0 )

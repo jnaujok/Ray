@@ -30,3 +30,6 @@ CMakeFiles/
 
 # Output of commands run under nohup
 nohup.out
+
+# Python bytecode
+__pycache__/

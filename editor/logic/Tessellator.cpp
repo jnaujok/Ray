@@ -391,7 +391,7 @@ namespace RayEditor
         }
         else if ( strType == "torus" || strType == "disc" || strType == "annulus" || strType == "paraboloid" ||
                   strType == "hyperboloid" || strType == "superquadric" || strType == "roundedBox" ||
-                  strType == "bezier" || strType == "bspline" )
+                  strType == "bezier" || strType == "bspline" || strType == "lathe" )
         {
                 // The core draws its own shapes (a csg part has no object of
                 // its own here, so one is made from its JSON).
@@ -423,7 +423,7 @@ namespace RayEditor
                 Triangle( oMesh, p[ 0 ], p[ 1 ], p[ 2 ], q[ 0 ], q[ 1 ], q[ 2 ] );
             }
         }
-        else if ( strType == "mesh" || strType == "text" )
+        else if ( strType == "mesh" || strType == "text" || strType == "extrusion" || strType == "sweep" )
         {
             CMesh *pMesh = dynamic_cast<CMesh *>( pObject );
 

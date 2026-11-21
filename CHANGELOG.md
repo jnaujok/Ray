@@ -10,6 +10,88 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.18] - 2026-11-21
+
+Turned and pushed solids: lathes that spin a profile of lines and curves around an axis, traced
+exactly, and extrusions and sweeps that push outlines back into solids or carry them along a path,
+built into meshes the way text is. Scenes without the new objects render byte for byte as before.
+
+### Added
+
+- **Lathes (`lathe`).** A profile in r and y (r the distance from the axis) spun around the shape's
+  own +y, for vases, goblets, bottles, chess pieces and table legs. The profile is a path of points
+  and curves, or with `smooth` a curve through its points (see Paths below); `center` and `rotation`
+  place it.
+  - **Traced exactly, not as triangles.** Each piece of the profile, spun around the axis, meets a
+    ray where a polynomial in the piece's own parameter is zero: degree 2 for a line (a cone, a
+    cylinder or a flat ring), up to 6 for a cubic. Its roots are found by bisection between their
+    turning points, searched a hair past each piece's ends so nothing slips through where pieces
+    join, then polished with Newton's method on the surface itself. A ray along the axis, which
+    the squared form would only touch at a pole, is solved by the radius instead. Each piece is
+    skipped unless the ray comes within its height and reach.
+  - **Solid or shell.** A profile that starts and ends on the axis encloses a solid, and so does any
+    profile with `capped`, whose open ends are closed by flat discs in to the axis. Its normals
+    point out of the solid whichever way the profile runs. An open profile is a shell shaded on
+    the side a ray sees.
+  - **Part way round.** `sweep` (degrees, default 360) turns the profile only part way, from +x
+    toward +z; a solid is closed by flat faces at both ends of the cut. A solid lathe works in a csg.
+  - **Surface coordinates:** u around (0 to 1 over the sweep), v along the profile by length.
+- **Extrusions (`extrusion`).** One `outline` or several `outlines` (holes found from how they nest)
+  pushed `depth` back into a closed mesh, as text's letters are, with `bevel` and `backBevel`
+  cutting the front and back edges at 45°, or `taper` (the scale at the back) and `twist` (degrees),
+  both about the outline's origin. A twisted extrusion's sides are cut into slices, one each 2° of
+  twist, with normals worked out from the twisted surface. `position` and `rotation` place it.
+  Built when loaded (curves flattened to within 0.1% of the outline's size); it works in a csg.
+- **Sweeps (`sweep`).** A tube: a circle of `radius`, or any `outline`, carried along a `path` of
+  points through the scene, smooth (a Catmull-Rom curve through them, the default) or straight
+  from point to point, open or `closed`. The cross-section is turned as little as it can be (a
+  rotation-minimizing frame, by double reflection), so the tube doesn't twist; a closed path's
+  frame is evened out so the tube meets itself. Built into a smooth mesh when loaded (`steps` along
+  each span, `segments` around), its open ends capped unless `capped` is false. For springs, pipes,
+  rails and, in 0.21, neon tubes.
+- **Paths**, shared by all three: arrays of points `[x, y]` and curves `{ "quadratic": [...] }` and
+  `{ "cubic": [...] }`, saved back as they were given (`core/src/Profile.cpp`).
+- **Scenes and tests.** `scenes/lathe_test.ray` (a pawn, a rook and a queen, a glass goblet, an
+  open terracotta vase and an orange with a quarter cut away) and `scenes/extrusion_test.ray` (a
+  tapered star, a twisted column, a beveled frame with a hole, a spring, a closed loop of tube and
+  a square rail), written by the new `tools/make_shape_scenes.py`, each with render, round-trip and
+  network tests, reference renders, README previews and places in the Expected output table.
+  `format_test` checks:
+  - a straight profile against the cylinder and cone it makes, hits and normals, from outside and
+    inside, down the axis and onto the rim where two pieces join;
+  - normals pointing out whichever way a profile runs; open shells and `capped` solids;
+  - a curved profile: 400 rays aimed along the normal at points of its surface, both pieces' ends
+    and the poles included, all hit exactly there, and every hit lies on the surface (within
+    1e-8 of the profile);
+  - a partial lathe's end faces, its side within the sweep, and a miss through the cut;
+  - a lathe and an extrusion each in a csg; saving a lathe's curves and sweep as given;
+  - extrusions: faces and square corners, a hole, beveled front and back, a taper's leaning sides
+    where they should be, a twist turned halfway at half the depth, and each watertight (every
+    edge joining exactly two faces);
+  - sweeps: a straight tube's radius and capped end, a capped spring and a tube round a closed path
+    watertight (so the frame meets itself);
+  - error messages for bad profiles, sweeps, outlines, paths and conflicting fields.
+
+### Changed
+
+- `.gitignore` ignores Python's `__pycache__/`.
+- **Text shares the extrusion code.** Text's letters are now built by the same `Extruder` code as
+  extrusions (moved out of `Text.cpp`, with a back bevel and tapered and twisted extrusions added).
+  Text renders byte for byte as before.
+- **The torture test** gains a glass goblet and a black queen turned on a lathe, a blue star tapered
+  and twisted, and a steel spring, at the front. Its reference render, README preview and
+  full-size image are regenerated; the full-size render (the adaptive command in `CLAUDE.md`) took
+  65,259 CPU-seconds (1 h 32 min on a busy machine, about 68 minutes idle), 52% more than 0.17's
+  42,865; the scene's own 5×5 sampler takes 8,123 CPU-seconds (about eight and a half minutes
+  idle). The lens focuses farther back, so the new pieces at the front are soft.
+
+  ![Before and after: the torture test at 2026-alpha-0.17 and 2026-alpha-0.18, whole and a full-size crop of the front](docs/images/changelog/torture-lathe.png)
+
+  Look along the front: the goblet left of the ring, the spring between the ring and the gold
+  torus, the queen beside the die, and the star at the right.
+
+  ![The new shapes: the lathe test and the extrusion test](docs/images/changelog/lathe-extrusion.png)
+
 ## [2026-alpha-0.17] - 2026-11-21
 
 Curved surfaces: Bézier patches and B-spline and NURBS surfaces, traced exactly rather than cut into
@@ -1710,7 +1792,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.17...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...HEAD
+[2026-alpha-0.18]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.17...2026-alpha-0.18
 [2026-alpha-0.17]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.16...2026-alpha-0.17
 [2026-alpha-0.16]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.15...2026-alpha-0.16
 [2026-alpha-0.15]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14.1...2026-alpha-0.15
