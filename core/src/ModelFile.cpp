@@ -516,9 +516,30 @@ BOOL ReadObj( const std::string &strData, SModel &oModel, std::string &strError 
     return TRUE;
 }
 
+std::string UnescapeUri( const std::string &strUri )
+{
+    std::string strOut;
+
+    for ( size_t nIndex = 0; nIndex < strUri.size(); nIndex++ )
+    {
+        if ( strUri[ nIndex ] == '%' && nIndex + 2 < strUri.size() && isxdigit( (unsigned char)strUri[ nIndex + 1 ] ) &&
+             isxdigit( (unsigned char)strUri[ nIndex + 2 ] ) )
+        {
+            strOut += (char)strtol( strUri.substr( nIndex + 1, 2 ).c_str(), NULL, 16 );
+            nIndex += 2;
+        }
+        else
+            strOut += strUri[ nIndex ];
+    }
+    return strOut;
+}
+
 BOOL Read( const std::string &strData, const std::string &strName, SModel &oModel, std::string &strError )
 {
     std::string strLower = Lower( strName );
+
+    if ( IsGltf( strData, strName ) )
+        return ReadGltf( strData, NULL, "", oModel, strError );
 
     if ( EndsWith( strLower, ".stl" ) )
         return ReadStl( strData, oModel, strError );

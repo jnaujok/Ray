@@ -16,6 +16,7 @@
 #include "SocketTaskMaster.h"
 #include "WireProtocol.h"
 #include "PixelSampler.h"
+#include "RayCountMap.h"
 #include "ColorModel.h"
 #include "SceneJson.h"
 
@@ -47,6 +48,7 @@ namespace
         std::string strPpm;
         std::string strPng;
         std::string strHdr;
+        std::string strRayCount;        // --ray-count: a heat map of rays per pixel
         std::string strEngine;
         std::string strSampler;         // Empty: what the scene says.
         std::string strColorModel;      // Empty: what the scene says.
@@ -71,6 +73,9 @@ namespace
         printf( "  -o, --output <file>         Image file to write (default: the one named in the scene)\n" );
         printf( "  --ppm <file>                Also write the image as a PPM file\n" );
         printf( "  --png <file>                Also write the image as a PNG file\n" );
+        printf( "  --ray-count <file>          Also write a PNG heat map of the camera rays each pixel\n" );
+        printf( "                              took (adaptive sampler; threads only), dark blue for few,\n" );
+        printf( "                              through green and yellow to white for the most\n" );
         printf( "  --hdr <file>                Also write the linear, unclipped colors as a Radiance\n" );
         printf( "                              HDR (.hdr) file (with --color hdr, scaled by its exposure)\n" );
         printf( "  --listen [port]             Trace with rayengine processes that connect on\n" );
@@ -109,6 +114,69 @@ namespace
         // A sampler or color model from "name" or "name:key=value,...", the
         // settings as the scene file would give them. NULL, with a message in
         // strError, if the name or a setting is not right.
+        // The rays per pixel CRayCountMap recorded, as a PNG heat map
+        // (a log scale from the fewest to the most), and a summary.
+    bool WriteRayCount( const std::string &strFile, bool bQuiet )
+    {
+        const std::vector<int> &anCounts = CRayCountMap::GetCounts();
+        int                     nWidth = CRayCountMap::GetWidth();
+        int                     nHeight = CRayCountMap::GetHeight();
+        int                     nLeast = 0, nMost = 0;
+        double                  dTotal = 0.0;
+        long                    nCounted = 0;
+
+        for ( int nCount : anCounts )
+        {
+            if ( nCount <= 0 )
+                continue;
+            if ( nCounted == 0 || nCount < nLeast )
+                nLeast = nCount;
+            if ( nCount > nMost )
+                nMost = nCount;
+            dTotal += nCount;
+            nCounted++;
+        }
+        if ( nCounted == 0 )
+        {
+            fprintf( stderr, "--ray-count: the sampler recorded no ray counts (use --aa adaptive, with threads)\n" );
+            CRayCountMap::Disable();
+            return false;
+        }
+
+            // Dark blue, blue, green, yellow, white.
+        static const double aadStops[ 5 ][ 3 ] = { { 0.05, 0.03, 0.25 }, { 0.10, 0.35, 0.80 }, { 0.15, 0.70, 0.35 },
+                                                   { 0.95, 0.85, 0.15 }, { 1.0, 1.0, 1.0 } };
+        std::vector<BYTE>   anPixels( (size_t)nWidth * (size_t)nHeight * 3, 0 );
+        double              dSpan = ( nMost > nLeast ) ? log( (double)nMost / (double)nLeast ) : 1.0;
+
+        for ( size_t nIndex = 0; nIndex < anCounts.size(); nIndex++ )
+        {
+            int nCount = anCounts[ nIndex ];
+
+            if ( nCount <= 0 )
+                continue;
+
+            double  dPlace = ( nMost > nLeast ) ? log( (double)nCount / (double)nLeast ) / dSpan * 4.0 : 0.0;
+            int     nStop = (std::min)( 3, (int)dPlace );
+            double  dWithin = dPlace - nStop;
+
+            for ( int nChannel = 0; nChannel < 3; nChannel++ )
+            {
+                double dValue = aadStops[ nStop ][ nChannel ] +
+                                ( aadStops[ nStop + 1 ][ nChannel ] - aadStops[ nStop ][ nChannel ] ) * dWithin;
+
+                anPixels[ nIndex * 3 + nChannel ] = (BYTE)(std::min)( 255.0, (std::max)( 0.0, dValue * 255.0 + 0.5 ) );
+            }
+        }
+
+        bool bWritten = CImageExport::WritePng( strFile, nWidth, nHeight, anPixels ) ? true : false;
+
+        if ( ! bQuiet )
+            printf( "Rays per pixel: %d to %d, %.2f on average\n", nLeast, nMost, dTotal / (double)nCounted );
+        CRayCountMap::Disable();
+        return bWritten;
+    }
+
     template <class T> T *MakeModel( const std::string &strSpec, std::string &strError )
     {
         size_t              nColon = strSpec.find( ':' );
@@ -256,7 +324,7 @@ namespace
                 nCount++;
             }
             else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--png" ||
-                      strArg == "--hdr" || strArg == "--engine" || strArg == "--save" ||
+                      strArg == "--hdr" || strArg == "--ray-count" || strArg == "--engine" || strArg == "--save" ||
                       strArg == "--save-json" )
             {
                 if ( strNext == NULL )
@@ -267,6 +335,7 @@ namespace
                 std::string &strTarget = ( strArg == "--ppm" ) ? oOptions.strPpm :
                                          ( strArg == "--png" ) ? oOptions.strPng :
                                          ( strArg == "--hdr" ) ? oOptions.strHdr :
+                                         ( strArg == "--ray-count" ) ? oOptions.strRayCount :
                                          ( strArg == "--save" ) ? oOptions.strSave :
                                          ( strArg == "--save-json" ) ? oOptions.strSaveJson :
                                          ( strArg == "--engine" ) ? oOptions.strEngine : oOptions.strOutput;
@@ -293,6 +362,11 @@ namespace
 
         if ( oOptions.bSpawn && ! oOptions.bListen )
             oOptions.bListen = true;
+        if ( oOptions.bListen && ! oOptions.strRayCount.empty() )
+        {
+            fprintf( stderr, "--ray-count works with threads only: networked engines don't send ray counts\n" );
+            return false;
+        }
 
         return ! oOptions.strScene.empty();
     }
@@ -575,6 +649,8 @@ int main( int argc, char **argv )
 
         if ( ! oOptions.strHdr.empty() )
             oImage.KeepLinear();
+        if ( ! oOptions.strRayCount.empty() )
+            CRayCountMap::Enable( oSettings.GetImageWidth(), oSettings.GetImageHeight() );
 
         bTraced = pMaster->TraceScene( oScene, oImage );
 
@@ -617,6 +693,11 @@ int main( int argc, char **argv )
             fprintf( stderr, "Couldn't write %s\n", oOptions.strPng.c_str() );
             return 1;
         }
+    }
+    if ( ! oOptions.strRayCount.empty() && ! WriteRayCount( oOptions.strRayCount, oOptions.bQuiet ) )
+    {
+        fprintf( stderr, "Couldn't write %s\n", oOptions.strRayCount.c_str() );
+        return 1;
     }
     if ( bHdrFailed )
         return 1;

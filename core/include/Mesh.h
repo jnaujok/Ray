@@ -33,10 +33,7 @@
 #include <string>
 #include <vector>
 
-namespace ModelFile
-{
-    struct SModel;
-}
+#include "ModelFile.h"
 
 class CMesh : public CObjects
 {
@@ -64,6 +61,10 @@ class CMesh : public CObjects
         std::string             m_strFile;          // its name in the scene
         std::string             m_strFilePath;      // where on the disk it came from (empty: the archive or the scene)
         std::shared_ptr<const std::string> m_pFileData;
+        std::string             m_strNode;          // a glTF model's node to read, or empty for its scene
+            // The other files a .gltf names, by its URI, with where each came from.
+        ModelFile::SGltfFiles   m_oGltfFiles;
+        std::vector<std::string> m_astrGltfPaths;
             // The file as read, shared by every copy of the scene that names
             // it, so it is read once while any of them lives.
         std::shared_ptr<const ModelFile::SModel> m_pModel;
@@ -78,6 +79,9 @@ class CMesh : public CObjects
         void                    UVMapToJson( IASLib::CObjectNode &oNode ) const;
             // Reads a mesh that names a model "file", and loads it.
         BOOL                    ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bDoubleSided );
+            // The folder of m_strFile, with its slash ("" for none), where a
+            // .gltf's other files are.
+        std::string             GltfFolder( void ) const;
         BOOL                    m_bDoubleSided;
         BOOL                    m_bSmooth;
         CColor                  m_oColor;

@@ -31,6 +31,25 @@
 *   groups, smoothing groups and materials ("o", "g", "s", "usemtl",     *
 *   "mtllib") are ignored: the mesh's own materials apply to all of it.  *
 *                                                                        *
+*   glTF 2.0, .gltf (JSON; its buffers in data: URIs or in files beside  *
+*   it, which the mesh reads and passes in) or .glb (the binary          *
+*   container, told apart by its "glTF" magic whatever its name):        *
+*   every mesh of the default scene (or of one named node and its        *
+*   children, in that node's own frame), each node's matrix or           *
+*   translation, rotation and scale flattened in. Triangles, strips and  *
+*   fans; points and lines are skipped. Accessors of every component     *
+*   type, with byteStride, normalized integers and sparse substitution.  *
+*   POSITION, NORMAL (kept if every primitive has them) and TEXCOORD_0   *
+*   (likewise). Each primitive's material's pbrMetallicRoughness         *
+*   baseColorFactor becomes its faces' color, times its                  *
+*   baseColorTexture at the middle of each face when that image is a     *
+*   PNG (sRGB, as glTF says); other images (JPEG, WebP) are skipped and  *
+*   counted in nSkippedImages, and the factor alone is used. Everything  *
+*   else about materials, cameras, lights, skins and animations is       *
+*   ignored. Draco- or meshopt-compressed models are refused. glTF is    *
+*   right-handed and Ray's scenes are left-handed, so z is negated and   *
+*   each face turned back round: the model isn't mirrored.               *
+*                                                                        *
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 #ifndef __MODELFILE_H__
@@ -40,7 +59,9 @@
 #include "Vector.h"
 #include "Color.h"
 
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ModelFile
@@ -53,6 +74,14 @@ namespace ModelFile
         std::vector<FLT>            anUVs;          // u and v a vertex, or empty
         std::vector<CColor>         aoFaceColors;   // one a face, or empty if the file has no colors
         std::vector<unsigned char>  abHasColor;     // whether each face has its color (with aoFaceColors)
+        int                         nSkippedImages = 0;     // glTF base color images that weren't PNG
+    };
+
+        /// The other files a .gltf names (buffers and PNG images), by the
+        /// URI it gives them.
+    struct SGltfFiles
+    {
+        std::vector< std::pair< std::string, std::shared_ptr<const std::string> > > aoFiles;
     };
 
         /// Reads a model from a file's contents. strName (the file's name)
@@ -62,6 +91,18 @@ namespace ModelFile
     BOOL        Read( const std::string &strData, const std::string &strName, SModel &oModel, std::string &strError );
 
     BOOL        ReadStl( const std::string &strData, SModel &oModel, std::string &strError );
+        /// Whether a file is glTF: by the .glb magic, or a .gltf or .glb name.
+    BOOL        IsGltf( const std::string &strData, const std::string &strName );
+        /// Reads glTF. pFiles holds the files a .gltf names (NULL: none);
+        /// strNode, if not empty, picks one node.
+    BOOL        ReadGltf( const std::string &strData, const SGltfFiles *pFiles, const std::string &strNode, SModel &oModel,
+                          std::string &strError );
+        /// The files a glTF model names besides itself: its buffers' and its
+        /// PNG images' URIs (data: URIs left out). FALSE for a URI that leaves
+        /// its folder, or JSON that isn't glTF.
+    BOOL        GltfUris( const std::string &strData, std::vector<std::string> &astrUris, std::string &strError );
+        /// A URI with its %XX escapes decoded, as a file name.
+    std::string UnescapeUri( const std::string &strUri );
     BOOL        ReadObj( const std::string &strData, SModel &oModel, std::string &strError );
 }
 

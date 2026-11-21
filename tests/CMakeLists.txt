@@ -465,7 +465,9 @@ add_test(NAME render_torture
                  -DREFERENCE=${REFERENCE_DIR}/torture_test.raw
                  -DSIZE=160x120
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(render_torture PROPERTIES TIMEOUT 900 LABELS slow)
+# Labelled torture as well as slow: CI leaves it out (ctest -LE torture), since the runners are
+# too slow for it; the full preset runs it locally before every merge.
+set_tests_properties(render_torture PROPERTIES TIMEOUT 900 LABELS "slow;torture")
 add_test(NAME roundtrip_torture_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/torture_test.ray ${RENDER_DIR})
 
 add_test(NAME render_sampler_stratified
