@@ -4,6 +4,8 @@
 [wxWidgets](https://www.wxwidgets.org/) 3.2 (native controls on each system: Win32, GTK 3,
 Cocoa) and sits beside the Windows-only MFC editor, `Ray.exe`, which is unchanged.
 
+<img src="../docs/images/editor.png" alt="ray-editor on Linux: the scene tree on the left, the textured teapot ray-traced in the view after Render, and the settings in the property grid on the right" width="720">
+
 ## Building
 
 ```sh

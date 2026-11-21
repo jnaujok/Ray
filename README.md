@@ -402,6 +402,8 @@ zoom and click an object to select it. *View > Wireframe Overlay* draws the tria
 ray-traces the view over it, a quick pass first. *Edit* adds objects, lights and a sky, and
 *File > Import Model* brings in an STL or OBJ file. See [`editor/README.md`](editor/README.md).
 
+<img src="docs/images/editor.png" alt="ray-editor on Linux: the scene tree on the left, the textured teapot ray-traced in the view after Render, and the settings in the property grid on the right" width="720">
+
 **Windows scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
 menu, and choose *Render*. Right-click the scene's name in the tree to edit its settings, camera or
 environment as JSON, add any object or light as JSON, or import a model; right-click an object or

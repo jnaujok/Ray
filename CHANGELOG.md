@@ -14,7 +14,13 @@ Every change that alters rendered output shows its before and after images here.
 
 Smoother spectral dispersion: a pixel's samples now take one each of as many wavelength strata,
 shuffled per pixel, instead of wavelengths tied to where each sample falls in the pixel. Scenes
-with `"dispersion": "rgb"` (the default) render byte for byte as before.
+with `"dispersion": "rgb"` (the default) render byte for byte as before. Plus the first screenshot
+of `ray-editor`.
+
+### Added
+
+- A screenshot of `ray-editor` on Linux (`docs/images/editor.png`: the textured teapot after
+  *Render*), in the README's editor section and in `editor/README.md`.
 
 ### Fixed
 
