@@ -14,6 +14,7 @@
 #include "Globals.h"
 #endif
 
+#include "DracoDecoder.h"
 #include "ModelFile.h"
 #include "PngImage.h"
 #include "SceneJson.h"
@@ -21,6 +22,7 @@
 
 #include <math.h>
 #include <string.h>
+#include <map>
 #include <memory>
 
 namespace
@@ -115,6 +117,7 @@ namespace
             BOOL                            m_bCoords;       // and coordinates
             BOOL                            m_bAnyColor;
             std::vector<CColor>             m_aoFaceColors;
+            std::vector<double>             m_adDracoColorCoords;    // a Draco primitive's base color coordinates
                 // Decoded base color images, by image index (width 0: none).
             struct SImage { int nWidth = 0; int nHeight = 0; std::vector<BYTE> anPixels; BOOL bTried = FALSE; };
             std::vector<SImage>             m_aoImages;
@@ -124,6 +127,9 @@ namespace
             BOOL Number( const IASLib::CJsonNode *pNode, const char *strField, double &dValue ) const;
             BOOL LoadBuffers( const std::string &strBinary );
             BOOL Uri( const std::string &strUri, std::string &strOut, const char *strWhat );
+            BOOL BufferView( int nView, std::string &strOut );
+            BOOL DracoPrimitive( const IASLib::CJsonNode &oPrimitive, const IASLib::CJsonNode &oDraco, std::vector<double> &adPoints,
+                                 std::vector<double> &adNormals, std::vector<double> &adCoords, std::vector<size_t> &anOrder );
             BOOL Accessor( int nIndex, int nWidth, std::vector<double> &adOut );
             SMatrix NodeMatrix( const IASLib::CJsonNode &oNode ) const;
             BOOL Node( int nIndex, const SMatrix &oMatrix, int nDepth );
@@ -172,6 +178,105 @@ namespace
             }
         }
         return Fail( std::string( "its " ) + strWhat + " \"" + strUri + "\" is missing" );
+    }
+
+    BOOL CGltfReader::BufferView( int nView, std::string &strOut )
+    {
+        const IASLib::CJsonNode *pViews = Array( "bufferViews" );
+        const IASLib::CJsonNode *pView = ( pViews && nView >= 0 ) ? pViews->get( nView ) : NULL;
+        double                   dBuffer = 0.0, dOffset = 0.0, dLength = 0.0;
+
+        if ( pView == NULL || ! pView->isObject() || ! Number( pView, "byteLength", dLength ) )
+            return FALSE;
+        Number( pView, "buffer", dBuffer );
+        Number( pView, "byteOffset", dOffset );
+        if ( dBuffer < 0.0 || (size_t)dBuffer >= m_astrBuffers.size() || dOffset < 0.0 || dLength < 0.0 ||
+             (size_t)dOffset + (size_t)dLength > m_astrBuffers[ (size_t)dBuffer ].size() )
+            return FALSE;
+        strOut = m_astrBuffers[ (size_t)dBuffer ].substr( (size_t)dOffset, (size_t)dLength );
+        return TRUE;
+    }
+
+        // A Draco-compressed primitive: its attributes are named by the
+        // extension's own ids, and every corner of the decoded mesh becomes
+        // a vertex, joined with the others where all its values match.
+    BOOL CGltfReader::DracoPrimitive( const IASLib::CJsonNode &oPrimitive, const IASLib::CJsonNode &oDraco, std::vector<double> &adPoints,
+                                      std::vector<double> &adNormals, std::vector<double> &adCoords, std::vector<size_t> &anOrder )
+    {
+        const IASLib::CJsonNode *pAttributes = oDraco.get( "attributes" );
+        double                   dView = -1.0;
+        std::string              strBytes, strWhy;
+        Draco::SMesh             oMesh;
+
+        if ( ! Number( &oDraco, "bufferView", dView ) || ! BufferView( (int)dView, strBytes ) )
+            return Fail( "a Draco primitive's bufferView is missing" );
+        if ( ! Draco::Decode( (const unsigned char *)strBytes.data(), strBytes.size(), oMesh, strWhy ) )
+            return Fail( "a Draco primitive " + strWhy );
+
+        auto Attribute = [ & ]( const std::string &strName, int nWidth ) -> const Draco::SAttribute *
+        {
+            double dId = -1.0;
+
+            if ( ! Number( pAttributes, strName.c_str(), dId ) )
+                return NULL;
+
+            const Draco::SAttribute *pFound = oMesh.ByUniqueId( (int)dId );
+
+            return ( pFound && pFound->nComponents >= nWidth ) ? pFound : NULL;
+        };
+        double dMaterial = -1.0;
+        int    nColorCoord = 0;
+
+        if ( Number( &oPrimitive, "material", dMaterial ) )
+        {
+            CColor oIgnored;
+            int    nIgnored = -1;
+
+            BaseColor( (int)dMaterial, oIgnored, nIgnored, nColorCoord );
+        }
+
+        const Draco::SAttribute *pPositions = Attribute( "POSITION", 3 );
+        const Draco::SAttribute *pNormals = Attribute( "NORMAL", 3 );
+        const Draco::SAttribute *pCoords = Attribute( "TEXCOORD_0", 2 );
+        const Draco::SAttribute *pColorCoords = Attribute( "TEXCOORD_" + std::to_string( nColorCoord ), 2 );
+
+        if ( pPositions == NULL )
+            return Fail( "a Draco primitive has no POSITION" );
+
+        std::map<std::vector<int>, size_t> oJoined;
+        std::vector<int>                   anKey( 4 );
+        size_t                             nCorners = (size_t)oMesh.nFaces * 3;
+
+        m_adDracoColorCoords.clear();
+        for ( size_t c = 0; c < nCorners; c++ )
+        {
+            anKey[ 0 ] = pPositions->anCornerValue[ c ];
+            anKey[ 1 ] = pNormals ? pNormals->anCornerValue[ c ] : -1;
+            anKey[ 2 ] = pCoords ? pCoords->anCornerValue[ c ] : -1;
+            anKey[ 3 ] = pColorCoords ? pColorCoords->anCornerValue[ c ] : -1;
+
+            auto oFound = oJoined.find( anKey );
+
+            if ( oFound != oJoined.end() )
+            {
+                anOrder.push_back( oFound->second );
+                continue;
+            }
+
+            size_t nVertex = adPoints.size() / 3;
+
+            oJoined[ anKey ] = nVertex;
+            anOrder.push_back( nVertex );
+            for ( int k = 0; k < 3; k++ )
+                adPoints.push_back( pPositions->afValues[ (size_t)anKey[ 0 ] * (size_t)pPositions->nComponents + (size_t)k ] );
+            for ( int k = 0; pNormals && k < 3; k++ )
+                adNormals.push_back( pNormals->afValues[ (size_t)anKey[ 1 ] * (size_t)pNormals->nComponents + (size_t)k ] );
+            for ( int k = 0; pCoords && k < 2; k++ )
+                adCoords.push_back( pCoords->afValues[ (size_t)anKey[ 2 ] * (size_t)pCoords->nComponents + (size_t)k ] );
+            for ( int k = 0; pColorCoords && k < 2; k++ )
+                m_adDracoColorCoords.push_back( pColorCoords->afValues[ (size_t)anKey[ 3 ] * (size_t)pColorCoords->nComponents + (size_t)k ] );
+        }
+        return TRUE;
     }
 
     BOOL CGltfReader::LoadBuffers( const std::string &strBinary )
@@ -519,18 +624,29 @@ namespace
             return TRUE;        // points and lines have no faces
 
         const IASLib::CJsonNode *pExtensions = oPrimitive.get( "extensions" );
+        const IASLib::CJsonNode *pDraco = pExtensions ? pExtensions->get( "KHR_draco_mesh_compression" ) : NULL;
 
-        if ( pExtensions && ( pExtensions->get( "KHR_draco_mesh_compression" ) || pExtensions->get( "EXT_meshopt_compression" ) ) )
-            return Fail( "is compressed (Draco or meshopt), which Ray doesn't decode" );
+        if ( pExtensions && pExtensions->get( "EXT_meshopt_compression" ) )
+            return Fail( "is meshopt-compressed, which Ray doesn't decode" );
 
         const IASLib::CJsonNode *pAttributes = oPrimitive.get( "attributes" );
         double                   dPosition = 0.0, dNormal = 0.0, dIndices = 0.0, dMaterial = -1.0;
         std::vector<double>      adPoints, adNormals, adCoords, adIndices;
+        std::vector<size_t>      anDracoOrder;
 
-        if ( ! Number( pAttributes, "POSITION", dPosition ) )
-            return Fail( "a primitive has no POSITION" );
-        if ( ! Accessor( (int)dPosition, 3, adPoints ) )
-            return FALSE;
+        if ( pDraco )
+        {
+            if ( ! DracoPrimitive( oPrimitive, *pDraco, adPoints, adNormals, adCoords, anDracoOrder ) )
+                return FALSE;
+            dMode = 4.0;
+        }
+        else
+        {
+            if ( ! Number( pAttributes, "POSITION", dPosition ) )
+                return Fail( "a primitive has no POSITION" );
+            if ( ! Accessor( (int)dPosition, 3, adPoints ) )
+                return FALSE;
+        }
 
         size_t  nPoints = adPoints.size() / 3;
         CColor  oFactor( 1.0, 1.0, 1.0 );
@@ -549,14 +665,14 @@ namespace
                 return TRUE;
         }
 
-        BOOL   bHasNormals = Number( pAttributes, "NORMAL", dNormal );
         std::string strCoord = "TEXCOORD_" + std::to_string( nTexCoord );
         double dCoord = 0.0, dCoord0 = 0.0;
-        BOOL   bHasCoords = Number( pAttributes, "TEXCOORD_0", dCoord0 );
+        BOOL   bHasNormals = pDraco ? ( adNormals.size() == adPoints.size() ) : Number( pAttributes, "NORMAL", dNormal );
+        BOOL   bHasCoords = pDraco ? ( adCoords.size() == nPoints * 2 ) : Number( pAttributes, "TEXCOORD_0", dCoord0 );
 
-        if ( bHasNormals && ! Accessor( (int)dNormal, 3, adNormals ) )
+        if ( ! pDraco && bHasNormals && ! Accessor( (int)dNormal, 3, adNormals ) )
             return FALSE;
-        if ( bHasCoords && ! Accessor( (int)dCoord0, 2, adCoords ) )
+        if ( ! pDraco && bHasCoords && ! Accessor( (int)dCoord0, 2, adCoords ) )
             return FALSE;
         if ( adNormals.size() != adPoints.size() )
             bHasNormals = FALSE;
@@ -565,12 +681,19 @@ namespace
 
         std::vector<double> adColorCoords( adCoords );
 
-        if ( nTexCoord != 0 && Number( pAttributes, strCoord.c_str(), dCoord ) && ! Accessor( (int)dCoord, 2, adColorCoords ) )
+        if ( pDraco )
+        {
+            if ( nTexCoord != 0 )
+                adColorCoords = m_adDracoColorCoords;
+        }
+        else if ( nTexCoord != 0 && Number( pAttributes, strCoord.c_str(), dCoord ) && ! Accessor( (int)dCoord, 2, adColorCoords ) )
             return FALSE;
 
         std::vector<size_t> anOrder;
 
-        if ( Number( &oPrimitive, "indices", dIndices ) )
+        if ( pDraco )
+            anOrder = anDracoOrder;
+        else if ( Number( &oPrimitive, "indices", dIndices ) )
         {
             if ( ! Accessor( (int)dIndices, 1, adIndices ) )
                 return FALSE;
@@ -774,9 +897,8 @@ namespace
         {
             std::string strName = pRequired->get( nIndex )->textString();
 
-            if ( strName == "KHR_draco_mesh_compression" || strName == "EXT_meshopt_compression" )
-                return Fail( "needs " + strName + ", which Ray doesn't decode (decompress it first, e.g. with "
-                             "tools/gltf_decompress.py)" );
+            if ( strName == "EXT_meshopt_compression" )
+                return Fail( "needs " + strName + ", which Ray doesn't decode" );
         }
         if ( ! LoadBuffers( strBinary ) )
             return FALSE;
