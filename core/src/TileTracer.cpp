@@ -66,12 +66,8 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
                 // Traced spectrally, the lens is sent four single
                 // wavelengths, one from each quarter of the range, each weighed
                 // by how its wavelength looks (see Spectrum.h).
-            FLT nU, nV;
             FLT anSum[ 3 ] = { 0.0, 0.0, 0.0 };
-
-            oRay.SamplePoint( RaySampling::PURPOSE_WAVELENGTH, nU, nV );
-
-            FLT nWhere = RaySpectrum::WhereInPart( nU, nV );
+            FLT nWhere = oRay.WavelengthOffset();
 
             for ( int nPart = 0; nPart < RaySpectrum::PARTS; nPart++ )
             {
@@ -85,6 +81,7 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
                 CColor  oSeen;
 
                 oChannelRay.CreateRayAt( oScene, oRay.GetImageX(), oRay.GetImageY(), oRay.GetPixelX(), oRay.GetPixelY(), 1.0, nChannel );
+                oChannelRay.CopySampleIndex( oRay );
                 oScene.TraceRay( oChannelRay, oSeen, NULL );
                 anSum[ 0 ] += oSeen.GetR() * anWeight[ 0 ] * oChannelRay.GetWeight();
                 anSum[ 1 ] += oSeen.GetG() * anWeight[ 1 ] * oChannelRay.GetWeight();

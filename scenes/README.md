@@ -278,8 +278,12 @@ seen through it (edges fringe with color) but casts no rainbow on the floor: lig
 surface through glass is not traced.
 
 With the camera's `"dispersion": "spectral"` a split makes four single wavelengths instead, one
-from each quarter of 380 to 720 nm, picked from where the ray's sample falls in its pixel so a
-pixel's samples spread evenly over the range. Each is bent by the Cauchy index at its own
+from each quarter of 380 to 720 nm, all at the same place in their quarters. Where that place is
+comes from which of its pixel's samples the ray is: the samples take one each of as many equal
+strata, in an order shuffled by a hash of the pixel, so a pixel's wavelengths spread evenly over
+the range and have nothing to do with where in the pixel each sample falls. (Samplers that make a
+fixed number of rays a pixel say which each is; with `corners` and `none`, the place is a hash of
+the sample point.) Each is bent by the Cauchy index at its own
 wavelength, and what it sees is weighed by how that wavelength looks (the CIE 1931 color matching
 functions, as linear sRGB, scaled so an even spread of wavelengths adds up to white). Over a
 pixel the colors smear into a continuous rainbow, with the yellows and cyans three bars can't

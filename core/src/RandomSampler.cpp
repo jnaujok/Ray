@@ -99,6 +99,7 @@ BOOL CRandomSampler::NextRay( CScene &oScene, CRay &oRay )
         Offset( nX, nY, m_nRay, nU, nV );
         oRay.CreateRayAt( oScene, nX + nU, nY + nV, nTagX, nY );
     }
+    oRay.SetSampleIndex( m_nRay, m_nSamples + 1 );
 
     if ( ++m_nRay > m_nSamples )
     {

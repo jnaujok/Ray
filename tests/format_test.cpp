@@ -2615,6 +2615,86 @@ static void SpectralChecks( void )
     Check( RaySpectrum::PartWavelength( 0, 0.0 ) == RaySpectrum::SHORTEST && RaySpectrum::PartWavelength( RaySpectrum::PARTS - 1, 1.0 ) == RaySpectrum::LONGEST,
            "a split's parts cover the range" );
 
+        // A pixel's samples spread its wavelengths over the range: one each
+        // of as many strata, shuffled by the pixel, whatever their order.
+    {
+        BOOL bPermutes = TRUE;
+
+        for ( uint32_t nCount = 1; nCount <= 300 && bPermutes; nCount += ( nCount < 20 ) ? 1 : 37 )
+            for ( uint32_t nSeed = 0; nSeed < 5 && bPermutes; nSeed++ )
+            {
+                std::vector<int> anSeen( nCount, 0 );
+
+                for ( uint32_t nIndex = 0; nIndex < nCount; nIndex++ )
+                {
+                    uint32_t nTo = RaySampling::Permute( nIndex, nCount, nSeed * 0x9E3779B9U );
+
+                    if ( nTo >= nCount || anSeen[ nTo ]++ )
+                        bPermutes = FALSE;
+                }
+            }
+        Check( bPermutes, "the shuffle of strata puts every index in a different place" );
+
+        CScene oScene;
+
+        Check( oScene.FromJson( GlassBallBeforeWall( "\"indexOfRefraction\": 1.5, \"abbe\": 20" ) ) == 0, "a scene for wavelength strata loads" );
+
+        BOOL    bStrata = TRUE;
+        BOOL    bSame = TRUE;
+        BOOL    bShuffled = FALSE;
+        int     anFirst[ 2 ] = { -1, -1 };
+
+        for ( int nPixel = 0; nPixel < 2; nPixel++ )
+        {
+            const int           COUNT = 25;
+            std::vector<int>    anStratum( COUNT, 0 );
+            std::vector<int>    anChildStratum( COUNT, 0 );
+
+            for ( int nSample = 0; nSample < COUNT; nSample++ )
+            {
+                CRay oRay;
+                CRay oAgain;
+                CRay oChild;
+
+                oRay.CreateRayAt( oScene, 10 + nPixel + ( ( nSample % 5 ) + 0.5 ) / 5.0, 7 + ( ( nSample / 5 ) + 0.5 ) / 5.0, 10 + nPixel, 7 );
+                oRay.SetSampleIndex( nSample, COUNT );
+                oAgain = oRay;
+                oChild.InheritSample( oRay, 3 );
+
+                FLT nOffset = oRay.WavelengthOffset();
+                int nStratum = (int)floor( nOffset * COUNT );
+
+                if ( ! ( nOffset >= 0.0 && nOffset < 1.0 ) || nStratum < 0 || nStratum >= COUNT || anStratum[ nStratum ]++ )
+                    bStrata = FALSE;
+                FLT nChild = oChild.WavelengthOffset();
+                int nChildStratum = (int)floor( nChild * COUNT );
+
+                if ( oAgain.WavelengthOffset() != nOffset || nChild != oChild.WavelengthOffset() )
+                    bSame = FALSE;
+                    // A ray made from it (a reflection, say) shuffles the
+                    // strata again, but still takes one each.
+                if ( nChildStratum < 0 || nChildStratum >= COUNT || anChildStratum[ nChildStratum ]++ )
+                    bStrata = FALSE;
+                if ( nSample == 0 )
+                    anFirst[ nPixel ] = nStratum;
+            }
+        }
+        if ( anFirst[ 0 ] != anFirst[ 1 ] )
+            bShuffled = TRUE;
+        Check( bStrata, "a pixel's 25 samples, and the rays made from them, take one each of 25 wavelength strata" );
+        Check( bSame, "a ray's wavelength offset is the same every time, and in its copies" );
+        Check( bShuffled, "neighboring pixels shuffle their strata differently" );
+
+        CRay oNoIndex;
+
+        oNoIndex.CreateRayAt( oScene, 10.3, 7.6, 10, 7 );
+
+        FLT nHashed = oNoIndex.WavelengthOffset();
+
+        Check( nHashed >= 0.0 && nHashed < 1.0 && oNoIndex.GetSampleCount() == 0 && nHashed == oNoIndex.WavelengthOffset(),
+               "a ray without a sample index takes a hashed wavelength offset" );
+    }
+
         // Wavelength channels, and the same index as the lens's lines.
     int nChannel = CLens::WavelengthChannel( 500.0 );
 

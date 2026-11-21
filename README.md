@@ -103,8 +103,9 @@ The ray tracing itself is the 1997 code.
   a pixel. Glass with an Abbe number disperses: a ray splits into red, green and blue at it, each
   bent by its own index, so a flint glass prism or ball fringes what is seen through it with color.
   With the camera's `"dispersion": "spectral"` it splits instead into four single wavelengths,
-  weighed by the CIE color matching functions, so over a pixel's samples the colors smear into a
-  continuous rainbow (yellows and cyans too) instead of three bars.
+  weighed by the CIE color matching functions and spread over the range by a per-pixel shuffle of
+  wavelength strata, so over a pixel's samples the colors smear into a continuous rainbow (yellows
+  and cyans too) instead of three bars.
   An optional sample clamp on the camera keeps a rare very bright ray (a "firefly") from showing
   as a lone speck.
 
@@ -400,6 +401,8 @@ zoom and click an object to select it. *View > Wireframe Overlay* draws the tria
 *View > Look Through Scene Camera* shows what the camera sees, and *Render > Render View* (F5)
 ray-traces the view over it, a quick pass first. *Edit* adds objects, lights and a sky, and
 *File > Import Model* brings in an STL or OBJ file. See [`editor/README.md`](editor/README.md).
+
+<img src="docs/images/editor.png" alt="ray-editor on Linux: the scene tree on the left, the textured teapot ray-traced in the view after Render, and the settings in the property grid on the right" width="720">
 
 **Windows scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
 menu, and choose *Render*. Right-click the scene's name in the tree to edit its settings, camera or

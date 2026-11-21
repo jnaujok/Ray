@@ -47,6 +47,44 @@ namespace RaySampling
         return (FLT)( (double)( nValue >> 11 ) * ( 1.0 / 9007199254740992.0 ) );
     }
 
+        /// Where index nIndex (0 up to nCount) goes in a shuffle of 0 up to
+        /// nCount picked by nSeed: Kensler's stateless permutation
+        /// ("Correlated Multi-Jittered Sampling", 2013). Every index goes
+        /// to a different place, and the same seed always gives the same
+        /// shuffle.
+    inline uint32_t Permute( uint32_t nIndex, uint32_t nCount, uint32_t nSeed )
+    {
+        uint32_t nMask = nCount - 1;
+
+        nMask |= nMask >> 1;
+        nMask |= nMask >> 2;
+        nMask |= nMask >> 4;
+        nMask |= nMask >> 8;
+        nMask |= nMask >> 16;
+        do
+        {
+            nIndex ^= nSeed;
+            nIndex *= 0xe170893dU;
+            nIndex ^= nSeed >> 16;
+            nIndex ^= ( nIndex & nMask ) >> 4;
+            nIndex ^= nSeed >> 8;
+            nIndex *= 0x0929eb3fU;
+            nIndex ^= nSeed >> 23;
+            nIndex ^= ( nIndex & nMask ) >> 1;
+            nIndex *= 1U | ( nSeed >> 27 );
+            nIndex *= 0x6935fa69U;
+            nIndex ^= ( nIndex & nMask ) >> 11;
+            nIndex *= 0x74dcb303U;
+            nIndex ^= ( nIndex & nMask ) >> 2;
+            nIndex *= 0x9e501cc3U;
+            nIndex ^= ( nIndex & nMask ) >> 2;
+            nIndex *= 0xc860a3dfU;
+            nIndex &= nMask;
+            nIndex ^= nIndex >> 5;
+        } while ( nIndex >= nCount );
+        return ( nIndex + nSeed ) % nCount;
+    }
+
         /// The fractional part, from 0 up to 1.
     inline FLT Wrap( FLT nValue )
     {

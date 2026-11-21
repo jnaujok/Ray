@@ -128,12 +128,8 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
             // Traced spectrally, it goes on as four single wavelengths, one
             // from each quarter of the range, each weighed by how its
             // wavelength looks (see Spectrum.h).
-        FLT     nU, nV;
         FLT     anSum[ 3 ] = { 0.0, 0.0, 0.0 };
-
-        oViewIncident.SamplePoint( RaySampling::PURPOSE_WAVELENGTH, nU, nV );
-
-        FLT     nWhere = RaySpectrum::WhereInPart( nU, nV );
+        FLT     nWhere = oViewIncident.WavelengthOffset();
 
         for ( int nPart = 0; nPart < RaySpectrum::PARTS; nPart++ )
         {

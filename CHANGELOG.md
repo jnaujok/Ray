@@ -10,6 +10,60 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.12.1] - 2026-11-20
+
+Smoother spectral dispersion: a pixel's samples now take one each of as many wavelength strata,
+shuffled per pixel, instead of wavelengths tied to where each sample falls in the pixel. Scenes
+with `"dispersion": "rgb"` (the default) render byte for byte as before. Plus the first screenshot
+of `ray-editor`.
+
+### Added
+
+- A screenshot of `ray-editor` on Linux (`docs/images/editor.png`: the textured teapot after
+  *Render*), in the README's editor section and in `editor/README.md`.
+
+### Fixed
+
+- **Spectral dispersion was grainier than it had to be, and patterned.** Each sample's four
+  wavelengths (one in each quarter of 380–720 nm, all at the same place in their quarters, as in
+  Wilkie et al.'s hero wavelength sampling) took that place from where the sample fell in its
+  pixel. So wavelength and position moved together, and through strongly dispersive glass, where
+  a wavelength's change moves the image as much as a step across the pixel does, the two
+  cancelled out in places: a pixel's samples kept looking at the same few points of the wall
+  behind, and the grain stayed in fixed streaks however many rays a pixel. Now the place comes
+  from which of its pixel's samples the ray is (`CRay::WavelengthOffset`): the samples take one
+  each of as many equal strata, in an order shuffled by a hash of the pixel (Kensler's
+  permutation, `RaySampling::Permute`), with a hashed place inside each stratum. Wavelength no
+  longer has anything to do with position, and a pixel's wavelengths still cover the range evenly.
+  - The samplers that make a fixed number of rays a pixel (`stratified`, `box`, `random`, and
+    `adaptive`, out of its maximum) say which each ray is (`CRay::SetSampleIndex`); rays made from
+    a ray keep it. With `corners` and `none` the place is a hash of the sample point.
+  - Error against a 256-ray render of `prism_test`, in the rainbow (root mean square, 0–255):
+
+    | Rays a pixel | 0.11.1 | Hashed place per sample | Shuffled strata (now) |
+    |---|---|---|---|
+    | 4 (the test's 2×2) | 30.0 | 31.6 | **23.7** (21% less) |
+    | 64 | 6.24 | 8.12 | **4.58** (27% less) |
+
+    A hashed place alone, without strata, was worse than before; the shuffled strata are better
+    at every count. Over the whole image the error falls from 15.2 to 12.7 (4 rays) and 2.97 to
+    2.26 (64 rays).
+  - The red, green and magenta bands in `prism_test` are real: the wall's white bars are closer
+    together than the spectrum each fans out to, so neighboring bars' spectra overlap. The
+    256-ray render shows them too; what changed is the grain in them.
+  - `prism_test`, `chromatic_test` and `torture_test` are regenerated, with their README previews
+    and the full-size `docs/images/torture_test.png` (2,229 CPU-seconds, about the same as
+    before). No other render changes.
+
+  ![Before and after: prism_test at 4 and 64 rays a pixel, and the torture test's prism, with wavelengths tied to sample positions (left) and shuffled strata (right)](docs/images/changelog/spectral-strata.png)
+
+  Look at the bars through the prism: at 4 rays a pixel the speckle is finer and less streaked, at
+  64 the bands are clean, and the torture test's prism fringes are smoother.
+- `format_test` checks that the shuffle puts every index in a different place for counts up to
+  300, that a pixel's 25 samples (and the rays made from them) take one each of 25 wavelength
+  strata, that a ray's offset is the same every time and in its copies, that neighboring pixels
+  shuffle differently, and that a ray without a sample index takes a hashed offset.
+
 ## [2026-alpha-0.12] - 2026-11-20
 
 A scene editor for every platform: `ray-editor`, built on wxWidgets for Windows, Linux and macOS,
@@ -1112,7 +1166,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12.1...HEAD
+[2026-alpha-0.12.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12...2026-alpha-0.12.1
 [2026-alpha-0.12]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11.1...2026-alpha-0.12
 [2026-alpha-0.11.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11...2026-alpha-0.11.1
 [2026-alpha-0.11]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.10...2026-alpha-0.11

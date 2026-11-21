@@ -52,6 +52,8 @@ CRay::CRay( void )
     m_nSampleU = 0.5;
     m_nSampleV = 0.5;
     m_nSampleKey = 0;
+    m_nSampleIndex = 0;
+    m_nSampleCount = 0;
     m_nChannel = 0;
 }
 
@@ -75,6 +77,8 @@ CRay::CRay( const CRay &oRay )
     m_nSampleU = oRay.m_nSampleU;
     m_nSampleV = oRay.m_nSampleV;
     m_nSampleKey = oRay.m_nSampleKey;
+    m_nSampleIndex = oRay.m_nSampleIndex;
+    m_nSampleCount = oRay.m_nSampleCount;
     m_nChannel = oRay.m_nChannel;
 }
 
@@ -102,6 +106,8 @@ CRay &CRay::operator =( const CRay &oRay )
     m_nSampleU = oRay.m_nSampleU;
     m_nSampleV = oRay.m_nSampleV;
     m_nSampleKey = oRay.m_nSampleKey;
+    m_nSampleIndex = oRay.m_nSampleIndex;
+    m_nSampleCount = oRay.m_nSampleCount;
     m_nChannel = oRay.m_nChannel;
 
     return *this;
@@ -129,6 +135,8 @@ void CRay::CreateRay( CVector &oVector, CVector &oOrigin, FLT nInfluence, int nX
     m_nSampleU = 0.5;
     m_nSampleV = 0.5;
     m_nSampleKey = 0;
+    m_nSampleIndex = 0;
+    m_nSampleCount = 0;
     m_nChannel = 0;
 }
 
@@ -188,6 +196,8 @@ void CRay::CreateRayAt( CScene &oScene, FLT nImageX, FLT nImageY, int nTagX, int
     m_nSampleU = nImageX - nPixelX;
     m_nSampleV = nImageY - nPixelY;
     m_nSampleKey = RaySampling::Mix( RaySampling::Mix( (uint64_t)(int64_t)nPixelX ) ^ (uint64_t)(int64_t)nPixelY );
+    m_nSampleIndex = 0;
+    m_nSampleCount = 0;
     m_nChannel = nChannel;
 }
 
@@ -209,6 +219,8 @@ void CRay::Set( FLT nX, FLT nY, FLT nZ, FLT nI, FLT nJ, FLT nK, FLT nT, FLT nInf
     m_nSampleU = 0.5;
     m_nSampleV = 0.5;
     m_nSampleKey = 0;
+    m_nSampleIndex = 0;
+    m_nSampleCount = 0;
     m_nChannel = 0;
 }
 
@@ -238,8 +250,11 @@ void CRay::InheritSample( const CRay &oParent, uint64_t nBranch )
 
     m_nSampleU = RaySampling::Unit( nHash );
     m_nSampleV = RaySampling::Unit( RaySampling::Mix( nHash ) );
-        // A ray made from another keeps its wavelength.
+        // A ray made from another keeps its wavelength, and which of its
+        // pixel's samples it came from.
     m_nChannel = oParent.m_nChannel;
+    m_nSampleIndex = oParent.m_nSampleIndex;
+    m_nSampleCount = oParent.m_nSampleCount;
 }
 
 void CRay::SamplePoint( uint64_t nPurpose, FLT &nU, FLT &nV ) const
@@ -265,4 +280,42 @@ void CRay::SamplePoint( uint64_t nPurpose, FLT &nU, FLT &nV ) const
         nU = nShiftedU;
         nV = nShiftedV;
     }
+}
+
+void CRay::SetSampleIndex( int nIndex, int nCount )
+{
+    if ( nCount > 0 && nIndex >= 0 && nIndex < nCount )
+    {
+        m_nSampleIndex = (uint32_t)nIndex;
+        m_nSampleCount = (uint32_t)nCount;
+    }
+    else
+    {
+        m_nSampleIndex = 0;
+        m_nSampleCount = 0;
+    }
+}
+
+FLT CRay::WavelengthOffset( void ) const
+{
+        // The pixel's own shuffle: its key (not the ray's depth, so a
+        // primary ray and the rays it makes agree on a sample's stratum).
+    uint64_t    nHash = RaySampling::Mix( m_nSampleKey ^ RaySampling::Mix( (uint64_t)RaySampling::PURPOSE_WAVELENGTH ) );
+
+    if ( m_nSampleCount > 1 )
+    {
+        uint32_t    nStratum = RaySampling::Permute( m_nSampleIndex, m_nSampleCount, (uint32_t)( nHash >> 32 ) );
+        FLT         nJitter = RaySampling::Unit( RaySampling::Mix( nHash ^ RaySampling::Mix( (uint64_t)m_nSampleIndex + 1 ) ) );
+
+        return ( (FLT)nStratum + nJitter ) / (FLT)m_nSampleCount;
+    }
+
+    uint64_t    nBitsU;
+    uint64_t    nBitsV;
+    double      dU = (double)m_nSampleU;
+    double      dV = (double)m_nSampleV;
+
+    memcpy( &nBitsU, &dU, sizeof( nBitsU ) );
+    memcpy( &nBitsV, &dV, sizeof( nBitsV ) );
+    return RaySampling::Unit( RaySampling::Mix( RaySampling::Mix( nHash ^ nBitsU ) ^ nBitsV ) );
 }

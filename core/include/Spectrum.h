@@ -5,8 +5,11 @@
 *   (a camera's "dispersion": "spectral"). Where white light would split *
 *   into colors (dispersive glass, a chromatic lens), it splits instead  *
 *   into four rays at single wavelengths, one from each quarter of the   *
-*   visible range, picked from where the ray's sample falls in its       *
-*   pixel. What each sees is weighed by how a wavelength looks: the CIE  *
+*   visible range, all at the same place in their quarters: where comes  *
+*   from which of its pixel's samples the ray is                         *
+*   (CRay::WavelengthOffset), so a pixel's samples take one each of as   *
+*   many                                                                 *
+*   strata. What each sees is weighed by how a wavelength looks: the CIE *
 *   1931 color matching functions (Wyman, Sloan and Shirley's 2013 fit), *
 *   turned to linear sRGB, and scaled so an even spread of wavelengths   *
 *   adds up to exactly white. Over a pixel's samples the wavelengths     *
@@ -44,9 +47,6 @@ namespace RaySpectrum
         /// The wavelength (in nanometers) part nPart of a split takes at
         /// nWhere (0 up to 1), and its weights.
     void        PartWeights( int nPart, FLT nWhere, FLT &nNanometers, FLT anRGB[ 3 ] );
-        /// Where across each part a split's wavelengths fall, from a ray's
-        /// sample point (u, v), so a pixel's samples spread over the range.
-    FLT         WhereInPart( FLT nU, FLT nV );
 }
 
 #endif // __SPECTRUM_H__
