@@ -120,7 +120,7 @@ void CDiffuseMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
 
 void CDiffuseMaterial::ToJson( IASLib::CObjectNode &oNode )
 {
-    RayJson::PutColor( oNode, "color", m_oColor );
+    m_oColor.Write( oNode, "color" );
     RayJson::PutBool( oNode, "diffuseCast", m_bDiffuseCast );
 }
 
@@ -129,6 +129,6 @@ BOOL CDiffuseMaterial::FromJson( const IASLib::CJsonNode &oNode )
     static const char *const astrFields[] = { "influence", "texture", "color", "diffuseCast", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
-           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
+           m_oColor.Read( oNode, "color", FALSE ) &&
            RayJson::GetBool( oNode, "diffuseCast", m_bDiffuseCast, FALSE );
 }

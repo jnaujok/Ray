@@ -134,8 +134,10 @@ void CBumpMap::Perturb( CObjects &oObject, const CVector &oPoint, CVector &oNorm
     {
             // The slope of the heights along each direction, by central
             // differences; the normal tilts down it.
-        FLT nSlope1 = m_nDepth * ( Height( *m_pTexture, oObject, oPlus1 ) - Height( *m_pTexture, oObject, oMinus1 ) ) / ( 2.0 * m_nStep );
-        FLT nSlope2 = m_nDepth * ( Height( *m_pTexture, oObject, oPlus2 ) - Height( *m_pTexture, oObject, oMinus2 ) ) / ( 2.0 * m_nStep );
+        CMapPoint   oAt( oPoint, &oObject );
+        FLT         nDepth = m_nDepth.At( oAt );
+        FLT nSlope1 = nDepth * ( Height( *m_pTexture, oObject, oPlus1 ) - Height( *m_pTexture, oObject, oMinus1 ) ) / ( 2.0 * m_nStep );
+        FLT nSlope2 = nDepth * ( Height( *m_pTexture, oObject, oPlus2 ) - Height( *m_pTexture, oObject, oMinus2 ) ) / ( 2.0 * m_nStep );
         CVector oSlope = Combine( nSlope1, oT1, nSlope2, oT2 );
 
         oTilted = oN - oSlope;
@@ -186,8 +188,10 @@ void CBumpMap::Perturb( CObjects &oObject, const CVector &oPoint, CVector &oNorm
         if ( Dot( oBitangent, oAlongV ) < 0.0 )
             oBitangent = oBitangent * -1.0;
 
-        FLT     nX = ( ( 2.0 * oColor.GetR() ) - 1.0 ) * m_nStrength;
-        FLT     nY = ( ( 2.0 * oColor.GetG() ) - 1.0 ) * m_nStrength;
+        CMapPoint   oStrengthAt( oPoint, &oObject );
+        FLT         nStrength = m_nStrength.At( oStrengthAt );
+        FLT     nX = ( ( 2.0 * oColor.GetR() ) - 1.0 ) * nStrength;
+        FLT     nY = ( ( 2.0 * oColor.GetG() ) - 1.0 ) * nStrength;
         FLT     nZ = ( 2.0 * oColor.GetB() ) - 1.0;
         CVector oInPlane = Combine( nX, oTangent, nY, oBitangent );
         CVector oOut = oN * nZ;
@@ -219,9 +223,9 @@ void CBumpMap::ToJson( IASLib::CObjectNode &oNode ) const
         m_pTexture->Write( oNode, "texture" );
     }
     if ( m_eMode == MODE_NORMAL )
-        RayJson::PutNumber( oNode, "strength", m_nStrength );
+        m_nStrength.Write( oNode, "strength" );
     else
-        RayJson::PutNumber( oNode, "depth", m_nDepth );
+        m_nDepth.Write( oNode, "depth" );
     RayJson::PutNumber( oNode, "step", m_nStep );
 }
 
@@ -257,17 +261,17 @@ BOOL CBumpMap::FromJson( const IASLib::CJsonNode &oNode )
 
         return RayJson::Fail( "is for a normal map; a height map takes \"depth\"" );
     }
-    if ( ! RayJson::GetNumber( oNode, "depth", m_nDepth, FALSE ) ||
-         ! RayJson::GetNumber( oNode, "strength", m_nStrength, FALSE ) ||
+    if ( ! m_nDepth.Read( oNode, "depth", FALSE ) ||
+         ! m_nStrength.Read( oNode, "strength", FALSE ) ||
          ! RayJson::GetNumber( oNode, "step", m_nStep, FALSE ) )
         return FALSE;
-    if ( ! std::isfinite( (double)m_nDepth ) || ABS( m_nDepth ) > 1e6 )
+    if ( ! m_nDepth.IsMapped() && ( ! std::isfinite( (double)m_nDepth.Get() ) || ABS( m_nDepth.Get() ) > 1e6 ) )
     {
         RayJson::CWhere oWhere( "depth" );
 
         return RayJson::Fail( "must be a number of scene units (negative to invert the bumps)" );
     }
-    if ( ! std::isfinite( (double)m_nStrength ) || m_nStrength < 0.0 || m_nStrength > 100.0 )
+    if ( ! m_nStrength.IsMapped() && ( ! std::isfinite( (double)m_nStrength.Get() ) || m_nStrength < 0.0 || m_nStrength > 100.0 ) )
     {
         RayJson::CWhere oWhere( "strength" );
 

@@ -92,6 +92,7 @@ set(RAY_CORE_SOURCES
     core/src/LightArray.cpp
     core/src/MarbleTexture.cpp
     core/src/Material.cpp
+    core/src/Maps.cpp
     core/src/MaterialList.cpp
     core/src/Matrix.cpp
     core/src/Mesh.cpp

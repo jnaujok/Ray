@@ -1,0 +1,323 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 240,
+        "imageHeight": 180,
+        "imageFile": "maps_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 16,
+        "depthThreshold": 0.01
+    },
+    "background": [0.6, 0.75, 0.95],
+    "camera": {
+        "position": [0.0, 2.6, -7.5],
+        "lookAt": [0.0, 0.9, 1.0],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 34.0,
+        "horizontalAngle": 44.0,
+        "aspectRatio": 1.333333,
+        "sampler": {
+            "type": "stratified",
+            "grid": 3,
+            "seed": 0
+        },
+        "colorModel": "clip"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.1, 0.1]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "checker",
+                        "colors": [
+                            [0.15, 0.15, 0.17],
+                            [0.85, 0.85, 0.8]
+                        ],
+                        "size": 1.0,
+                        "solid": false
+                    }
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "noise",
+                    "colors": [
+                        [0.0, 0.0, 0.0],
+                        [1.0, 1.0, 1.0]
+                    ],
+                    "scale": 0.12,
+                    "origin": [0.0, 0.0, 0.0],
+                    "turbulence": 1.0,
+                    "octaves": 4,
+                    "seed": 9
+                },
+                "depth": {
+                    "texture": {
+                        "type": "cells",
+                        "colors": [
+                            [0.0, 0.0, 0.0],
+                            [1.0, 1.0, 1.0]
+                        ],
+                        "scale": 1.5,
+                        "origin": [0.0, 0.0, 0.0],
+                        "turbulence": 0.0,
+                        "octaves": 6,
+                        "seed": 4,
+                        "mode": "flecks"
+                    },
+                    "scale": 0.04
+                },
+                "step": 0.001
+            }
+        },
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 5.0],
+            "normal": [0.0, 0.0, -1.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.15, 0.15, 0.15]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.85,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "checker",
+                        "colors": [
+                            [0.35, 0.45, 0.6],
+                            [0.95, 0.93, 0.88]
+                        ],
+                        "size": 0.5,
+                        "solid": false
+                    }
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-2.4, 0.9, 0.8],
+            "radius": 0.9,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "transparent",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "indexOfRefraction": 1.5,
+                    "roughness": {
+                        "texture": {
+                            "type": "cells",
+                            "colors": [
+                                [0.0, 0.0, 0.0],
+                                [0.0, 0.0, 0.0],
+                                [1.0, 1.0, 1.0]
+                            ],
+                            "scale": 0.4,
+                            "origin": [0.0, 0.0, 0.0],
+                            "turbulence": 0.0,
+                            "octaves": 6,
+                            "seed": 3,
+                            "mode": "flecks"
+                        },
+                        "scale": 0.35
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.4,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.12,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-0.4, 0.9, 1.6],
+            "radius": 0.9,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.02, 0.02, 0.02]
+                },
+                {
+                    "type": "reflective",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseReflectivity": 0.0,
+                    "filterReflection": false,
+                    "roughness": {
+                        "texture": {
+                            "type": "noise",
+                            "colors": [
+                                [0.0, 0.0, 0.0],
+                                [1.0, 1.0, 1.0]
+                            ],
+                            "scale": 0.5,
+                            "origin": [0.0, 0.0, 0.0],
+                            "turbulence": 0.0,
+                            "octaves": 6,
+                            "seed": 2
+                        },
+                        "scale": 0.6,
+                        "offset": -0.15
+                    }
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [1.5, 0.8, 0.4],
+            "radius": 0.8,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "transparent",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "indexOfRefraction": {
+                        "texture": {
+                            "type": "noise",
+                            "colors": [
+                                [0.0, 0.0, 0.0],
+                                [1.0, 1.0, 1.0]
+                            ],
+                            "scale": 0.35,
+                            "origin": [0.0, 0.0, 0.0],
+                            "turbulence": 0.0,
+                            "octaves": 6,
+                            "seed": 6
+                        },
+                        "scale": 0.8,
+                        "offset": 1.1
+                    }
+                },
+                {
+                    "type": "specular",
+                    "influence": 0.4,
+                    "color": [1.0, 1.0, 1.0],
+                    "power": 0.12,
+                    "indexOfRefraction": 1.5,
+                    "materialHighlight": false
+                }
+            ]
+        },
+        {
+            "type": "box",
+            "center": [3.0, 0.9, 2.0],
+            "size": [1.2, 1.8, 0.15],
+            "rotation": [0.0, -25.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "transparent",
+                    "influence": {
+                        "texture": {
+                            "type": "checker",
+                            "colors": [
+                                [0.0, 0.0, 0.0],
+                                [1.0, 1.0, 1.0]
+                            ],
+                            "size": 0.3,
+                            "solid": true
+                        }
+                    },
+                    "color": [1.0, 1.0, 1.0],
+                    "indexOfRefraction": 1.0
+                },
+                {
+                    "type": "diffuse",
+                    "influence": {
+                        "texture": {
+                            "type": "checker",
+                            "colors": [
+                                [0.0, 0.0, 0.0],
+                                [1.0, 1.0, 1.0]
+                            ],
+                            "size": 0.3,
+                            "solid": true
+                        },
+                        "scale": -0.9,
+                        "offset": 0.9
+                    },
+                    "color": [0.2, 0.35, 0.8],
+                    "diffuseCast": false
+                },
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.05, 0.05, 0.05]
+                }
+            ]
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "position": [-4.0, 7.0, -6.0],
+            "color": [0.55, 0.55, 0.55]
+        },
+        {
+            "type": "spot",
+            "position": [0.5, 6.0, -2.5],
+            "direction": [0.0, -1.0, 0.55],
+            "color": [0.9, 0.9, 0.9],
+            "angle": 40.0,
+            "falloff": 10.0,
+            "tint": {
+                "type": "marble",
+                "colors": [
+                    [1.0, 0.45, 0.3],
+                    [1.0, 0.9, 0.6],
+                    [0.5, 0.7, 1.0]
+                ],
+                "scale": 1.6,
+                "origin": [0.0, 0.0, 0.0],
+                "turbulence": 1.5,
+                "octaves": 6,
+                "seed": 5,
+                "axis": [1.0, 0.0, 0.0]
+            },
+            "intensity": {
+                "texture": {
+                    "type": "cells",
+                    "colors": [
+                        [1.0, 1.0, 1.0],
+                        [0.0, 0.0, 0.0]
+                    ],
+                    "scale": 0.7,
+                    "origin": [0.0, 0.0, 0.0],
+                    "turbulence": 0.0,
+                    "octaves": 6,
+                    "seed": 8,
+                    "mode": "distance"
+                },
+                "scale": 1.2,
+                "offset": 0.2
+            }
+        }
+    ]
+}

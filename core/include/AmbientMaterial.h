@@ -7,7 +7,7 @@
 class CAmbientMaterial : public CMaterial
 {
     protected:
-        CColor              m_oColor;
+        CColorMap           m_oColor;
     public:
                             DEFINE_MATERIAL( CAmbientMaterial );
 

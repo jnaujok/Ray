@@ -30,7 +30,8 @@ namespace RaySampling
         PURPOSE_LIGHT = 0x4C494748ULL,          // plus the light's index: a point on an area light
         PURPOSE_ENVIRONMENT = 0x454E5649ULL,    // a direction toward the sky, for the environment's light
         PURPOSE_WAVELENGTH = 0x57415645ULL,     // the wavelengths white light splits into (spectral dispersion)
-        PURPOSE_INDIRECT = 0x494E4449ULL        // a direction to gather bounced light from (indirect light)
+        PURPOSE_INDIRECT = 0x494E4449ULL,       // a direction to gather bounced light from (indirect light)
+        PURPOSE_VOLUME = 0x564F4C55ULL          // where in each step a textured absorption is read (glass)
     };
 
         /// SplitMix64's finalizer.

@@ -290,6 +290,32 @@ add_test(NAME render_underwater
 set_tests_properties(render_underwater PROPERTIES FIXTURES_SETUP render_underwater TIMEOUT 300)
 add_test(NAME roundtrip_underwater_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/underwater_test.ray ${RENDER_DIR})
 
+# Texture maps: frosting, polish, index and see-through patches from
+# textures, bumps of varying depth, and a light colored by a 3D texture.
+add_test(NAME render_maps
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/maps_test.ray
+                 -DOUTPUT=${RENDER_DIR}/maps_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/maps_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_maps PROPERTIES FIXTURES_SETUP render_maps TIMEOUT 300)
+add_test(NAME roundtrip_maps_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/maps_test.ray ${RENDER_DIR})
+
+# Textures inside glass: art glass swirls, smoky quartz, amber with dark
+# flecks, and veins floating in a clear block.
+add_test(NAME render_volume
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/volume_test.ray
+                 -DOUTPUT=${RENDER_DIR}/volume_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/volume_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_volume PROPERTIES FIXTURES_SETUP render_volume TIMEOUT 300)
+add_test(NAME roundtrip_volume_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/volume_test.ray ${RENDER_DIR})
+
 # An environment map: an HDR sky behind the scene, in a mirror ball and
 # through a glass one, lighting the diffuse surfaces (image-based lighting).
 add_test(NAME render_environment
@@ -469,7 +495,7 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 # networked engines intact. Engines get texture images, PNGs, the sky and
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
-                       materials projector underwater environment csg prism models benchy)
+                       materials projector underwater environment csg prism models benchy maps volume)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

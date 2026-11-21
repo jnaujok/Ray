@@ -12,6 +12,12 @@
 *                   (as 1/d) or "inverseSquare" (as 1/d^2, as real light *
 *                   does); "distance" (default 1) is where it is its     *
 *                   full color. Not for sunlight.                        *
+*   "tint"          a color the light is multiplied by at the point it   *
+*                   lights: a color, or a texture read at that point in  *
+*                   the scene (a solid texture: marble, noise, cells,    *
+*                   caustics), so what light arrives depends on where.   *
+*   "intensity"     a number the light is multiplied by there (default   *
+*                   1): a number, or a texture read the same way.        *
 *   "filter"        an image or pattern the light shines through, like a *
 *                   slide in a projector or a gobo in a stage light: an  *
 *                   object with a "texture" (any texture or preset) and  *
@@ -34,6 +40,7 @@
 
 #include "Objects.h"
 #include "Texture.h"
+#include "Maps.h"
 
 #include <memory>
 #include <vector>
@@ -65,12 +72,18 @@ class CLight : public CObjects
         FLT             m_nHotspot;             // fresnel: the bright center's angle in degrees (0: a third of the angle)
         FLT             m_nRim;                 // fresnel: the beam's brightness outside the center, 0 to 1
         std::vector<FLT> m_anTable;             // table: brightness at even steps from the axis to the edge
+            // The light's color and strength at the point it lights: 1 unless
+            // given (a constant, or a texture read at that point).
+        CColorMap       m_oTint;
+        CScalarMap      m_nIntensity;
 
             // The beam's brightness at nCos (the cosine of the angle from the
             // axis), in a cone of nAngle degrees whose edge fades over the
             // last nFalloff degrees: 0 outside, up to 1. The default profile,
             // smoothstep, is the fading edge alone (the spot light's own).
         FLT             ProfileFactor( FLT nCos, FLT nAngle, FLT nFalloff ) const;
+            // Whether the tint is a constant other than white.
+        BOOL            HasTint( void ) const;
             // Where the filter is looked up for light reaching oPoint along
             // oToLight (from the point toward the light). Lights override it
             // with their own projection; the default looks all around.

@@ -44,6 +44,7 @@
 #include "LayersTexture.h"
 #include "FaceColorTexture.h"
 #include "Spectrum.h"
+#include "Maps.h"
 #include "Presets.h"
 #include "CellsTexture.h"
 #include "CausticsTexture.h"
@@ -3923,6 +3924,175 @@ static void SceneEditChecks( void )
     // The model files in scenes/models: Benchy, the colored STLs and the OBJ
     // ring, the mesh tree on Benchy, and a scene's models going into an
     // archive and out beside a JSON file.
+    // A solid checker of black and white cells strSize across, as JSON.
+static std::string Checker( const char *strSize = "1" )
+{
+    return std::string( "{ \"type\": \"checker\", \"colors\": [[0, 0, 0], [1, 1, 1]], \"size\": " ) + strSize + ", \"solid\": true }";
+}
+
+static void MapChecks( void )
+{
+        // A map reads its texture, scales and offsets it, and keeps it in range.
+    {
+        IASLib::CJsonNode  *pNode = RayJson::Parse( "{ \"value\": { \"texture\": " + Checker() + ", \"scale\": 2, \"offset\": 0.5 } }" );
+        CScalarMap          oMap( 7.0 );
+        STexturePoint       oBlack;
+        STexturePoint       oWhite;
+
+        oBlack.bHasUV = oWhite.bHasUV = FALSE;
+        oBlack.bHasColor = oWhite.bHasColor = FALSE;
+        oBlack.nU = oBlack.nV = oWhite.nU = oWhite.nV = 0.0;
+        oBlack.oPoint = CVector( 0.5, 0.5, 0.5 );
+        oWhite.oPoint = CVector( 1.5, 0.5, 0.5 );
+        Check( pNode && oMap.Read( *pNode, "value", FALSE ) && oMap.IsMapped(), "a number can be a texture" );
+
+        FLT nBlack = oMap.At( oBlack );
+        FLT nWhite = oMap.At( oWhite );
+
+        Check( ( nBlack == 0.5 && nWhite == 2.5 ) || ( nBlack == 2.5 && nWhite == 0.5 ), "a map's value is offset + scale x the texture" );
+        oMap.SetRange( 0.0, 1.0 );
+        Check( oMap.At( oBlack ) <= 1.0 && oMap.At( oWhite ) <= 1.0, "a map's values are kept within the setting's range" );
+
+        CScalarMap oPlain( 3.0 );
+
+        Check( oPlain.At( oBlack ) == 3.0 && oPlain.Get() == 3.0 && ! oPlain.IsMapped(), "a constant is its value everywhere" );
+        delete pNode;
+
+        IASLib::CJsonNode  *pRed = RayJson::Parse( "{ \"value\": { \"texture\": { \"type\": \"checker\", \"colors\": "
+                                                   "[[0.2, 0.4, 0.9], [0.2, 0.4, 0.9]], \"size\": 1, \"solid\": true }, "
+                                                   "\"channel\": \"red\" } }" );
+        CScalarMap          oRedMap;
+
+        Check( pRed && oRedMap.Read( *pRed, "value", FALSE ) && ABS( oRedMap.At( oBlack ) - 0.2 ) < 1e-12,
+               "a map can read one channel of its texture" );
+        delete pRed;
+    }
+
+        // Every material setting takes a texture, and saves it back; plain
+        // values are saved exactly as before.
+    {
+        std::string strMaterials =
+            "\"radius\": 1, \"materials\": [ "
+            "{ \"type\": \"ambient\", \"influence\": 1, \"color\": " + Checker() + " }, "
+            "{ \"type\": \"diffuse\", \"influence\": { \"texture\": " + Checker() + ", \"scale\": 0.5 }, \"color\": " + Checker() + " }, "
+            "{ \"type\": \"specular\", \"influence\": 0.3, \"power\": { \"texture\": " + Checker() + ", \"scale\": 0.5, \"offset\": 0.1 }, "
+            "  \"indexOfRefraction\": " + Checker() + " }, "
+            "{ \"type\": \"reflective\", \"influence\": 0.2, \"roughness\": " + Checker() + ", \"diffuseReflectivity\": " + Checker() + " }, "
+            "{ \"type\": \"transparent\", \"influence\": 0.4, \"roughness\": " + Checker() + ", \"indexOfRefraction\": { \"texture\": " +
+            Checker() + ", \"offset\": 1 }, \"attenuationColor\": " + Checker() + ", \"attenuationDistance\": 2, \"attenuationStep\": 0.1 } ], "
+            "\"bump\": { \"texture\": " + Checker() + ", \"depth\": { \"texture\": " + Checker() + ", \"scale\": 0.01 } }";
+        CScene      oScene;
+        std::string strText = Minimal( "\"radius\": 1", strMaterials.c_str() );
+
+        Check( oScene.FromJson( strText ) == 0, "every material setting can be a texture" );
+
+        std::string strSaved = oScene.ToJson();
+        CScene      oAgain;
+
+        Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "textured settings round-trip" );
+        Check( strSaved.find( "\"attenuationStep\": 0.1" ) != std::string::npos &&
+               strSaved.find( "\"offset\": 1" ) != std::string::npos, "textured settings are saved as they were given" );
+
+        CObjects *pBall = oScene.GetObjectAt( 0 );
+
+        if ( pBall )
+        {
+            CMaterialList  &oMaterials = pBall->GetMaterials();
+            CMapPoint       oBlack( CVector( 0.5, 0.5, 0.5 ), pBall );
+            CMapPoint       oWhite( CVector( 1.5, 0.5, 0.5 ), pBall );
+            FLT             nBlack = oMaterials.InfluenceAt( 1, oBlack );
+            FLT             nWhite = oMaterials.InfluenceAt( 1, oWhite );
+
+            Check( oMaterials.IsInfluenceMapped( 1 ) && ! oMaterials.IsInfluenceMapped( 0 ) && nBlack != nWhite &&
+                   ( nBlack == 0.5 || nWhite == 0.5 ), "a material's influence can vary over the surface" );
+            Check( oMaterials.InfluenceAt( 2, oBlack ) == 0.3, "a plain influence is its value" );
+        }
+
+        CScene oPlain;
+
+        Check( oPlain.FromJson( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"reflective\", \"influence\": 0.5, "
+                                                          "\"roughness\": 0.3 } ]" ) ) == 0 &&
+               oPlain.ToJson().find( "\"roughness\": 0.3" ) != std::string::npos &&
+               oPlain.ToJson().find( "\"influence\": 0.5" ) != std::string::npos, "plain settings are saved as plain numbers" );
+    }
+
+        // Absorption inside glass from a texture: a constant one is exactly
+        // Beer-Lambert, and a checker through which half the path lies in
+        // each color gives the color to the power of half the path.
+    {
+        std::string strConstant = ", \"attenuationColor\": { \"type\": \"checker\", \"colors\": [[0.5, 0.25, 1], [0.5, 0.25, 1]], "
+                                  "\"size\": 1, \"solid\": true }, \"attenuationDistance\": 1";
+        CColor      oMiddle = ThroughBall( strConstant.c_str(), 0.0 );
+        CColor      oSide = ThroughBall( strConstant.c_str(), 0.6 );
+
+        Check( ABS( oMiddle.GetR() - 0.25 ) < 1e-9 && ABS( oMiddle.GetG() - 0.0625 ) < 1e-9 && ABS( oMiddle.GetB() - 1.0 ) < 1e-9,
+               "a constant texture inside glass absorbs exactly as Beer-Lambert" );
+        Check( ABS( oSide.GetR() - pow( 0.5, 1.6 ) ) < 1e-9, "a textured absorption follows the path's length" );
+
+        std::string strChecker = ", \"attenuationColor\": { \"type\": \"checker\", \"colors\": [[0.5, 0.5, 0.5], [1, 1, 1]], "
+                                 "\"size\": 0.5, \"solid\": true }, \"attenuationDistance\": 1, \"attenuationStep\": ";
+        double      dHalf = sqrt( 1.0 - 0.2 * 0.2 );     // half the chord at x = 0.2; half of it lies in each color
+        double      dExpected = pow( 0.5, dHalf );
+        CColor      oFine = ThroughBall( ( strChecker + "0.0005" ).c_str(), 0.2 );
+        CColor      oCoarse = ThroughBall( ( strChecker + "0.1" ).c_str(), 0.2 );
+
+        Check( ABS( oFine.GetR() - dExpected ) < 2e-3, "textured absorption adds up along the path, a step at a time" );
+        Check( ABS( oFine.GetR() - dExpected ) <= ABS( oCoarse.GetR() - dExpected ) + 1e-9,
+               "smaller steps come closer to the exact absorption" );
+
+        CColor oAgain = ThroughBall( ( strChecker + "0.1" ).c_str(), 0.2 );
+
+        Check( oAgain.GetR() == oCoarse.GetR(), "textured absorption is the same every time" );
+    }
+
+        // A light's tint and intensity are read at the point it lights.
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( WithLights( "{ \"type\": \"point\", \"position\": [0, 10, 0], \"color\": [1, 0.5, 0.25], \"tint\": " +
+                                            Checker() + ", \"intensity\": { \"texture\": " + Checker() + ", \"scale\": 2, \"offset\": 1 } }" ) ) == 0,
+               "a light's tint and intensity can be textures" );
+
+        CLight *pLight = oScene.GetLight( 0 );
+
+        if ( pLight )
+        {
+            CVector oBlackPoint( 0.5, 0.5, 0.5 );
+            CVector oWhitePoint( 1.5, 0.5, 0.5 );
+            CVector oToBlack( CVector( 0, 10, 0 ) - oBlackPoint );
+            CVector oToWhite( CVector( 0, 10, 0 ) - oWhitePoint );
+            CColor  oAtBlack = pLight->ShadeAt( oBlackPoint, oToBlack );
+            CColor  oAtWhite = pLight->ShadeAt( oWhitePoint, oToWhite );
+            CColor  oDark( oAtBlack.GetR() < oAtWhite.GetR() ? oAtBlack : oAtWhite );
+            CColor  oLit( oAtBlack.GetR() < oAtWhite.GetR() ? oAtWhite : oAtBlack );
+
+            Check( oDark.GetR() == 0.0 && ABS( oLit.GetR() - 3.0 ) < 1e-12 && ABS( oLit.GetG() - 1.5 ) < 1e-12,
+                   "what light arrives depends on where it lands" );
+            Check( oScene.ToJson().find( "\"tint\"" ) != std::string::npos, "a light's tint is saved" );
+        }
+
+        CScene oPlain;
+
+        Check( oPlain.FromJson( WithLights( "{ \"type\": \"point\", \"position\": [0, 10, 0], \"color\": [1, 1, 1] }" ) ) == 0 &&
+               oPlain.ToJson().find( "\"tint\"" ) == std::string::npos &&
+               oPlain.ToJson().find( "\"intensity\"" ) == std::string::npos, "a light without them saves neither" );
+    }
+
+        // Errors.
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"reflective\", \"roughness\": { \"scale\": 2 } } ]" ),
+                 BAD_FILE, "an object with a \"texture\"" );
+    ExpectError( Minimal( "\"radius\": 1", ( "\"radius\": 1, \"materials\": [ { \"type\": \"reflective\", \"roughness\": { \"texture\": " +
+                                             Checker() + ", \"channel\": \"purple\" } } ]" ).c_str() ),
+                 BAD_FILE, "roughness.channel: must be" );
+    ExpectError( Minimal( "\"radius\": 1", ( "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"attenuationColor\": " +
+                                             Checker() + " } ]" ).c_str() ),
+                 BAD_FILE, "a textured attenuationColor needs an attenuationDistance" );
+    ExpectError( Minimal( "\"radius\": 1", "\"radius\": 1, \"materials\": [ { \"type\": \"transparent\", \"attenuationStep\": 0 } ]" ),
+                 BAD_FILE, "attenuationStep must be more than 0" );
+    ExpectError( WithLights( "{ \"type\": \"point\", \"position\": [0, 10, 0], \"color\": [1, 1, 1], \"intensity\": -1 }" ),
+                 BAD_FILE, "intensity: must be 0 or more" );
+}
+
 static void ModelFileChecks( const char *strScenes, const char *strDir )
 {
     CScene oBenchy;
@@ -4054,6 +4224,7 @@ int main( int argc, char **argv )
         LightOptionChecks();
         ModelChecks();
         SceneEditChecks();
+        MapChecks();
     }
 
     if ( g_nFailures == 0 )

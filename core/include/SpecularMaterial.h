@@ -7,9 +7,9 @@
 class CSpecularMaterial : public CMaterial
 {
     protected:
-        CColor              m_oColor;
-        FLT                 m_nPower;
-        FLT                 m_nIOR;
+        CColorMap           m_oColor;
+        CScalarMap          m_nPower;
+        CScalarMap          m_nIOR;
     	BOOL                m_bMaterialHighlight;
     public:
                             DEFINE_MATERIAL( CSpecularMaterial );

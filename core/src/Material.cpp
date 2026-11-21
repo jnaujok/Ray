@@ -154,6 +154,16 @@ CColor CMaterial::ColorAt( const CColor &oColor, CVector &oPoint, CObjects *pObj
     return m_pTexture->ColorAt( oAt );
 }
 
+CColor CMaterial::ColorAt( const CColorMap &oColor, CVector &oPoint, CObjects *pObject )
+{
+    if ( m_pTexture || ! oColor.IsMapped() )
+        return ColorAt( oColor.Get(), oPoint, pObject );
+
+    CMapPoint oAt( oPoint, pObject );
+
+    return oColor.At( oAt );
+}
+
 void CMaterial::TextureToJson( IASLib::CObjectNode &oNode ) const
 {
     if ( m_pTexture )

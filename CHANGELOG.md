@@ -10,6 +10,82 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.15] - 2026-11-21
+
+Textures everywhere: every number and color of a material, a bump map's depth and strength, and a
+light's new `tint` and `intensity` can be a texture instead of a constant, read where it shades, so
+glass can be frosted in places, a mirror polished in patches and sunlight broken by cloud shadows;
+and glass whose absorption is a texture adds it up along the path inside, so solid textures color it
+from within. Scenes without the new forms render byte for byte as before.
+
+### Added
+
+- **Texture maps for every setting.** A material's `color`, `influence`, a specular's `power` and
+  `indexOfRefraction`, a reflective's `roughness` and `diffuseReflectivity`, a transparent's
+  `indexOfRefraction`, `roughness`, `attenuationColor` and `attenuationDistance`, and a bump map's
+  `depth` and `strength` each take a number (or color) as before, or a texture:
+  - any texture or preset as it is (`"roughness": { "type": "cells", ... }`), or
+  - one wrapped with `scale` (default 1), `offset` (default 0) and, for numbers, `channel`
+    (`"average"` of red, green and blue, the default, `"luminance"`, `"red"`, `"green"` or `"blue"`):
+    a number is offset + scale × the channel, a color the texture's color × scale + offset.
+
+  The texture is read at the point being shaded, as a material's texture is, and what it gives is
+  kept within the setting's range (roughness 0 to 1, an index 0.001 to 50); a constant is checked
+  when read, as before. Constants are saved exactly as before. In the code each setting is a
+  `CScalarMap` or `CColorMap` (`core/include/Maps.h`): constants cost nothing extra (the point to
+  read a texture at, a `CMapPoint`, is worked out only when a texture asks), and they convert to and
+  from plain numbers and colors, so the MFC editor's dialogs work unchanged.
+- **Lights driven by a 3D texture.** Every light takes `tint` (a color, default white) and
+  `intensity` (a number of 0 or more, default 1), constants or texture maps read **at the point the
+  light falls on**, so what light arrives depends on where it arrives. They are in addition to
+  0.14's `filter`, which colors the light by the direction it leaves in. Use solid textures: a lit
+  point has no surface coordinates. A light without them shines exactly as before.
+- **Textures inside glass.** A `transparent` material whose `attenuationColor` or
+  `attenuationDistance` is a texture absorbs by the texture along the ray's path inside: from where
+  the ray went in to where it comes out, `attenuationStep` (new, default 0.05 scene units) at a time,
+  each step taking away −ln(color) × step / distance per channel, read at a point shifted within the
+  step by the ray's sample (`PURPOSE_VOLUME`), so a pixel's rays read between each other's and the
+  result is the same every run. A texture the same everywhere gives exactly the closed form
+  (Beer–Lambert). That makes art glass (`marble` swirls), smoky quartz (`noise`), amber with dark
+  inclusions (`cells`) and veins floating in a clear block. It works with rough glass, CSG and
+  meshes; spectral dispersion uses the same absorption for every wavelength. Cost: one texture
+  lookup per step, about 25 to 50 per ray through a ball in the test scene.
+- **`scenes/maps_test.ray`** (a ball frosted in patches, a mirror polished in patches, glass whose
+  index wanders from 1.1 to 1.9, a lace panel of glass and paint by `influence`, a floor whose bumps'
+  depth varies, a spot light tinted by `marble` with a `cells` intensity) and
+  **`scenes/volume_test.ray`** (art glass, smoky quartz, amber, a veined block), each with render,
+  round-trip and network tests, references, README previews and Expected output entries.
+  `format_test`'s new `MapChecks`: a map's scale, offset, range and channel; every material setting
+  read as a texture, round-tripped, and saved as given; a varying influence; plain settings saved as
+  plain numbers; a constant texture inside glass equal to Beer–Lambert to 1e-9; a checker inside
+  glass converging to the exact absorption as the step shrinks, and the same every time; a light's
+  tint and intensity read at the lit point; and the errors.
+
+  ![Before and after: the maps scene with constants (left) and with texture maps (right); the volume scene with flat absorption and with textures inside; and the torture test at 0.14.1 and 0.15](docs/images/changelog/maps-volumes.png)
+
+  Top: on the left every map replaced by a constant; on the right the ball is clear in some cells
+  and frosted in others, the mirror is polished in patches, the third ball's refraction wanders,
+  the panel is a lace of glass and blue paint, and the spot light's color and strength come from a
+  marble and a cells texture where it lands. Middle: flat absorption against textures inside: the
+  first ball swirls blue and red, the quartz is smoky in clouds, the amber has dark flecks and the
+  clear block has gray veins inside. Bottom: the torture test, its mirror now frosted in patches,
+  the green cube swirled inside, and cloud shadows from the sun across the floor.
+
+### Changed
+
+- **The torture test uses them.** The mirror wall's `roughness` is a `cells` texture (frosted in a
+  third of its cells), the glass cube's `attenuationColor` is a green `marble` (swirls instead of an
+  even tint), and the low sun's `intensity` is a `noise` texture read where it lands (cloud shadows).
+  Its reference render, README preview and full-size `docs/images/torture_test.png` are
+  regenerated. The full-size Release render took 4,695 CPU-seconds, against 4,210 for 0.14 (12% more; 6 min 20 s wall on a busy 16-core machine).
+- `CLAUDE.md`: a convention that new material and light settings are `CScalarMap`/`CColorMap`.
+
+### Fixed
+
+- **`CMakePresets.json` loads.** 2026-alpha-0.14.1 wrote it as version 2, where every configure
+  preset must name a generator, so CMake 3.28 refused it (`Preset "asan" missing field
+  "generator"`). It is now version 3, where the generator is optional (CMake 3.21 or newer).
+
 ## [2026-alpha-0.14.1] - 2026-11-20
 
 Faster tests and measured bounce light: the whole suite runs in about 45 seconds on a Release
@@ -1450,7 +1526,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14.1...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.15...HEAD
+[2026-alpha-0.15]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14.1...2026-alpha-0.15
 [2026-alpha-0.14.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14...2026-alpha-0.14.1
 [2026-alpha-0.14]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.13...2026-alpha-0.14
 [2026-alpha-0.13]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12.1...2026-alpha-0.13

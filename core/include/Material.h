@@ -8,6 +8,7 @@
 #include "Color.h"
 #include "Rays.h"
 #include "Texture.h"
+#include "Maps.h"
 
 #include <memory>
 
@@ -30,6 +31,9 @@ class CMaterial
             // The color at a point: the texture's there, if there is one,
             // else oColor. pObject gives the point's surface coordinates.
         CColor              ColorAt( const CColor &oColor, CVector &oPoint, CObjects *pObject );
+            // The same for a color that may itself be a texture (a map): the
+            // material's "texture" if it has one, else the map at the point.
+        CColor              ColorAt( const CColorMap &oColor, CVector &oPoint, CObjects *pObject );
 
    public:
         virtual            ~CMaterial( void ) {}
