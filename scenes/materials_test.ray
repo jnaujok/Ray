@@ -1,0 +1,386 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 384,
+        "imageHeight": 320,
+        "imageFile": "materials_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 6,
+        "depthThreshold": 0.01
+    },
+    "background": [0.3, 0.32, 0.36],
+    "camera": {
+        "position": [0.0, 0.0, -11.0],
+        "lookAt": [0.0, 0.0, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 31.0,
+        "horizontalAngle": 37.0,
+        "aspectRatio": 1.2,
+        "sampler": "corners",
+        "colorModel": "clip"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.6],
+            "normal": [0.0, 0.0, -1.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.1, 0.1]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.7,
+                    "color": [0.75, 0.76, 0.78],
+                    "diffuseCast": false
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-2.625, 2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "carrara-marble"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-1.575, 2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "black-marquina"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-0.525, 2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "verde-marble"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [0.525, 2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "rosso-marble"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [1.575, 2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "travertine"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [2.625, 2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "granite"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-2.625, 1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "black-granite"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-1.575, 1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "slate"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-0.525, 1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "sandstone"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [0.525, 1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "basalt"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [1.575, 1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "sand"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [2.625, 1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "concrete"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-2.625, 0.0, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "terrazzo"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-1.575, 0.0, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "terracotta"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-0.525, 0.0, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "oak"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [0.525, 0.0, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "pine"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [1.575, 0.0, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "walnut"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [2.625, 0.0, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "cherry"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-2.625, -1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "mahogany"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-1.575, -1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "ebony"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-0.525, -1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "birch"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [0.525, -1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "jade"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [1.575, -1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "amber"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [2.625, -1.05, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "obsidian"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-2.625, -2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "malachite"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-1.575, -2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "lapis-lazuli"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [-0.525, -2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "brushed-steel"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [0.525, -2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "brushed-gold"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [1.575, -2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "brushed-copper"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [2.625, -2.1, 0.0],
+            "radius": 0.46,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "rust"
+                }
+            ]
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "position": [-6.0, 7.0, -9.0],
+            "color": [0.8, 0.8, 0.8]
+        },
+        {
+            "type": "point",
+            "position": [7.0, 3.0, -8.0],
+            "color": [0.35, 0.35, 0.38]
+        }
+    ]
+}

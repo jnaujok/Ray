@@ -78,13 +78,15 @@ void CPointLight::ToJson( IASLib::CObjectNode &oNode )
 {
     RayJson::PutVector( oNode, "position", m_oPosition );
     RayJson::PutColor( oNode, "color", m_oColor );
+    OptionsToJson( oNode, FALSE );
 }
 
 BOOL CPointLight::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "position", "color", NULL };
 
-    return RayJson::OnlyFields( oNode, astrFields ) &&
+    return OnlyLightFields( oNode, astrFields, TRUE, FALSE ) &&
            RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) &&
-           RayJson::GetColor( oNode, "color", m_oColor, TRUE );
+           RayJson::GetColor( oNode, "color", m_oColor, TRUE ) &&
+           OptionsFromJson( oNode, TRUE, FALSE );
 }

@@ -22,13 +22,16 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
 | `environment_test.ray` | | An environment map: the HDR sky `textures/sky.hdr` behind the scene, in a mirror ball and through a glass one, lighting a white ball, a small red one and a checkered floor (`samples` 8, so the floor darkens under the balls), with a sun whose direction matches the sky's, with a 4×4 stratified sampler |
 | `bounce_test.ray` | | Indirect light: a box room with a red wall on the left and a green one on the right, a white block and a white ball, lit only by a small rectangle light under the ceiling. One bounce of light gathered from the nearby objects (`"objects"`, 2 rays an object) bleeds red and green onto the white surfaces and fills the shadows and the ceiling, with a 3×3 stratified sampler at 160×120 |
 | `haze_test.ray` | | Haze: an avenue of colored columns and balls receding along a checkered floor under a sky, fading into ground mist that thins with height (`density` 0.16, `heightFalloff` 0.7), lit by two point lights (one far down the avenue) and a sun, with a 2×2 stratified sampler at 160×120 |
+| `materials_test.ray` | | The material presets: thirty spheres before a gray wall, one of each finish in the library (`{ "preset": name }`), in its order: the marbles, travertine, the granites, slate, sandstone, basalt, sand, concrete, terrazzo and terracotta, the seven woods, jade, amber, obsidian, malachite and lapis lazuli, the brushed metals and rust, lit by two point lights with the `corners` sampler |
+| `projector_test.ray` | | Light profiles and filters: six spot lights on a wall, one of each beam `profile` (smoothstep, linear, cosine, gaussian, fresnel and a table with rings), a spot that projects `textures/uv_grid.ppm` onto the floor like a slide (its `filter`), a black marble ball in its beam, and a warm point light near the floor that falls off with the square of distance (`attenuation`) |
+| `underwater_test.ray` | | Underwater: blue-green haze, a rippled sand floor (the `sand` preset and a stretched noise bump), a basalt boulder, a terracotta block, a jade ball and a travertine column, and sunlight that throws the `caustics` preset over everything (its `filter`) |
 | `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
 | `csg_test.ray` | | Constructive solid geometry: a glass lens blank (two balls' intersection), a bowl (a ball with a smaller one and a turned box taken out, blue outside, white inside and clay at the cut rim, by `childMaterials`), a die (a rounded cube, itself the intersection of a cube and a ball, with six pips drilled in and painted black) and a hammered gold capsule (a cylinder and two balls, with a bump map), with a 3×3 stratified sampler |
 | `models_test.ray` | | Model files: a puzzle cube from a VisCAM-colored STL, a gem from a Magics-colored STL (four faces with their own colors, four with the model's), both shown by the `faceColors` texture, and a ring from an OBJ file of quads with texture coordinates and normals, wearing an image texture, each placed by `fitSize` or `scale`, `rotation`, `align` and `translation`, with a 2×2 stratified sampler |
@@ -363,13 +366,17 @@ without dispersive glass or a chromatic lens render exactly the same either way.
 | `wood` | Rings about the line through `origin` along `axis` (default `[0, 1, 0]`), one each `scale`, wobbled by noise; each ring runs through the ramp, its last color the dark edge. Default `turbulence` `0.3`; default colors pine |
 | `noise` | The noise itself, for stone, granite or clouds: with `turbulence` `0` (the default), smooth layered noise through the ramp; with more, `turbulence` times the turbulence function, which has sharp creases. Default colors black to white |
 | `layers` | The layer lines of a 3D print: rounded ridges, one each `scale` (default `0.1`) along `axis` (default `[0, 0, 1]`, the print direction of a model file), 0 at the seams and rising along a parabola to 1 in the middle of each layer, through the ramp. As a color it darkens the seams (default colors light gray to white); as a bump map's texture, with colors black to white, it gives each layer its rounded edge. `turbulence` (default `0`) wobbles the layers slowly, its noise about twenty layers across |
+| `cells` | Worley's cellular noise: space split into cells around points scattered one a unit cube (one each `scale`). `mode`: `"flecks"` (the default: one value all over each cell, so each cell is a chip of a ramp color: granite, terrazzo), `"distance"` (the distance to the nearest point, about 0 to 1: spots) or `"edges"` (the gap to the second nearest, 0 on the cells' boundaries: cracks, scales). `turbulence` (default `0`) moves the point by noise first, so the cells' sides wander. Default colors black to white |
+| `caustics` | The web of bright lines light makes under water: the edges of Worley cells, bent by `turbulence` (default `0.6`), 1 on a line and falling to 0 a `width` (default `0.12`, a fraction of a cell) away, in `layers` (1 to 3, default 2) turned and scaled against each other. Meant for a light's `filter` (below), where it adds light along the lines: the default ramp runs from a dim blue-gray to a white brighter than 1 |
 | `faceColors` | The colors a colored model file gives its faces; `default` (default `[0.8, 0.8, 0.8]`) where a face has none or the surface isn't from such a file |
 | `image` | `file` (required: a PNG, a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
 
-`marble`, `wood`, `noise` and `layers` are solid: they fill space, so an object looks carved from a block and
+`marble`, `wood`, `noise`, `layers`, `cells` and `caustics` are solid: they fill space, so an object looks carved from a block and
 needs no surface coordinates. They share these fields: `colors` (a ramp of two or more colors,
 evenly spaced and blended between), `scale` (default `1`: the size of the pattern in scene units),
-`origin` (default `[0, 0, 0]`: where the pattern is centered), `turbulence`, `octaves` (default
+`origin` (default `[0, 0, 0]`: where the pattern is centered), `stretch` (default `[1, 1, 1]`:
+the scale along x, y and z on top of `scale`, so `[40, 1, 1]` draws features forty times longer
+along x, as brushed metal has; written only when it isn't the default), `turbulence`, `octaves` (default
 `6`, from 1 to 12: layers of noise, each twice as fine and half as strong), and `seed` (default
 `0`: each seed is a different block, and the same seed always the same one). The noise is Perlin's
 gradient noise. The pattern stays put in the scene, so moving an object moves it through the block,
@@ -427,22 +434,84 @@ object's surface coordinates (above), so it needs them. A tilted normal that wou
 the ray, as at the rim of a sphere, is passed over for the smooth one, so a surface is never lit
 from behind.
 
+**Presets: a library of natural materials.** Instead of building a stone or a wood from a ramp of
+colors and the right noise, a scene can name one from Ray's library and change what it likes.
+The library is part of Ray, so a scene that names a preset needs no other file and networked
+engines have it too. A preset can be named in two places:
+
+- **As a texture**, anywhere a texture goes (a material's, a bump map's, a light's `filter`):
+  `{ "preset": "carrara-marble" }` is the preset's texture, and any other field beside it
+  replaces the preset's own: `{ "preset": "oak", "scale": 0.03, "axis": [1, 0, 0] }` is oak with
+  finer rings, its grain along x.
+- **As a whole finish**, as an entry of an object's `materials`: `{ "preset": "carrara-marble" }`
+  stands for the preset's materials, its texture with a finish that suits it (polished stones and
+  gems: ambient, diffuse, a sharp highlight and a hint of blurred reflection; honed stone a broad
+  sheen; rough stone, sand, clay and rust matte; woods a soft highlight; metals a blurred
+  reflection tinted by the texture). Beside `"preset"`, `"texture"` is laid over the texture of
+  every material that has one, and a material type (`"ambient"`, `"diffuse"`, `"specular"`,
+  `"reflective"`, `"transparent"`) is laid over the preset's material of that type, added if it has
+  none, or taken out if it is `null`:
+  `{ "preset": "black-marquina", "texture": { "seed": 5 }, "specular": { "power": 0.3 }, "reflective": null }`.
+  A preset entry can sit among other materials.
+
+Laying over merges objects field by field and replaces anything else. A scene saved again keeps
+the preset's name and only the fields given beside it, as long as they still give exactly the
+texture or materials they gave when the scene was read; changed some other way since (in an
+editor), the full texture or materials are saved instead, so nothing is lost.
+
+| Group | Presets |
+|-------|---------|
+| Stone | `carrara-marble` (white, soft gray veins), `black-marquina` (black, sharp white veins), `verde-marble` (dark green serpentine), `rosso-marble` (red, cream veins), `travertine` (beige bands), `granite` (gray and pink flecks), `black-granite`, `slate` (blue-gray, in fine layers), `sandstone` (wavy red-gold strata), `basalt`, `sand`, `concrete`, `terrazzo` (cream with colored chips) |
+| Wood (rings about +y; give `axis` to turn the grain) | `oak`, `pine`, `walnut`, `cherry`, `mahogany`, `ebony`, `birch` |
+| Gem | `jade`, `amber`, `obsidian`, `malachite` (concentric green bands), `lapis-lazuli` (deep blue, gold flecks) |
+| Metal (grain along x) | `brushed-steel`, `brushed-gold`, `brushed-copper`, `rust` |
+| Other | `terracotta`; `caustics` (a texture only, for a light's `filter`) |
+
+The textures follow the classic procedural recipes: marble as bands bent by turbulence and wood as
+rings wobbled by noise (Perlin, "An Image Synthesizer", SIGGRAPH 1985; "Improving Noise", 2002),
+stones and gems as noise or turbulence through a ramp of colors, and granite and terrazzo as
+cellular flecks (Worley, "A Cellular Texture Basis Function", SIGGRAPH 1996), as gathered in
+Ebert, Musgrave, Peachey, Perlin and Worley, *Texturing and Modeling: A Procedural Approach*.
+The colors are Ray's own, matched by eye. Presets are kept in `core/src/Presets.cpp`.
+
 **Lights.**
 
 | `type` | Fields |
 |--------|--------|
 | `point` | `position` (required), `color` (required). A point: sharp shadows |
 | `sphereLight` | `position` (required): its center; `color` (required); `radius` (default `1`); `samples` (default `1`, up to 256). A glowing ball: soft shadows |
-| `rectangleLight` | `position` (required): its center; `color` (required); `edge1` and `edge2` (required): its sides, as vectors; `samples` (default `1`, up to 256). A glowing panel, shining only to the side `edge1` × `edge2` points to: soft shadows |
-| `spot` | `position` (required); `direction` (required): which way it points; `color` (required); `angle` (default `30`): degrees from its axis to the edge of its cone, more than 0 and less than 90; `falloff` (default `5`): degrees inside the edge over which it fades (a smoothstep), from 0 (a hard edge) to the angle; `radius` (default `0`) and `samples` (default `1`, up to 256). A light in a cone; with a radius it is a disc (seen from each point as a sphere light is), with soft shadows |
+| `rectangleLight` | `position` (required): its center; `color` (required); `edge1` and `edge2` (required): its sides, as vectors; `samples` (default `1`, up to 256); `angle` (default `0`: no limit) and `falloff` (default `0`): with an angle, it shines in a beam that many degrees from its facing, its edge fading over the last `falloff` degrees, like a softbox with a grid, and takes a `profile` (below). A glowing panel, shining only to the side `edge1` × `edge2` points to: soft shadows |
+| `spot` | `position` (required); `direction` (required): which way it points; `color` (required); `angle` (default `30`): degrees from its axis to the edge of its cone, more than 0 and less than 90; `falloff` (default `5`): degrees inside the edge over which it fades (a smoothstep, or as its `profile` says), from 0 (a hard edge) to the angle; `radius` (default `0`) and `samples` (default `1`, up to 256). A light in a cone; with a radius it is a disc (seen from each point as a sphere light is), with soft shadows |
 | `directional` | `direction` (required): the way the light travels; `color` (required); `angle` (default `0`): its angular diameter in degrees, less than 90 (the sun is about 0.53); `samples` (default `1`, up to 256). Sunlight: the same light from the same direction everywhere, its shadows the size of what casts them; with an angle, soft shadows that blur the farther they fall. It has no position |
 
 An area light (`sphereLight`, `rectangleLight`, and a `spot` with a radius or a `directional` with
 an angle) shades each point from `samples` of its points, each with its own shadow ray and an even
 share of its `color`; a sphere light's and a spot's points are on the disc it shows the point, and
 a sun's on its disc in the sky. Like a point light, every light gives the same light at every
-distance and the camera doesn't see it. A shadow ray toward the sun (or the sky) goes 10⁶ scene
-units. Glass casts shadows as if it were opaque, as before.
+distance (unless it has an `attenuation`) and the camera doesn't see it. A shadow ray toward the
+sun (or the sky) goes 10⁶ scene units. Glass casts shadows as if it were opaque, as before.
+
+Every light can also take these, all off unless given, so a light without them shines exactly as
+before:
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `attenuation` | `"none"` | How the light weakens with distance `d`: `"none"` (the same everywhere), `"inverse"` (by `distance` / d) or `"inverseSquare"` (by (`distance` / d)², as real light does). Not for `directional` |
+| `distance` | `1` | Where an attenuated light is its full `color` |
+| `filter` | none | An image or pattern the light shines through, like a slide in a projector or a gobo in a stage light: `{ "texture": ..., "size": 1 }`, any texture or texture preset, which colors the light it sends each way. A `spot` projects it across its cone: an image's (u, v) run from 0 to 1 over the square around the cone, and a solid texture reads the same place with the cone's edge `size` from its middle. A `directional` light projects it straight along its direction: a point is moved onto the plane across the light, an image spans `size` scene units, and a solid texture reads the point in units of `size`, so the pattern is the same all along the light. A `rectangleLight` projects it along its facing, the image over the rectangle. A `point` or `sphereLight` wraps it all around: an image by longitude and latitude, a solid texture on a sphere of radius `size`. With the `caustics` preset under haze, sunlight gives the rippling light seen under water (`underwater_test.ray`) |
+
+A `spot`, and a `rectangleLight` with an `angle`, shape their beam with a `profile`. Each is the
+fading edge (over the last `falloff` degrees) times a shape across the cone, by the angle θ from
+the axis:
+
+| `profile` | Shape |
+|-----------|-------|
+| `"smoothstep"` | The default: even all across, the edge fading along a smoothstep (as before) |
+| `"linear"` | Even all across, the edge fading in a straight line |
+| `"cosine"` | cos^`exponent`(θ) (`exponent` default `8`): a soft hot center, like a bare bulb in a reflector |
+| `"gaussian"` | exp(−½ (θ / `spread`)²) (`spread` default a third of the angle): a smooth beam with no visible edge |
+| `"fresnel"` | Full out to `hotspot` degrees (default a third of the angle), falling smoothly over as wide again to `rim` (default `0.35`), which holds out to the edge: the bright center and wide, even spill of a stage Fresnel |
+| `"table"` | `table`: brightnesses at even steps from the axis (first) to the edge (last), blended between, like a photometric (IES) table: a real fixture's measured beam |
 
 **`environment`.** What a ray that leaves the scene sees, instead of the flat `background`: camera
 rays that miss everything, and reflected and refracted rays that escape, so it shows behind the
@@ -495,7 +564,9 @@ same image, and networked engines give exactly the same as threads.
   fields that older readers would refuse but that change nothing when left out, such as an
   object's `bump` (2026-alpha-0.8), and the `environment` and the `spot` and `directional` lights
   (2026-alpha-0.9), and `csg` objects, a transparent material's `abbe` and the camera's `clamp`
-  (2026-alpha-0.10), and the camera's `dispersion` (2026-alpha-0.11.1), and the settings' `indirect` and the scene's `haze` (2026-alpha-0.13).
+  (2026-alpha-0.10), and the camera's `dispersion` (2026-alpha-0.11.1), and the settings' `indirect` and the scene's `haze` (2026-alpha-0.13), and presets
+  (`"preset"` in a texture or a materials entry), the `cells` and `caustics` textures, a solid
+  texture's `stretch`, and lights' `attenuation`, `filter` and beam `profile` (2026-alpha-0.14).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

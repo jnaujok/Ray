@@ -17,6 +17,7 @@
 #include "SceneJson.h"
 
 #include <math.h>
+#include <algorithm>
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -51,18 +52,32 @@ FLT CSpotLight::ConeFactor( const CVector &oToLight ) const
     oFromLight.Normalize();
 
     FLT nCos = oAxis.Dot( oFromLight );
-    FLT nOuter = (FLT)cos( (double)( m_nAngle * PI / 180.0 ) );
-    FLT nInner = (FLT)cos( (double)( ( m_nAngle - m_nFalloff ) * PI / 180.0 ) );
 
-    if ( nCos <= nOuter )
-        return 0.0;
-    if ( nCos >= nInner )
-        return 1.0;
+    return ProfileFactor( nCos, m_nAngle, m_nFalloff );
+}
 
-        // Smoothstep across the fading edge.
-    FLT nT = ( nCos - nOuter ) / ( nInner - nOuter );
+void CSpotLight::FilterAt( const CVector &oPoint, const CVector &oToLight, STexturePoint &oAt ) const
+{
+    CVector oAxis( m_oDirection );
+    CVector oFromLight( oToLight );
+    CVector oFirst;
+    CVector oSecond;
 
-    return nT * nT * ( 3.0 - ( 2.0 * nT ) );
+    (void)oPoint;
+    oAxis.Normalize();
+    oFromLight = oFromLight * -1.0;
+    oFromLight.Normalize();
+    RaySampling::Basis( oAxis, oFirst, oSecond );
+
+    FLT nAlong = (std::max)( oAxis.Dot( oFromLight ), (FLT)1.0e-9 );
+    FLT nEdge = (FLT)tan( (double)( m_nAngle * PI / 180.0 ) );
+    FLT nX = ( oFirst.Dot( oFromLight ) / nAlong ) / nEdge;
+    FLT nY = ( oSecond.Dot( oFromLight ) / nAlong ) / nEdge;
+
+    oAt.oPoint = CVector( nX * m_nFilterSize, nY * m_nFilterSize, 0.0 );
+    oAt.nU = 0.5 + ( 0.5 * nX );
+    oAt.nV = 0.5 + ( 0.5 * nY );
+    oAt.bHasUV = TRUE;
 }
 
 CColor CSpotLight::GetShade( CVector oToLight )
@@ -114,20 +129,22 @@ void CSpotLight::ToJson( IASLib::CObjectNode &oNode )
         RayJson::PutNumber( oNode, "radius", m_nRadius );
         oNode.put( "samples", m_nSamples );
     }
+    OptionsToJson( oNode, TRUE );
 }
 
 BOOL CSpotLight::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "position", "direction", "color", "angle", "falloff", "radius", "samples", NULL };
 
-    if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+    if ( ! OnlyLightFields( oNode, astrFields, TRUE, TRUE ) ||
          ! RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) ||
          ! RayJson::GetVector( oNode, "direction", m_oDirection, TRUE ) ||
          ! RayJson::GetColor( oNode, "color", m_oColor, TRUE ) ||
          ! RayJson::GetNumber( oNode, "angle", m_nAngle, FALSE ) ||
          ! RayJson::GetNumber( oNode, "falloff", m_nFalloff, FALSE ) ||
          ! RayJson::GetNumber( oNode, "radius", m_nRadius, FALSE ) ||
-         ! RayJson::GetInt( oNode, "samples", m_nSamples, 1, MAXIMUM_LIGHT_SAMPLES, FALSE ) )
+         ! RayJson::GetInt( oNode, "samples", m_nSamples, 1, MAXIMUM_LIGHT_SAMPLES, FALSE ) ||
+         ! OptionsFromJson( oNode, TRUE, TRUE ) )
         return FALSE;
     if ( m_oDirection.Magnitude() == 0.0 )
         return RayJson::Fail( "direction must not be [0, 0, 0]" );

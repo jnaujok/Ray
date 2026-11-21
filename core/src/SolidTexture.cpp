@@ -53,7 +53,8 @@ CSolidTexture::CSolidTexture( const FLT *anColors, int nColors, FLT nTurbulence 
     m_oOrigin( 0.0, 0.0, 0.0 ),
     m_nTurbulence( nTurbulence ),
     m_nOctaves( 6 ),
-    m_nSeed( 0 )
+    m_nSeed( 0 ),
+    m_oStretch( 1.0, 1.0, 1.0 )
 {
     for ( int nIndex = 0; nIndex < nColors; nIndex++ )
         m_aoColors.push_back( CColor( anColors[ nIndex * 3 ], anColors[ ( nIndex * 3 ) + 1 ], anColors[ ( nIndex * 3 ) + 2 ] ) );
@@ -128,6 +129,49 @@ FLT CSolidTexture::Turbulence( FLT nX, FLT nY, FLT nZ ) const
     return nSum;
 }
 
+void CSolidTexture::Cells( FLT nX, FLT nY, FLT nZ, FLT &nF1, FLT &nF2, FLT &nCell ) const
+{
+    FLT     nFloorX = floor( nX );
+    FLT     nFloorY = floor( nY );
+    FLT     nFloorZ = floor( nZ );
+
+    nF1 = nF2 = 1.0e30;
+    nCell = 0.0;
+    for ( int nI = -1; nI <= 1; nI++ )
+    {
+        for ( int nJ = -1; nJ <= 1; nJ++ )
+        {
+            for ( int nK = -1; nK <= 1; nK++ )
+            {
+                FLT     nCellX = nFloorX + nI;
+                FLT     nCellY = nFloorY + nJ;
+                FLT     nCellZ = nFloorZ + nK;
+                int     nHashX = (int)( (long long)nCellX & 255 );
+                int     nHashY = (int)( (long long)nCellY & 255 );
+                int     nHashZ = (int)( (long long)nCellZ & 255 );
+                int     nHash = m_anPermute[ m_anPermute[ m_anPermute[ nHashX ] + nHashY ] + nHashZ ];
+                    // The cell's point, somewhere inside it.
+                FLT     nPointX = nCellX + ( ( m_anPermute[ nHash ] + 0.5 ) / 256.0 );
+                FLT     nPointY = nCellY + ( ( m_anPermute[ nHash + 1 ] + 0.5 ) / 256.0 );
+                FLT     nPointZ = nCellZ + ( ( m_anPermute[ nHash + 2 ] + 0.5 ) / 256.0 );
+                FLT     nDX = nPointX - nX;
+                FLT     nDY = nPointY - nY;
+                FLT     nDZ = nPointZ - nZ;
+                FLT     nDistance = SQRT( ( nDX * nDX ) + ( nDY * nDY ) + ( nDZ * nDZ ) );
+
+                if ( nDistance < nF1 )
+                {
+                    nF2 = nF1;
+                    nF1 = nDistance;
+                    nCell = ( m_anPermute[ nHash + 3 ] + 0.5 ) / 256.0;
+                }
+                else if ( nDistance < nF2 )
+                    nF2 = nDistance;
+            }
+        }
+    }
+}
+
 CColor CSolidTexture::RampAt( FLT nAt ) const
 {
     int nLast = (int)m_aoColors.size() - 1;
@@ -156,10 +200,11 @@ CColor CSolidTexture::ColorAt( const STexturePoint &oAt ) const
 {
     CVector oPoint( oAt.oPoint );
     CVector oOrigin( m_oOrigin );
+    CVector oStretch( m_oStretch );
 
-    return RampAt( Pattern( ( oPoint.GetX() - oOrigin.GetX() ) / m_nScale,
-                            ( oPoint.GetY() - oOrigin.GetY() ) / m_nScale,
-                            ( oPoint.GetZ() - oOrigin.GetZ() ) / m_nScale ) );
+    return RampAt( Pattern( ( oPoint.GetX() - oOrigin.GetX() ) / ( m_nScale * oStretch.GetX() ),
+                            ( oPoint.GetY() - oOrigin.GetY() ) / ( m_nScale * oStretch.GetY() ),
+                            ( oPoint.GetZ() - oOrigin.GetZ() ) / ( m_nScale * oStretch.GetZ() ) ) );
 }
 
 void CSolidTexture::ToJson( IASLib::CObjectNode &oNode ) const
@@ -176,6 +221,12 @@ void CSolidTexture::ToJson( IASLib::CObjectNode &oNode ) const
     RayJson::PutNumber( oNode, "turbulence", m_nTurbulence );
     oNode.put( "octaves", m_nOctaves );
     oNode.put( "seed", m_nSeed );
+    {
+        CVector oStretch( m_oStretch );
+
+        if ( oStretch.GetX() != 1.0 || oStretch.GetY() != 1.0 || oStretch.GetZ() != 1.0 )
+            RayJson::PutVector( oNode, "stretch", m_oStretch );
+    }
     ExtraToJson( oNode );
 }
 
@@ -183,7 +234,7 @@ BOOL CSolidTexture::FromJson( const IASLib::CJsonNode &oNode )
 {
     std::vector<const char *>   astrFields;
     const char *const          *astrExtra = ExtraFields();
-    static const char *const    astrBase[] = { "colors", "scale", "origin", "turbulence", "octaves", "seed" };
+    static const char *const    astrBase[] = { "colors", "scale", "origin", "turbulence", "octaves", "seed", "stretch" };
 
     for ( size_t nIndex = 0; nIndex < sizeof( astrBase ) / sizeof( astrBase[ 0 ] ); nIndex++ )
         astrFields.push_back( astrBase[ nIndex ] );
@@ -196,8 +247,15 @@ BOOL CSolidTexture::FromJson( const IASLib::CJsonNode &oNode )
          ! RayJson::GetVector( oNode, "origin", m_oOrigin, FALSE ) ||
          ! RayJson::GetNumber( oNode, "turbulence", m_nTurbulence, FALSE ) ||
          ! RayJson::GetInt( oNode, "octaves", m_nOctaves, 1, MAXIMUM_OCTAVES, FALSE ) ||
-         ! RayJson::GetInt( oNode, "seed", m_nSeed, 0, 2147483647, FALSE ) )
+         ! RayJson::GetInt( oNode, "seed", m_nSeed, 0, 2147483647, FALSE ) ||
+         ! RayJson::GetVector( oNode, "stretch", m_oStretch, FALSE ) )
         return FALSE;
+    {
+        CVector oStretch( m_oStretch );
+
+        if ( ! ( oStretch.GetX() > 0.0 && oStretch.GetY() > 0.0 && oStretch.GetZ() > 0.0 ) )
+            return RayJson::Fail( "stretch must be positive along every axis" );
+    }
     if ( ! ( m_nScale > 0.0 ) )
         return RayJson::Fail( "scale must be positive" );
     if ( ! ( m_nTurbulence >= 0.0 ) )

@@ -81,17 +81,19 @@ void CSphereLight::ToJson( IASLib::CObjectNode &oNode )
     RayJson::PutColor( oNode, "color", m_oColor );
     RayJson::PutNumber( oNode, "radius", m_nRadius );
     oNode.put( "samples", m_nSamples );
+    OptionsToJson( oNode, FALSE );
 }
 
 BOOL CSphereLight::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "position", "color", "radius", "samples", NULL };
 
-    if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+    if ( ! OnlyLightFields( oNode, astrFields, TRUE, FALSE ) ||
          ! RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) ||
          ! RayJson::GetColor( oNode, "color", m_oColor, TRUE ) ||
          ! RayJson::GetNumber( oNode, "radius", m_nRadius, FALSE ) ||
-         ! RayJson::GetInt( oNode, "samples", m_nSamples, 1, MAXIMUM_LIGHT_SAMPLES, FALSE ) )
+         ! RayJson::GetInt( oNode, "samples", m_nSamples, 1, MAXIMUM_LIGHT_SAMPLES, FALSE ) ||
+         ! OptionsFromJson( oNode, TRUE, FALSE ) )
         return FALSE;
     if ( ! ( m_nRadius > 0.0 ) )
         return RayJson::Fail( "radius must be more than 0" );

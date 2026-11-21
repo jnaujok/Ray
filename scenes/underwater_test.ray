@@ -1,0 +1,123 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 400,
+        "imageHeight": 250,
+        "imageFile": "underwater_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 4,
+        "depthThreshold": 0.01
+    },
+    "background": [0.05, 0.25, 0.33],
+    "haze": {
+        "color": [0.06, 0.3, 0.38],
+        "density": 0.07
+    },
+    "camera": {
+        "position": [0.0, 2.0, -9.0],
+        "lookAt": [0.0, 0.8, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 32.0,
+        "horizontalAngle": 49.0,
+        "aspectRatio": 1.6,
+        "sampler": "corners",
+        "colorModel": "clip"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "sand"
+                }
+            ],
+            "bump": {
+                "mode": "height",
+                "texture": {
+                    "type": "noise",
+                    "colors": [
+                        [0.0, 0.0, 0.0],
+                        [1.0, 1.0, 1.0]
+                    ],
+                    "scale": 0.6,
+                    "origin": [0.0, 0.0, 0.0],
+                    "turbulence": 0.0,
+                    "octaves": 2,
+                    "seed": 0,
+                    "stretch": [4.0, 1.0, 1.0]
+                },
+                "depth": 0.04,
+                "step": 0.001
+            }
+        },
+        {
+            "type": "sphere",
+            "center": [-2.2, 0.9, 1.5],
+            "radius": 0.9,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "basalt"
+                }
+            ]
+        },
+        {
+            "type": "box",
+            "center": [1.6, 0.5, 0.6],
+            "size": 1.0,
+            "rotation": [0.0, 30.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "terracotta"
+                }
+            ]
+        },
+        {
+            "type": "sphere",
+            "center": [0.1, 0.45, -1.4],
+            "radius": 0.45,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "jade"
+                }
+            ]
+        },
+        {
+            "type": "cylinder",
+            "base": [3.4, 0.0, 3.0],
+            "top": [3.4, 2.6, 3.0],
+            "radius": 0.35,
+            "capped": true,
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "preset": "travertine"
+                }
+            ]
+        }
+    ],
+    "lights": [
+        {
+            "type": "directional",
+            "direction": [0.15, -1.0, 0.3],
+            "color": [1.1, 1.15, 1.05],
+            "filter": {
+                "texture": {
+                    "preset": "caustics"
+                },
+                "size": 1.0
+            }
+        },
+        {
+            "type": "point",
+            "position": [-4.0, 6.0, -8.0],
+            "color": [0.15, 0.25, 0.3]
+        }
+    ]
+}

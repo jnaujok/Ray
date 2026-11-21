@@ -203,7 +203,7 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
                     CVector oMaterialToLight( oToLight );
                     CVector oPoint( oIntersect );
 
-                    oLight = pLight->GetShade( oToLight );
+                    oLight = pLight->ShadeAt( oIntersect, oToLight );
                     if ( bHaze )
                         oLight = oLight * oScene.LightThrough( oIntersect, oToLight );
                     oColor = pMaterial->GetColor( oScene, oRay, oLight, oMaterialToLight, oPoint, oMaterialNormal, this );
@@ -286,7 +286,7 @@ void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, 
         if ( oScene.Intersect( oLightRay, this ) )
             continue;
 
-        CColor  oLight( pLight->GetShade( oToLight ) * nShare );
+        CColor  oLight( pLight->ShadeAt( oIntersect, oToLight ) * nShare );
 
         if ( oScene.GetHaze() )
             oLight = oLight * oScene.LightThrough( oIntersect, oToLight );

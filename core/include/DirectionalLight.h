@@ -40,6 +40,13 @@ class CDirectionalLight : public CLight
         virtual int     GetSampleCount( void ) { return ( m_nAngle > 0.0 ) ? m_nSamples : 0; }
         virtual BOOL    SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoint );
 
+    protected:
+            // The filter straight along the light: a point projected onto
+            // the plane across it; (u, v) are its place in units of "size",
+            // 0.5 on the line through the origin.
+        virtual void    FilterAt( const CVector &oPoint, const CVector &oToLight, STexturePoint &oAt ) const;
+
+    public:
 #ifdef RAY_GUI
         virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
 #endif

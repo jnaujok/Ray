@@ -44,6 +44,11 @@
 #include "LayersTexture.h"
 #include "FaceColorTexture.h"
 #include "Spectrum.h"
+#include "Presets.h"
+#include "CellsTexture.h"
+#include "CausticsTexture.h"
+#include "CheckerTexture.h"
+#include "Light.h"
 
 
 #include <math.h>
@@ -3070,6 +3075,394 @@ static void IndirectChecks( void )
                  BAD_FILE, "objects must be a whole number from 1 to 64" );
 }
 
+
+// ---------------------------------------------------------------------------
+// Material presets, light profiles, attenuation and filters
+// ---------------------------------------------------------------------------
+
+    // A scene whose one sphere is made of strMaterials (a JSON array).
+static std::string WithMaterials( const std::string &strMaterials )
+{
+    return Minimal( "\"radius\": 1 }", ( "\"radius\": 1, \"materials\": " + strMaterials + " }" ).c_str() );
+}
+
+static void PresetChecks( void )
+{
+    int                         nCount;
+    const RayPresets::SPreset  *aoPresets = RayPresets::GetPresets( nCount );
+    int                         nMaterials = 0;
+    bool                        bAllTextures = true;
+    bool                        bAllMaterials = true;
+
+    Check( nCount >= 25, "the library has at least 25 presets" );
+    for ( int nIndex = 0; nIndex < nCount; nIndex++ )
+    {
+        std::string                         strName( aoPresets[ nIndex ].strName );
+        std::unique_ptr<IASLib::CJsonNode>  pGiven( RayJson::Parse( "{ \"preset\": \"" + strName + "\" }" ) );
+        std::unique_ptr<CTexture>           pTexture( pGiven ? CTexture::Read( *pGiven ) : NULL );
+
+        if ( ! pTexture || pTexture->GetPreset() != strName )
+        {
+            fprintf( stderr, "preset texture %s: %s\n", strName.c_str(), RayJson::GetError().c_str() );
+            bAllTextures = false;
+        }
+        if ( aoPresets[ nIndex ].strMaterials )
+        {
+            CScene oScene;
+
+            nMaterials++;
+            if ( oScene.FromJson( WithMaterials( "[ { \"preset\": \"" + strName + "\" } ]" ) ) != 0 )
+            {
+                fprintf( stderr, "preset materials %s: %s\n", strName.c_str(), oScene.GetLoadError() );
+                bAllMaterials = false;
+            }
+        }
+    }
+    Check( bAllTextures, "every preset's texture loads, and knows its preset" );
+    Check( bAllMaterials && nMaterials >= 25, "every preset's materials load" );
+    Check( RayPresets::Find( "carrara-marble" ) != NULL && RayPresets::Find( "no-such-stone" ) == NULL, "presets are found by name" );
+
+        // A texture preset with a field laid over it.
+    {
+        std::unique_ptr<IASLib::CJsonNode>  pGiven( RayJson::Parse( "{ \"preset\": \"carrara-marble\", \"scale\": 2.5, \"seed\": 4 }" ) );
+        std::unique_ptr<CTexture>           pTexture( CTexture::Read( *pGiven ) );
+        IASLib::CObjectNode                 oFull;
+
+        Check( pTexture && strcmp( pTexture->GetName(), "marble" ) == 0, "a texture preset gives the preset's type" );
+        if ( pTexture )
+        {
+            pTexture->ToJson( oFull );
+
+            std::string strFull = RayJson::Write( oFull );
+
+            Check( strFull.find( "\"scale\": 2.5" ) != std::string::npos && strFull.find( "\"seed\": 4" ) != std::string::npos &&
+                   strFull.find( "\"turbulence\": 1.2" ) != std::string::npos && strFull.find( "0.42" ) != std::string::npos,
+                   "fields given beside a preset replace its own; the rest are the preset's" );
+
+            IASLib::CObjectNode oSaved;
+
+            pTexture->Write( oSaved, "texture" );
+
+            std::string strSaved = RayJson::Write( oSaved );
+
+            Check( strSaved.find( "\"preset\": \"carrara-marble\"" ) != std::string::npos &&
+                   strSaved.find( "\"type\"" ) == std::string::npos && strSaved.find( "colors" ) == std::string::npos,
+                   "a texture preset is saved as its name and the fields given beside it" );
+        }
+    }
+
+        // A materials preset, its overlays, and how it is saved.
+    {
+        CScene      oScene;
+        std::string strScene = WithMaterials( "[ { \"preset\": \"carrara-marble\", \"texture\": { \"scale\": 2.0 }, "
+                                              "\"specular\": { \"power\": 0.3 }, \"reflective\": null } ]" );
+
+        Check( oScene.FromJson( strScene ) == 0, "a materials preset with overlays loads" );
+
+        CObjects *pSphere = oScene.GetObjectAt( 0 );
+
+        if ( pSphere )
+        {
+            CMaterialList      &oList = pSphere->GetMaterials();
+            IASLib::CArrayNode  oFull;
+
+            Check( oList.GetSize() == 3, "a preset stands for its materials; null takes one out" );
+            oList.ToJsonInFull( oFull );
+
+            std::string strFull = RayJson::Write( oFull );
+
+            Check( strFull.find( "\"power\": 0.3" ) != std::string::npos && strFull.find( "\"reflective\"" ) == std::string::npos &&
+                   strFull.find( "\"scale\": 2.0" ) != std::string::npos,
+                   "a preset's material and texture take the fields laid over them" );
+        }
+
+        std::string strSaved = oScene.ToJson();
+        CScene      oReread;
+
+        Check( strSaved.find( "\"preset\": \"carrara-marble\"" ) != std::string::npos &&
+               strSaved.find( "\"type\": \"marble\"" ) == std::string::npos &&
+               strSaved.find( "\"reflective\": null" ) != std::string::npos,
+               "a materials preset is saved as the entry the scene gave" );
+        Check( oReread.FromJson( strSaved ) == 0 && oReread.ToJson() == strSaved, "a scene with presets reads back the same" );
+
+            // Changed after loading, it is saved in full.
+        if ( pSphere )
+        {
+            pSphere->GetMaterials().SetInfluence( 1, 0.5 );
+
+            std::string strChanged = oScene.ToJson();
+
+            Check( strChanged.find( "\"preset\": \"carrara-marble\" }" ) == std::string::npos &&
+                   strChanged.find( "\"type\": \"diffuse\"" ) != std::string::npos &&
+                   strChanged.find( "\"influence\": 0.5" ) != std::string::npos,
+                   "a preset's materials changed since loading are saved in full" );
+        }
+    }
+
+        // An added material, and a preset among other materials.
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( WithMaterials( "[ { \"type\": \"ambient\", \"color\": [0.1, 0.1, 0.1] }, "
+                                               "{ \"preset\": \"oak\", \"transparent\": { \"influence\": 0.2 } } ]" ) ) == 0 &&
+               oScene.GetObjectAt( 0 )->GetMaterials().GetSize() == 1 + 3 + 1,
+               "a preset can sit among other materials, and an overlay of a type it lacks adds one" );
+
+        CScene oReread;
+
+        Check( oReread.FromJson( oScene.ToJson() ) == 0 && oReread.ToJson() == oScene.ToJson(),
+               "a preset among other materials reads back the same" );
+    }
+
+        // Presets in a bump map and a light's filter.
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( Minimal( "\"radius\": 1 }",
+                   "\"radius\": 1, \"bump\": { \"texture\": { \"preset\": \"slate\" }, \"depth\": 0.02 } }" ) ) == 0 &&
+               oScene.ToJson().find( "\"preset\": \"slate\"" ) != std::string::npos,
+               "a bump map's texture can be a preset" );
+    }
+
+    ExpectError( WithMaterials( "[ { \"preset\": \"no-such-stone\" } ]" ), 1, "there is no preset \"no-such-stone\"" );
+    ExpectError( WithMaterials( "[ { \"preset\": \"caustics\" } ]" ), 1, "is a texture, not a material" );
+    ExpectError( WithMaterials( "[ { \"preset\": \"oak\", \"shine\": 1 } ]" ), 1, "isn't a field of a preset" );
+    ExpectError( WithMaterials( "[ { \"preset\": \"oak\", \"specular\": 3 } ]" ), 1, "must be an object" );
+    ExpectError( WithMaterials( "[ { \"type\": \"diffuse\", \"texture\": { \"preset\": \"marble\" } } ]" ), 1, "there is no preset" );
+    ExpectError( WithMaterials( "[ { \"type\": \"diffuse\", \"texture\": { \"preset\": \"oak\", \"stretch\": [1, 0, 1] } } ]" ), 1,
+                 "stretch must be positive" );
+}
+
+static void CellChecks( void )
+{
+    CCellsTexture       oCells;
+    CCausticsTexture    oCaustics;
+    STexturePoint       oAt;
+    bool                bInRange = true;
+    bool                bSame = true;
+    FLT                 nMost = 0.0;
+    FLT                 nLeast = 1.0;
+
+    oAt.bHasUV = FALSE;
+    oAt.bHasColor = FALSE;
+    oAt.nU = oAt.nV = 0.0;
+    for ( int nI = 0; nI < 40; nI++ )
+    {
+        for ( int nJ = 0; nJ < 40; nJ++ )
+        {
+            oAt.oPoint = CVector( nI * 0.137, 0.31, nJ * 0.113 );
+
+            CColor oCell = oCells.ColorAt( oAt );
+            CColor oCaustic = oCaustics.ColorAt( oAt );
+            CColor oAgain = oCaustics.ColorAt( oAt );
+
+                // The caustics ramp runs from 0.35 to 1.4 in red.
+            FLT nValue = ( oCaustic.GetR() - 0.35 ) / ( 1.4 - 0.35 );
+
+            bInRange = bInRange && oCell.GetR() >= 0.0 && oCell.GetR() <= 1.0 && nValue >= -1e-12 && nValue <= 1.0 + 1e-12;
+            bSame = bSame && oCaustic.GetR() == oAgain.GetR();
+            nMost = std::max( nMost, nValue );
+            nLeast = std::min( nLeast, nValue );
+        }
+    }
+    Check( bInRange, "cells and caustics stay within their ramps" );
+    Check( bSame, "caustics are the same at a point every time" );
+    Check( nMost > 0.9 && nLeast == 0.0, "caustics are bright lines on darker ground" );
+
+        // Flecks: one value all over a cell (points near a feature point).
+    {
+        std::unique_ptr<IASLib::CJsonNode>  pGiven( RayJson::Parse( "{ \"type\": \"cells\", \"mode\": \"flecks\" }" ) );
+        std::unique_ptr<CTexture>           pFlecks( CTexture::Read( *pGiven ) );
+        STexturePoint                       oNear( oAt );
+
+        oAt.oPoint = CVector( 10.5, 3.5, 7.5 );
+        oNear.oPoint = CVector( 10.5001, 3.5001, 7.5001 );
+        Check( pFlecks && pFlecks->ColorAt( oAt ).GetR() == pFlecks->ColorAt( oNear ).GetR(), "flecks are one color across a cell" );
+    }
+    ExpectError( WithMaterials( "[ { \"type\": \"diffuse\", \"texture\": { \"type\": \"cells\", \"mode\": \"blobs\" } } ]" ), 1,
+                 "must be \"flecks\", \"distance\" or \"edges\"" );
+    ExpectError( WithMaterials( "[ { \"type\": \"diffuse\", \"texture\": { \"type\": \"caustics\", \"layers\": 4 } } ]" ), 1,
+                 "layers" );
+}
+
+    // The first light of a scene whose lights are strLights.
+static std::string WithLights( const std::string &strLights )
+{
+    return Minimal( "\"lights\": [ { \"type\": \"point\", \"position\": [5, 5, -5], \"color\": [1, 1, 1] } ]",
+                    ( "\"lights\": [ " + strLights + " ]" ).c_str() );
+}
+
+    // The red of the light a spot (at the origin, along +z) sends theta
+    // degrees off its axis.
+static FLT SpotAt( CLight &oLight, double dDegrees )
+{
+    double  dRadians = dDegrees * PI / 180.0;
+    CVector oPoint( 10.0 * sin( dRadians ), 0.0, 10.0 * cos( dRadians ) );
+    CVector oToLight( oPoint * -1.0 );
+
+    return oLight.ShadeAt( oPoint, oToLight ).GetR();
+}
+
+static void LightOptionChecks( void )
+{
+    const char *strSpot = "{ \"type\": \"spot\", \"position\": [0, 0, 0], \"direction\": [0, 0, 1], \"color\": [1, 1, 1], "
+                          "\"angle\": 20, \"falloff\": 5";
+
+        // The default profile is the old smoothstep edge, exactly.
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( WithLights( std::string( strSpot ) + " }" ) ) == 0, "a spot light loads" );
+
+        CSpotLight *pSpot = dynamic_cast<CSpotLight *>( oScene.GetLight( 0 ) );
+
+        if ( pSpot )
+        {
+            double  dOuter = cos( 20.0 * PI / 180.0 );
+            double  dInner = cos( 15.0 * PI / 180.0 );
+            double  dCos = cos( 17.0 * PI / 180.0 );
+            double  dT = ( dCos - dOuter ) / ( dInner - dOuter );
+
+            Check( SpotAt( *pSpot, 5.0 ) == 1.0 && SpotAt( *pSpot, 25.0 ) == 0.0 &&
+                   ABS( SpotAt( *pSpot, 17.0 ) - dT * dT * ( 3.0 - 2.0 * dT ) ) < 1e-12,
+                   "the default profile is the smoothstep edge it always was" );
+            Check( oScene.ToJson().find( "\"profile\"" ) == std::string::npos, "the default profile isn't saved" );
+        }
+    }
+
+    struct SProfileCase
+    {
+        const char *strExtra;
+        double      dDegrees;
+        double      dExpected;
+        const char *strWhat;
+    };
+    const SProfileCase aoCases[] =
+    {
+        { ", \"profile\": \"linear\"", 17.0, -1.0, "a linear profile fades evenly across the edge" },
+        { ", \"profile\": \"cosine\", \"exponent\": 10", 10.0, pow( cos( 10.0 * PI / 180.0 ), 10.0 ), "a cosine profile is cos^exponent" },
+        { ", \"profile\": \"gaussian\", \"spread\": 5", 5.0, exp( -0.5 ), "a gaussian profile falls to exp(-1/2) at its spread" },
+        { ", \"profile\": \"fresnel\", \"hotspot\": 4, \"rim\": 0.3", 2.0, 1.0, "a fresnel profile is full in its center" },
+        { ", \"profile\": \"fresnel\", \"hotspot\": 4, \"rim\": 0.3", 10.0, 0.3, "a fresnel profile falls to its rim" },
+        { ", \"profile\": \"table\", \"table\": [1, 0.5]", 10.0, 0.75, "a table profile blends between its entries" },
+    };
+
+    for ( size_t nCase = 0; nCase < sizeof( aoCases ) / sizeof( aoCases[ 0 ] ); nCase++ )
+    {
+        CScene oScene;
+
+        if ( oScene.FromJson( WithLights( std::string( strSpot ) + aoCases[ nCase ].strExtra + " }" ) ) != 0 )
+        {
+            Check( false, aoCases[ nCase ].strWhat );
+            continue;
+        }
+
+        double dExpected = aoCases[ nCase ].dExpected;
+
+        if ( dExpected < 0.0 )
+        {
+            double dOuter = cos( 20.0 * PI / 180.0 );
+            double dInner = cos( 15.0 * PI / 180.0 );
+
+            dExpected = ( cos( 17.0 * PI / 180.0 ) - dOuter ) / ( dInner - dOuter );
+        }
+        Check( ABS( SpotAt( *oScene.GetLight( 0 ), aoCases[ nCase ].dDegrees ) - dExpected ) < 1e-12, aoCases[ nCase ].strWhat );
+
+        CScene oReread;
+
+        Check( oReread.FromJson( oScene.ToJson() ) == 0 && oReread.ToJson() == oScene.ToJson(), "a beam profile reads back the same" );
+    }
+
+        // Attenuation.
+    {
+        const char *astrKinds[] = { "none", "inverse", "inverseSquare" };
+        const double adExpected[] = { 1.0, 0.5, 0.25 };
+
+        for ( int nKind = 0; nKind < 3; nKind++ )
+        {
+            CScene oScene;
+
+            Check( oScene.FromJson( WithLights( std::string( "{ \"type\": \"point\", \"position\": [0, 0, 0], \"color\": [1, 1, 1], "
+                                                             "\"attenuation\": \"" ) + astrKinds[ nKind ] + "\", \"distance\": 2 }" ) ) == 0,
+                   "an attenuated point light loads" );
+
+            CVector oPoint( 0.0, 4.0, 0.0 );
+            CVector oToLight( 0.0, -4.0, 0.0 );
+
+            Check( oScene.GetLight( 0 ) && ABS( oScene.GetLight( 0 )->ShadeAt( oPoint, oToLight ).GetR() - adExpected[ nKind ] ) < 1e-15,
+                   "attenuation weakens a light by 1, d0/d or (d0/d)^2" );
+        }
+    }
+
+        // A filter projected across a spot's cone (angle 45: tan 1).
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( WithLights( "{ \"type\": \"spot\", \"position\": [0, 0, 0], \"direction\": [0, 0, 1], "
+                                            "\"color\": [1, 1, 1], \"angle\": 45, \"falloff\": 0, \"filter\": { \"texture\": "
+                                            "{ \"type\": \"checker\", \"colors\": [[1, 0, 0], [0, 0, 1]], \"size\": 0.5 } } }" ) ) == 0,
+               "a spot light with a filter loads" );
+
+        CLight *pLight = oScene.GetLight( 0 );
+        CVector oFirst;
+        CVector oSecond;
+
+        RaySampling::Basis( CVector( 0.0, 0.0, 1.0 ), oFirst, oSecond );
+        if ( pLight )
+        {
+                // x / z = 0.2: u = 0.6, v = 0.5 -> cells 1 + 1, even: the
+                // first color. x / z = -0.2: u = 0.4 -> 0 + 1, odd: the second.
+            CVector oForward( 0.0, 0.0, 1.0 );
+            CVector oRightward( oFirst * 0.2 );
+            CVector oLeftward( oFirst * -0.2 );
+            CVector oRight( oRightward + oForward );
+            CVector oLeft( oLeftward + oForward );
+            CVector oToRight( oRight * -1.0 );
+            CVector oToLeft( oLeft * -1.0 );
+            CColor  oOne = pLight->ShadeAt( oRight, oToRight );
+            CColor  oOther = pLight->ShadeAt( oLeft, oToLeft );
+
+            Check( oOne.GetR() == 1.0 && oOne.GetB() == 0.0 && oOther.GetR() == 0.0 && oOther.GetB() == 1.0,
+                   "a spot light's filter is projected across its cone" );
+        }
+        Check( oScene.ToJson().find( "\"filter\"" ) != std::string::npos, "a filter is saved" );
+    }
+
+        // Sunlight's filter, straight along its direction: moving across it
+        // by the size moves one whole image over.
+    {
+        CScene oScene;
+
+        Check( oScene.FromJson( WithLights( "{ \"type\": \"directional\", \"direction\": [0, -1, 0], \"color\": [1, 1, 1], "
+                                            "\"filter\": { \"texture\": { \"preset\": \"caustics\" }, \"size\": 2 } }" ) ) == 0,
+               "sunlight with a caustics filter loads" );
+
+        CLight *pSun = oScene.GetLight( 0 );
+
+        if ( pSun )
+        {
+            CVector oHigh( 1.3, 5.0, 0.7 );
+            CVector oLow( 1.3, -2.0, 0.7 );
+            CVector oToSun( 0.0, 1.0e6, 0.0 );
+
+            Check( pSun->ShadeAt( oHigh, oToSun ).GetR() == pSun->ShadeAt( oLow, oToSun ).GetR(),
+                   "sunlight's filter is the same all along its direction" );
+        }
+    }
+
+    ExpectError( WithLights( std::string( strSpot ) + ", \"profile\": \"spiky\" }" ), 1, "must be \"smoothstep\"" );
+    ExpectError( WithLights( std::string( strSpot ) + ", \"profile\": \"table\" }" ), 1, "needs a \"table\"" );
+    ExpectError( WithLights( std::string( strSpot ) + ", \"rim\": 2 }" ), 1, "must be from 0 to 1" );
+    ExpectError( WithLights( "{ \"type\": \"point\", \"position\": [0, 0, 0], \"color\": [1, 1, 1], \"attenuation\": \"cubic\" }" ), 1,
+                 "\"inverseSquare\"" );
+    ExpectError( WithLights( "{ \"type\": \"directional\", \"direction\": [0, -1, 0], \"color\": [1, 1, 1], \"attenuation\": \"inverse\" }" ),
+                 1, "attenuation" );
+    ExpectError( WithLights( "{ \"type\": \"point\", \"position\": [0, 0, 0], \"color\": [1, 1, 1], \"filter\": { \"size\": 1 } }" ), 1,
+                 "needs a \"texture\"" );
+    ExpectError( WithLights( "{ \"type\": \"point\", \"position\": [0, 0, 0], \"color\": [1, 1, 1], \"profile\": \"cosine\" }" ), 1,
+                 "profile" );
+}
+
 static void HazeChecks( void )
 {
     CHaze oHaze;
@@ -3656,6 +4049,9 @@ int main( int argc, char **argv )
         ClampChecks();
         IndirectChecks();
         HazeChecks();
+        PresetChecks();
+        CellChecks();
+        LightOptionChecks();
         ModelChecks();
         SceneEditChecks();
     }

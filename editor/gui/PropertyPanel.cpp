@@ -7,6 +7,7 @@
 #include "PropertyPanel.h"
 
 #include "SceneJson.h"
+#include "Presets.h"
 
 #include <wx/button.h>
 #include <wx/notebook.h>
@@ -186,6 +187,17 @@ void CPropertyPanel::AddNode( wxPGProperty *pParent, const std::string &strPath,
     {
         pProperty = Append( new wxBoolProperty( strShown, strName, oNode.asBoolean() ) );
         m_pGrid->SetPropertyAttribute( pProperty, wxPG_BOOL_USE_CHECKBOX, true );
+    }
+    else if ( oNode.isTextual() && strLabel == "preset" )
+    {
+            // A preset: picked from the library's list (or typed).
+        wxPGChoices     oChoices;
+        int             nCount;
+        const RayPresets::SPreset *aoPresets = RayPresets::GetPresets( nCount );
+
+        for ( int i = 0; i < nCount; i++ )
+            oChoices.Add( wxString::FromUTF8( aoPresets[ i ].strName ) );
+        pProperty = Append( new wxEditEnumProperty( strShown, strName, oChoices, wxString::FromUTF8( oNode.textString().c_str() ) ) );
     }
     else if ( oNode.isTextual() )
     {

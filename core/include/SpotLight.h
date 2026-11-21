@@ -11,8 +11,10 @@
 *   over the disc it shows (as a sphere light is), so its shadows are    *
 *   soft. With no radius it is exactly a point light inside its cone.    *
 *                                                                        *
-*   Like the other lights, it gives the same light at every distance,    *
-*   and the camera doesn't see it.                                       *
+*   Like the other lights, it gives the same light at every distance     *
+*   (unless given an "attenuation"), and the camera doesn't see it. A    *
+*   "profile" shapes the beam inside the cone, and a "filter" is         *
+*   projected across it: see Light.h.                                    *
 *                                                                        *
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
@@ -46,6 +48,12 @@ class CSpotLight : public CLight
         FLT             ConeFactor( const CVector &oToLight ) const;
         virtual int     GetSampleCount( void ) { return ( m_nRadius > 0.0 ) ? m_nSamples : 0; }
         virtual BOOL    SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoint );
+
+    protected:
+            // The filter across the cone: (u, v) from 0 to 1 over the square
+            // around the cone's circle; a solid texture's point is the same
+            // place, the cone's edge "size" from its middle.
+        virtual void    FilterAt( const CVector &oPoint, const CVector &oToLight, STexturePoint &oAt ) const;
 
 #ifdef RAY_GUI
         virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
