@@ -10,6 +10,80 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.19] - 2026-11-21
+
+Solids from mathematics: implicit surfaces given by a formula in a small built-in language with
+exact gradients, metaballs found exactly as polynomials along each ray, and fractals (a mandelbulb,
+the Menger sponge and the Sierpinski tetrahedron) found by sphere tracing a distance estimate.
+Scenes without the new objects render byte for byte as before.
+
+### Added
+
+- **Implicit surfaces (`implicit`).** A surface given by a formula in x, y and z: where it is zero,
+  inside where it is negative, within a box of half-sizes `bounds` around `center`, scaled by
+  `scale` and turned by `rotation`.
+  - **A small formula language** (`CExpression`), compiled to a program for a stack machine, so it
+    is quick and every thread can use it at once: numbers, `x`, `y`, `z`, `pi`, `e`, named
+    `parameters`, `+ - * /`, `^` (grouped from the right; `-x^2` is −(x²); `2^-1` works),
+    parentheses, and `sin cos tan asin acos atan atan2 sqrt abs exp log pow min max floor clamp mix
+    smoothstep`. A mistake is reported with its column, as in `formula: column 5: the formula ends
+    too soon`.
+  - **Exact normals.** The formula's gradient is worked out alongside its value, carrying the
+    derivatives through every operation (forward-mode automatic differentiation), not by
+    differences.
+  - **Finding it.** A ray steps through the box (the diagonal over `steps`, default 256) and the
+    surface is where the formula changes sign between two steps, pinned down by bisection to
+    rounding. With `lipschitz`, the most the formula changes per unit of distance, a step is
+    |f| / lipschitz where that is longer. Features thinner than a step can be missed, and so can a
+    place where the formula only touches zero; the cost is up to `steps` evaluations a ray through
+    the box.
+  - **A solid,** so a csg can use it.
+- **Metaballs (`blob`).** `balls`, each a center, a radius and a strength (negative dents the
+  others), add Wyvill's falloff, strength × (1 − d²/r²)³ within the radius, and the surface is where
+  the sum is `threshold` (default 0.5). Along a ray each ball's field is a polynomial of degree 6, so
+  between the places the ray enters and leaves balls the sum is one polynomial and its roots are
+  found exactly, with the same root finder as the torus. Normals from the field's gradient. A solid.
+- **Fractals (`fractal`).** Found by sphere tracing a distance estimate, stepping as far as the
+  estimate says is safe until within `epsilon` (0.0001) of the surface, for at most `maxSteps`
+  (256) steps of `stepFactor` (1) times the estimate. `kind` is `mandelbulb` (`power` 8,
+  `iterations` 10, `bailout` 2), `menger` (the Menger sponge, `iterations` 3; 0 is the cube) or
+  `sierpinski` (the tetrahedron, `iterations` 6; 0 is the solid tetrahedron). Normals by
+  differences of the estimate. Sphere tracing can't start inside, so fractals aren't csg solids.
+- **Shared by all three** (`CFieldShape`): a uniform `scale`; surface coordinates projected onto a
+  sphere around the center, so textures, bump maps and maps work; and triangles for `ray-editor`'s
+  preview by marching tetrahedra through the bounds. All three are in the editor's *Add* menu.
+- **`scenes/implicit_test.ray`** (a sphere from its formula beside the sphere itself, a gyroid's
+  labyrinth cut to a ball by a csg, and Taubin's heart), **`scenes/blob_test.ray`** (five balls
+  melted together, and a ball dented by two of negative strength) and **`scenes/fractal_test.ray`**
+  (a mandelbulb, a Menger sponge and a Sierpinski tetrahedron), written by the new
+  `tools/make_math_scenes.py`, each with render, round-trip and network tests, a reference render,
+  a README preview and a place in the Expected output table.
+- **`format_test` checks:** the language's precedence, grouping and every function, exact
+  gradients, seven error messages with their columns; an implicit sphere agreeing with the sphere on
+  300 rays (hits within 1e-9, normals within 1e-6), from inside and scaled; a Lipschitz bound with 8
+  steps; a gyroid hit at the first sign change a 200,000-step march finds, on the surface; an
+  implicit ball cut out of a box by a csg; a lone metaball as the sphere of the right radius, two
+  merged with a level bridge, a dent; a Menger sponge of 0 iterations as the cube and of 1 drilled
+  through; a Sierpinski tetrahedron of 0 iterations; a power-2 mandelbulb; the same trace every
+  time; round-trips (parameters keep their order); and nine error messages.
+
+  ![The new solids: implicit surfaces, metaballs and fractals](docs/images/changelog/math-solids.png)
+
+  Left, a sphere from its formula is the same as the sphere beside it; the gyroid ball and the heart
+  are formulas too. Middle, metaballs melting together, and a ball dented by two of negative
+  strength. Right, a mandelbulb, a Menger sponge and a Sierpinski tetrahedron.
+
+### Changed
+
+- **The torture test** gains a purple cluster of four metaballs behind the mirror sphere, glossy and
+  a little reflective. Its reference render, README preview and full-size image are regenerated.
+
+  ![Before and after: the torture test at 0.18 and 0.19](docs/images/changelog/torture-blob.png)
+
+  The metaballs stand to the right of the mirror sphere, in front of the frosted mirror wall (the
+  crop below is the full-size image, enlarged). The full-size adaptive render took 66,659 CPU-seconds,
+  2% more than 0.18's 65,259 (94 minutes on this machine while it ran tests too).
+
 ## [2026-alpha-0.18] - 2026-11-21
 
 Turned and pushed solids: lathes that spin a profile of lines and curves around an axis, traced
@@ -1792,7 +1866,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.19...HEAD
+[2026-alpha-0.19]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...2026-alpha-0.19
 [2026-alpha-0.18]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.17...2026-alpha-0.18
 [2026-alpha-0.17]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.16...2026-alpha-0.17
 [2026-alpha-0.16]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.15...2026-alpha-0.16

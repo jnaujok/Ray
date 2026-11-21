@@ -57,6 +57,10 @@
 #include "Bezier.h"
 #include "BSpline.h"
 #include "Lathe.h"
+#include "Expression.h"
+#include "Implicit.h"
+#include "Blob.h"
+#include "Fractal.h"
 #include "Extrusion.h"
 #include "Sweep.h"
 #include <map>
@@ -5250,6 +5254,344 @@ static bool MeshHitsAt( CObjects &oObject, CRay oRay, double dT )
     return oObject.Intersect( oRay, oHit ) && ABS( oRay.GetT() - dT ) < 1e-9;
 }
 
+    // The value of a formula at a point, or NAN if it doesn't compile.
+static double FormulaAt( const char *strFormula, double x, double y, double z )
+{
+    CExpression                   oExpression;
+    std::map<std::string, double> aoParameters;
+    std::string                   strError;
+
+    aoParameters[ "k" ] = 2.0;
+    if ( ! oExpression.Compile( strFormula, aoParameters, strError ) )
+    {
+        fprintf( stderr, "FAILED: \"%s\" doesn't compile: %s\n", strFormula, strError.c_str() );
+        return NAN;
+    }
+    return oExpression.Value( x, y, z );
+}
+
+    // The error compiling a formula, or "" if it compiles.
+static std::string FormulaError( const char *strFormula )
+{
+    CExpression                   oExpression;
+    std::map<std::string, double> aoParameters;
+    std::string                   strError;
+
+    return oExpression.Compile( strFormula, aoParameters, strError ) ? std::string() : strError;
+}
+
+static void MathShapeChecks( void )
+{
+    const double dPi = 3.14159265358979323846;
+    CScene       oScene;
+    CObjects    *pObject;
+    CVector      oHit;
+
+        // The formula language: precedence, power to the right, unary minus
+        // under power, functions and parameters.
+    Check( FormulaAt( "1 + 2 * 3", 0, 0, 0 ) == 7.0, "* binds tighter than +" );
+    Check( FormulaAt( "(1 + 2) * 3", 0, 0, 0 ) == 9.0, "parentheses group" );
+    Check( FormulaAt( "2^3^2", 0, 0, 0 ) == 512.0, "^ groups from the right" );
+    Check( FormulaAt( "-2^2", 0, 0, 0 ) == -4.0, "-x^2 is -(x^2)" );
+    Check( FormulaAt( "2^-1", 0, 0, 0 ) == 0.5, "an exponent can be negative" );
+    Check( FormulaAt( "10 - 4 - 3", 0, 0, 0 ) == 3.0 && FormulaAt( "24 / 4 / 2", 0, 0, 0 ) == 3.0, "- and / group from the left" );
+    Check( FormulaAt( "x*100 + y*10 + z", 1, 2, 3 ) == 123.0, "x, y and z are the point" );
+    Check( FormulaAt( "k * x", 3, 0, 0 ) == 6.0, "a parameter stands for its number" );
+    Check( ABS( FormulaAt( "sin(pi/2) + cos(0) + tan(0)", 0, 0, 0 ) - 2.0 ) < 1e-15, "sin, cos, tan and pi" );
+    Check( ABS( FormulaAt( "atan2(1, 1)", 0, 0, 0 ) - ( dPi / 4 ) ) < 1e-15 &&
+           ABS( FormulaAt( "asin(1) + acos(1) + atan(0)", 0, 0, 0 ) - ( dPi / 2 ) ) < 1e-15, "the inverse trigonometric functions" );
+    Check( FormulaAt( "sqrt(16) + abs(-3) + floor(-1.5)", 0, 0, 0 ) == 5.0, "sqrt, abs and floor" );
+    Check( ABS( FormulaAt( "exp(log(3)) + pow(2, 10) + e - e", 0, 0, 0 ) - 1027.0 ) < 1e-12, "exp, log, pow and e" );
+    Check( FormulaAt( "min(2, 3) + max(2, 3)", 0, 0, 0 ) == 5.0 && FormulaAt( "clamp(5, 0, 1) + clamp(-5, 0, 1)", 0, 0, 0 ) == 1.0,
+           "min, max and clamp" );
+    Check( FormulaAt( "mix(2, 4, 0.25)", 0, 0, 0 ) == 2.5 && FormulaAt( "smoothstep(0, 1, 0.5)", 0, 0, 0 ) == 0.5 &&
+           FormulaAt( "smoothstep(0, 1, 2)", 0, 0, 0 ) == 1.0, "mix and smoothstep" );
+
+        // Exact gradients.
+    {
+        CExpression                   oExpression;
+        std::map<std::string, double> aoParameters;
+        std::string                   strError;
+        double                        anGradient[ 3 ];
+
+        Check( oExpression.Compile( "x^2 + 3*y*z", aoParameters, strError ) &&
+               oExpression.Gradient( 1, 2, 3, anGradient ) == 19.0 &&
+               anGradient[ 0 ] == 2.0 && anGradient[ 1 ] == 9.0 && anGradient[ 2 ] == 6.0, "a polynomial's gradient is exact" );
+        Check( oExpression.Compile( "sin(x)*cos(y) + exp(z)/2 + sqrt(x*x + 1)", aoParameters, strError ), "a formula of functions compiles" );
+        oExpression.Gradient( 0.3, 0.4, 0.5, anGradient );
+        Check( ABS( anGradient[ 0 ] - ( ( cos( 0.3 ) * cos( 0.4 ) ) + ( 0.3 / sqrt( 1.09 ) ) ) ) < 1e-14 &&
+               ABS( anGradient[ 1 ] + ( sin( 0.3 ) * sin( 0.4 ) ) ) < 1e-14 && ABS( anGradient[ 2 ] - ( exp( 0.5 ) / 2 ) ) < 1e-14,
+               "the gradient carries through the functions exactly" );
+        Check( oExpression.Compile( "pow(x, y) + atan2(y, x)", aoParameters, strError ), "pow and atan2 compile" );
+        oExpression.Gradient( 2.0, 3.0, 0.0, anGradient );
+        Check( ABS( anGradient[ 0 ] - ( 12.0 - ( 3.0 / 13.0 ) ) ) < 1e-12 && ABS( anGradient[ 1 ] - ( ( 8.0 * log( 2.0 ) ) + ( 2.0 / 13.0 ) ) ) < 1e-12,
+               "a power with a variable exponent, and atan2, have exact gradients" );
+    }
+
+        // Errors, with the column.
+    Check( FormulaError( "x +" ) == "column 4: the formula ends too soon", "a formula that ends too soon is reported at its end" );
+    Check( FormulaError( "foo(x) + 1" ) == "column 1: unknown name \"foo\"", "an unknown name is reported" );
+    Check( FormulaError( "1 + sin x" ) == "column 5: sin needs its arguments in parentheses", "a function needs parentheses" );
+    Check( FormulaError( "(x + 1" ) == "column 1: this \"(\" isn't closed", "an unclosed parenthesis is reported where it opens" );
+    Check( FormulaError( "1 $ 2" ) == "column 3: unexpected \"$\"", "a stray character is reported" );
+    Check( FormulaError( "min(x)" ) == "column 1: min takes 2 arguments", "a function's argument count is checked" );
+    Check( FormulaError( "x y" ) == "column 3: unexpected \"y\"", "two terms without an operator are reported" );
+
+        // An implicit unit sphere matches the sphere, scaled and from inside.
+    pObject = FirstObject( oScene, "{ \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"x^2 + y^2 + z^2 - 1\", \"bounds\": 1.5 }" );
+    if ( pObject )
+    {
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "a ray hits an implicit sphere where a sphere is hit" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, 0, 1, 0, 0 ), 1.0, 1, 0, 0 ), "a ray from inside an implicit sphere leaves it" );
+        Check( Misses( *pObject, RayFrom( 1.01, 0, -5, 0, 0, 1 ) ), "a ray beside an implicit sphere misses it" );
+        Check( pObject->IsClosed() ? true : false, "an implicit surface is a solid" );
+
+        CScene    oSphereScene;
+        CObjects *pSphere = FirstObject( oSphereScene, "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }" );
+        int       nBad = 0;
+
+        for ( int n = 0; pSphere && n < 300; n++ )
+        {
+            double  a = n * 2.399963, b = ( ( n % 37 ) / 36.0 * 2.8 ) - 1.4;
+            double  ox = 4 * cos( a ), oz = 4 * sin( a ), oy = 0.7 * sin( n * 0.7 );
+            double  tx = 0.8 * sin( n * 1.3 ), ty = 0.8 * b / 1.4, tz = 0.8 * cos( n * 0.9 );
+            double  dx = tx - ox, dy = ty - oy, dz = tz - oz, l = sqrt( ( dx * dx ) + ( dy * dy ) + ( dz * dz ) );
+            CRay    oA = RayFrom( ox, oy, oz, dx / l, dy / l, dz / l ), oB = oA;
+            CVector oHitA, oHitB, oNA, oNB;
+            bool    bA = pObject->Intersect( oA, oHitA ) ? true : false, bB = pSphere->Intersect( oB, oHitB ) ? true : false;
+
+            if ( bA != bB )
+                nBad++;
+            else if ( bA )
+            {
+                pObject->SurfaceNormal( oHitA, oNA );
+                pSphere->SurfaceNormal( oHitB, oNB );
+                if ( ABS( oA.GetT() - oB.GetT() ) > 1e-9 || ABS( oNA.GetX() - oNB.GetX() ) > 1e-6 || ABS( oNA.GetY() - oNB.GetY() ) > 1e-6 ||
+                     ABS( oNA.GetZ() - oNB.GetZ() ) > 1e-6 )
+                    nBad++;
+            }
+        }
+        Check( nBad == 0, "an implicit sphere matches the sphere on 300 rays, hits and normals" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"x^2 + y^2 + z^2 - 1\", \"bounds\": 1, "
+                                   "\"scale\": 2 }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 3.0, 0, 0, -1 ), "scale grows an implicit surface" );
+    pObject = FirstObject( oScene, "{ \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"sqrt(x^2 + y^2 + z^2) - 1\", "
+                                   "\"bounds\": 1.5, \"steps\": 8, \"lipschitz\": 1 }" );
+    if ( pObject )
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 4.0, 0, 0, -1 ), "with a Lipschitz bound, long steps still find the surface" );
+
+        // A gyroid: the hit is the first sign change along the ray, found by
+        // a much finer march, and lies on the surface.
+    pObject = FirstObject( oScene, "{ \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": "
+                                   "\"sin(k*x)*cos(k*y) + sin(k*y)*cos(k*z) + sin(k*z)*cos(k*x)\", \"parameters\": { \"k\": 5 }, \"bounds\": 1 }" );
+    if ( pObject )
+    {
+        CExpression                   oGyroid;
+        std::map<std::string, double> aoParameters;
+        std::string                   strError;
+        int                           nBad = 0, nHits = 0;
+
+        aoParameters[ "k" ] = 5.0;
+        oGyroid.Compile( "sin(k*x)*cos(k*y) + sin(k*y)*cos(k*z) + sin(k*z)*cos(k*x)", aoParameters, strError );
+        for ( int n = 0; n < 60; n++ )
+        {
+            double a = n * 2.399963, dy = 0.3 * sin( n * 1.7 );
+            double dx = cos( a ), dz = sin( a ), l = sqrt( ( dx * dx ) + ( dy * dy ) + ( dz * dz ) );
+            double ox = ( -3 * dx / l ) + ( 0.2 * sin( (double)n ) ), oy = -3 * dy / l, oz = -3 * dz / l;
+            CRay   oRay = RayFrom( ox, oy, oz, dx / l, dy / l, dz / l );
+
+            if ( ! pObject->Intersect( oRay, oHit ) )
+                continue;
+            nHits++;
+
+            double tHit = oRay.GetT();
+            double tFirst = -1.0, fPrevious = 0.0;
+
+                // The finer march, inside the box.
+            for ( int s = 0; s <= 200000; s++ )
+            {
+                double t = s * 6.0 / 200000;
+                double x = ox + ( t * dx / l ), y = oy + ( t * dy / l ), z = oz + ( t * dz / l );
+
+                if ( ABS( x ) > 1 || ABS( y ) > 1 || ABS( z ) > 1 )
+                {
+                    if ( fPrevious != 0.0 )
+                        break;
+                    continue;
+                }
+
+                double f = oGyroid.Value( x, y, z );
+
+                if ( fPrevious != 0.0 && ( f < 0 ) != ( fPrevious < 0 ) )
+                {
+                    tFirst = t;
+                    break;
+                }
+                fPrevious = ( f == 0.0 ) ? 1e-300 : f;
+            }
+            if ( ABS( tHit - tFirst ) > ( 6.0 / 200000 ) + 1e-9 || ABS( oGyroid.Value( oHit.GetX(), oHit.GetY(), oHit.GetZ() ) ) > 1e-9 )
+                nBad++;
+        }
+        Check( nHits > 30 && nBad == 0, "a gyroid is hit at the first sign change along each ray, on the surface" );
+    }
+
+        // An implicit surface in a csg: a cube with a ball cut out of it.
+    pObject = FirstObject( oScene, "{ \"type\": \"csg\", \"operation\": \"difference\", \"objects\": [ "
+                                   "{ \"type\": \"box\", \"center\": [0, 0, 0], \"size\": 2 }, "
+                                   "{ \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"x^2 + y^2 + z^2 - 0.25\", \"bounds\": 0.6 } ] }" );
+    if ( pObject )
+    {
+        CRay oOutside = RayFrom( -5, 0, 0, 1, 0, 0 ), oInside = RayFrom( 0, 0, 0, 1, 0, 0 ), oCorner = RayFrom( -5, 0.9, 0.9, 1, 0, 0 );
+
+        Check( pObject->Intersect( oOutside, oHit ) && ABS( oOutside.GetT() - 4.0 ) < 1e-9, "a csg with an implicit part is hit on its box" );
+        Check( pObject->Intersect( oInside, oHit ) && ABS( oInside.GetT() - 0.5 ) < 1e-9,
+               "a ray from inside the hole an implicit ball cut hits the hole's wall" );
+        Check( pObject->Intersect( oCorner, oHit ) && ABS( oCorner.GetT() - 4.0 ) < 1e-9, "away from the hole the box is solid" );
+    }
+
+        // A lone metaball is a sphere of radius R sqrt( 1 - (threshold/s)^(1/3) ).
+    pObject = FirstObject( oScene, "{ \"type\": \"blob\", \"center\": [0, 0, 0], \"balls\": [ { \"center\": [0, 0, 0], \"radius\": 2 } ] }" );
+    if ( pObject )
+    {
+        double  r = 2.0 * sqrt( 1.0 - cbrt( 0.5 ) );
+        CBlob  *pBlob = dynamic_cast<CBlob *>( pObject );
+        double  anCenter[ 3 ] = { 0, 0, 0 }, anOne[ 3 ] = { 1, 0, 0 };
+
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ), 5.0 - r, 0, 0, -1 ), "a lone metaball is the sphere of the right radius" );
+        Check( ShapeHitsAt( *pObject, RayFrom( 0, 0, 0, 0, 1, 0 ), r, 0, 1, 0 ), "a ray from inside a metaball leaves it" );
+        Check( pBlob && pBlob->Sum( anCenter ) == 1.0 && ABS( pBlob->Sum( anOne ) - 0.421875 ) < 1e-15,
+               "a ball's field is its strength at its center and (1 - r^2/R^2)^3 of it at r" );
+        Check( pObject->IsClosed() ? true : false, "a blob is a solid" );
+    }
+
+        // Two balls melt together: a ray down between them hits the bridge,
+        // whose top faces straight up.
+    pObject = FirstObject( oScene, "{ \"type\": \"blob\", \"center\": [0, 0, 0], \"balls\": [ { \"center\": [-0.6, 0, 0], \"radius\": 1.5 }, "
+                                   "{ \"center\": [0.6, 0, 0], \"radius\": 1.5 } ], \"threshold\": 0.4 }" );
+    if ( pObject )
+    {
+        CRay    oDown = RayFrom( 0, 5, 0, 0, -1, 0 );
+        CVector oNormal;
+        CBlob  *pBlob = dynamic_cast<CBlob *>( pObject );
+
+        Check( pObject->Intersect( oDown, oHit ) && pObject->SurfaceNormal( oHit, oNormal ) && ABS( oNormal.GetY() - 1.0 ) < 1e-9,
+               "two metaballs merge, with a smooth bridge between them" );
+
+        double anAt[ 3 ] = { oHit.GetX(), oHit.GetY(), oHit.GetZ() };
+
+        Check( pBlob && ABS( pBlob->Sum( anAt ) - 0.4 ) < 1e-9, "the bridge's surface is where the sum is the threshold" );
+    }
+
+        // A negative ball dents a positive one.
+    pObject = FirstObject( oScene, "{ \"type\": \"blob\", \"center\": [0, 0, 0], \"balls\": [ { \"center\": [0, 0, 0], \"radius\": 2 }, "
+                                   "{ \"center\": [0, 0, -1], \"radius\": 0.8, \"strength\": -1 } ] }" );
+    if ( pObject )
+    {
+        CRay oDent = RayFrom( 0, 0, -5, 0, 0, 1 ), oSide = RayFrom( 0, 0, 5, 0, 0, -1 );
+
+        Check( pObject->Intersect( oDent, oHit ) && pObject->Intersect( oSide, oHit ) && oDent.GetT() > oSide.GetT() + 0.05,
+               "a ball of negative strength dents the blob" );
+    }
+
+        // Fractals: a menger sponge of no iterations is the cube, one of one
+        // iteration is drilled through the middle, and the trace is the same
+        // every time.
+    pObject = FirstObject( oScene, "{ \"type\": \"fractal\", \"kind\": \"menger\", \"center\": [0, 0, 0], \"iterations\": 0 }" );
+    if ( pObject )
+    {
+        CRay    oRay = RayFrom( 0.3, 0.2, -5, 0, 0, 1 );
+        CVector oNormal;
+
+        Check( pObject->Intersect( oRay, oHit ) && oRay.GetT() <= 4.0 && oRay.GetT() > 4.0 - 2e-4 &&
+               pObject->SurfaceNormal( oHit, oNormal ) && ABS( oNormal.GetZ() + 1.0 ) < 1e-3, "a menger sponge of 0 iterations is the cube" );
+        Check( ! pObject->IsClosed(), "a fractal is not a solid for a csg" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"fractal\", \"kind\": \"menger\", \"center\": [0, 0, 0], \"iterations\": 1 }" );
+    if ( pObject )
+    {
+        Check( Misses( *pObject, RayFrom( 0, 0, -5, 0, 0, 1 ) ), "a ray through a menger sponge's middle hole misses it" );
+        Check( ! Misses( *pObject, RayFrom( 0.8, 0.8, -5, 0, 0, 1 ) ), "a ray at a menger sponge's corner hits it" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"fractal\", \"kind\": \"sierpinski\", \"center\": [0, 0, 0], \"iterations\": 0 }" );
+    if ( pObject )
+    {
+        CFractal *pFractal = dynamic_cast<CFractal *>( pObject );
+        double    anCenter[ 3 ] = { 0, 0, 0 }, anCorner[ 3 ] = { 0.99, 0.99, 0.99 }, anOpposite[ 3 ] = { -0.9, -0.9, -0.9 };
+
+        Check( pFractal && pFractal->Estimate( anCenter ) < 0 && pFractal->Estimate( anCorner ) < 0 && pFractal->Estimate( anOpposite ) > 0,
+               "a sierpinski tetrahedron of 0 iterations is the tetrahedron" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"fractal\", \"kind\": \"mandelbulb\", \"center\": [0, 0, 0], \"power\": 2 }" );
+    if ( pObject )
+    {
+        CFractal *pFractal = dynamic_cast<CFractal *>( pObject );
+        double    anOrigin[ 3 ] = { 0, 0, 0 }, anFar[ 3 ] = { 3, 0, 0 };
+
+        Check( pFractal && pFractal->Estimate( anOrigin ) < 0 && pFractal->Estimate( anFar ) > 0 && pFractal->Estimate( anFar ) < 3,
+               "a power-2 mandelbulb holds the origin, and its estimate outside is positive and no more than the distance" );
+    }
+    pObject = FirstObject( oScene, "{ \"type\": \"fractal\", \"kind\": \"mandelbulb\", \"center\": [0, 0, 0] }" );
+    if ( pObject )
+    {
+        CRay    oA = RayFrom( 0.1, 0.05, -5, 0, 0, 1 ), oB = oA;
+        CVector oHitB;
+
+        Check( pObject->Intersect( oA, oHit ) && pObject->Intersect( oB, oHitB ) && oA.GetT() == oB.GetT() && oA.GetT() > 3.5 && oA.GetT() < 4.5,
+               "a mandelbulb is hit near its heart, the same every time" );
+    }
+
+        // Round trips.
+    {
+        CScene      oRound, oAgain;
+        std::string strText = Minimal( "\"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 } ]",
+            "\"objects\": [ { \"type\": \"implicit\", \"center\": [1, 2, 3], \"formula\": \"x^2 + a*y^2 + z^2 - b\", "
+            "\"parameters\": { \"b\": 1, \"a\": 2 }, \"bounds\": [1, 2, 3], \"steps\": 100, \"lipschitz\": 4, \"scale\": 0.5, \"rotation\": [10, 20, 30] }, "
+            "{ \"type\": \"blob\", \"center\": [0, 0, 0], \"balls\": [ { \"center\": [0, 1, 0], \"radius\": 1, \"strength\": -0.5 }, "
+            "{ \"center\": [1, 1, 0], \"radius\": 2 } ], \"threshold\": 0.3 }, "
+            "{ \"type\": \"fractal\", \"kind\": \"mandelbulb\", \"center\": [0, 0, 0], \"power\": 6, \"iterations\": 7, \"bailout\": 3, "
+            "\"epsilon\": 0.001, \"maxSteps\": 100, \"stepFactor\": 0.9 }, "
+            "{ \"type\": \"fractal\", \"kind\": \"sierpinski\", \"center\": [0, 0, 0] } ]" );
+
+        if ( oRound.FromJson( strText ) == 0 )
+        {
+            std::string strSaved = oRound.ToJson();
+
+            Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "implicit surfaces, blobs and fractals read back as saved" );
+            Check( strSaved.find( "\"b\": 1" ) != std::string::npos && strSaved.find( "\"a\": 2" ) > strSaved.find( "\"b\": 1" ),
+                   "an implicit surface's parameters keep their order" );
+        }
+        else
+            Check( false, oRound.GetLoadError() );
+    }
+
+        // Bad settings are reported.
+    std::string strObjects = "\"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 } ]";
+
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"x + \", \"bounds\": 1 } ]" ),
+                 BAD_FILE, "column 5: the formula ends too soon" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"x\", \"bounds\": 0 } ]" ),
+                 BAD_FILE, "bounds must be more than 0" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"x\", \"bounds\": 1, "
+                                              "\"parameters\": { \"x\": 1 } } ]" ),
+                 BAD_FILE, "\"x\" is taken by the formula language" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"implicit\", \"center\": [0, 0, 0], \"formula\": \"x\" } ]" ),
+                 BAD_FILE, "bounds" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"blob\", \"center\": [0, 0, 0], \"balls\": [ "
+                                              "{ \"center\": [0, 0, 0], \"radius\": 1, \"strength\": -1 } ] } ]" ),
+                 BAD_FILE, "at least one ball of positive strength" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"blob\", \"center\": [0, 0, 0], \"balls\": [ "
+                                              "{ \"center\": [0, 0, 0], \"radius\": 0 } ] } ]" ),
+                 BAD_FILE, "radius must be more than 0" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"fractal\", \"center\": [0, 0, 0], \"kind\": \"julia\" } ]" ),
+                 BAD_FILE, "kind must be mandelbulb, menger or sierpinski" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"fractal\", \"center\": [0, 0, 0], \"kind\": \"menger\", \"power\": 3 } ]" ),
+                 BAD_FILE, "only a mandelbulb has a power and a bailout" );
+    ExpectError( Minimal( strObjects.c_str(), "\"objects\": [ { \"type\": \"fractal\", \"center\": [0, 0, 0], \"kind\": \"menger\", \"epsilon\": 0 } ]" ),
+                 BAD_FILE, "epsilon must be more than 0" );
+}
+
 static void ExtrusionChecks( void )
 {
     CScene      oScene;
@@ -5544,6 +5886,7 @@ int main( int argc, char **argv )
         PatchChecks();
         LatheChecks();
         ExtrusionChecks();
+        MathShapeChecks();
     }
 
     if ( g_nFailures == 0 )

@@ -22,7 +22,7 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble, the Utah teapot's own 32 Bezier patches traced exactly) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), a polished gold torus standing on its rim, the word "RAY" in beveled red letters (Lato Bold) standing on top of the mirror frame, on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble, the Utah teapot's own 32 Bezier patches traced exactly) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), a polished gold torus standing on its rim, a purple cluster of four metaballs (a `blob`) behind the mirror sphere, the word "RAY" in beveled red letters (Lato Bold) standing on top of the mirror frame, on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
@@ -45,6 +45,9 @@ when the binary format was dropped; they are in the repository's history.
 | `nurbs_test.ray` | | B-spline and NURBS surfaces: a gold torus made of rational quadratic circles both ways (a `bspline` with weights) in front of the analytic `torus` of the same size, and a bicubic B-spline sheet, gently waved, with `textures/uv_grid.ppm` running across all its patches and a fine noise bump, with the `corners` sampler |
 | `lathe_test.ray` | | Solids of revolution: a black pawn and a white rook (profiles of lines and curves), a black queen (a smooth profile through points), a glass goblet, an open terracotta vase (the `terracotta` preset; an open profile, a shell) and an orange with a quarter cut away (`sweep` 270), with the `corners` sampler |
 | `extrusion_test.ray` | | Extrusions and sweeps: a gold star tapered to a point, a blue square column twisted 120 degrees, a red frame with a round hole beveled front and back, a steel spring and a green closed loop of tube (sweeps along smooth paths) and a brown zigzag rail with a square cross-section, with the `corners` sampler |
+| `implicit_test.ray` | | Implicit surfaces: a sphere from its formula beside the sphere itself, a gyroid's labyrinth cut down to a ball by a csg, and Taubin's heart, with the `corners` sampler |
+| `blob_test.ray` | | Metaballs: five blue balls melted together, and an orange ball dented by two of negative strength, with the `corners` sampler |
+| `fractal_test.ray` | | Fractals by sphere tracing: a mandelbulb, a Menger sponge and a Sierpinski tetrahedron, with the `corners` sampler |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -265,6 +268,9 @@ color, not used in shading), `materials` (default: one diffuse material), and op
 | `sweep` | `path` (required): two or more points `[x, y, z]` in the scene; `smooth` (default `true`): a curve through them (else straight from point to point); `closed` (default `false`); `radius` (default `0.1`) or `outline`: a closed path (see below) as the cross-section; `segments` (default `24`, 3 to 256) around a round tube; `steps` (default `12`, 1 to 256) along each span of a smooth path; `capped` (default `true`) |
 | `bezier` | `patches` (required, unless `file`): each `{ "points": [...] }` (u varies fastest) or `{ "indices": [...] }` into the shape's own `points`, with `degree` (`[u, v]`, from 1 to 15; needed unless the points are a square number: 16 is bicubic) and `uv` (default `[0, 0, 1, 1]`); or `file`: a `.bpt` file of patches; `points`: the shared points for `indices`; a point is `[x, y, z]` or `[x, y, z, weight]`; `scale` (default `1`): a number or `[x, y, z]`; `closed` (default `false`); `center` (default `[0, 0, 0]`); `rotation` |
 | `bspline` | `points` (required): rows of points along v, each an array along u, `[x, y, z]` or `[x, y, z, weight]`; `degree` (default `[3, 3]`, or one number for both); `knotsU`, `knotsV` (default clamped and evenly spaced): points in a row (or rows) + degree + 1 numbers, never decreasing; `scale`; `closed`; `center` (default `[0, 0, 0]`); `rotation` |
+| `implicit` | `formula` (required): see below; `parameters`: an object of names and numbers; `bounds` (required): half-sizes, a number or `[x, y, z]`; `steps` (default `256`, 4 to 1000000); `lipschitz` (default none); `scale` (default `1`); `center` (required); `rotation` |
+| `blob` | `balls` (required): `{ "center", "radius", "strength" }` each (`strength` default `1`); `threshold` (default `0.5`); `scale`; `center` (required); `rotation` |
+| `fractal` | `kind` (required): `"mandelbulb"`, `"menger"` or `"sierpinski"`; `iterations`; `power`, `bailout` (mandelbulb only); `epsilon` (default `0.0001`); `maxSteps` (default `256`); `stepFactor` (default `1`); `scale`; `center` (required); `rotation` |
 
 A cylinder or cone points from `base` to `top`, any way. Capped, its ends are closed with flat discs
 and it is a solid; with `"capped": false` it is an open shell, seen into from its ends, and it
@@ -386,9 +392,54 @@ algorithm, with weights carried along) until every knot in its range repeats as 
 degree, which cuts it into patches that are the same surface exactly. Its surface coordinates run
 from 0 to 1 across the whole surface. Bump maps, textures and maps work on both.
 
+**Implicit surfaces, blobs and fractals.** These three are defined by a number at every point:
+negative inside, zero on the surface. Each is worked out at size 1 in its own frame, scaled by
+`scale` (default `1`, a number), turned by `rotation` and moved to `center`. Surface coordinates
+are projected onto a sphere around the center: u around +y, v from the bottom (0) to the top (1).
+Bump maps, textures and maps work on all three.
+
+- An **implicit** surface is where its `formula` is zero, inside where it is negative, within a box
+  of half-sizes `bounds` (a number, or `[x, y, z]`) around the center. The formula is in x, y and z:
+  numbers (`2`, `0.5`, `1e-3`); the constants `pi` and `e`; `parameters`, an object of names and
+  numbers (`{ "k": 5 }`) the formula can use; `+ - * /`; `^` for a power, grouped from the right
+  (`2^3^2` is 2⁹), with unary minus below it (`-x^2` is −(x²)) and a negative exponent allowed
+  (`2^-1`); parentheses; and the functions `sin`, `cos`, `tan`, `asin`, `acos`, `atan`,
+  `atan2(y, x)`, `sqrt`, `abs`, `exp`, `log`, `pow(a, b)`, `min(a, b)`, `max(a, b)`, `floor`,
+  `clamp(x, low, high)`, `mix(a, b, t)` and `smoothstep(edge0, edge1, x)`. A mistake is reported
+  with its column (`formula: column 5: the formula ends too soon`). A ray is followed through the
+  box in steps of the box's diagonal over `steps` (default `256`), and the surface is found where
+  the formula changes sign between two steps, then pinned down by bisection to rounding. With
+  `lipschitz`, the most the formula can change per unit of distance (1 for a true distance), a step
+  is |f| / lipschitz where that is longer, which is faster and as safe. A feature thinner than a
+  step can be stepped over, and a place where the formula touches zero without changing sign is
+  missed: raise `steps` for fine detail. The cost is up to `steps` evaluations a ray through the
+  box. The normal is the formula's gradient, worked out exactly (the derivatives are carried through
+  every operation). It is a solid, so a csg can use it (`implicit_test.ray` cuts a gyroid's
+  labyrinth down to a ball).
+- A **blob** is metaballs: `balls`, each `{ "center": [x, y, z], "radius": r, "strength": s }`
+  (`strength` default `1`; negative dents the others), adds s (1 − d²/r²)³ within its radius (d the
+  distance from its center) and nothing beyond, and the surface is where the sum is `threshold`
+  (default `0.5`, more than 0). A lone ball is a sphere of radius r √(1 − (threshold / s)^(1/3)).
+  Ball centers are in the blob's own frame. Along a ray each ball's field is a polynomial of degree
+  6, so between the places the ray enters and leaves balls the sum is one polynomial and its roots
+  are found exactly. At least one ball must have positive strength. It is a solid.
+- A **fractal** is traced by sphere tracing a distance estimate: the ray steps as far as the
+  estimate says is safe (times `stepFactor`, default `1`, at most 1) until it is within `epsilon`
+  (default `0.0001`, at size 1) of the surface, for at most `maxSteps` (default `256`) steps. A
+  smaller epsilon shows finer detail and takes more steps. `kind` is `"mandelbulb"` (White and
+  Nylander's 3D Mandelbrot set, +y the pole: `power` default `8`, from 2 to 32; `iterations`
+  default `10`; `bailout` default `2`; within a box of half-size 1.25 for power 6 and up),
+  `"menger"` (the Menger sponge, a cube of half-size 1 with its middle thirds drilled out
+  `iterations` times, default `3`; with 0 it is the cube) or `"sierpinski"` (the Sierpinski
+  tetrahedron, corners at (1, 1, 1), (−1, −1, 1), (−1, 1, −1) and (1, −1, −1), folded
+  `iterations` times, default `6`; `"rotation": [-45, 0, 35.264]` stands it on a face).
+  `iterations` is from 0 to 64. Only a mandelbulb has a `power` and a `bailout`. The normal is the
+  estimate's gradient, by differences. Sphere tracing can't start inside, so a fractal isn't a
+  solid a csg can use.
+
 **Constructive solid geometry.** A `csg` is a solid made from others: a `"union"` is inside any of
 them, an `"intersection"` inside all of them, and a `"difference"` inside the first and none of the
-rest. Its `objects` are written as in the scene's own list, and can be any closed shapes: spheres, tori, superquadrics, rounded boxes,
+rest. Its `objects` are written as in the scene's own list, and can be any closed shapes: spheres, tori, superquadrics, rounded boxes, implicit surfaces, blobs,
 boxes, capped cylinders, cones, paraboloids and hyperboloids, text, closed patches, meshes (which must be closed; a mesh with holes gives wrong
 results) and other csgs. Planes, triangles and open cylinders and cones are refused. A csg has
 its own `materials` and `bump`, and shades as one object, so glass made of parts is entered and

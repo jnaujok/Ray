@@ -127,6 +127,11 @@ set(RAY_CORE_SOURCES
     core/src/Haze.cpp
     core/src/LocalShape.cpp
     core/src/Torus.cpp
+    core/src/Expression.cpp
+    core/src/FieldShape.cpp
+    core/src/Implicit.cpp
+    core/src/Blob.cpp
+    core/src/Fractal.cpp
     core/src/Bezier.cpp
     core/src/BSpline.cpp
     core/src/Disc.cpp

@@ -391,7 +391,8 @@ namespace RayEditor
         }
         else if ( strType == "torus" || strType == "disc" || strType == "annulus" || strType == "paraboloid" ||
                   strType == "hyperboloid" || strType == "superquadric" || strType == "roundedBox" ||
-                  strType == "bezier" || strType == "bspline" || strType == "lathe" )
+                  strType == "bezier" || strType == "bspline" || strType == "lathe" ||
+                  strType == "implicit" || strType == "blob" || strType == "fractal" )
         {
                 // The core draws its own shapes (a csg part has no object of
                 // its own here, so one is made from its JSON).

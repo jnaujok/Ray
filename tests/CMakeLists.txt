@@ -353,7 +353,7 @@ add_test(NAME roundtrip_text_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scen
 # open vase and a cut-away orange. Extrusions: a tapered star, a twisted
 # column, a beveled frame with a hole, and sweeps (a spring, a closed loop and
 # a square rail).
-foreach(scene IN ITEMS patches nurbs lathe extrusion)
+foreach(scene IN ITEMS patches nurbs lathe extrusion implicit blob fractal)
     add_test(NAME render_${scene}
              COMMAND ${CMAKE_COMMAND}
                      -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -546,7 +546,7 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 # model files inside the scene, so they need no files.
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
-                       patches nurbs lathe extrusion)
+                       patches nurbs lathe extrusion implicit blob fractal)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

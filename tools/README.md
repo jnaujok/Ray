@@ -95,6 +95,21 @@ build/raythrower scenes/lathe_test.ray --save-json scenes/lathe_test.ray
 build/raythrower scenes/extrusion_test.ray --save-json scenes/extrusion_test.ray
 ```
 
+## `make_math_scenes.py`
+
+Writes `scenes/implicit_test.ray`, `scenes/blob_test.ray` and `scenes/fractal_test.ray` from
+`shapes_test.ray`'s settings: implicit surfaces (a sphere's formula, a gyroid cut to a ball by a csg,
+Taubin's heart), metaballs (a melted cluster and a dented ball) and fractals (a mandelbulb, a Menger
+sponge and a Sierpinski tetrahedron). It needs only Python 3; re-save each scene with `raythrower`
+afterwards:
+
+```sh
+tools/make_math_scenes.py
+build/raythrower scenes/implicit_test.ray --save-json scenes/implicit_test.ray
+build/raythrower scenes/blob_test.ray --save-json scenes/blob_test.ray
+build/raythrower scenes/fractal_test.ray --save-json scenes/fractal_test.ray
+```
+
 ## `obj_to_ray.py`
 
 Turns a Wavefront OBJ model into a Ray mesh object (JSON), ready to put in a scene's `objects`
