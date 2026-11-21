@@ -168,8 +168,8 @@ void CMapBase::WriteMap( IASLib::CObjectNode &oParent, const char *strKey, BOOL 
 
 CScalarMap::CScalarMap( FLT nValue ) :
 m_nValue( nValue ),
-m_nMin( -std::numeric_limits<FLT>::max() ),
-m_nMax( std::numeric_limits<FLT>::max() )
+m_nMin( -(std::numeric_limits<FLT>::max)() ),
+m_nMax( (std::numeric_limits<FLT>::max)() )
 {
 }
 

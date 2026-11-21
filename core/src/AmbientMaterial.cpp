@@ -52,9 +52,11 @@ CColor CAmbientMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor &
 
 void CAmbientMaterial::Properties( void )
 {
-    CSetColorDlg    oDlg( &m_oColor );
+    CColor          oColor( m_oColor.Get() );
+    CSetColorDlg    oDlg( &oColor );
 
-    oDlg.DoModal();
+    if ( oDlg.DoModal() == IDOK )
+        m_oColor = oColor;
 }
 
 void CAmbientMaterial::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
