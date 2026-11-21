@@ -44,6 +44,11 @@ set(RAY_COLOR_SCENE scan_test)
 
 add_test(NAME ray_stream_format COMMAND format_test)
 
+# Windows headers make min and max macros; this catches calls that would break
+# the Windows build, on every platform.
+add_test(NAME lint_minmax
+         COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/LintMinMax.cmake)
+
 foreach(scene IN LISTS RAY_TEST_SCENES)
     set(scene_file "${PROJECT_SOURCE_DIR}/scenes/${scene}.ray")
 

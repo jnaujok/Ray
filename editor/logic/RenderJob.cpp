@@ -103,9 +103,9 @@ namespace RayEditor
         std::lock_guard<std::mutex> oLock( m_oPixelsLock );
         int                         nWidth = m_oRequest.nWidth, nHeight = m_oRequest.nHeight;
 
-        for ( int y = nY * nScale; y < std::min( nHeight, ( nY + 1 ) * nScale ); y++ )
+        for ( int y = nY * nScale; y < (std::min)( nHeight, ( nY + 1 ) * nScale ); y++ )
         {
-            for ( int x = nX * nScale; x < std::min( nWidth, ( nX + 1 ) * nScale ); x++ )
+            for ( int x = nX * nScale; x < (std::min)( nWidth, ( nX + 1 ) * nScale ); x++ )
             {
                 size_t nAt = ( ( (size_t)y * (size_t)nWidth ) + (size_t)x ) * 3;
 
@@ -221,8 +221,8 @@ namespace RayEditor
         for ( int nPass = m_oRequest.bQuickPass ? 1 : 2; nPass <= 2 && bOK && ! m_bStop; nPass++ )
         {
             int     nScale = ( nPass == 1 ) ? 4 : 1;
-            int     nWidth = std::max( 1, ( m_oRequest.nWidth + nScale - 1 ) / nScale );
-            int     nHeight = std::max( 1, ( m_oRequest.nHeight + nScale - 1 ) / nScale );
+            int     nWidth = (std::max)( 1, ( m_oRequest.nWidth + nScale - 1 ) / nScale );
+            int     nHeight = (std::max)( 1, ( m_oRequest.nHeight + nScale - 1 ) / nScale );
             CScene  oScene;
 
             m_nPass = nPass;

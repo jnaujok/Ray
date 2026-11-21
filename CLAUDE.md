@@ -128,6 +128,11 @@ ctest --preset full             # every test
   hand-written versions. In core headers write `IASLib::CString` in full: the GUI also sees MFC's
   `CString`.
 - Avoid names that are Win32 macros (`SendMessage`, `GetMessage`, `CreateWindow`, ...).
+- **Never call `min` or `max` unparenthesized.** Windows headers define `min` and `max` as macros,
+  and the MFC build sees them, so `std::min(a, b)`, `std::max(...)` and
+  `std::numeric_limits<T>::max()` break the Windows GUI build. Write `(std::min)(a, b)`,
+  `(std::max)(a, b)` and `(std::numeric_limits<T>::max)()` in every file under `core/`, `src/`,
+  `include/` and `editor/`. The `lint_minmax` test checks this on every platform.
 
 ## Conventions
 

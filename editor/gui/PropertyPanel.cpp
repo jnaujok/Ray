@@ -123,7 +123,7 @@ CPropertyPanel::CPropertyPanel( wxWindow *pParent, RayEditor::CEditorDocument &o
 void CPropertyPanel::ShowError( const std::string &strError )
 {
     m_pError->SetLabel( strError.empty() ? wxString() : wxString::FromUTF8( ( "Not changed: " + strError ).c_str() ) );
-    m_pError->Wrap( std::max( 100, GetClientSize().x - 12 ) );
+    m_pError->Wrap( (std::max)( 100, GetClientSize().x - 12 ) );
     Layout();
 }
 

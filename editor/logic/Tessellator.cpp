@@ -91,7 +91,7 @@ namespace RayEditor
 
         void Sphere( SDrawMesh &oMesh, const SVec3 &c, double r, int nSegments )
         {
-            int nRings = std::max( 4, nSegments / 2 );
+            int nRings = (std::max)( 4, nSegments / 2 );
 
             for ( int j = 0; j < nRings; j++ )
             {
@@ -238,9 +238,9 @@ namespace RayEditor
                 if ( strType == "diffuse" && ! pChosen )
                     pChosen = pMaterial;
                 else if ( strType == "transparent" )
-                    nTransparent = std::max( nTransparent, Number( *pMaterial, "influence", 0.0 ) );
+                    nTransparent = (std::max)( nTransparent, Number( *pMaterial, "influence", 0.0 ) );
                 else if ( strType == "reflective" )
-                    nReflective = std::max( nReflective, Number( *pMaterial, "influence", 0.0 ) );
+                    nReflective = (std::max)( nReflective, Number( *pMaterial, "influence", 0.0 ) );
             }
             if ( ! pChosen && nTransparent <= 0.5 && nReflective <= 0.5 )
             {
@@ -316,7 +316,7 @@ namespace RayEditor
             anColor[ 3 ] = 0.35f;
         }
         for ( int i = 0; i < 3; i++ )
-            anColor[ i ] = std::min( 1.0f, std::max( 0.0f, anColor[ i ] ) );
+            anColor[ i ] = (std::min)( 1.0f, (std::max)( 0.0f, anColor[ i ] ) );
     }
 
     bool TessellateObject( const IASLib::CJsonNode &oObject, CObjects *pObject, int nObject, double nPlane,
@@ -454,12 +454,12 @@ namespace RayEditor
     {
         std::string strType = Text( oLight, "type" );
         SVec3       p, d, c;
-        double      s = std::max( 1e-3, nSize * 0.08 );
+        double      s = (std::max)( 1e-3, nSize * 0.08 );
 
         oOut.nLight = nLight;
         if ( JsonVector( Get( oLight, "color" ), c ) )
         {
-            double nMax = std::max( c.x, std::max( c.y, c.z ) );
+            double nMax = (std::max)( c.x, (std::max)( c.y, c.z ) );
 
             if ( nMax > 0.0 )
             {
@@ -529,7 +529,7 @@ namespace RayEditor
 
                 double nAngle = Number( oLight, "angle", 30.0 );
                 double nLength = nSize * 0.3;
-                double r = nLength * std::tan( std::min( 89.0, nAngle ) * EDITOR_PI / 180.0 );
+                double r = nLength * std::tan( (std::min)( 89.0, nAngle ) * EDITOR_PI / 180.0 );
                 SVec3  u = Perpendicular( d ), v = d.Cross( u ).Normalized();
                 SVec3  oEnd = p + ( d * nLength );
 
@@ -602,8 +602,8 @@ namespace RayEditor
                 }
                 else
                 {
-                    oOut.oMinimum = SVec3( std::min( oOut.oMinimum.x, a.x ), std::min( oOut.oMinimum.y, a.y ), std::min( oOut.oMinimum.z, a.z ) );
-                    oOut.oMaximum = SVec3( std::max( oOut.oMaximum.x, b.x ), std::max( oOut.oMaximum.y, b.y ), std::max( oOut.oMaximum.z, b.z ) );
+                    oOut.oMinimum = SVec3( (std::min)( oOut.oMinimum.x, a.x ), (std::min)( oOut.oMinimum.y, a.y ), (std::min)( oOut.oMinimum.z, a.z ) );
+                    oOut.oMaximum = SVec3( (std::max)( oOut.oMaximum.x, b.x ), (std::max)( oOut.oMaximum.y, b.y ), (std::max)( oOut.oMaximum.z, b.z ) );
                 }
             }
         }
@@ -614,7 +614,7 @@ namespace RayEditor
         }
 
         SVec3   oCenter = ( oOut.oMinimum + oOut.oMaximum ) * 0.5;
-        double  nSize = std::max( 1.0, ( oOut.oMaximum - oOut.oMinimum ).Length() );
+        double  nSize = (std::max)( 1.0, ( oOut.oMaximum - oOut.oMinimum ).Length() );
 
         for ( int i = 0; i < oScene.GetObjectCount(); i++ )
         {

@@ -66,7 +66,7 @@ wxSize CSceneCanvas::PixelSize( void ) const
     wxSize  oSize = GetClientSize();
     double  nScale = GetContentScaleFactor();
 
-    return wxSize( std::max( 1, (int)std::lround( oSize.x * nScale ) ), std::max( 1, (int)std::lround( oSize.y * nScale ) ) );
+    return wxSize( (std::max)( 1, (int)std::lround( oSize.x * nScale ) ), (std::max)( 1, (int)std::lround( oSize.y * nScale ) ) );
 }
 
 void CSceneCanvas::SetScene( CScene &oScene, bool bFrame )
@@ -80,9 +80,9 @@ void CSceneCanvas::SetScene( CScene &oScene, bool bFrame )
 
     CColor &oBackground = oScene.GetBackground();
 
-    m_anBackground[ 0 ] = (float)std::min( 1.0, std::max( 0.0, (double)oBackground.GetR() ) );
-    m_anBackground[ 1 ] = (float)std::min( 1.0, std::max( 0.0, (double)oBackground.GetG() ) );
-    m_anBackground[ 2 ] = (float)std::min( 1.0, std::max( 0.0, (double)oBackground.GetB() ) );
+    m_anBackground[ 0 ] = (float)(std::min)( 1.0, (std::max)( 0.0, (double)oBackground.GetR() ) );
+    m_anBackground[ 1 ] = (float)(std::min)( 1.0, (std::max)( 0.0, (double)oBackground.GetG() ) );
+    m_anBackground[ 2 ] = (float)(std::min)( 1.0, (std::max)( 0.0, (double)oBackground.GetB() ) );
 
         // The scene's lights, for OpenGL's eight.
     m_aanLights.clear();
@@ -112,16 +112,16 @@ void CSceneCanvas::SetScene( CScene &oScene, bool bFrame )
         }
         else
             continue;
-        anLight[ 4 ] = (float)std::min( 1.0, oColor.x );
-        anLight[ 5 ] = (float)std::min( 1.0, oColor.y );
-        anLight[ 6 ] = (float)std::min( 1.0, oColor.z );
+        anLight[ 4 ] = (float)(std::min)( 1.0, oColor.x );
+        anLight[ 5 ] = (float)(std::min)( 1.0, oColor.y );
+        anLight[ 6 ] = (float)(std::min)( 1.0, oColor.z );
         anLight[ 10 ] = 180.0f;
         if ( anLight[ 3 ] == 1.0f && JsonVector( pLight->get( "direction" ), oDirection ) )
         {
             anLight[ 7 ] = (float)oDirection.x;
             anLight[ 8 ] = (float)oDirection.y;
             anLight[ 9 ] = (float)oDirection.z;
-            anLight[ 10 ] = (float)std::min( 90.0, JsonNumber( *pLight, "angle", 30.0 ) );
+            anLight[ 10 ] = (float)(std::min)( 90.0, JsonNumber( *pLight, "angle", 30.0 ) );
             anLight[ 11 ] = 2.0f;
         }
         m_aanLights.push_back( anLight );
@@ -231,7 +231,7 @@ void CSceneCanvas::DrawMeshes( bool bTranslucent )
         if ( bClear != bTranslucent )
             continue;
 
-        float nAlpha = oMesh.bGhost ? std::min( 0.3f, oMesh.anColor[ 3 ] ) : oMesh.anColor[ 3 ];
+        float nAlpha = oMesh.bGhost ? (std::min)( 0.3f, oMesh.anColor[ 3 ] ) : oMesh.anColor[ 3 ];
 
         glColor4f( oMesh.anColor[ 0 ], oMesh.anColor[ 1 ], oMesh.anColor[ 2 ], nAlpha );
         glCallList( m_anLists[ i ] );
@@ -262,14 +262,14 @@ void CSceneCanvas::OnPaint( wxPaintEvent & )
         BuildLists();
 
         // How far the scene reaches sets the near and far planes.
-    double  nSize = std::max( 1.0, ( m_oDrawing.oMaximum - m_oDrawing.oMinimum ).Length() );
+    double  nSize = (std::max)( 1.0, ( m_oDrawing.oMaximum - m_oDrawing.oMinimum ).Length() );
     double  nDistance = ( m_oView.GetEye() - ( m_oDrawing.oMinimum + m_oDrawing.oMaximum ) * 0.5 ).Length();
-    double  nNear = std::max( nSize * 1e-4, ( nDistance - nSize * 4.0 ) * 0.5 );
+    double  nNear = (std::max)( nSize * 1e-4, ( nDistance - nSize * 4.0 ) * 0.5 );
     double  nFar = nDistance + nSize * 8.0;
     double  anMatrix[ 16 ];
 
     if ( nNear > nDistance * 0.1 )
-        nNear = std::max( 1e-3, nDistance * 0.1 );
+        nNear = (std::max)( 1e-3, nDistance * 0.1 );
     glMatrixMode( GL_PROJECTION );
     m_oView.Projection( (double)oSize.x / (double)oSize.y, nNear, nFar, anMatrix );
     glLoadMatrixd( anMatrix );
@@ -425,7 +425,7 @@ void CSceneCanvas::OnMouse( wxMouseEvent &oEvent )
 
     if ( oEvent.GetEventType() == wxEVT_MOUSEWHEEL )
     {
-        int nSteps = oEvent.GetWheelRotation() / std::max( 1, oEvent.GetWheelDelta() );
+        int nSteps = oEvent.GetWheelRotation() / (std::max)( 1, oEvent.GetWheelDelta() );
 
         if ( nSteps != 0 )
         {
@@ -486,7 +486,7 @@ void CSceneCanvas::OnMouse( wxMouseEvent &oEvent )
         if ( oEvent.LeftIsDown() && ! oEvent.ShiftDown() )
             m_oView.Orbit( -oDelta.x * 0.4, oDelta.y * 0.4 );
         else
-            m_oView.Pan( (double)oDelta.x / std::max( 1, oClient.y ), (double)oDelta.y / std::max( 1, oClient.y ) );
+            m_oView.Pan( (double)oDelta.x / (std::max)( 1, oClient.y ), (double)oDelta.y / (std::max)( 1, oClient.y ) );
         m_oLast = oPoint;
         ViewChanged();
     }
