@@ -13,6 +13,12 @@
 
 #include "Globals.h"
 
+#define MAXIMUM_INDIRECT_BOUNCES    8
+#define MAXIMUM_INDIRECT_SAMPLES    256
+#ifndef RAY_FAR_AWAY
+#define RAY_FAR_AWAY    1.0e6
+#endif
+
 namespace IASLib
 {
     class CJsonNode;
@@ -104,7 +110,28 @@ class CSettings
         BOOL            m_bFractalTurbulence;
         FLT             m_nFractalSeed;
 
+            // Light bounced between surfaces ("indirect" in JSON; see
+            // CObjects::IndirectShade): how many bounces (0, the default, for
+            // none), how many rays a matte point gathers with, how far they
+            // look, and a scale on what they bring back.
+        int             m_nIndirectBounces;
+        int             m_nIndirectSamples;
+        FLT             m_nIndirectDistance;
+        FLT             m_nIndirectStrength;
+
     public:
+        int             GetIndirectBounces( void ) const { return m_nIndirectBounces; }
+        int             GetIndirectSamples( void ) const { return m_nIndirectSamples; }
+        FLT             GetIndirectDistance( void ) const { return m_nIndirectDistance; }
+        FLT             GetIndirectStrength( void ) const { return m_nIndirectStrength; }
+        void            SetIndirect( int nBounces, int nSamples, FLT nDistance, FLT nStrength )
+                        {
+                            m_nIndirectBounces = nBounces;
+                            m_nIndirectSamples = nSamples;
+                            m_nIndirectDistance = nDistance;
+                            m_nIndirectStrength = nStrength;
+                        }
+
         void            SetImageWidth( int nWidth ) 
                         { 
                             m_nImageWidth = nWidth; 

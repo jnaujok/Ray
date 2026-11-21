@@ -213,6 +213,32 @@ add_test(NAME render_lights
 set_tests_properties(render_lights PROPERTIES FIXTURES_SETUP render_lights TIMEOUT 300)
 add_test(NAME roundtrip_lights_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/lights_test.ray ${RENDER_DIR})
 
+# Light bounced between surfaces: a box with a red wall and a green one,
+# whose colors bleed onto the white walls, floor, block and ball, and fill
+# light in the shadows and on the ceiling.
+add_test(NAME render_bounce
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/bounce_test.ray
+                 -DOUTPUT=${RENDER_DIR}/bounce_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/bounce_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_bounce PROPERTIES FIXTURES_SETUP render_bounce TIMEOUT 300)
+add_test(NAME roundtrip_bounce_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/bounce_test.ray ${RENDER_DIR})
+
+# Haze: an avenue of columns fading into ground mist under a sky.
+add_test(NAME render_haze
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/haze_test.ray
+                 -DOUTPUT=${RENDER_DIR}/haze_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/haze_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_haze PROPERTIES FIXTURES_SETUP render_haze TIMEOUT 300)
+add_test(NAME roundtrip_haze_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/haze_test.ray ${RENDER_DIR})
+
 # An environment map: an HDR sky behind the scene, in a mirror ball and
 # through a glass one, lighting the diffuse surfaces (image-based lighting).
 add_test(NAME render_environment
@@ -505,6 +531,34 @@ add_test(NAME network_lights
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_lights PROPERTIES FIXTURES_REQUIRED render_lights
                                              RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_bounce
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/bounce_test.ray
+                 -DOUTPUT=${RENDER_DIR}/bounce_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/bounce_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_bounce PROPERTIES FIXTURES_REQUIRED render_bounce
+                                             RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_haze
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/haze_test.ray
+                 -DOUTPUT=${RENDER_DIR}/haze_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/haze_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_haze PROPERTIES FIXTURES_REQUIRED render_haze
+                                           RESOURCE_LOCK ray_network TIMEOUT 300)
 
     # The engines get the sky image inside the scene, so they need no files.
 math(EXPR port "${port} + 1")

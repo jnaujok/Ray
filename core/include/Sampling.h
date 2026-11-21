@@ -29,7 +29,8 @@ namespace RaySampling
         PURPOSE_REFRACT = 0x52465241ULL,        // rough glass's direction
         PURPOSE_LIGHT = 0x4C494748ULL,          // plus the light's index: a point on an area light
         PURPOSE_ENVIRONMENT = 0x454E5649ULL,    // a direction toward the sky, for the environment's light
-        PURPOSE_WAVELENGTH = 0x57415645ULL      // the wavelengths white light splits into (spectral dispersion)
+        PURPOSE_WAVELENGTH = 0x57415645ULL,     // the wavelengths white light splits into (spectral dispersion)
+        PURPOSE_INDIRECT = 0x494E4449ULL        // a direction to gather bounced light from (indirect light)
     };
 
         /// SplitMix64's finalizer.

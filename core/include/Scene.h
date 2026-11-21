@@ -16,6 +16,7 @@
 #include "Camera.h"
 #include "RaySettings.h"
 #include "Environment.h"
+#include "Haze.h"
 #include "ObjectsArray.h"
 #include "LightArray.h"
 
@@ -44,6 +45,8 @@ class CScene
             // What rays that leave the scene see, instead of the background
             // color; NULL for none.
         std::shared_ptr<const CEnvironment> m_pEnvironment;
+            // The atmosphere the scene sits in, or NULL for clear air.
+        std::shared_ptr<const CHaze>        m_pHaze;
         std::string         m_strLoadError;
 
             // A bounding volume hierarchy over the objects, built when a ray
@@ -163,6 +166,12 @@ class CScene
             /// What a ray leaving the scene along oDirection sees: the
             /// environment, or the background color.
         CColor              Escaped( CVector &oDirection );
+            /// The haze, or NULL if the air is clear.
+        const CHaze        *GetHaze( void ) const { return m_pHaze.get(); }
+            /// How much of a light's light reaches oPoint along oToLight (the
+            /// vector from the point to the light, as CLight::ToLight gives
+            /// it) through the haze: 1 in clear air.
+        FLT                 LightThrough( const CVector &oPoint, const CVector &oToLight );
         CSettings          &GetSettings( void) { return m_oSettings; }
 
         CCamera            &GetCamera( void ) { return m_oCamera; }

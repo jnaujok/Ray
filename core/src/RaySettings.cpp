@@ -45,6 +45,10 @@ CSettings::CSettings( int nWidth, int nHeight, int nColorDepth, LPCSTR strOutput
     m_nAdaptiveFocalThreshold = 0.01;
     m_bFractalTurbulence = FALSE;
     m_nFractalSeed = 0.04;
+    m_nIndirectBounces = 0;
+    m_nIndirectSamples = 8;
+    m_nIndirectDistance = 10.0;
+    m_nIndirectStrength = 1.0;
 }
 
 #ifdef RAY_GUI
@@ -90,6 +94,15 @@ void CSettings::ToJson( IASLib::CObjectNode &oNode )
     oNode.put( "colorDepth", (int)m_nColorDepth );
     oNode.put( "maximumDepth", (int)m_nMaximumTraceDepth );
     RayJson::PutNumber( oNode, "depthThreshold", m_nAdaptiveDepthThreshold );
+    if ( m_nIndirectBounces > 0 )
+    {
+        IASLib::CObjectNode *pIndirect = oNode.putObject( "indirect" );
+
+        pIndirect->put( "bounces", m_nIndirectBounces );
+        pIndirect->put( "samples", m_nIndirectSamples );
+        RayJson::PutNumber( *pIndirect, "distance", m_nIndirectDistance );
+        RayJson::PutNumber( *pIndirect, "strength", m_nIndirectStrength );
+    }
 
     IASLib::CObjectNode *pReserved = new IASLib::CObjectNode;
     if ( m_bGammaCorrect != oDefault.m_bGammaCorrect ) RayJson::PutBool( *pReserved, "gammaCorrect", m_bGammaCorrect );
@@ -124,7 +137,8 @@ void CSettings::ToJson( IASLib::CObjectNode &oNode )
 BOOL CSettings::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "imageWidth", "imageHeight", "imageFile", "colorDepth", "maximumDepth",
-                                              "depthThreshold", "reserved1997", NULL };
+                                              "depthThreshold", "indirect", "reserved1997", NULL };
+    static const char *const astrIndirect[] = { "bounces", "samples", "distance", "strength", NULL };
     static const char *const astrReserved[] = { "gammaCorrect", "gammaCorrection", "adaptiveDepth", "antialias", "adaptiveAntialiasing", "antialiasThreshold", "maximumAntialiasDepth", "atmosphericEffects", "distanceAttenuation", "distanceHazeHemidepth", "caustics", "adaptiveCaustics", "maximumCausticDepth", "causticThreshold", "simpleRadiosity", "traceByColor", "focalBlur", "depthOfField", "focalDisplacement", "adaptiveFocalBlur", "adaptiveFocalThreshold", "fractalTurbulence", "fractalSeed", NULL };
     std::string strImageFile = (const char *)m_strImageFile;
 
@@ -137,6 +151,33 @@ BOOL CSettings::FromJson( const IASLib::CJsonNode &oNode )
          ! RayJson::GetNumber( oNode, "depthThreshold", m_nAdaptiveDepthThreshold, FALSE ) )
         return FALSE;
     m_strImageFile = strImageFile.c_str();
+
+    const IASLib::CJsonNode *pIndirect = oNode.get( "indirect" );
+
+    if ( pIndirect )
+    {
+        RayJson::CWhere oWhere( "indirect" );
+
+        if ( ! pIndirect->isObject() )
+            return RayJson::Fail( "must be an object" );
+        if ( ! RayJson::OnlyFields( *pIndirect, astrIndirect ) ||
+             ! RayJson::GetInt( *pIndirect, "bounces", m_nIndirectBounces, 0, MAXIMUM_INDIRECT_BOUNCES, TRUE ) ||
+             ! RayJson::GetInt( *pIndirect, "samples", m_nIndirectSamples, 1, MAXIMUM_INDIRECT_SAMPLES, FALSE ) ||
+             ! RayJson::GetNumber( *pIndirect, "distance", m_nIndirectDistance, FALSE ) ||
+             ! RayJson::GetNumber( *pIndirect, "strength", m_nIndirectStrength, FALSE ) )
+            return FALSE;
+        if ( ! ( m_nIndirectDistance > 0.0 ) || m_nIndirectDistance > RAY_FAR_AWAY )
+            return RayJson::Fail( "distance must be more than 0 and at most 1000000" );
+        if ( ! ( m_nIndirectStrength >= 0.0 ) || m_nIndirectStrength > 100.0 )
+            return RayJson::Fail( "strength must be from 0 to 100" );
+    }
+    else
+    {
+        CSettings oDefault;
+
+        SetIndirect( oDefault.m_nIndirectBounces, oDefault.m_nIndirectSamples, oDefault.m_nIndirectDistance,
+                     oDefault.m_nIndirectStrength );
+    }
 
     const IASLib::CJsonNode *pReserved = oNode.get( "reserved1997" );
 

@@ -10,6 +10,75 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.13] - 2026-11-20
+
+Light between surfaces, and air: matte surfaces gather the light bounced off the surfaces near
+them, so colors bleed and shadows get fill light, and a haze that far things fade into dims light
+on its way to a surface, the same everywhere or lying low as ground mist. Scenes without the new
+fields render byte for byte as before.
+
+### Added
+
+- **Indirect light** (`settings.indirect`: `bounces`, `samples`, `distance`, `strength`; off unless
+  `bounces` is set). At every point a ray hits on a surface with a `diffuse` material, `samples`
+  gathering rays go out over the half the ray came from, spread by the cosine from the ray's sample
+  point (`CRay::SamplePoint`, a new purpose `PURPOSE_INDIRECT`), each reaching `distance` at most
+  through the scene's bounding volume hierarchy. The surface a gathering ray hits sends back only
+  the light it scatters diffusely: its diffuse materials lit by the lights (point and area, with
+  shadows) and the sky, what glows (`ambient`, the new `CMaterial::Glows`), and its own gathered
+  light while bounces are left; no highlights, reflections or refraction (rays carry
+  `CRay::IsGather` and their bounce count). The average, times `strength`, lights the point's
+  diffuse materials like a light along its normal. A ray that hits nothing in reach brings nothing:
+  distant light stays the sky's and ambient's. Each sample gathers with `samples` rays at the first
+  bounce and one at each bounce after, so the cost grows with bounces instead of multiplying; with
+  a stratified sampler the pixel's samples spread the directions evenly. Closed objects (spheres,
+  boxes, capped cylinders and cones) light themselves from inside. Each gathered sample respects
+  the camera's `clamp`.
+  - **Why no cache:** an irradiance cache filled as pixels are traced depends on which pixel asks
+    first, so threads and networked engines (which trace tiles in any order) would disagree.
+    Everything here is worked out from the ray alone, so every task gives exactly the same image,
+    and the network tests hold it to that. The cost is `samples` gathering rays (each with its own
+    shadow rays) at every diffuse hit.
+- **Haze** (the scene's `haze`: `color`, `density`, `heightFalloff`, `baseHeight`). Every ray is
+  blended toward the haze's color by the transmittance `exp( -∫ density )` along it, as far as its
+  hit or 1,000,000 units for a ray that leaves the scene, and light from a light to a surface is
+  dimmed by the same transmittance along its path. With a `heightFalloff` the haze thins with
+  height, like ground mist; its integral has a closed form, so haze is exact and nearly free.
+  Sunlight (a `directional` light) isn't dimmed by haze that is the same everywhere, since its path
+  would never end there.
+- `scenes/bounce_test.ray` (a box room with red and green walls, two bounces) and
+  `scenes/haze_test.ray` (an avenue of columns fading into ground mist), each with render,
+  round-trip and network tests, reference renders, README previews and places in the Expected
+  output table. `format_test` checks that bounces 0 traces exactly what no indirect light does;
+  that a closed room glowing g and scattering a gives exactly g (1 + a + … + aⁿ) for n bounces
+  (every gathering ray sees the same light there, so the answer is exact at any sample count); that
+  nothing comes back from beyond `distance`; that a red wall adds red, and only red, to the floor
+  beside it; that indirect light is the same every time and in every copy of the scene; haze
+  transmittance for constant density and against a fine numerical integral of height-falloff
+  density; that haze dims the light on its way to a surface and the view of it exactly; that
+  sunlight isn't dimmed by constant haze; editing haze as a part of the scene; round-trips; and the
+  errors for bad settings.
+- The scene editor (`ray-editor`) lists the haze in its tree, can add (Edit > Add Haze) and delete
+  it; `indirect` shows with the other settings in the property grid once a scene has it (the JSON
+  tab adds it).
+
+### Changed
+
+- **The torture test** has one bounce of indirect light (`samples` 1, so 25 gathering directions a
+  pixel from its 5×5 sampler, reaching 6 units) and a light haze that thins with height, which
+  fades the far floor and the horizon band into it. Its reference render, README preview and the
+  full-size image are regenerated. A full-size Release render takes 3,060 CPU-seconds against 2,229
+  before (37% more; 248 s wall on a busy 16-core machine), about three and a half minutes on an
+  idle one.
+
+  ![Before and after: the bounce test without and with indirect light, the haze test without and with haze, and the torture test at 0.12.1 and 0.13](docs/images/changelog/bounce-haze.png)
+
+  Top, the bounce test without indirect light and with two bounces: the ceiling and the shadows are
+  no longer black, and the block and ball pick up red and green from the walls. Middle, the haze
+  test in clear air and in ground mist: the far columns fade, their bottoms more than their tops.
+  Bottom, the torture test before and after: the horizon band and the far floor fade into the haze,
+  and the floor and the shadows are a little lighter.
+
 ## [2026-alpha-0.12.1] - 2026-11-20
 
 Smoother spectral dispersion: a pixel's samples now take one each of as many wavelength strata,
@@ -1166,7 +1235,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12.1...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.13...HEAD
+[2026-alpha-0.13]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12.1...2026-alpha-0.13
 [2026-alpha-0.12.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12...2026-alpha-0.12.1
 [2026-alpha-0.12]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11.1...2026-alpha-0.12
 [2026-alpha-0.11.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11...2026-alpha-0.11.1

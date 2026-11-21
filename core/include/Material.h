@@ -47,6 +47,12 @@ class CMaterial
             // shades it: diffuse materials. Light from the sky's other
             // directions reaches shiny ones as their reflections.
         virtual BOOL        LitBySky( void ) { return FALSE; }
+            // Whether the color it gives without any light (GetColor without
+            // a light: ambient) is light the surface sends out to others, so
+            // it counts in the light bounced between surfaces (indirect).
+            // Reflections and refraction don't: light gathered from a surface
+            // is what it scatters diffusely.
+        virtual BOOL        Glows( void ) { return FALSE; }
             // The material as JSON for a scene file: its fields go into oNode,
             // which already holds its "type". FromJson reads them back and
             // returns FALSE, with RayJson::Fail, if one is missing or bad.

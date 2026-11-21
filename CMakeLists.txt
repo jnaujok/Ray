@@ -109,6 +109,7 @@ set(RAY_CORE_SOURCES
     core/src/SpotLight.cpp
     core/src/DirectionalLight.cpp
     core/src/Environment.cpp
+    core/src/Haze.cpp
     core/src/SrgbColorModel.cpp
     core/src/StratifiedSampler.cpp
     core/src/Texture.cpp

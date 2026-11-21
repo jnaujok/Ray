@@ -591,6 +591,27 @@ BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny )
 #endif
         bRetVal = FALSE;
     }
+    if ( m_pHaze )
+    {
+            // What the ray saw, through the haze between: as far as the hit,
+            // or RAY_FAR_AWAY for a ray that left the scene.
+        CVector oOrigin( oRay.GetX(), oRay.GetY(), oRay.GetZ() );
+        CVector oDirection( oRay.GetI(), oRay.GetJ(), oRay.GetK() );
+        FLT     nLength = oDirection.Magnitude();
+        FLT     nDistance = RAY_FAR_AWAY;
+
+        if ( nLength > 0.0 )
+        {
+            oDirection = oDirection * ( 1.0 / nLength );
+            if ( pIntersection )
+            {
+                CVector oPath( oIntersect - oOrigin );
+
+                nDistance = oPath.Magnitude();
+            }
+            oPixel = m_pHaze->Through( oPixel, m_pHaze->Transmittance( oOrigin, oDirection, nDistance ) );
+        }
+    }
     oResult = oPixel;
     return bRetVal;
 }
@@ -601,6 +622,25 @@ CColor CScene::Escaped( CVector &oDirection )
     if ( m_pEnvironment )
         return m_pEnvironment->ColorIn( oDirection );
     return m_oBackgroundColor;
+}
+
+FLT CScene::LightThrough( const CVector &oPoint, const CVector &oToLight )
+{
+    if ( ! m_pHaze )
+        return 1.0;
+
+    CVector oPath( oToLight );
+    FLT     nDistance = oPath.Magnitude();
+
+    if ( ! ( nDistance > 0.0 ) )
+        return 1.0;
+        // A directional light's vector is RAY_FAR_AWAY long: sunlight. In
+        // haze that is the same everywhere its path never ends, so it isn't
+        // dimmed (see Haze.h).
+    if ( nDistance >= RAY_FAR_AWAY * 0.5 && m_pHaze->GetHeightFalloff() <= 0.0 )
+        return 1.0;
+    oPath = oPath * ( 1.0 / nDistance );
+    return m_pHaze->Transmittance( oPoint, oPath, nDistance );
 }
 
 CLight  *CScene::GetLight( int nIndex )
@@ -818,6 +858,8 @@ IASLib::CObjectNode *CScene::ToJsonTree( void )
     RayJson::PutColor( oRoot, "background", m_oBackgroundColor );
     if ( m_pEnvironment )
         m_pEnvironment->ToJson( *oRoot.putObject( "environment" ) );
+    if ( m_pHaze )
+        m_pHaze->ToJson( *oRoot.putObject( "haze" ) );
     m_oCamera.ToJson( *oRoot.putObject( "camera" ) );
 
     IASLib::CArrayNode *apArrays[ 2 ] = { oRoot.putArray( "objects" ), oRoot.putArray( "lights" ) };
@@ -909,7 +951,7 @@ std::string CScene::PartToJson( const std::string &strPart )
     std::string                             strList;
     int                                     nIndex;
 
-    if ( strPart == "settings" || strPart == "camera" || strPart == "environment" )
+    if ( strPart == "settings" || strPart == "camera" || strPart == "environment" || strPart == "haze" )
         pNode = pRoot->get( strPart.c_str() );
     else if ( SplitPart( strPart, strList, nIndex ) && nIndex >= 0 )
     {
@@ -953,7 +995,7 @@ DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, 
 
     RayJson::ClearError();
     m_strLoadError.clear();
-    if ( ! bList && strPart != "settings" && strPart != "camera" && strPart != "environment" )
+    if ( ! bList && strPart != "settings" && strPart != "camera" && strPart != "environment" && strPart != "haze" )
     {
         m_strLoadError = "there is no part of a scene called \"" + strPart + "\"";
         return BAD_FILE;
@@ -970,6 +1012,11 @@ DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, 
         if ( strPart == "environment" )
         {
             m_pEnvironment.reset();
+            return 0;
+        }
+        if ( strPart == "haze" )
+        {
+            m_pHaze.reset();
             return 0;
         }
         if ( bList && nIndex >= 0 )
@@ -1046,6 +1093,17 @@ DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, 
             bRead = TRUE;
         }
     }
+    else if ( strPart == "haze" )
+    {
+        std::shared_ptr<CHaze>  pHaze( new CHaze );
+        RayJson::CWhere         oWhere( "haze" );
+
+        if ( pHaze->FromJson( *pNode ) )
+        {
+            m_pHaze = pHaze;
+            bRead = TRUE;
+        }
+    }
     else
     {
             // Read as the scene reads its lists, from a list of one.
@@ -1115,7 +1173,7 @@ DWORD CScene::FromJson( const std::string &strText )
 
 DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
 {
-    static const char *const astrFields[] = { "format", "version", "settings", "background", "environment", "camera", "objects", "lights", NULL };
+    static const char *const astrFields[] = { "format", "version", "settings", "background", "environment", "haze", "camera", "objects", "lights", NULL };
     const IASLib::CJsonNode            *pRoot = &oRoot;
     std::vector<CObjects *>             apObjects;
     std::vector<CObjects *>             apLights;
@@ -1123,6 +1181,7 @@ DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
     CCamera                             oCamera;
     CColor                              oBackground( 1, 1, 1 );
     std::shared_ptr<CEnvironment>       pEnvironment;
+    std::shared_ptr<CHaze>              pHaze;
     std::string                         strFormat;
     int                                 nVersion = 0;
     BOOL                                bRead = FALSE;
@@ -1173,7 +1232,18 @@ DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
                 bEnvironment = pEnvironment->FromJson( *pEnvironmentNode );
             }
 
-            bRead = bSettings && bCamera && bEnvironment &&
+            const IASLib::CJsonNode *pHazeNode = pRoot->get( "haze" );
+            BOOL                     bHaze = TRUE;
+
+            if ( bSettings && bCamera && bEnvironment && pHazeNode )
+            {
+                RayJson::CWhere oWhere( "haze" );
+
+                pHaze.reset( new CHaze );
+                bHaze = pHaze->FromJson( *pHazeNode );
+            }
+
+            bRead = bSettings && bCamera && bEnvironment && bHaze &&
                     RayJson::GetColor( *pRoot, "background", oBackground, FALSE ) &&
                     ReadObjects( *pRoot, "objects", FALSE, apObjects ) &&
                     ReadObjects( *pRoot, "lights", TRUE, apLights );
@@ -1198,6 +1268,7 @@ DWORD CScene::FromJsonTree( const IASLib::CJsonNode &oRoot )
     m_oCamera = oCamera;
     m_oBackgroundColor = oBackground;
     m_pEnvironment = pEnvironment;
+    m_pHaze = pHaze;
     for ( size_t nIndex = 0; nIndex < apObjects.size(); nIndex++ )
         AddObject( apObjects[ nIndex ] );
     for ( size_t nIndex = 0; nIndex < apLights.size(); nIndex++ )

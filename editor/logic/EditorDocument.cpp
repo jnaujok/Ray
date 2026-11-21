@@ -214,6 +214,8 @@ namespace RayEditor
         aoParts.push_back( { "camera", "Camera", "", {} } );
         if ( m_pScene->GetEnvironment() )
             aoParts.push_back( { "environment", "Environment", "", {} } );
+        if ( m_pScene->GetHaze() )
+            aoParts.push_back( { "haze", "Haze", "", {} } );
         for ( int i = 0; i < m_pScene->GetObjectCount(); i++ )
         {
             SPart oPart;
@@ -275,7 +277,8 @@ namespace RayEditor
 
     bool CEditorDocument::Delete( const std::string &strPart, std::string &strError )
     {
-        if ( strPart.compare( 0, 8, "objects/" ) != 0 && strPart.compare( 0, 7, "lights/" ) != 0 && strPart != "environment" )
+        if ( strPart.compare( 0, 8, "objects/" ) != 0 && strPart.compare( 0, 7, "lights/" ) != 0 && strPart != "environment" &&
+             strPart != "haze" )
         {
             strError = "the settings and the camera can't be deleted";
             return false;

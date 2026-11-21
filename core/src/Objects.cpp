@@ -159,6 +159,11 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
     int         nMaterial;
     CColor      oBlack( 0, 0, 0 );
     CColor      oLight;
+        // A ray gathering bounced light (IndirectShade) wants only the light
+        // the surface scatters diffusely: its diffuse materials lit, and
+        // what glows (ambient); no highlights, reflections or refraction.
+    BOOL        bGather = oRay.IsGather();
+    BOOL        bHaze = ( oScene.GetHaze() != NULL );
 
     oReturn.Set( 0, 0, 0 );
 
@@ -185,7 +190,7 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
             while ( nMaterial < oMaterials.GetSize() )
             {
                 pMaterial = oMaterials[ nMaterial ];
-                if ( oMaterials.GetInfluence( nMaterial ) != 0.0 )
+                if ( oMaterials.GetInfluence( nMaterial ) != 0.0 && ( ! bGather || pMaterial->LitBySky() ) )
                 {
                         // Each material gets its own copies: materials adjust
                         // the normal and light vector (normalizing them, turning
@@ -197,6 +202,8 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
                     CVector oPoint( oIntersect );
 
                     oLight = pLight->GetShade( oToLight );
+                    if ( bHaze )
+                        oLight = oLight * oScene.LightThrough( oIntersect, oToLight );
                     oColor = pMaterial->GetColor( oScene, oRay, oLight, oMaterialToLight, oPoint, oMaterialNormal, this );
                     oReturn = oReturn + ( oColor * oMaterials.GetInfluence( nMaterial ) );
                 }
@@ -212,14 +219,17 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
     if ( pEnvironment && pEnvironment->GetSamples() > 0 )
         EnvironmentShade( oScene, oRay, oIntersect, oNormal, *pEnvironment, oReturn );
 
-        // Do the intersection/shadings that do NOT require light 
+    if ( oRay.GetBounce() < oScene.GetSettings().GetIndirectBounces() )
+        IndirectShade( oScene, oRay, oIntersect, oNormal, oReturn );
+
+        // Do the intersection/shadings that do NOT require light
         // i.e. reflections, transparency, etc.
 
     nMaterial = 0;
     while ( nMaterial < oMaterials.GetSize() )
     {
         pMaterial = oMaterials[ nMaterial ];
-        if ( oMaterials.GetInfluence( nMaterial ) != 0.0 )
+        if ( oMaterials.GetInfluence( nMaterial ) != 0.0 && ( ! bGather || pMaterial->Glows() ) )
         {
                 // The ray's influence on its pixel, scaled by this material's
                 // share: a reflected or refracted ray made from it carries that
@@ -276,9 +286,14 @@ void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, 
 
         CColor  oLight( pLight->GetShade( oToLight ) * nShare );
 
+        if ( oScene.GetHaze() )
+            oLight = oLight * oScene.LightThrough( oIntersect, oToLight );
+
         for ( int nMaterial = 0; nMaterial < oMaterials.GetSize(); nMaterial++ )
         {
             if ( oMaterials.GetInfluence( nMaterial ) == 0.0 )
+                continue;
+            if ( oRay.IsGather() && ! oMaterials[ nMaterial ]->LitBySky() )
                 continue;
 
             CVector oMaterialNormal( oNormal );
@@ -345,6 +360,138 @@ void CObjects::EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect
 
     CColor  oSky( oEnvironment.IrradianceIn( oUp ) );
     CColor  oLight( oSky * ( (FLT)nOpen / (FLT)nSamples ) );
+
+    for ( int nMaterial = 0; nMaterial < oMaterials.GetSize(); nMaterial++ )
+    {
+        if ( oMaterials.GetInfluence( nMaterial ) == 0.0 || ! oMaterials[ nMaterial ]->LitBySky() )
+            continue;
+
+        CVector oMaterialNormal( oNormal );
+        CVector oMaterialToLight( oUp );
+        CVector oMaterialPoint( oIntersect );
+        CColor  oColor = oMaterials[ nMaterial ]->GetColor( oScene, oRay, oLight, oMaterialToLight, oMaterialPoint,
+                                                              oMaterialNormal, this );
+
+        oReturn = oReturn + ( oColor * oMaterials.GetInfluence( nMaterial ) );
+    }
+}
+
+void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CColor &oReturn )
+{
+    CMaterialList  &oMaterials = m_pShadeMaterials ? *m_pShadeMaterials : m_oMaterials;
+    BOOL            bDiffuse = FALSE;
+
+    for ( int nMaterial = 0; nMaterial < oMaterials.GetSize() && ! bDiffuse; nMaterial++ )
+        bDiffuse = ( oMaterials.GetInfluence( nMaterial ) != 0.0 && oMaterials[ nMaterial ]->LitBySky() );
+    if ( ! bDiffuse )
+        return;
+
+        // Light bounced off the surfaces near the point: gathering rays, as
+        // many as "samples" at the first bounce (one at each bounce after
+        // it, so the cost doesn't multiply), spread by the cosine over the
+        // half on the side the ray came from, from the ray's sample point
+        // (CRay::SamplePoint), so a stratified sampler covers the half
+        // evenly over a pixel's rays. Each goes "distance" at most; the
+        // surface it hits sends back the light it scatters diffusely (lit
+        // by the lights and the sky, plus what glows, plus its own bounced
+        // light while bounces are left). Rays that hit nothing in reach
+        // bring nothing: distant light is the sky's and ambient's to give.
+        // Nothing is cached and nothing depends on the order pixels are
+        // traced in, so every task, thread or engine, gives the same result.
+    CSettings  &oSettings = oScene.GetSettings();
+    int         nSamples = ( oRay.GetBounce() == 0 ) ? oSettings.GetIndirectSamples() : 1;
+    FLT         nDistance = oSettings.GetIndirectDistance();
+    const CHaze *pHaze = oScene.GetHaze();
+    FLT         nFirstU;
+    FLT         nFirstV;
+    CVector     oUp( oNormal );
+    CVector     oView( oIntersect.GetX() - oRay.GetX(), oIntersect.GetY() - oRay.GetY(), oIntersect.GetZ() - oRay.GetZ() );
+    CVector     oFirst;
+    CVector     oSecond;
+    CColor      oSum( 0, 0, 0 );
+
+    if ( nSamples < 1 )
+        return;
+    oUp.Normalize();
+    if ( oUp.Dot( oView ) > 0.0 )
+        oUp = oUp * -1.0;
+    RaySampling::Basis( oUp, oFirst, oSecond );
+    oRay.SamplePoint( (uint64_t)RaySampling::PURPOSE_INDIRECT, nFirstU, nFirstV );
+
+    for ( int nSample = 0; nSample < nSamples; nSample++ )
+    {
+        FLT     nU;
+        FLT     nV;
+        FLT     nX;
+        FLT     nY;
+
+        RaySampling::Spread( nFirstU, nFirstV, nSample, nU, nV );
+        RaySampling::ConcentricDisc( nU, nV, nX, nY );
+
+        FLT     nRest = 1.0 - ( nX * nX ) - ( nY * nY );
+        FLT     nAlongUp = ( nRest > 0.0 ) ? SQRT( nRest ) : 0.0;
+        CVector oAcross1( oFirst * nX );
+        CVector oAcross2( oSecond * nY );
+        CVector oAlong( oUp * nAlongUp );
+        CVector oPartway( oAcross1 + oAcross2 );
+        CVector oDirection( oPartway + oAlong );
+        CVector oReach( oDirection * nDistance );
+        CVector oFrom( oIntersect );
+        CVector oHit;
+        CRay    oGather;
+
+            // The ray reaches nDistance at most: CreateRay keeps hits within
+            // the length of its vector.
+        oGather.CreateRay( oReach, oFrom, oRay.GetInfluence(), oRay.GetPixelX(), oRay.GetPixelY() );
+        oGather.InheritSample( oRay, (uint64_t)RaySampling::PURPOSE_INDIRECT + (uint64_t)nSample );
+        oGather.CopySampleIndex( oRay );
+        oGather.SetDepth( oRay.GetDepth() );
+        oGather.SetGather( oRay.GetBounce() + 1 );
+        oGather.Increment();
+        if ( oGather.GetDepth() > oSettings.GetMaximumDepth() )
+            continue;
+
+        CObjects   *pHit = oScene.ClosestHit( oGather, oHit, this );
+
+            // The scene skips the object the ray leaves, but a closed one
+            // (a sphere, a box) can light itself from inside: try it alone,
+            // from just off the surface.
+        if ( pHit != this && IsClosed() )
+        {
+            FLT     nScale = 1.0 + ABS( oFrom.GetX() ) + ABS( oFrom.GetY() ) + ABS( oFrom.GetZ() );
+            CVector oNudge( oUp * ( 1e-7 * nScale ) );
+            CVector oNudged( oFrom + oNudge );
+            CRay    oSelf( oGather );
+            CVector oSelfHit;
+
+            oSelf.CreateRay( oReach, oNudged, oRay.GetInfluence(), oRay.GetPixelX(), oRay.GetPixelY() );
+            if ( Intersect( oSelf, oSelfHit ) )
+            {
+                CVector oToSelf( oSelfHit - oFrom );
+                CVector oToOther( oHit - oFrom );
+
+                if ( pHit == NULL || oToSelf.Magnitude() < oToOther.Magnitude() )
+                {
+                    pHit = this;
+                    oHit = oSelfHit;
+                }
+            }
+        }
+        if ( pHit == NULL )
+            continue;
+
+        CColor  oBounced( pHit->Shade( oScene, oGather, oHit ) );
+
+        if ( pHaze )
+        {
+            CVector oPath( oHit - oFrom );
+
+            oBounced = pHaze->Through( oBounced, pHaze->Transmittance( oFrom, oDirection, oPath.Magnitude() ) );
+        }
+        oSum = oSum + oScene.GetCamera().ClampSample( oBounced );
+    }
+
+    CColor  oLight( oSum * ( oSettings.GetIndirectStrength() / (FLT)nSamples ) );
 
     for ( int nMaterial = 0; nMaterial < oMaterials.GetSize(); nMaterial++ )
     {

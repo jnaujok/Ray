@@ -53,6 +53,7 @@ class CMainFrame : public wxFrame
         void            OnRedo( wxCommandEvent &oEvent );
         void            OnAdd( wxCommandEvent &oEvent );
         void            OnAddEnvironment( wxCommandEvent &oEvent );
+        void            OnAddHaze( wxCommandEvent &oEvent );
         void            OnDuplicate( wxCommandEvent &oEvent );
         void            OnDelete( wxCommandEvent &oEvent );
         void            OnWireframe( wxCommandEvent &oEvent );

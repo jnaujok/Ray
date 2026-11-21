@@ -63,7 +63,16 @@ class CRay
             // lens makes rays in one channel; dispersive glass splits a ray
             // in every channel into three. Rays made from it keep it.
         int             m_nChannel;
+            // How many diffuse bounces of gathered light (CObjects::
+            // IndirectShade) the ray is from the camera, and whether it is
+            // one of those gathering rays: a surface it hits sends back only
+            // the light it scatters diffusely, not its reflections.
+        int             m_nBounce;
+        BOOL            m_bGather;
     public:
+        int             GetBounce( void ) const { return m_nBounce; }
+        BOOL            IsGather( void ) const { return m_bGather; }
+        void            SetGather( int nBounce ) { m_nBounce = nBounce; m_bGather = TRUE; }
                         CRay( void );
                         CRay( const CRay &oSource );
         virtual        ~CRay( void );

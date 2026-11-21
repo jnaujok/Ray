@@ -165,7 +165,10 @@ class CObjects
             // samples), from directions over the half of the sky above it.
         void                EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal,
                                               const CEnvironment &oEnvironment, CColor &oReturn );
-};      
+            // Adds the light bounced off other surfaces nearby (the scene's
+            // "indirect" settings) to the point's diffuse materials.
+        void                IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CColor &oReturn );
+};
 
 
 #ifndef DYNAMIC_OBJECTS

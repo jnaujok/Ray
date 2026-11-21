@@ -17,6 +17,7 @@ class CAmbientMaterial : public CMaterial
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CColor &oLight, CVector &oToLight, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual CColor      GetColor( CScene &oScene, CRay &oViewIncident, CVector &oIntersect, CVector &oNormal, CObjects *pIntersect );
         virtual void        SetColor( CColor &oColor ) { m_oColor = oColor; }
+        virtual BOOL        Glows( void ) { return TRUE; }
 #ifdef RAY_GUI
         virtual void        Properties( void );
         virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
