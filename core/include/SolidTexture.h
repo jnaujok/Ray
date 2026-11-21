@@ -19,7 +19,9 @@
 *   texture has its own default), "scale" (default 1), "origin" (default *
 *   [0, 0, 0]), "turbulence" (how much the noise disturbs the pattern),  *
 *   "octaves" (finer layers of noise, 1 to 12, default 6), "seed"        *
-*   (default 0).                                                         *
+*   (default 0), "stretch" (default [1, 1, 1]: the scale along x, y and *
+*   z on top of "scale", so [40, 1, 1] draws features forty times longer *
+*   along x, as brushed metal has).                                      *
 *                                                                        *
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
@@ -39,6 +41,7 @@ class CSolidTexture : public CTexture
         FLT                     m_nTurbulence;
         int                     m_nOctaves;
         int                     m_nSeed;
+        CVector                 m_oStretch;
             // The seed's shuffle of 0-255, twice over so lookups needn't wrap.
         unsigned char           m_anPermute[ 512 ];
 
@@ -52,6 +55,12 @@ class CSolidTexture : public CTexture
         virtual void            ExtraToJson( IASLib::CObjectNode &oNode ) const { (void)oNode; }
         virtual BOOL            ExtraFromJson( const IASLib::CJsonNode &oNode ) { (void)oNode; return TRUE; }
         virtual const char *const *ExtraFields( void ) const { return NULL; }
+
+            // Worley's cellular noise at a point: one feature point a unit
+            // cell, placed by the seed. nF1 and nF2 are the distances to the
+            // nearest and second nearest; nCell is 0 to 1, the same all over
+            // the nearest point's cell (a chip of color for flecks).
+        void                    Cells( FLT nX, FLT nY, FLT nZ, FLT &nF1, FLT &nF2, FLT &nCell ) const;
 
     public:
             // A texture with these colors (nColors of them, as r, g, b) and

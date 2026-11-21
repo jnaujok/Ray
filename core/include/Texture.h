@@ -13,6 +13,10 @@
 *   To add a texture, derive from this class and add it to the table in  *
 *   Texture.cpp so it can be named in a scene.                           *
 *                                                                        *
+*   Read and Write handle a texture's JSON wherever one goes: a "type"   *
+*   and its settings, or a "preset" from the library (see Presets.h)     *
+*   with fields laid over it, which is saved again the same way.         *
+*                                                                        *
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 #ifndef __TEXTURE_H__
@@ -21,6 +25,9 @@
 #include "Globals.h"
 #include "Color.h"
 #include "Vector.h"
+
+#include <memory>
+#include <string>
 
 namespace IASLib
 {
@@ -41,6 +48,11 @@ struct STexturePoint
 
 class CTexture
 {
+    protected:
+            // The texture's JSON as the scene gave it, if it named a preset:
+            // written back in its place while the texture still matches it.
+        std::shared_ptr<const IASLib::CJsonNode> m_pPreset;
+
     public:
         struct SType
         {
@@ -63,6 +75,17 @@ class CTexture
 
         static CTexture        *Create( const char *strName );
         static const SType     *GetTypes( int &nCount );
+
+            /// A texture from its JSON object (a "type" and its settings, or
+            /// a "preset" and fields laid over it). NULL, with RayJson::Fail,
+            /// if it can't be read.
+        static CTexture        *Read( const IASLib::CJsonNode &oNode );
+            /// Writes the texture into oParent[ strKey ]: the preset and its
+            /// changes if it came from one and still matches, else its type
+            /// and settings.
+        void                    Write( IASLib::CObjectNode &oParent, const char *strKey ) const;
+            /// The preset it came from, or "".
+        std::string             GetPreset( void ) const;
 };
 
 #endif // __TEXTURE_H__

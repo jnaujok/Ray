@@ -239,6 +239,42 @@ add_test(NAME render_haze
 set_tests_properties(render_haze PROPERTIES FIXTURES_SETUP render_haze TIMEOUT 300)
 add_test(NAME roundtrip_haze_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/haze_test.ray ${RENDER_DIR})
 
+# The material presets: thirty spheres, one of each finish in the library.
+add_test(NAME render_materials
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/materials_test.ray
+                 -DOUTPUT=${RENDER_DIR}/materials_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/materials_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_materials PROPERTIES FIXTURES_SETUP render_materials TIMEOUT 300)
+add_test(NAME roundtrip_materials_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/materials_test.ray ${RENDER_DIR})
+
+# Beam profiles on a wall, a slide projected from a spot, an attenuated light.
+add_test(NAME render_projector
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/projector_test.ray
+                 -DOUTPUT=${RENDER_DIR}/projector_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/projector_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_projector PROPERTIES FIXTURES_SETUP render_projector TIMEOUT 300)
+add_test(NAME roundtrip_projector_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/projector_test.ray ${RENDER_DIR})
+
+# Underwater: blue-green haze, sand, and caustics projected from the sun.
+add_test(NAME render_underwater
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/underwater_test.ray
+                 -DOUTPUT=${RENDER_DIR}/underwater_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/underwater_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_underwater PROPERTIES FIXTURES_SETUP render_underwater TIMEOUT 300)
+add_test(NAME roundtrip_underwater_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/underwater_test.ray ${RENDER_DIR})
+
 # An environment map: an HDR sky behind the scene, in a mirror ball and
 # through a glass one, lighting the diffuse surfaces (image-based lighting).
 add_test(NAME render_environment
@@ -558,6 +594,48 @@ add_test(NAME network_haze
                  -DEXACT_WITH=${RENDER_DIR}/haze_test.raw
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(network_haze PROPERTIES FIXTURES_REQUIRED render_haze
+                                           RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_materials
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/materials_test.ray
+                 -DOUTPUT=${RENDER_DIR}/materials_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/materials_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_materials PROPERTIES FIXTURES_REQUIRED render_materials
+                                           RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_projector
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/projector_test.ray
+                 -DOUTPUT=${RENDER_DIR}/projector_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/projector_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_projector PROPERTIES FIXTURES_REQUIRED render_projector
+                                           RESOURCE_LOCK ray_network TIMEOUT 300)
+
+math(EXPR port "${port} + 1")
+add_test(NAME network_underwater
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/underwater_test.ray
+                 -DOUTPUT=${RENDER_DIR}/underwater_test_network.raw
+                 -DMODE=network
+                 -DPORT=${port}
+                 -DEXACT_WITH=${RENDER_DIR}/underwater_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(network_underwater PROPERTIES FIXTURES_REQUIRED render_underwater
                                            RESOURCE_LOCK ray_network TIMEOUT 300)
 
     # The engines get the sky image inside the scene, so they need no files.

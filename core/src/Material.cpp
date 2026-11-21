@@ -156,34 +156,22 @@ CColor CMaterial::ColorAt( const CColor &oColor, CVector &oPoint, CObjects *pObj
 
 void CMaterial::TextureToJson( IASLib::CObjectNode &oNode ) const
 {
-    if ( ! m_pTexture )
-        return;
-
-    IASLib::CObjectNode *pTexture = oNode.putObject( "texture" );
-
-    pTexture->put( "type", m_pTexture->GetName() );
-    m_pTexture->ToJson( *pTexture );
+    if ( m_pTexture )
+        m_pTexture->Write( oNode, "texture" );
 }
 
 BOOL CMaterial::TextureFromJson( const IASLib::CJsonNode &oNode )
 {
     const IASLib::CJsonNode *pTexture = oNode.isObject() ? oNode.get( "texture" ) : NULL;
-    std::string              strType;
 
     if ( pTexture == NULL )
         return TRUE;
 
     RayJson::CWhere oWhere( "texture" );
+    CTexture       *pNew = CTexture::Read( *pTexture );
 
-    if ( ! RayJson::GetString( *pTexture, "type", strType, TRUE ) )
+    if ( pNew == NULL )
         return FALSE;
-
-    std::unique_ptr<CTexture> pNew( CTexture::Create( strType.c_str() ) );
-
-    if ( ! pNew )
-        return RayJson::Fail( "unknown texture type \"" + strType + "\"" );
-    if ( ! pNew->FromJson( *pTexture ) )
-        return FALSE;
-    m_pTexture.reset( pNew.release() );
+    m_pTexture.reset( pNew );
     return TRUE;
 }

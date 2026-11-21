@@ -11,6 +11,11 @@
 *   in every direction it shines, and the camera doesn't see it. Its     *
 *   color is the whole panel's, shared among its samples.                *
 *                                                                        *
+*   With an "angle" (degrees from its facing; default 0, no limit) it    *
+*   shines in a beam, like a softbox with a grid: its edge fades over    *
+*   the last "falloff" degrees, shaped by a "profile" (see Light.h). It  *
+*   also takes an "attenuation" and a "filter", as every light does.     *
+*                                                                        *
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
@@ -25,6 +30,8 @@ class CRectangleLight : public CLight
         CVector         m_oEdge1;
         CVector         m_oEdge2;
         int             m_nSamples;
+        FLT             m_nAngle;           // degrees from its facing to the edge of its beam; 0: all its side
+        FLT             m_nFalloff;         // degrees, inside the edge, over which the beam fades
 
     public:
                         DYNAMIC_OBJECTS( CRectangleLight );
@@ -36,6 +43,13 @@ class CRectangleLight : public CLight
         virtual int     GetSampleCount( void ) { return m_nSamples; }
         virtual BOOL    SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoint );
 
+    protected:
+            // The filter along its facing: a point projected onto its plane;
+            // (u, v) are its place across the rectangle (0 to 1 over it); a
+            // solid texture reads that place in units of "size".
+        virtual void    FilterAt( const CVector &oPoint, const CVector &oToLight, STexturePoint &oAt ) const;
+
+    public:
 #ifdef RAY_GUI
         virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
 #endif

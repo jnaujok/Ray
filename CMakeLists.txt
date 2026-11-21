@@ -56,6 +56,8 @@ set(RAY_CORE_SOURCES
     core/src/BumpMap.cpp
     core/src/BoxSampler.cpp
     core/src/Camera.cpp
+    core/src/CausticsTexture.cpp
+    core/src/CellsTexture.cpp
     core/src/CheckerTexture.cpp
     core/src/CenterSampler.cpp
     core/src/ClipColorModel.cpp
@@ -89,6 +91,7 @@ set(RAY_CORE_SOURCES
     core/src/PixelAccumulator.cpp
     core/src/PixelSampler.cpp
     core/src/PngImage.cpp
+    core/src/Presets.cpp
     core/src/Plane.cpp
     core/src/PtLight.cpp
     core/src/Rays.cpp

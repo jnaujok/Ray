@@ -10,6 +10,95 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.14] - 2026-11-20
+
+Natural materials and shaped light: a library of thirty-one stones, woods, gems and metals that a
+scene pulls in by name and then changes, two new solid textures (cellular flecks and underwater
+caustics), beam profiles that shape a spot light like real fixtures with lenses, distance
+attenuation, and filters a light shines through, projecting slides, gobos and caustics. Scenes
+without the new fields render byte for byte as before.
+
+### Added
+
+- **A library of natural materials (presets).** `{ "preset": "carrara-marble" }` names one of 31
+  presets, wherever a texture goes (a material's, a bump map's, a light's filter) or as an entry of
+  an object's `materials`, where it stands for a whole finish: the preset's solid texture with
+  ambient, diffuse, highlight and reflection set to suit it (polished, glossy, satin, matte, oiled
+  wood or brushed metal). Fields given beside the name are laid over the preset's: as a texture,
+  any texture field (`scale`, `colors`, `seed`, `axis`...); as a finish, `"texture"` over its
+  texture and a material type (`"specular": { "power": 0.3 }`) over that material, added if it has
+  none, or taken out with `null`. A scene saved again keeps the preset's name and only what was
+  given beside it, as long as that still gives exactly what it did; once changed some other way
+  (in an editor) the full texture or materials are saved, so nothing is lost.
+  - Stones: `carrara-marble`, `black-marquina`, `verde-marble`, `rosso-marble`, `travertine`,
+    `granite`, `black-granite`, `slate`, `sandstone`, `basalt`, `sand`, `concrete`, `terrazzo`.
+  - Woods: `oak`, `pine`, `walnut`, `cherry`, `mahogany`, `ebony`, `birch`.
+  - Gems: `jade`, `amber`, `obsidian`, `malachite`, `lapis-lazuli`.
+  - Metals: `brushed-steel`, `brushed-gold`, `brushed-copper`, `rust`.
+  - Other: `terracotta`, and `caustics` (a texture only, for a light's filter).
+  - They follow the classic procedural recipes (Perlin 1985 and 2002; Worley 1996; Ebert et al.,
+    *Texturing and Modeling*), with colors of our own. They live in `core/src/Presets.cpp`, so a
+    scene that names one needs no file, and networked engines have them too.
+  - `ray-editor`'s property grid offers the list for any `preset` field.
+- **`cells` and `caustics` textures.** `cells` is Worley's cellular noise: `"flecks"` (one ramp
+  color a cell, for granite and terrazzo), `"distance"` (spots) or `"edges"` (cracks), with
+  turbulence bending the cells' sides. `caustics` draws the web of bright lines light makes under
+  water (Worley cell edges bent by noise, in `layers` turned against each other, `width` wide),
+  with a ramp that rises above white so the lines add light. Every solid texture also takes a
+  `stretch` (`[40, 1, 1]` draws features forty times longer along x, for brushed metal), written
+  only when it isn't `[1, 1, 1]`.
+- **Beam profiles.** A spot light, and a rectangle light given a new `angle` (a softbox with a
+  grid), take a `profile`: `"smoothstep"` (the default, exactly as before), `"linear"`,
+  `"cosine"` (cos^`exponent`), `"gaussian"` (`spread`), `"fresnel"` (a full center out to
+  `hotspot`, falling to `rim`: a stage Fresnel), or `"table"`, brightnesses from the axis to the
+  edge like a photometric (IES) table. The shape multiplies the fading edge.
+- **Attenuation.** Point, sphere, rectangle and spot lights take `attenuation`: `"none"` (the
+  default, as before), `"inverse"` or `"inverseSquare"`, full strength at `distance`.
+- **Filters a light shines through.** Every light takes a `filter`: `{ "texture": ..., "size": 1 }`,
+  any texture or preset, that colors the light it sends each way. A spot projects it across its
+  cone (a slide projector or a gobo), sunlight straight along its direction (the same all along
+  it), a rectangle light along its facing, and a point or sphere light all around. With haze and
+  the `caustics` preset, sunlight gives the rippling light seen under water.
+- **`CLight::ShadeAt`** applies attenuation and the filter on top of `GetShade`; the tracer's lit
+  shading and area-light shading call it.
+- **New test scenes**, each with render, round-trip and network tests, a reference render, a README
+  preview and a place in the Expected output table:
+  - `materials_test.ray`: thirty spheres, one of each finish in the library.
+  - `projector_test.ray`: six spots on a wall, one of each profile, a slide projected onto the
+    floor, and a warm light that falls off with the square of distance.
+  - `underwater_test.ray`: haze, sand, a few stones and caustics from the sun.
+- **`format_test` checks** that every preset's texture and finish loads; that fields beside a preset
+  replace its own; that presets are saved as written and read back the same, and saved in full once
+  changed; the finish overlays (a type added, changed, or taken out with null) and their errors;
+  that cells and caustics stay in their ramps, are the same every time, and that flecks are one
+  color a cell; the exact value of every beam profile, and that the default is the smoothstep edge
+  it always was; the three attenuations; that a spot projects its filter across its cone and that
+  sunlight's filter is the same all along it; and the errors for bad profiles, tables, rims,
+  attenuations and filters.
+
+  ![Before and after: spot lights with plain edges against six beam profiles, a slide and an attenuated light; the underwater scene without and with caustics; and the torture test at 0.13 and 0.14](docs/images/changelog/presets-lights.png)
+
+  Top, the projector scene with every spot's default edge and no filter or attenuation (so the warm
+  light near the floor lights the whole wall), then as it is: from the left smoothstep, linear, cosine, gaussian, fresnel and a table with rings, the
+  `uv_grid` slide projected onto the floor around the marble ball, and a warm pool from a light
+  that falls off with distance. Middle, the underwater scene without and with the sun's `caustics`
+  filter. Bottom, a full-size crop of the torture test: the mirror frame is now the `walnut` preset
+  and the cone behind the teapot `malachite`, and the spot on the teapot has a `fresnel` beam and
+  throws a dappled `caustics` pattern.
+
+### Changed
+
+- **Torture test:** the mirror frame uses the `walnut` preset (its grain turned along the frame),
+  the hammered cone the `malachite` preset, and the spot light on the teapot a `fresnel` profile
+  and a `caustics` filter. Its reference render, README preview and full-size image are
+  regenerated; a full-size Release render took 4,210 CPU-seconds against 3,751 for 0.13 (12% more;
+  432 s wall on a busy 16-core machine, about four and a half minutes idle).
+- Material, bump-map and light-filter textures are all read and written by `CTexture::Read` and
+  `CTexture::Write`, which handle presets; a texture without one is written exactly as before.
+- A light's filter is looked up along the direction to the light's middle (its position, or along
+  sunlight), not to the point of an area light a sample comes from, so a spot with a radius
+  projects a sharp picture, as a projector's slide does, instead of grain.
+
 ## [2026-alpha-0.13] - 2026-11-20
 
 Light between surfaces, and air: matte surfaces gather the light bounced off the surfaces near
@@ -1252,7 +1341,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.13...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14...HEAD
+[2026-alpha-0.14]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.13...2026-alpha-0.14
 [2026-alpha-0.13]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12.1...2026-alpha-0.13
 [2026-alpha-0.12.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12...2026-alpha-0.12.1
 [2026-alpha-0.12]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.11.1...2026-alpha-0.12

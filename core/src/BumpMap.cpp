@@ -216,10 +216,7 @@ void CBumpMap::ToJson( IASLib::CObjectNode &oNode ) const
     oNode.put( "mode", ( m_eMode == MODE_NORMAL ) ? "normal" : "height" );
     if ( m_pTexture )
     {
-        IASLib::CObjectNode *pTexture = oNode.putObject( "texture" );
-
-        pTexture->put( "type", m_pTexture->GetName() );
-        m_pTexture->ToJson( *pTexture );
+        m_pTexture->Write( oNode, "texture" );
     }
     if ( m_eMode == MODE_NORMAL )
         RayJson::PutNumber( oNode, "strength", m_nStrength );
@@ -289,17 +286,10 @@ BOOL CBumpMap::FromJson( const IASLib::CJsonNode &oNode )
         return RayJson::Fail( "needs a \"texture\"" );
 
     RayJson::CWhere oWhere( "texture" );
-    std::string     strType;
+    CTexture       *pNew = CTexture::Read( *pTexture );
 
-    if ( ! RayJson::GetString( *pTexture, "type", strType, TRUE ) )
+    if ( pNew == NULL )
         return FALSE;
-
-    std::unique_ptr<CTexture> pNew( CTexture::Create( strType.c_str() ) );
-
-    if ( ! pNew )
-        return RayJson::Fail( "unknown texture type \"" + strType + "\"" );
-    if ( ! pNew->FromJson( *pTexture ) )
-        return FALSE;
-    m_pTexture.reset( pNew.release() );
+    m_pTexture.reset( pNew );
     return TRUE;
 }

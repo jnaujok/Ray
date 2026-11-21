@@ -86,6 +86,13 @@ The ray tracing itself is the 1997 code.
   (sunlight), the same everywhere; and area lights that cast soft shadows: a glowing ball
   (`sphereLight`), a glowing panel (`rectangleLight`), a spot light with a radius, and a sun with
   an angular size, whose shadows blur the farther they fall, each shaded from points spread over it.
+  A spot light's beam (and a rectangle light's, given an angle) can take a profile like a real
+  fixture's: linear, cosine, gaussian, a stage Fresnel's hot center, or a table of measured
+  brightnesses. Lights can fall off with distance (`attenuation`), and any light can shine through
+  a `filter`, an image or pattern it projects like a slide projector or a gobo: with haze and the
+  `caustics` pattern from the sun, a scene looks under water.
+
+  <img src="docs/images/tests/projector_test.png" alt="Six spot lights on a wall, each with a different beam profile, a colored slide projected onto the floor, and a warm pool of light" width="320"> <img src="docs/images/tests/underwater_test.png" alt="An underwater scene: blue-green haze, sand rippled with bright caustics, a boulder, a jade ball, a terracotta block and a column" width="320">
 
   <img src="docs/images/tests/lights_test.png" alt="A warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with soft shadows on a cone, and a low sun casting long soft shadows" width="320">
 - **Environment maps:** rays that leave the scene see a sky gradient or an HDR (or PNG) picture of
@@ -135,6 +142,17 @@ The ray tracing itself is the 1997 code.
   <img src="docs/images/textures.png" alt="A checkered floor, an image texture on a wall and a sphere, and a solid checker sphere" width="320"> <img src="docs/images/teapot_textured.png" alt="The Utah teapot with an image texture, spherically UV-mapped" width="320">
 
   <img src="docs/images/solid_textures.png" alt="A white marble sphere, a green marble cube, a wooden log and floor before a granite wall, three green glass slabs that darken with thickness, and an amber glass ball" width="640">
+
+  Solid textures also include cellular noise (`cells`: granite flecks, spots, cracks) and the web of
+  light under water (`caustics`), and any of them can be stretched along an axis (brushed metal).
+- **Natural materials by name:** a library of 31 presets (marbles, granites, slate, sandstone and
+  other stones; oak, pine, walnut, cherry, mahogany, ebony and birch; jade, amber, obsidian,
+  malachite and lapis lazuli; brushed steel, gold and copper, and rust) that a scene names as a
+  texture (`{ "preset": "oak", "scale": 0.03 }`) or as a whole finish in an object's materials
+  (`{ "preset": "carrara-marble", "specular": { "power": 0.3 } }`), changing any field. Saved
+  scenes keep the name and the changes.
+
+  <img src="docs/images/tests/materials_test.png" alt="Thirty spheres, one of each material preset: marbles, granites, stones, woods, gems and brushed metals" width="320">
 - **Model files and printed plastic:** a mesh can load an STL or OBJ `file` and place it with a
   `scale` (or `fitSize`), `rotation`, `align` and `translation`; the file goes into the saved scene
   and, inside the scene, to networked engines. Colored STL files (the VisCAM/SolidView and
@@ -341,11 +359,12 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 **Render the torture test**, every kind of object (the teapot too, in marble, and a layer-lined
 3DBenchy, a colored-STL puzzle cube and an OBJ ring), mirrors, glass
 (the cube absorbing by thickness, the ball frosted, a flint prism fanning colors into a spectrum), a die with drilled
-pips (constructive solid geometry), textures (a wooden mirror frame), a brushed
-gold tube, soft shadows from a sphere light, a rectangle light, a spot light and a low sun, and an
+pips (constructive solid geometry), textures and presets (a walnut mirror frame, a malachite cone), a brushed
+gold tube, soft shadows from a sphere light, a rectangle light, a spot light with a Fresnel beam
+that projects dappled caustics onto the teapot, and a low sun, and an
 HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
 light haze, through the double Gauss lens at 25 rays a pixel, each traced at four wavelengths
-(spectral dispersion) and clamped at 1.5, at its full 1024×768 (about four minutes on an idle
+(spectral dispersion) and clamped at 1.5, at its full 1024×768 (about four and a half minutes on an idle
 16-core machine, with a Release build):
 
 ```sh
@@ -436,7 +455,7 @@ The tests render every sample scene and compare it with a reference render (four
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -494,7 +513,8 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td><td align="center"><img src="docs/images/tests/bump_test.png" alt="render_bump" width="260"><br><code>render_bump</code></td><td align="center"><img src="docs/images/tests/lights_test.png" alt="render_lights" width="260"><br><code>render_lights</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment" width="260"><br><code>render_environment</code></td><td align="center"><img src="docs/images/tests/csg_test.png" alt="render_csg" width="260"><br><code>render_csg</code></td><td align="center"><img src="docs/images/tests/prism_test.png" alt="render_prism" width="260"><br><code>render_prism</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/models_test.png" alt="render_models" width="260"><br><code>render_models</code></td><td align="center"><img src="docs/images/tests/benchy_test.png" alt="render_benchy" width="260"><br><code>render_benchy</code></td><td align="center"><img src="docs/images/tests/bounce_test.png" alt="render_bounce (160x120)" width="160"><br><code>render_bounce (160x120)</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/haze_test.png" alt="render_haze (160x120)" width="160"><br><code>render_haze (160x120)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/haze_test.png" alt="render_haze (160x120)" width="160"><br><code>render_haze (160x120)</code></td><td align="center"><img src="docs/images/tests/materials_test.png" alt="render_materials" width="260"><br><code>render_materials</code></td><td align="center"><img src="docs/images/tests/projector_test.png" alt="render_projector" width="260"><br><code>render_projector</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/underwater_test.png" alt="render_underwater" width="260"><br><code>render_underwater</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -583,9 +603,11 @@ and boxes, solid marble, wood and stone textures, glass that absorbs by thicknes
 and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG textures, spot and
 directional lights, environment maps with image-based lighting, constructive solid geometry,
 dispersive glass with spectral dispersion, STL and OBJ model files with printed layer lines and
-lean, shared meshes, light bounced between surfaces, haze, and JSON scenes so far, and a cross-platform scene editor with a shaded
-OpenGL view and progressive rendering. Both editors reach every feature through JSON editing; next
-up is light bouncing between surfaces and atmospheric haze.
+lean, shared meshes, light bounced between surfaces, haze, a library of natural material presets,
+beam profiles, attenuation and projected light filters, and JSON scenes so far, and a
+cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both editors
+reach every feature through JSON editing; next up is using any texture wherever a color or number
+goes (transparency, roughness, lights driven by a 3D texture) and 3D textures inside glass.
 
 ## Changelog
 

@@ -142,6 +142,11 @@ ctest --test-dir build --output-on-failure
   objects made of parts override `Occludes` to stop at the first part a shadow ray hits. The tree
   must find exactly what testing every object in order does (`ClosestHitByEachObject`), ties
   included; `format_test` checks it.
+- **New material presets** go in the table in `core/src/Presets.cpp`: a texture as JSON and,
+  unless it is a texture only, a finish (a JSON array of materials whose textures name the preset).
+  Read and write textures with `CTexture::Read` and `CTexture::Write`, never `CTexture::Create`
+  and `ToJson` by hand, so presets work wherever a texture goes. List every preset in
+  `scenes/README.md`.
 - **New object, light, or material classes** register a JSON `type` name in
   `DYNAMIC_IMPLEMENTS( CClass, "name" )` or `IMPLEMENT_MATERIAL( CClass, Name, "name" )`, and the
   macros make them implement `ToJson` and `FromJson`.

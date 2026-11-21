@@ -97,17 +97,40 @@ void CDirectionalLight::ToJson( IASLib::CObjectNode &oNode )
         RayJson::PutNumber( oNode, "angle", m_nAngle );
         oNode.put( "samples", m_nSamples );
     }
+    OptionsToJson( oNode, FALSE );
+}
+
+void CDirectionalLight::FilterAt( const CVector &oPoint, const CVector &oToLight, STexturePoint &oAt ) const
+{
+    CVector oDirection( m_oDirection );
+    CVector oFirst;
+    CVector oSecond;
+    CVector oAt3( oPoint );
+
+    (void)oToLight;
+    oDirection.Normalize();
+    RaySampling::Basis( oDirection, oFirst, oSecond );
+
+    FLT     nAlong = oDirection.Dot( oAt3 );
+    CVector oAlong( oDirection * nAlong );
+    CVector oAcross( oAt3 - oAlong );
+
+    oAt.oPoint = oAcross * ( 1.0 / m_nFilterSize );
+    oAt.nU = ( oFirst.Dot( oAt3 ) / m_nFilterSize ) + 0.5;
+    oAt.nV = ( oSecond.Dot( oAt3 ) / m_nFilterSize ) + 0.5;
+    oAt.bHasUV = TRUE;
 }
 
 BOOL CDirectionalLight::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "direction", "color", "angle", "samples", NULL };
 
-    if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+    if ( ! OnlyLightFields( oNode, astrFields, FALSE, FALSE ) ||
          ! RayJson::GetVector( oNode, "direction", m_oDirection, TRUE ) ||
          ! RayJson::GetColor( oNode, "color", m_oColor, TRUE ) ||
          ! RayJson::GetNumber( oNode, "angle", m_nAngle, FALSE ) ||
-         ! RayJson::GetInt( oNode, "samples", m_nSamples, 1, MAXIMUM_LIGHT_SAMPLES, FALSE ) )
+         ! RayJson::GetInt( oNode, "samples", m_nSamples, 1, MAXIMUM_LIGHT_SAMPLES, FALSE ) ||
+         ! OptionsFromJson( oNode, FALSE, FALSE ) )
         return FALSE;
     if ( m_oDirection.Magnitude() == 0.0 )
         return RayJson::Fail( "direction must not be [0, 0, 0]" );
