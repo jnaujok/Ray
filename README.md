@@ -95,6 +95,18 @@ The ray tracing itself is the 1997 code.
   makes an HDR sky for the tests.
 
   <img src="docs/images/tests/environment_test.png" alt="An HDR sky with clouds behind a mirror ball, a glass ball, a white ball and a red ball on a checkered floor, lit by the sky" width="320">
+- **Indirect light:** light bounced between surfaces (`settings.indirect`), a "poor man's
+  radiosity", so a red wall tints the white floor beside it pink and shadows and ceilings get fill
+  light. Each matte point treats the objects near it (found through the scene's tree) as lights
+  and aims a few rays at each, or gathers over the whole half above it (`"hemisphere"`). The rays
+  come from each sample's point in its pixel, so a stratified sampler smooths it, and every thread
+  and engine gives the same image; there is no cache.
+
+  <img src="docs/images/tests/bounce_test.png" alt="A white box room with a red left wall and a green right wall, a white block and ball, the walls' colors bleeding onto them" width="320">
+- **Haze:** an atmosphere (`haze`) that far things fade into and that dims light on its way to a
+  surface, the same everywhere or thinning with height into ground mist.
+
+  <img src="docs/images/tests/haze_test.png" alt="An avenue of colored columns and balls fading into ground mist under a blue sky" width="320">
 - **Materials:** ambient, diffuse, specular, reflective, and transparent, mixed per object by
   influence. Transparent materials can absorb light by how far it travels inside (Beer–Lambert),
   so thick glass is deeper in color than thin, and a glass ball darker through its middle than at
@@ -331,15 +343,16 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 (the cube absorbing by thickness, the ball frosted, a flint prism fanning colors into a spectrum), a die with drilled
 pips (constructive solid geometry), textures (a wooden mirror frame), a brushed
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light and a low sun, and an
-HDR sky in the mirrors and glass that lights the scene too, through the double Gauss lens at 25
-rays a pixel, each traced at four wavelengths (spectral dispersion) and clamped at 1.5, at its full
-1024×768 (about two and a half minutes on an idle 16-core machine, with a Release build):
+HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
+light haze, through the double Gauss lens at 25 rays a pixel, each traced at four wavelengths
+(spectral dispersion) and clamped at 1.5, at its full 1024×768 (about four minutes on an idle
+16-core machine, with a Release build):
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
-<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, textured shapes and a wood-framed mirror wall under an HDR sky, through a real lens" width="720">
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, textured shapes and a wood-framed mirror wall under an HDR sky in a light haze, through a real lens" width="720">
 
 **Bring in a model**: name an STL or OBJ file in a mesh, and place it (here a printable model,
 which stands on z, turned to stand on y, 2 units across, on the floor):
@@ -423,7 +436,7 @@ The tests render every sample scene and compare it with a reference render (four
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -480,7 +493,8 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td><td align="center"><img src="docs/images/tests/solid_textures_test.png" alt="render_solid_textures" width="260"><br><code>render_solid_textures</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td><td align="center"><img src="docs/images/tests/bump_test.png" alt="render_bump" width="260"><br><code>render_bump</code></td><td align="center"><img src="docs/images/tests/lights_test.png" alt="render_lights" width="260"><br><code>render_lights</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment" width="260"><br><code>render_environment</code></td><td align="center"><img src="docs/images/tests/csg_test.png" alt="render_csg" width="260"><br><code>render_csg</code></td><td align="center"><img src="docs/images/tests/prism_test.png" alt="render_prism" width="260"><br><code>render_prism</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/models_test.png" alt="render_models" width="260"><br><code>render_models</code></td><td align="center"><img src="docs/images/tests/benchy_test.png" alt="render_benchy" width="260"><br><code>render_benchy</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/models_test.png" alt="render_models" width="260"><br><code>render_models</code></td><td align="center"><img src="docs/images/tests/benchy_test.png" alt="render_benchy" width="260"><br><code>render_benchy</code></td><td align="center"><img src="docs/images/tests/bounce_test.png" alt="render_bounce (160x120)" width="160"><br><code>render_bounce (160x120)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/haze_test.png" alt="render_haze (160x120)" width="160"><br><code>render_haze (160x120)</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -569,7 +583,7 @@ and boxes, solid marble, wood and stone textures, glass that absorbs by thicknes
 and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG textures, spot and
 directional lights, environment maps with image-based lighting, constructive solid geometry,
 dispersive glass with spectral dispersion, STL and OBJ model files with printed layer lines and
-lean, shared meshes, and JSON scenes so far, and a cross-platform scene editor with a shaded
+lean, shared meshes, light bounced between surfaces, haze, and JSON scenes so far, and a cross-platform scene editor with a shaded
 OpenGL view and progressive rendering. Both editors reach every feature through JSON editing; next
 up is light bouncing between surfaces and atmospheric haze.
 

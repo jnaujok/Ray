@@ -31,6 +31,7 @@ namespace
     {
         ID_IMPORT = wxID_HIGHEST + 1,
         ID_ADD_ENVIRONMENT,
+        ID_ADD_HAZE,
         ID_DUPLICATE,
         ID_WIREFRAME,
         ID_SCENE_CAMERA,
@@ -111,6 +112,7 @@ CMainFrame::CMainFrame( void )
     pEdit->AppendSubMenu( pAddObject, "Add &Object" );
     pEdit->AppendSubMenu( pAddLight, "Add &Light" );
     pEdit->Append( ID_ADD_ENVIRONMENT, "Add &Environment (Sky)" );
+    pEdit->Append( ID_ADD_HAZE, "Add &Haze" );
     pEdit->AppendSeparator();
     pEdit->Append( ID_DUPLICATE, "D&uplicate\tCtrl+D" );
     pEdit->Append( wxID_DELETE, "&Delete\tDel" );
@@ -170,6 +172,7 @@ CMainFrame::CMainFrame( void )
     Bind( wxEVT_MENU, &CMainFrame::OnRedo, this, wxID_REDO );
     Bind( wxEVT_MENU, &CMainFrame::OnAdd, this, ID_ADD_FIRST, nId - 1 );
     Bind( wxEVT_MENU, &CMainFrame::OnAddEnvironment, this, ID_ADD_ENVIRONMENT );
+    Bind( wxEVT_MENU, &CMainFrame::OnAddHaze, this, ID_ADD_HAZE );
     Bind( wxEVT_MENU, &CMainFrame::OnDuplicate, this, ID_DUPLICATE );
     Bind( wxEVT_MENU, &CMainFrame::OnDelete, this, wxID_DELETE );
     Bind( wxEVT_MENU, &CMainFrame::OnWireframe, this, ID_WIREFRAME );
@@ -189,6 +192,7 @@ CMainFrame::CMainFrame( void )
     Bind( wxEVT_UPDATE_UI, &CMainFrame::OnUpdateUI, this, ID_STOP_RENDER );
     Bind( wxEVT_UPDATE_UI, &CMainFrame::OnUpdateUI, this, ID_SAVE_RENDER );
     Bind( wxEVT_UPDATE_UI, &CMainFrame::OnUpdateUI, this, ID_ADD_ENVIRONMENT );
+    Bind( wxEVT_UPDATE_UI, &CMainFrame::OnUpdateUI, this, ID_ADD_HAZE );
     m_pTree->Bind( wxEVT_TREE_SEL_CHANGED, &CMainFrame::OnTreeSelection, this );
 
     Rebuild( true );
@@ -484,6 +488,19 @@ void CMainFrame::OnAddEnvironment( wxCommandEvent & )
     SelectPart( "environment" );
 }
 
+void CMainFrame::OnAddHaze( wxCommandEvent & )
+{
+    std::string strError;
+
+    if ( ! m_oDocument.SetPart( "haze", "{ \"color\": [0.7, 0.75, 0.8], \"density\": 0.02 }", strError ) )
+    {
+        ReportError( "Can't add haze", strError );
+        return;
+    }
+    Rebuild( false );
+    SelectPart( "haze" );
+}
+
 void CMainFrame::OnDuplicate( wxCommandEvent & )
 {
     std::string strNew, strError;
@@ -605,10 +622,11 @@ void CMainFrame::OnUpdateUI( wxUpdateUIEvent &oEvent )
         case wxID_UNDO:             oEvent.Enable( m_oDocument.CanUndo() ); break;
         case wxID_REDO:             oEvent.Enable( m_oDocument.CanRedo() ); break;
         case ID_DUPLICATE:          oEvent.Enable( IndexIn( strPart, "objects" ) >= 0 || IndexIn( strPart, "lights" ) >= 0 ); break;
-        case wxID_DELETE:           oEvent.Enable( IndexIn( strPart, "objects" ) >= 0 || IndexIn( strPart, "lights" ) >= 0 || strPart == "environment" ); break;
+        case wxID_DELETE:           oEvent.Enable( IndexIn( strPart, "objects" ) >= 0 || IndexIn( strPart, "lights" ) >= 0 || strPart == "environment" || strPart == "haze" ); break;
         case ID_STOP_RENDER:        oEvent.Enable( m_pCanvas->IsRendering() || m_pCanvas->HasRender() ); break;
         case ID_SAVE_RENDER:        oEvent.Enable( m_pCanvas->HasRender() && ! m_pCanvas->IsRendering() ); break;
         case ID_ADD_ENVIRONMENT:    oEvent.Enable( m_oDocument.Scene().GetEnvironment() == NULL ); break;
+        case ID_ADD_HAZE:           oEvent.Enable( m_oDocument.Scene().GetHaze() == NULL ); break;
         default:                    break;
     }
 }

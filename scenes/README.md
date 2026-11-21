@@ -22,11 +22,13 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5 |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped, lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
 | `environment_test.ray` | | An environment map: the HDR sky `textures/sky.hdr` behind the scene, in a mirror ball and through a glass one, lighting a white ball, a small red one and a checkered floor (`samples` 8, so the floor darkens under the balls), with a sun whose direction matches the sky's, with a 4×4 stratified sampler |
+| `bounce_test.ray` | | Indirect light: a box room with a red wall on the left and a green one on the right, a white block and a white ball, lit only by a small rectangle light under the ceiling. One bounce of light gathered from the nearby objects (`"objects"`, 2 rays an object) bleeds red and green onto the white surfaces and fills the shadows and the ceiling, with a 3×3 stratified sampler at 160×120 |
+| `haze_test.ray` | | Haze: an avenue of colored columns and balls receding along a checkered floor under a sky, fading into ground mist that thins with height (`density` 0.16, `heightFalloff` 0.7), lit by two point lights (one far down the avenue) and a sun, with a 2×2 stratified sampler at 160×120 |
 | `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
 | `csg_test.ray` | | Constructive solid geometry: a glass lens blank (two balls' intersection), a bowl (a ball with a smaller one and a turned box taken out, blue outside, white inside and clay at the cut rim, by `childMaterials`), a die (a rounded cube, itself the intersection of a cube and a ball, with six pips drilled in and painted black) and a hammered gold capsule (a cylinder and two balls, with a bump map), with a 3×3 stratified sampler |
 | `models_test.ray` | | Model files: a puzzle cube from a VisCAM-colored STL, a gem from a Magics-colored STL (four faces with their own colors, four with the model's), both shown by the `faceColors` texture, and a ring from an OBJ file of quads with texture coordinates and normals, wearing an image texture, each placed by `fitSize` or `scale`, `rotation`, `align` and `translation`, with a 2×2 stratified sampler |
@@ -65,6 +67,7 @@ places.
 | `settings` | | Render settings, below |
 | `background` | `[1, 1, 1]` | The color of rays that hit nothing, unless there is an `environment` |
 | `environment` | none | What rays that leave the scene see instead: a sky gradient or an HDR image of the surroundings, which can also light the scene. Below |
+| `haze` | none | An atmosphere: haze, fog or ground mist that what is far away fades into, and that dims light on its way to a surface. Below |
 | `camera` | required | Below |
 | `objects` | `[]` | Spheres, planes, cylinders, cones, boxes, triangles, and meshes, below |
 | `lights` | `[]` | Lights, below |
@@ -78,7 +81,65 @@ places.
 | `colorDepth` | `8` | Bits per channel (kept from 1997; images are always 8-bit) |
 | `maximumDepth` | `16` | How many levels deep a ray may be traced: the ray from the camera is level 1, and each reflection or refraction one more, so 16 allows 15 bounces |
 | `depthThreshold` | `0.01` | A ray whose influence on its pixel falls below this is not traced further. A reflected or refracted ray carries its parent's influence times its material's share, so rays off a weakly reflective surface stop after a few bounces; between strong mirrors `maximumDepth` stops them |
+| `indirect` | none (off) | Light bounced between surfaces, below |
 | `reserved1997` | | Settings the 1997 code defined but never implemented (anti-aliasing, caustics, focal blur, haze, and so on), kept so nothing is lost. Only the ones that differ from their defaults are written. The tracer ignores them. |
+
+**`settings.indirect`**: light bounced between surfaces, a "poor man's radiosity": colors bleed
+from one surface onto another, and shadows and corners get fill light instead of going black. It
+works at every point a ray hits on a surface with a `diffuse` material. The light gathered there,
+times `strength`, lights the point's diffuse materials as a light straight along the normal.
+Whatever a gathering ray meets sends back only the light it scatters diffusely: its diffuse
+materials lit by the lights (with shadows) and the sky, what glows (`ambient`), and, while
+`bounces` are left, its own gathered light; reflections, highlights and refraction don't count. All
+of it is worked out from the ray alone (its sample point in its pixel), with no cache, so a
+stratified sampler smooths it and every thread and networked engine gives exactly the same image.
+Gathered light respects the camera's `clamp`. Two methods:
+
+- **`"objects"`** (the default): each object near the point is treated as a light. The scene's
+  tree finds the objects whose bounds come within `distance`; of those, the `objects` that fill the
+  most of the point's view (an object's share of it is the solid angle of its bounding sphere; a
+  plane's is the disc of it within `distance`) each get `samples` rays aimed evenly over the cone
+  of directions it fills. A ray counts only if that object is the first thing it meets, so no
+  direction counts twice, and it counts by the cosine at the point and the solid angle it stands
+  for, so the answer is right whatever the number of rays. An object the point is inside the bounds
+  of (the room it stands in, a mesh it is part of) is gathered from over the whole half above the
+  point instead, and a closed object (a sphere, a box) lights itself when seen from inside. Cost:
+  at most `objects` × `samples` gathering rays at each diffuse hit, each shading what it meets with
+  direct light (more with `bounces` above 1), so it stays predictable however big the scene.
+- **`"hemisphere"`**: `samples` rays spread by the cosine over the whole half above the point, each
+  reaching `distance`. Nothing nearby is missed, but most rays in an open scene hit nothing. Cost:
+  `samples` gathering rays at each diffuse hit. A ray that hits nothing in reach brings nothing:
+  distant light is the sky's and ambient's to give.
+
+With either, each sample gathers with `samples` rays (per object) at the first bounce and one at
+every bounce after it, so the cost grows with `bounces` instead of multiplying; a scene with a 5×5
+sampler and `samples` 1 still gathers 25 directions a pixel. One bounce is usually enough.
+
+| Field | Default | |
+|-------|---------|-|
+| `method` | `"objects"` | `"objects"` or `"hemisphere"`, above |
+| `bounces` | required | How many times light may bounce, 0 (off) to 8 |
+| `samples` | `4` | Gathering rays at the first bounce (for `"objects"`, per object), 1 to 256 |
+| `objects` | `8` | For `"objects"`: the most objects one point gathers from, 1 to 64 |
+| `distance` | `10` | How near an object must be (`"objects"`), or how far a ray reaches (`"hemisphere"`), in scene units (more than 0, at most 1,000,000) |
+| `strength` | `1` | A scale on the gathered light, 0 to 100 |
+
+**`haze`**
+
+A ray is blended toward the haze's `color` by how much light gets through the haze along it, the
+transmittance `exp( -∫ density )`: as far as what it hits, or 1,000,000 units for a ray that leaves
+the scene, so the sky is hazed too. Light from a light to a surface is dimmed by the same
+transmittance along its path. Sunlight (a `directional` light) comes from outside the scene, so
+in haze that is the same everywhere it isn't dimmed (its path would never end); with a
+`heightFalloff` it is dimmed over its whole path up and out of the haze. The integral has a closed
+form, so haze costs almost nothing.
+
+| Field | Default | |
+|-------|---------|-|
+| `color` | `[0.7, 0.75, 0.8]` | What the haze looks like, and what far away things fade into |
+| `density` | required | How thick it is, per scene unit, at `baseHeight` (0 to 1,000,000) |
+| `heightFalloff` | `0` | With 0 the haze is the same everywhere. Above 0 it thins by e for every 1 / `heightFalloff` units above `baseHeight` (and thickens below it), like mist lying on the ground. Up is +y |
+| `baseHeight` | `0` | The height where the haze is `density` thick |
 
 **`camera`**
 
@@ -434,7 +495,7 @@ same image, and networked engines give exactly the same as threads.
   fields that older readers would refuse but that change nothing when left out, such as an
   object's `bump` (2026-alpha-0.8), and the `environment` and the `spot` and `directional` lights
   (2026-alpha-0.9), and `csg` objects, a transparent material's `abbe` and the camera's `clamp`
-  (2026-alpha-0.10), and the camera's `dispersion` (2026-alpha-0.11.1).
+  (2026-alpha-0.10), and the camera's `dispersion` (2026-alpha-0.11.1), and the settings' `indirect` and the scene's `haze` (2026-alpha-0.13).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

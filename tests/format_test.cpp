@@ -2868,6 +2868,323 @@ static void ClampChecks( void )
 }
 
 // --------------------------------------------------------------------------
+// Indirect light (light bounced between surfaces) and haze
+// --------------------------------------------------------------------------
+
+    // A closed sphere of radius 5 round the origin whose inside glows
+    // dGlow and scatters dAlbedo of what reaches it, with no lights, and the
+    // given "indirect" settings (or none).
+static std::string GlowingRoom( double dGlow, double dAlbedo, const char *strIndirect )
+{
+    char achText[ 1024 ];
+
+    snprintf( achText, sizeof( achText ),
+              "{ \"format\": \"Ray scene\", \"version\": 3, \"background\": [0, 0, 0],\n"
+              "  \"settings\": { \"maximumDepth\": 16, \"depthThreshold\": 0.0001 %s },\n"
+              "  \"camera\": { \"position\": [0, 0, -1], \"lookAt\": [0, 0, 0] },\n"
+              "  \"objects\": [ { \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 5,\n"
+              "                   \"materials\": [ { \"type\": \"ambient\", \"influence\": 1, \"color\": [%g, %g, %g] },\n"
+              "                                  { \"type\": \"diffuse\", \"influence\": 1, \"color\": [%g, %g, %g] } ] } ],\n"
+              "  \"lights\": [] }\n",
+              strIndirect, dGlow, dGlow, dGlow, dAlbedo, dAlbedo, dAlbedo );
+    return achText;
+}
+
+    // A white floor with a red wall beside the point (1, 0, 0) and a light
+    // over it, with the given "indirect" settings (or none).
+static std::string RedWallFloor( const char *strIndirect )
+{
+    std::string strText =
+        "{ \"format\": \"Ray scene\", \"version\": 3, \"background\": [0, 0, 0],\n"
+        "  \"settings\": { \"maximumDepth\": 16, \"depthThreshold\": 0.0001 ";
+
+    strText += strIndirect;
+    strText +=
+        " },\n"
+        "  \"camera\": { \"position\": [0, 1, -10], \"lookAt\": [0, 0, 0] },\n"
+        "  \"objects\": [ { \"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 1, 0],\n"
+        "                   \"materials\": [ { \"type\": \"diffuse\", \"influence\": 1, \"color\": [1, 1, 1] } ] },\n"
+        "                 { \"type\": \"box\", \"center\": [1.6, 1.5, 0], \"size\": [0.2, 3, 6],\n"
+        "                   \"materials\": [ { \"type\": \"diffuse\", \"influence\": 1, \"color\": [1, 0, 0] } ] } ],\n"
+        "  \"lights\": [ { \"type\": \"point\", \"position\": [-3, 6, 0], \"color\": [1, 1, 1] } ] }\n";
+    return strText;
+}
+
+static void IndirectChecks( void )
+{
+    CScene oPlain;
+    CScene oOff;
+
+        // Off (the default, or bounces 0), nothing changes and nothing is saved.
+    Check( oPlain.FromJson( RedWallFloor( "" ) ) == 0 &&
+           oOff.FromJson( RedWallFloor( ", \"indirect\": { \"bounces\": 0, \"samples\": 4 }" ) ) == 0,
+           "scenes without indirect light load" );
+    Check( oPlain.GetSettings().GetIndirectBounces() == 0 && oPlain.ToJson().find( "indirect" ) == std::string::npos,
+           "indirect light is off by default, and isn't saved" );
+
+    CColor oPlainColor = TraceFrom( oPlain, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+    CColor oOffColor = TraceFrom( oOff, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+
+    Check( memcmp( &oPlainColor, &oOffColor, sizeof( CColor ) ) == 0, "bounces 0 traces exactly what no indirect light does" );
+
+        // In a closed room that glows g and scatters a, every gathering ray
+        // sees the same light, so the answer is exact whatever the samples:
+        // g ( 1 + a + ... + a^bounces ).
+    const double adAlbedo[] = { 0.5, 0.8 };
+    const char  *astrMethod[] = { "objects", "hemisphere" };
+
+    for ( int nCase = 0; nCase < 4; nCase++ )
+    {
+        int         nAlbedo = nCase % 2;
+        const char *strMethod = astrMethod[ nCase / 2 ];
+
+        for ( int nBounces = 1; nBounces <= 4; nBounces++ )
+        {
+            CScene  oRoom;
+            char    achIndirect[ 128 ];
+            double  dExpected = 0.0;
+            double  dTerm = 0.1;
+
+            snprintf( achIndirect, sizeof( achIndirect ), ", \"indirect\": { \"method\": \"%s\", \"bounces\": %d, \"samples\": 3, \"distance\": 20 }",
+                      strMethod, nBounces );
+            for ( int nTerm = 0; nTerm <= nBounces; nTerm++ )
+            {
+                dExpected += dTerm;
+                dTerm *= adAlbedo[ nAlbedo ];
+            }
+            Check( oRoom.FromJson( GlowingRoom( 0.1, adAlbedo[ nAlbedo ], achIndirect ) ) == 0, "the glowing room loads" );
+
+            CColor oSeen = TraceFrom( oRoom, CVector( 0.3, -0.2, 0.1 ), CVector( 0.2, 0.1, 1.0 ) );
+
+            if ( ABS( oSeen.GetR() - dExpected ) > 1e-9 || ABS( oSeen.GetB() - dExpected ) > 1e-9 )
+            {
+                fprintf( stderr, "FAILED: glowing room, %s, albedo %g, %d bounces: %.12f, expected %.12f\n", strMethod,
+                         adAlbedo[ nAlbedo ], nBounces, (double)oSeen.GetR(), dExpected );
+                g_nFailures++;
+            }
+        }
+    }
+
+        // Gathering over the half above, a shorter reach than the room brings
+        // nothing back; aimed at objects, one farther than the distance is
+        // left out.
+    CScene oShort;
+    CScene oFar;
+
+    Check( oShort.FromJson( GlowingRoom( 0.1, 0.5, ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 2, \"distance\": 0.5 }" ) ) == 0 &&
+           ABS( TraceFrom( oShort, CVector( 0, 0, 0 ), CVector( 0, 0, 1 ) ).GetR() - 0.1 ) < 1e-12,
+           "gathering rays bring back nothing from beyond their distance" );
+    Check( oFar.FromJson( RedWallFloor( ", \"indirect\": { \"bounces\": 1, \"distance\": 0.5 }" ) ) == 0,
+           "a scene with a short reach loads" );
+
+    CColor oFarColor = TraceFrom( oFar, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+
+    Check( memcmp( &oFarColor, &oPlainColor, sizeof( CColor ) ) == 0, "an object farther than the distance sends no light" );
+
+        // Beside a red wall, the floor picks up red; and the same ray always
+        // gives the same color.
+    CScene oBounce;
+    CScene oAgain;
+    CScene oHemisphere;
+    const char *strBounce = ", \"indirect\": { \"bounces\": 1, \"samples\": 16, \"distance\": 10 }";
+
+    Check( oBounce.FromJson( RedWallFloor( strBounce ) ) == 0 && oAgain.FromJson( RedWallFloor( strBounce ) ) == 0 &&
+           oHemisphere.FromJson( RedWallFloor( ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 1, \"samples\": 64, \"distance\": 10 }" ) ) == 0,
+           "a scene with indirect light loads" );
+
+    CColor oBounceColor = TraceFrom( oBounce, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+    CColor oAgainColor = TraceFrom( oAgain, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+    CColor oRepeat = TraceFrom( oBounce, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+    CColor oHemisphereColor = TraceFrom( oHemisphere, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+
+    Check( oBounceColor.GetR() > oPlainColor.GetR() + 0.01 && ABS( oBounceColor.GetG() - oPlainColor.GetG() ) < 1e-12,
+           "light bounced off a red wall adds red to the floor beside it, and only red" );
+    Check( oHemisphereColor.GetR() > oPlainColor.GetR() + 0.01 && ABS( oHemisphereColor.GetG() - oPlainColor.GetG() ) < 1e-12,
+           "gathered over the half above, too" );
+    Check( memcmp( &oBounceColor, &oAgainColor, sizeof( CColor ) ) == 0 && memcmp( &oBounceColor, &oRepeat, sizeof( CColor ) ) == 0,
+           "indirect light is the same every time, in every copy of the scene" );
+
+        // Both ways estimate the same light: averaged over many rays and
+        // points, the red each adds beside the wall agrees.
+    {
+        double adRed[ 2 ] = { 0.0, 0.0 };
+        int    nPoints = 0;
+
+        for ( int nMethod = 0; nMethod < 2; nMethod++ )
+        {
+            CScene oMany;
+
+            Check( oMany.FromJson( RedWallFloor( nMethod ? ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 1, \"samples\": 256, \"distance\": 20 }"
+                                                         : ", \"indirect\": { \"bounces\": 1, \"samples\": 256, \"distance\": 20 }" ) ) == 0,
+                   "the comparison scenes load" );
+            nPoints = 0;
+            for ( double dX = 0.2; dX < 1.4; dX += 0.3 )
+            {
+                for ( double dZ = -1.0; dZ <= 1.0; dZ += 0.5 )
+                {
+                    adRed[ nMethod ] += TraceFrom( oMany, CVector( dX, 0.5, dZ ), CVector( 0.0, -1.0, 0.0 ) ).GetR() -
+                                        TraceFrom( oPlain, CVector( dX, 0.5, dZ ), CVector( 0.0, -1.0, 0.0 ) ).GetR();
+                    nPoints++;
+                }
+            }
+        }
+        if ( ! ( ABS( adRed[ 0 ] - adRed[ 1 ] ) < 0.05 * adRed[ 1 ] ) )
+        {
+            fprintf( stderr, "FAILED: aimed at objects (%.5f) and over the half above (%.5f) gather different light\n",
+                     adRed[ 0 ] / nPoints, adRed[ 1 ] / nPoints );
+            g_nFailures++;
+        }
+    }
+
+        // The cap on how many objects one point gathers from.
+    CScene oCapped;
+
+    Check( oCapped.FromJson( RedWallFloor( ", \"indirect\": { \"bounces\": 1, \"objects\": 1 }" ) ) == 0 &&
+           oCapped.GetSettings().GetIndirectObjects() == 1, "the objects cap is read" );
+
+        // Saved and read back.
+    std::string strSaved = oBounce.ToJson();
+    CScene      oRead;
+
+    Check( strSaved.find( "\"indirect\"" ) != std::string::npos && oRead.FromJson( strSaved ) == 0 && oRead.ToJson() == strSaved &&
+           oRead.GetSettings().GetIndirectSamples() == 16 && oRead.GetSettings().GetIndirectDistance() == 10.0,
+           "indirect settings are saved and read back" );
+
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 9 } }," ),
+                 BAD_FILE, "settings.indirect: bounces must be a whole number from 0 to 8" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"samples\": 0 } }," ),
+                 BAD_FILE, "settings.indirect: samples must be a whole number from 1 to 256" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"distance\": 0 } }," ),
+                 BAD_FILE, "distance must be more than 0" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"strength\": -1 } }," ),
+                 BAD_FILE, "strength must be from 0 to 100" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"samples\": 2 } }," ),
+                 BAD_FILE, "bounces" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"rays\": 2 } }," ),
+                 BAD_FILE, "rays" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"method\": \"cache\" } }," ),
+                 BAD_FILE, "unknown method \"cache\" (objects or hemisphere)" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"method\": \"hemisphere\", \"objects\": 2 } }," ),
+                 BAD_FILE, "objects is only for the objects method" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"objects\": 0 } }," ),
+                 BAD_FILE, "objects must be a whole number from 1 to 64" );
+}
+
+static void HazeChecks( void )
+{
+    CHaze oHaze;
+
+    Check( oHaze.Transmittance( CVector( 0, 1, 0 ), CVector( 1, 0, 0 ), 10.0 ) == 1.0, "haze of density 0 lets everything through" );
+
+        // Constant density: T = exp( -d L ).
+    CScene oScene;
+
+    Check( oScene.FromJson( Minimal( "\"lights\"", "\"haze\": { \"color\": [0.5, 0.6, 0.7], \"density\": 0.2 }, \"lights\"" ) ) == 0 &&
+           oScene.GetHaze() != NULL, "a scene with haze loads" );
+
+    const CHaze *pHaze = oScene.GetHaze();
+
+    if ( pHaze )
+    {
+        Check( ABS( pHaze->Transmittance( CVector( 3, -2, 1 ), CVector( 0.6, 0.0, 0.8 ), 7.5 ) - exp( -0.2 * 7.5 ) ) < 1e-14,
+               "constant haze lets exp( -density length ) through" );
+
+        CColor oThrough = pHaze->Through( CColor( 1.0, 0.0, 0.0 ), 0.25 );
+
+        Check( ABS( oThrough.GetR() - ( 0.25 + 0.75 * 0.5 ) ) < 1e-14 && ABS( oThrough.GetB() - 0.75 * 0.7 ) < 1e-14,
+               "a color seen through haze blends toward the haze's color" );
+        Check( pHaze->Transmittance( CVector( 0, 0, 0 ), CVector( 0, 0, 1 ), RAY_FAR_AWAY ) == 0.0,
+               "a ray leaving the scene through constant haze sees only haze" );
+    }
+
+        // Thinning with height: the closed form matches a fine numerical sum.
+    CScene oMist;
+
+    Check( oMist.FromJson( Minimal( "\"lights\"", "\"haze\": { \"density\": 0.5, \"heightFalloff\": 0.7, \"baseHeight\": 1 }, \"lights\"" ) ) == 0,
+           "a scene with ground mist loads" );
+
+    const CHaze *pMist = oMist.GetHaze();
+
+    if ( pMist )
+    {
+        const double adDirection[][ 3 ] = { { 0.0, 0.6, 0.8 }, { 0.0, -0.28, 0.96 }, { 1.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 } };
+        bool         bExact = true;
+
+        for ( int nDirection = 0; nDirection < 4; nDirection++ )
+        {
+            CVector oFrom( 0.5, 2.0, -1.0 );
+            CVector oAlong( adDirection[ nDirection ][ 0 ], adDirection[ nDirection ][ 1 ], adDirection[ nDirection ][ 2 ] );
+            double  dLength = 6.0;
+            double  dSum = 0.0;
+            int     nSteps = 200000;
+
+            for ( int nStep = 0; nStep < nSteps; nStep++ )
+            {
+                double dT = ( nStep + 0.5 ) * dLength / nSteps;
+                double dY = 2.0 + dT * adDirection[ nDirection ][ 1 ];
+
+                dSum += 0.5 * exp( -0.7 * ( dY - 1.0 ) ) * ( dLength / nSteps );
+            }
+            if ( ABS( pMist->OpticalDepth( oFrom, oAlong, dLength ) - dSum ) > 1e-8 ||
+                 ABS( pMist->Transmittance( oFrom, oAlong, dLength ) - exp( -dSum ) ) > 1e-8 )
+                bExact = false;
+        }
+        Check( bExact, "haze thinning with height lets exactly exp( -integral of the density ) through" );
+
+        CVector oLow( 0, 0, 0 );
+        CVector oHigh( 0, 6, 0 );
+        CVector oFlat( 1, 0, 0 );
+
+        Check( pMist->Transmittance( oLow, oFlat, 5.0 ) < pMist->Transmittance( oHigh, oFlat, 5.0 ),
+               "mist is thicker near the ground than above it" );
+        Check( pMist->Transmittance( oHigh, CVector( 0, 1, 0 ), RAY_FAR_AWAY ) > 0.0 &&
+               pMist->Transmittance( oLow, CVector( 0, -1, 0 ), RAY_FAR_AWAY ) == 0.0,
+               "a ray up out of the mist gets through; one down into it doesn't" );
+    }
+
+        // The floor under a light, without and with haze: the camera ray's
+        // color and the light's both pass through it.
+    CScene      oClear;
+    CScene      oHazy;
+    std::string strLight = "{ \"type\": \"point\", \"position\": [0, 4, 0], \"color\": [1, 1, 1] }";
+    std::string strFloor = FloorUnder( strLight.c_str() );
+    std::string strHazy = strFloor;
+
+    strHazy.replace( strHazy.find( "\"camera\"" ), 0, "\"haze\": { \"color\": [0, 0, 0], \"density\": 0.1 },\n  " );
+    Check( oClear.FromJson( strFloor ) == 0 && oHazy.FromJson( strHazy ) == 0, "the floor scenes load" );
+
+    double dClear = TraceFrom( oClear, CVector( 0, 0.5, 0 ), CVector( 0, -1, 0 ) ).GetR();
+    double dHazy = TraceFrom( oHazy, CVector( 0, 0.5, 0 ), CVector( 0, -1, 0 ) ).GetR();
+
+        // Black haze: the light comes 4 units down to the floor (exp( -0.4 ))
+        // and is seen from 0.5 units above it (exp( -0.05 )).
+    Check( ABS( dHazy - dClear * exp( -0.4 ) * exp( -0.05 ) ) < 1e-12, "haze dims the light on its way to a surface, and the view of it" );
+
+    CScene      oSun;
+    std::string strSun = FloorUnder( "{ \"type\": \"directional\", \"direction\": [0, -1, 0], \"color\": [1, 1, 1] }" );
+
+    strSun.replace( strSun.find( "\"camera\"" ), 0, "\"haze\": { \"color\": [0, 0, 0], \"density\": 0.1 },\n  " );
+    Check( oSun.FromJson( strSun ) == 0 &&
+           ABS( TraceFrom( oSun, CVector( 0, 0.5, 0 ), CVector( 0, -1, 0 ) ).GetR() - exp( -0.05 ) ) < 1e-12,
+           "sunlight isn't dimmed by haze that is the same everywhere" );
+
+        // Saved, read back, edited as a part, and its errors.
+    std::string strSaved = oMist.ToJson();
+    CScene      oRead;
+
+    Check( strSaved.find( "\"heightFalloff\": 0.7" ) != std::string::npos && oRead.FromJson( strSaved ) == 0 && oRead.ToJson() == strSaved,
+           "haze is saved and read back" );
+    Check( ! oRead.PartToJson( "haze" ).empty() && oRead.EditPart( "haze", "", "." ) == 0 && oRead.GetHaze() == NULL &&
+           oRead.EditPart( "haze", "{ \"density\": 0.3 }", "." ) == 0 && oRead.GetHaze() && oRead.GetHaze()->GetDensity() == 0.3,
+           "haze can be edited, removed and added as a part of the scene" );
+    Check( oClear.GetHaze() == NULL && oClear.ToJson().find( "haze" ) == std::string::npos, "a scene without haze saves none" );
+    ExpectError( Minimal( "\"lights\"", "\"haze\": { \"color\": [1, 1, 1] }, \"lights\"" ), BAD_FILE, "haze: needs \"density\"" );
+    ExpectError( Minimal( "\"lights\"", "\"haze\": { \"density\": -1 }, \"lights\"" ), BAD_FILE, "density must be from 0" );
+    ExpectError( Minimal( "\"lights\"", "\"haze\": { \"density\": 1, \"heightFalloff\": -1 }, \"lights\"" ), BAD_FILE, "heightFalloff must be" );
+    ExpectError( Minimal( "\"lights\"", "\"haze\": { \"density\": 1, \"fog\": 2 }, \"lights\"" ), BAD_FILE, "fog" );
+}
+
+// --------------------------------------------------------------------------
 // Model files (STL, OBJ), their placement, and the layers and faceColors
 // textures
 // --------------------------------------------------------------------------
@@ -3337,6 +3654,8 @@ int main( int argc, char **argv )
         SpectralChecks();
         LeanMeshChecks();
         ClampChecks();
+        IndirectChecks();
+        HazeChecks();
         ModelChecks();
         SceneEditChecks();
     }
