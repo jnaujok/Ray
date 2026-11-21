@@ -10,6 +10,13 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.19] - 2026-11-21
+
+Solids from mathematics: implicit surfaces given by a formula in a small built-in language with
+exact gradients, metaballs found exactly as polynomials along each ray, and fractals (a mandelbulb,
+the Menger sponge and the Sierpinski tetrahedron) found by sphere tracing a distance estimate.
+Scenes without the new objects render byte for byte as before.
+
 ### Added
 
 - **Implicit surfaces (`implicit`).** A surface given by a formula in x, y and z: where it is zero,
@@ -73,7 +80,9 @@ Every change that alters rendered output shows its before and after images here.
 
   ![Before and after: the torture test at 0.18 and 0.19](docs/images/changelog/torture-blob.png)
 
-  The metaballs stand to the right of the mirror sphere, against the mirror wall.
+  The metaballs stand to the right of the mirror sphere, in front of the frosted mirror wall (the
+  crop below is the full-size image, enlarged). The full-size adaptive render took 66,659 CPU-seconds,
+  2% more than 0.18's 65,259 (94 minutes on this machine while it ran tests too).
 
 ## [2026-alpha-0.18] - 2026-11-21
 
@@ -1857,7 +1866,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.19...HEAD
+[2026-alpha-0.19]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...2026-alpha-0.19
 [2026-alpha-0.18]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.17...2026-alpha-0.18
 [2026-alpha-0.17]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.16...2026-alpha-0.17
 [2026-alpha-0.16]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.15...2026-alpha-0.16
