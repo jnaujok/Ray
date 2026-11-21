@@ -94,14 +94,14 @@ The ray tracing itself is the 1997 code.
 
   <img src="docs/images/tests/projector_test.png" alt="Six spot lights on a wall, each with a different beam profile, a colored slide projected onto the floor, and a warm pool of light" width="320"> <img src="docs/images/tests/underwater_test.png" alt="An underwater scene: blue-green haze, sand rippled with bright caustics, a boulder, a jade ball, a terracotta block and a column" width="320">
 
-  <img src="docs/images/tests/lights_test.png" alt="A warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with soft shadows on a cone, and a low sun casting long soft shadows" width="320">
+  <img src="docs/images/lights.png" alt="A warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with soft shadows on a cone, and a low sun casting long soft shadows" width="320">
 - **Environment maps:** rays that leave the scene see a sky gradient or an HDR (or PNG) picture of
   the surroundings instead of a flat background, behind the scene, in mirrors and through glass,
   and it can light diffuse surfaces too (image-based lighting), smooth from a map of the sky's
   light worked out once, darker wherever shadow rays find the sky hidden. `tools/make_textures.py`
   makes an HDR sky for the tests.
 
-  <img src="docs/images/tests/environment_test.png" alt="An HDR sky with clouds behind a mirror ball, a glass ball, a white ball and a red ball on a checkered floor, lit by the sky" width="320">
+  <img src="docs/images/environment.png" alt="An HDR sky with clouds behind a mirror ball, a glass ball, a white ball and a red ball on a checkered floor, lit by the sky" width="320">
 - **Indirect light:** light bounced between surfaces (`settings.indirect`), a "poor man's
   radiosity", so a red wall tints the white floor beside it pink and shadows and ceilings get fill
   light. Each matte point treats the objects near it (found through the scene's tree) as lights
@@ -130,7 +130,7 @@ The ray tracing itself is the 1997 code.
 
   <img src="docs/images/tests/prism_test.png" alt="A flint glass prism and ball before white bars on a black wall, fanning them out into a spectrum" width="320">
 
-  <img src="docs/images/tests/soft_test.png" alt="Clear, lightly frosted and heavily frosted glass panes before a striped poster, a mirror ball and a brushed gold ball, and soft shadows from a rectangle light and a sphere light" width="320">
+  <img src="docs/images/soft.png" alt="Clear, lightly frosted and heavily frosted glass panes before a striped poster, a mirror ball and a brushed gold ball, and soft shadows from a rectangle light and a sphere light" width="320">
 - **Textures:** any material's color can come from a texture instead: a checkerboard, on the
   surface or solid (carved from a checkered block), an image file (PNG of any kind, PPM, or Ray
   raw) laid over the surface, or a solid noise texture: marble, wood, or plain noise and turbulence (granite, stone,
@@ -444,12 +444,20 @@ light to edit it as JSON or delete it.
 ## Testing
 
 ```sh
-ctest --test-dir build --output-on-failure
+cmake --preset release && cmake --build --preset release
+ctest --preset fast        # every test but the three slow renders: about 35 s on 16 cores
+ctest --preset full        # every test: about 45 s
 ```
 
-The torture test, the Benchy close-up and the prism (and their network twins) are labelled `slow`;
-`ctest --test-dir build -LE slow` runs everything else in a minute or two. CI runs everything, on
-every system.
+The presets (`CMakePresets.json`) build optimized, as CI does, and run 8 tests at a time; `ctest
+--test-dir build -j 8 [-LE slow]` does the same without them. The torture test, the Benchy close-up
+and the prism are labelled `slow`. `cmake --preset asan` and `ctest --preset asan-fast` run the fast
+tests under AddressSanitizer and UndefinedBehaviorSanitizer (about 4 minutes). A Debug build runs
+the suite about three times slower; use it for the debugger. CI runs every test on every system, and
+every test under the sanitizers.
+
+`tools/bounce_sweep.py` measures indirect light's noise and render time against its number of rays
+(see the 2026-alpha-0.14.1 changelog); it is a measurement, not a test.
 
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
@@ -495,8 +503,10 @@ on every platform, and again on Linux under AddressSanitizer and UndefinedBehavi
 These are the reference renders the tests compare against, from
 [`tests/reference/renders.tar.gz`](tests/reference/renders.tar.gz), each labelled with its test.
 They are shown at up to 320 pixels wide; `tools/render_previews.py` makes these previews from the
-archive, so run it whenever the references are regenerated. The networked tests (`network_*`) must
-produce exactly the same images as the threaded ones, so they have no images of their own.
+archive, so run it whenever the references are regenerated. The networked tests (`network_*`)
+render their scenes small with engines and with threads and must get exactly the same bytes, so they
+have no images of their own. `render_bounce_hemisphere` is `render_bounce`'s room gathered with the
+`"hemisphere"` method at the same 54 rays a point, for contrast.
 
 **Sample scenes**, with each scene's own sampler and color model (one ray a pixel, `clip`).
 `huh` and `ser_test2` have nothing in view. `triangle2`'s corners are given tilted normals that fake
@@ -510,11 +520,11 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/test.png" alt="render_test" width="260"><br><code>render_test</code></td><td align="center"><img src="docs/images/tests/triangle.png" alt="render_triangle" width="260"><br><code>render_triangle</code></td><td align="center"><img src="docs/images/tests/triangle2.png" alt="render_triangle2" width="160"><br><code>render_triangle2</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/xxx.png" alt="render_xxx" width="260"><br><code>render_xxx</code></td><td align="center"><img src="docs/images/tests/teapot.png" alt="render_teapot (160x120)" width="160"><br><code>render_teapot (160x120)</code></td><td align="center"><img src="docs/images/tests/lens_test.png" alt="render_lens (160x120)" width="160"><br><code>render_lens (160x120)</code></td><td align="center"><img src="docs/images/tests/chromatic_test.png" alt="render_chromatic (160x120)" width="160"><br><code>render_chromatic (160x120)</code></td><td align="center"><img src="docs/images/tests/texture_test.png" alt="render_texture" width="260"><br><code>render_texture</code></td><td align="center"><img src="docs/images/tests/teapot_textured.png" alt="render_teapot_textured (120x90)" width="120"><br><code>render_teapot_textured (120x90)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/primitives_test.png" alt="render_primitives" width="260"><br><code>render_primitives</code></td><td align="center"><img src="docs/images/tests/torture_test.png" alt="render_torture (160x120)" width="160"><br><code>render_torture (160x120)</code></td><td align="center"><img src="docs/images/tests/solid_textures_test.png" alt="render_solid_textures" width="260"><br><code>render_solid_textures</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft" width="260"><br><code>render_soft</code></td><td align="center"><img src="docs/images/tests/bump_test.png" alt="render_bump" width="260"><br><code>render_bump</code></td><td align="center"><img src="docs/images/tests/lights_test.png" alt="render_lights" width="260"><br><code>render_lights</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment" width="260"><br><code>render_environment</code></td><td align="center"><img src="docs/images/tests/csg_test.png" alt="render_csg" width="260"><br><code>render_csg</code></td><td align="center"><img src="docs/images/tests/prism_test.png" alt="render_prism" width="260"><br><code>render_prism</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/soft_test.png" alt="render_soft (160x120)" width="160"><br><code>render_soft (160x120)</code></td><td align="center"><img src="docs/images/tests/bump_test.png" alt="render_bump" width="260"><br><code>render_bump</code></td><td align="center"><img src="docs/images/tests/lights_test.png" alt="render_lights (160x120)" width="160"><br><code>render_lights (160x120)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment (160x120)" width="160"><br><code>render_environment (160x120)</code></td><td align="center"><img src="docs/images/tests/csg_test.png" alt="render_csg" width="260"><br><code>render_csg</code></td><td align="center"><img src="docs/images/tests/prism_test.png" alt="render_prism" width="260"><br><code>render_prism</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/models_test.png" alt="render_models" width="260"><br><code>render_models</code></td><td align="center"><img src="docs/images/tests/benchy_test.png" alt="render_benchy" width="260"><br><code>render_benchy</code></td><td align="center"><img src="docs/images/tests/bounce_test.png" alt="render_bounce (160x120)" width="160"><br><code>render_bounce (160x120)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/haze_test.png" alt="render_haze (160x120)" width="160"><br><code>render_haze (160x120)</code></td><td align="center"><img src="docs/images/tests/materials_test.png" alt="render_materials" width="260"><br><code>render_materials</code></td><td align="center"><img src="docs/images/tests/projector_test.png" alt="render_projector" width="260"><br><code>render_projector</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/underwater_test.png" alt="render_underwater" width="260"><br><code>render_underwater</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/underwater_test.png" alt="render_underwater" width="260"><br><code>render_underwater</code></td><td align="center"><img src="docs/images/tests/bounce_hemisphere_test.png" alt="render_bounce_hemisphere (160x120)" width="160"><br><code>render_bounce_hemisphere (160x120)</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,

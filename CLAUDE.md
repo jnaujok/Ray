@@ -45,9 +45,10 @@ fixed-function calls only, so it runs on Windows' `opengl32`, macOS's legacy pro
 ## Building and testing
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+cmake --preset release          # or: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build --preset release
+ctest --preset fast             # every test but the slow ones, 8 at a time
+ctest --preset full             # every test
 ```
 
 - IASLib is fetched by CMake (`FetchContent`, pinned to commit `de038c0`, the one that added
@@ -61,8 +62,21 @@ ctest --test-dir build --output-on-failure
   New editor source files go in `cmake/RayEditor.cmake` (GUI) or `editor/CMakeLists.txt` (logic).
 - Time renders with a Release build (`-DCMAKE_BUILD_TYPE=Release`); a Debug build is several
   times slower and misleads.
-- Run the tests under AddressSanitizer before changing anything in `core/`
-  (`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"`); CI does.
+- **Testing workflow.** Test optimized builds, as CI does: the Release preset for the tests and
+  the `asan` preset (RelWithDebInfo with AddressSanitizer and UndefinedBehaviorSanitizer) for the
+  sanitizers. A Debug or unoptimized sanitizer build runs the suite several times slower; keep it
+  for the debugger. Always run ctest in parallel (`-j 8`, or the presets).
+  - While working, run the tests you touched (`-R <regex>`) and the fast tier (`ctest --preset
+    fast`, about a minute).
+  - Before merging, run every test once (`ctest --preset full`) and the fast tier under the
+    sanitizers (`ctest --preset asan-fast`) when the change touches `core/`. Don't rerun a suite
+    that passed unless the code changed since.
+  - CI runs every test on every system, and every test under the sanitizers; a change merges only
+    when all its jobs pass.
+  - Tests that take minutes get `LABELS slow`. Keep new tests small: a render test needs only an
+    image big enough to show its feature, and a networked test compares engines with threads at
+    `RAY_NETWORK_SIZE` (`ray_network_test` in `tests/CMakeLists.txt`), never at full size.
+- CMake compiles through `ccache` when it's installed (`-DRAY_USE_CCACHE=OFF` to stop it).
 - **Every change that alters rendered output gets before and after images in `CHANGELOG.md`:** a
   side-by-side PNG in `docs/images/changelog/` (before on the left, after on the right, each
   labelled, for the scenes that changed most), linked under the change's entry with a line saying

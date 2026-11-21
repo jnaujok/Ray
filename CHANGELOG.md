@@ -10,6 +10,115 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.14.1] - 2026-11-20
+
+Faster tests and measured bounce light: the whole suite runs in about 45 seconds on a Release
+build, where the releases had been running it for four to six minutes on Debug, the bounce test gathers 9 rays an object, chosen from a sweep of 1 to 64, and a
+new test shows the `"hemisphere"` method beside it. Only `bounce_test`'s render changes; the
+references of four tests are smaller images of the same scenes.
+
+### Changed
+
+- **The tests take under a minute.** The 2026-alpha-0.14 release ran the full suite on Debug, 8 at
+  a time, in 6 min 20 s on a busy machine; it now takes about 45 s, and the fast tier about 30 s.
+  Measured here, before (118 tests) and after (121), on 16 cores:
+
+  | Run | Before | After |
+  |---|---|---|
+  | Every test, Release (`ctest --preset full`) | 89 s | 42 s |
+  | Every test, Debug | 263 s | 139 s |
+  | Every test but the slow ones, Release (`ctest --preset fast`) | — | 31 s |
+  | The fast tier under the sanitizers, optimized (`ctest --preset asan-fast`) | 289 s | 173 s |
+  | The same, unoptimized, as the releases ran it | over 17 min | — |
+
+  What made the difference:
+  - **Test optimized builds, as CI does.** The releases ran the suite on Debug and unoptimized
+    sanitizer builds, three to six times slower than CI's Release and RelWithDebInfo ones. The new
+    `CMakePresets.json` builds the same way CI does (`release`, `asan`, and `debug` for the
+    debugger) and runs 8 tests at a time (`ctest --preset fast`, `full`, `asan-fast`,
+    `asan-full`). `CLAUDE.md` has the new workflow: the touched tests and the fast tier while
+    working, every test once before merging, every test under the sanitizers on CI.
+  - **Networked tests render small and run side by side.** They checked that engines match threads
+    byte for byte by rendering each scene at full size, one at a time (they shared a lock), after
+    the full-size threaded render. That holds at any size, so each now renders its scene at 96×72
+    in 16-pixel tiles, with threads and then with three engines, compares the two, and runs
+    alongside the others (each has its own port). `ray_network_test()` in `tests/CMakeLists.txt`
+    defines them; `RenderTest.cmake` has a `SELF_CHECK` mode and a `TILE` option. Every scene a
+    networked test covered is still covered, and `bounce_hemisphere` is added.
+  - **Three slow feature tests render at 160×120:** `render_soft`, `render_lights` and
+    `render_environment`, the slowest under the sanitizers (111 s for `render_soft`). Their
+    references are the same scenes, smaller; the README's feature images keep the 320×240 renders
+    (`docs/images/soft.png`, `lights.png`, `environment.png`).
+  - **ccache:** CMake compiles through `ccache` when it's installed (`-DRAY_USE_CCACHE=OFF` to stop it).
+  - Only `render_torture`, `render_benchy` and `render_prism` are labelled `slow` now; the
+    networked Benchy and prism tests are small enough to drop it.
+  - Found but left alone: the master encodes the scene once for each engine, since each connection
+    is its own SJSON stream, so a scene carrying a large model (Benchy's 11 MB) costs about a second
+    of the master's time per engine before that engine can start.
+- **The bounce test gathers 9 rays an object** (`samples` 9, was 2). `tools/bounce_sweep.py`
+  (new) rendered `bounce_test` at 1 to 64 rays an object and measured each against a reference
+  with 256, over the whole image and over the 2,727 pixels only bounced light lights (16 cores):
+
+  | Rays an object | Rays a point | Wall | CPU | Noise, whole image | Noise, bounce-lit |
+  |---|---|---|---|---|---|
+  | 1 | 6 | 0.3 s | 2.3 s | 10.82 | 15.58 |
+  | 2 (the old setting) | 12 | 0.4 s | 3.3 s | 7.26 | 10.47 |
+  | 4 | 24 | 0.6 s | 5.5 s | 4.78 | 6.81 |
+  | **9** | **54** | **1.0 s** | **10.6 s** | **2.68** | **3.74** |
+  | 16 | 96 | 1.8 s | 17.8 s | 1.81 | 2.43 |
+  | 25 | 150 | 2.8 s | 27.2 s | 1.40 | 1.83 |
+  | 36 | 216 | 3.8 s | 37.6 s | 1.08 | 1.32 |
+  | 49 | 294 | 5.5 s | 52.6 s | 0.83 | 0.99 |
+  | 64 | 384 | 7.5 s | 69.4 s | 0.66 | 0.83 |
+
+  Noise is the root mean square difference from the reference on a 0–255 scale. It falls about as
+  one over the square root of the rays while the time grows with them: 9 rays costs 3.2 times the
+  CPU of 2 for 2.7 times less noise, and is where the grain stops showing at the test's size; 16
+  would cost 1.7 times more again for 1.5 times less.
+
+  ![bounce_test at 1, 4, 9, 16, 25, 36, 49 and 64 rays an object, each labelled with its noise](docs/images/changelog/bounce-sweep.png)
+
+  From top left, 1 to 64 rays an object: the grain over the white walls and in the shadows thins
+  quickly up to 9 and slowly after.
+
+  ![bounce_test before (2 rays an object) and after (9), and the hemisphere method at the same rays a point](docs/images/changelog/bounce-rays.png)
+
+  Left, the old 2 rays an object; middle, the new 9; right, `"hemisphere"` at the same 54 rays a
+  point. Look at the walls and the shadows under the block and the ball.
+- **The torture test keeps 1 ray an object.** On it (160×120, against 49 rays an object) 1 ray has
+  noise 2.23, 4 rays 0.95 for 1.85 times the CPU, and 9 rays 0.60 for 3.2 times: its 25 samples a
+  pixel already average the bounce noise below what shows, and it is the slowest test and render.
+
+### Added
+
+- **`render_bounce_hemisphere`** (`scenes/bounce_hemisphere_test.ray`, with its round-trip and
+  networked tests): `bounce_test` with the `"hemisphere"` method at 54 rays a point, the same as
+  the `"objects"` method's 9 rays for each of the 6 objects in reach. In this closed room it is
+  about three times smoother for the same rays, since every one of its rays hits something, and
+  costs about twice the CPU (longer rays):
+
+  | Rays a point | `"objects"` noise (bounce-lit) | `"hemisphere"` noise (bounce-lit) |
+  |---|---|---|
+  | 6 | 10.82 (15.58) | 3.23 (4.26) |
+  | 24 | 4.78 (6.81) | 1.45 (1.93) |
+  | 54 | 2.68 (3.74) | 0.79 (0.98) |
+  | 96 | 1.81 (2.43) | 0.61 (0.74) |
+
+  `"objects"` earns its keep in open scenes, where most hemisphere rays find nothing in reach.
+  (Both measured against the same `"objects"` reference: the two methods estimate the same light.)
+- **`tools/bounce_sweep.py`**, the measurement above, for any scene and counts.
+
+### Decided against, after measuring
+
+- **An even grid of bounce rays laid out by the sample's index** (one ray a cell, each of a pixel's
+  samples taking a different place in every cell) was 10 to 20% noisier than the R2 sequence the
+  rays already follow from each sample's point in its pixel (2.68 against 3.10 at 9 rays; 1.81
+  against 2.26 at 16). That sample point already spreads a pixel's samples evenly over each
+  object, as a rough mirror's does, so the rays were already "levelled".
+- **A separate clamp on gathered rays** made no difference until it darkened the image (at 0.5,
+  the bounce test lost 3% of its brightness and doubled its error; the torture test at 1.0 was
+  unchanged at 2.25 against 2.23). The camera's `clamp` already limits every gathered ray.
+
 ## [2026-alpha-0.14] - 2026-11-20
 
 Natural materials and shaped light: a library of thirty-one stones, woods, gems and metals that a
@@ -1341,7 +1450,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14.1...HEAD
+[2026-alpha-0.14.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14...2026-alpha-0.14.1
 [2026-alpha-0.14]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.13...2026-alpha-0.14
 [2026-alpha-0.13]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12.1...2026-alpha-0.13
 [2026-alpha-0.12.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.12...2026-alpha-0.12.1

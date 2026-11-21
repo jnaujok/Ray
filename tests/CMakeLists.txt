@@ -181,6 +181,7 @@ add_test(NAME render_soft
                  -DSCENE=${PROJECT_SOURCE_DIR}/scenes/soft_test.ray
                  -DOUTPUT=${RENDER_DIR}/soft_test.raw
                  -DREFERENCE=${REFERENCE_DIR}/soft_test.raw
+                 -DSIZE=160x120
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(render_soft PROPERTIES FIXTURES_SETUP render_soft TIMEOUT 900)
 add_test(NAME roundtrip_soft_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/soft_test.ray ${RENDER_DIR})
@@ -209,6 +210,7 @@ add_test(NAME render_lights
                  -DSCENE=${PROJECT_SOURCE_DIR}/scenes/lights_test.ray
                  -DOUTPUT=${RENDER_DIR}/lights_test.raw
                  -DREFERENCE=${REFERENCE_DIR}/lights_test.raw
+                 -DSIZE=160x120
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(render_lights PROPERTIES FIXTURES_SETUP render_lights TIMEOUT 300)
 add_test(NAME roundtrip_lights_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/lights_test.ray ${RENDER_DIR})
@@ -226,6 +228,19 @@ add_test(NAME render_bounce
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(render_bounce PROPERTIES FIXTURES_SETUP render_bounce TIMEOUT 300)
 add_test(NAME roundtrip_bounce_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/bounce_test.ray ${RENDER_DIR})
+
+# The same room with the "hemisphere" method, at the same rays a point (54:
+# 9 an object for the 6 objects in reach), for contrast.
+add_test(NAME render_bounce_hemisphere
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/bounce_hemisphere_test.ray
+                 -DOUTPUT=${RENDER_DIR}/bounce_hemisphere_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/bounce_hemisphere_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_bounce_hemisphere PROPERTIES TIMEOUT 300)
+add_test(NAME roundtrip_bounce_hemisphere_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/bounce_hemisphere_test.ray ${RENDER_DIR})
 
 # Haze: an avenue of columns fading into ground mist under a sky.
 add_test(NAME render_haze
@@ -284,6 +299,7 @@ add_test(NAME render_environment
                  -DSCENE=${PROJECT_SOURCE_DIR}/scenes/environment_test.ray
                  -DOUTPUT=${RENDER_DIR}/environment_test.raw
                  -DREFERENCE=${REFERENCE_DIR}/environment_test.raw
+                 -DSIZE=160x120
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
 set_tests_properties(render_environment PROPERTIES FIXTURES_SETUP render_environment TIMEOUT 300)
 add_test(NAME roundtrip_environment_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/environment_test.ray ${RENDER_DIR})
@@ -397,318 +413,65 @@ foreach(scene IN LISTS RAY_AA_SCENES)
     set_tests_properties(render_aa_${scene} PROPERTIES FIXTURES_SETUP render_aa_${scene} TIMEOUT 300)
 endforeach()
 
-# Each networked test listens on its own port, outside the range the system
-# hands out for outgoing connections, and they run one at a time.
-set(port 27997)
+# Networked engines must produce exactly what threads do, byte for byte.
+# That holds at any size, so each networked test renders its scene small
+# (RAY_NETWORK_SIZE, in RAY_NETWORK_TILE tiles, so three engines still share
+# many tiles), once with threads and once with engines, and compares the
+# two; it needs no other test. Each listens on its own port, outside the
+# range the system hands out for outgoing connections, so they can run at
+# the same time.
+set(RAY_NETWORK_SIZE 96x72)
+set(RAY_NETWORK_TILE 16)
+set(ray_network_port 27997)
+
+# ray_network_test(<name> <scene file> [AA <sampler>] [LABELS <labels>])
+function(ray_network_test name scene)
+    cmake_parse_arguments(NET "" "AA;LABELS" "" ${ARGN})
+    math(EXPR port "${ray_network_port} + 1")
+    set(ray_network_port ${port} PARENT_SCOPE)
+    set(aa_arg "")
+    if(NET_AA)
+        set(aa_arg "-DAA=${NET_AA}")
+    endif()
+    add_test(NAME network_${name}
+             COMMAND ${CMAKE_COMMAND}
+                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                     -DCOMPARE=$<TARGET_FILE:compare_images>
+                     -DSCENE=${scene}
+                     -DOUTPUT=${RENDER_DIR}/${name}_network.raw
+                     -DMODE=network
+                     -DSELF_CHECK=ON
+                     -DPORT=${port}
+                     -DSIZE=${RAY_NETWORK_SIZE}
+                     -DTILE=${RAY_NETWORK_TILE}
+                     ${aa_arg}
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+    # A master and three engines.
+    set_tests_properties(network_${name} PROPERTIES PROCESSORS 4 TIMEOUT 300)
+    if(NET_LABELS)
+        set_tests_properties(network_${name} PROPERTIES LABELS ${NET_LABELS})
+    endif()
+endfunction()
+
 foreach(scene IN LISTS RAY_NETWORK_SCENES)
-    math(EXPR port "${port} + 1")
-    add_test(NAME network_${scene}
-             COMMAND ${CMAKE_COMMAND}
-                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                     -DCOMPARE=$<TARGET_FILE:compare_images>
-                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${scene}.ray
-                     -DOUTPUT=${RENDER_DIR}/${scene}_network.raw
-                     -DMODE=network
-                     -DPORT=${port}
-                     -DEXACT_WITH=${RENDER_DIR}/${scene}.raw
-                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-    set_tests_properties(network_${scene} PROPERTIES FIXTURES_REQUIRED render_${scene}
-                                                     RESOURCE_LOCK ray_network TIMEOUT 300)
+    ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}.ray)
 endforeach()
-
 foreach(scene IN LISTS RAY_AA_NETWORK_SCENES)
-    math(EXPR port "${port} + 1")
-    add_test(NAME network_aa_${scene}
-             COMMAND ${CMAKE_COMMAND}
-                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                     -DCOMPARE=$<TARGET_FILE:compare_images>
-                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${scene}.ray
-                     -DOUTPUT=${RENDER_DIR}/${scene}_aa_network.raw
-                     -DMODE=network
-                     -DPORT=${port}
-                     -DAA=corners
-                     -DEXACT_WITH=${RENDER_DIR}/${scene}_aa.raw
-                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-    set_tests_properties(network_aa_${scene} PROPERTIES FIXTURES_REQUIRED render_aa_${scene}
-                                                     RESOURCE_LOCK ray_network TIMEOUT 300)
+    ray_network_test(aa_${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}.ray AA corners)
 endforeach()
 
-# The random sampler's points must not depend on which task traces a ray.
-math(EXPR port "${port} + 1")
-add_test(NAME network_sampler_random4
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray
-                 -DOUTPUT=${RENDER_DIR}/${RAY_SAMPLER_SCENE}_random4_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DAA=random:samples=4
-                 -DEXACT_WITH=${RENDER_DIR}/${RAY_SAMPLER_SCENE}_random4.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_sampler_random4 PROPERTIES FIXTURES_REQUIRED render_sampler_random4
-                                                        RESOURCE_LOCK ray_network TIMEOUT 300)
-
-# The adaptive sampler decides on rays from colors; networked engines must
-# decide the same.
-math(EXPR port "${port} + 1")
-add_test(NAME network_sampler_adaptive
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray
-                 -DOUTPUT=${RENDER_DIR}/${RAY_SAMPLER_SCENE}_adaptive_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DAA=adaptive
-                 -DEXACT_WITH=${RENDER_DIR}/${RAY_SAMPLER_SCENE}_adaptive.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_sampler_adaptive PROPERTIES FIXTURES_REQUIRED render_sampler_adaptive
-                                                         RESOURCE_LOCK ray_network TIMEOUT 300)
+# The random sampler's points must not depend on which task traces a ray, and
+# the adaptive sampler decides on rays from colors; engines must decide the same.
+ray_network_test(sampler_random4 ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray AA random:samples=4)
+ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray AA adaptive)
 
 # The channel a ray is traced in travels in its tag; it must come back from
-# networked engines intact.
-math(EXPR port "${port} + 1")
-add_test(NAME network_chromatic
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/chromatic_test.ray
-                 -DOUTPUT=${RENDER_DIR}/chromatic_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DSIZE=160x120
-                 -DEXACT_WITH=${RENDER_DIR}/chromatic_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_chromatic PROPERTIES FIXTURES_REQUIRED render_chromatic
-                                                  RESOURCE_LOCK ray_network TIMEOUT 600)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_texture
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/texture_test.ray
-                 -DOUTPUT=${RENDER_DIR}/texture_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/texture_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_texture PROPERTIES FIXTURES_REQUIRED render_texture
-                                                RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_primitives
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/primitives_test.ray
-                 -DOUTPUT=${RENDER_DIR}/primitives_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/primitives_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_primitives PROPERTIES FIXTURES_REQUIRED render_primitives
-                                                   RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_solid_textures
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/solid_textures_test.ray
-                 -DOUTPUT=${RENDER_DIR}/solid_textures_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/solid_textures_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_solid_textures PROPERTIES FIXTURES_REQUIRED render_solid_textures
-                                                       RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_soft
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/soft_test.ray
-                 -DOUTPUT=${RENDER_DIR}/soft_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/soft_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_soft PROPERTIES FIXTURES_REQUIRED render_soft
-                                             RESOURCE_LOCK ray_network TIMEOUT 900)
-
-    # The engines get the PNG images inside the scene, so they need no files.
-math(EXPR port "${port} + 1")
-add_test(NAME network_bump
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/bump_test.ray
-                 -DOUTPUT=${RENDER_DIR}/bump_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/bump_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_bump PROPERTIES FIXTURES_REQUIRED render_bump
-                                             RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_lights
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/lights_test.ray
-                 -DOUTPUT=${RENDER_DIR}/lights_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/lights_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_lights PROPERTIES FIXTURES_REQUIRED render_lights
-                                             RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_bounce
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/bounce_test.ray
-                 -DOUTPUT=${RENDER_DIR}/bounce_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/bounce_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_bounce PROPERTIES FIXTURES_REQUIRED render_bounce
-                                             RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_haze
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/haze_test.ray
-                 -DOUTPUT=${RENDER_DIR}/haze_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/haze_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_haze PROPERTIES FIXTURES_REQUIRED render_haze
-                                           RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_materials
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/materials_test.ray
-                 -DOUTPUT=${RENDER_DIR}/materials_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/materials_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_materials PROPERTIES FIXTURES_REQUIRED render_materials
-                                           RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_projector
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/projector_test.ray
-                 -DOUTPUT=${RENDER_DIR}/projector_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/projector_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_projector PROPERTIES FIXTURES_REQUIRED render_projector
-                                           RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_underwater
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/underwater_test.ray
-                 -DOUTPUT=${RENDER_DIR}/underwater_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/underwater_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_underwater PROPERTIES FIXTURES_REQUIRED render_underwater
-                                           RESOURCE_LOCK ray_network TIMEOUT 300)
-
-    # The engines get the sky image inside the scene, so they need no files.
-math(EXPR port "${port} + 1")
-add_test(NAME network_environment
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/environment_test.ray
-                 -DOUTPUT=${RENDER_DIR}/environment_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/environment_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_environment PROPERTIES FIXTURES_REQUIRED render_environment
-                                             RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_csg
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/csg_test.ray
-                 -DOUTPUT=${RENDER_DIR}/csg_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/csg_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_csg PROPERTIES FIXTURES_REQUIRED render_csg
-                                     RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_prism
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/prism_test.ray
-                 -DOUTPUT=${RENDER_DIR}/prism_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/prism_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_prism PROPERTIES FIXTURES_REQUIRED render_prism LABELS slow
-                                       RESOURCE_LOCK ray_network TIMEOUT 900)
-
-# The engines get the model files inside the scene.
-math(EXPR port "${port} + 1")
-add_test(NAME network_models
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/models_test.ray
-                 -DOUTPUT=${RENDER_DIR}/models_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/models_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_models PROPERTIES FIXTURES_REQUIRED render_models
-                                        RESOURCE_LOCK ray_network TIMEOUT 300)
-
-math(EXPR port "${port} + 1")
-add_test(NAME network_benchy
-         COMMAND ${CMAKE_COMMAND}
-                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
-                 -DCOMPARE=$<TARGET_FILE:compare_images>
-                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/benchy_test.ray
-                 -DOUTPUT=${RENDER_DIR}/benchy_test_network.raw
-                 -DMODE=network
-                 -DPORT=${port}
-                 -DEXACT_WITH=${RENDER_DIR}/benchy_test.raw
-                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
-set_tests_properties(network_benchy PROPERTIES FIXTURES_REQUIRED render_benchy LABELS slow
-                                        RESOURCE_LOCK ray_network TIMEOUT 900)
+# networked engines intact. Engines get texture images, PNGs, the sky and
+# model files inside the scene, so they need no files.
+foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
+                       materials projector underwater environment csg prism models benchy)
+    ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
+endforeach()
 
 # PNG and Radiance HDR output, checked with Python's own zlib.
 find_package(Python3 COMPONENTS Interpreter)
