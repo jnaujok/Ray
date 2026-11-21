@@ -22,7 +22,7 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble, the Utah teapot's own 32 Bezier patches traced exactly) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), a polished gold torus standing on its rim, a purple cluster of four metaballs (a `blob`) behind the mirror sphere, the word "RAY" in beveled red letters (Lato Bold) standing on top of the mirror frame, on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble, the Utah teapot's own 32 Bezier patches traced exactly) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), a gold torus (the `metal` material) standing on its rim, a purple cluster of four metaballs (a `blob`) behind the mirror sphere, the word "RAY" in beveled red letters (Lato Bold) standing on top of the mirror frame, on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss stopped down to f/8 (200 mm a unit, focused at 18, so everything from the front row to the mirror is sharp) with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
@@ -52,6 +52,8 @@ when the binary format was dropped; they are in the repository's history.
 | `film_test.ray` | | Kodak Ektachrome MS (`film` color model) on a 20 mm piece of film: gray steps a stop apart from 0.02 to 1.28, red, green and blue balls, and a far overexposed lamp whose light spreads into a red-orange halo (halation), with grain |
 | `reseau_test.ray` | | The Hasselblad Data Camera's Réseau crosses (drawn wider than the plate's own, and with more spread, so they show at this size): a bright white ball blooms over the cross on it, while the cross on a gray ball stays sharp |
 | `tranquility_test.ray` | | Tranquility Base: a lunar module built from boxes, a rounded box and cylinders (gold foil on four legs) beside a flag, on `regolith` in low sunlight (a 0.53° sun) under a black sky, shot with the Data Camera, its 60 mm Biogon, Réseau plate and Ektachrome MS; an imitation of the Apollo 11 views of the LM, not a recovered camera station |
+| `chess_dof_test.ray` | | Depth of field: a full chessboard in the Najdorf Sicilian, English Attack, after 1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 6.Be3 e5 7.Nb3 Be6 8.f3 Be7 9.Qd2 O-O 10.O-O-O Nbd7 11.g4 b5 (FEN `r2q1rk1/3nbppp/p2pbn2/1p2p3/4P1P1/1NN1BP2/PPPQ3P/2KR1B1R w - - 0 12`), played out by python-chess, the pieces Poly Haven's Chess Set (CC0) read from its glTF (`node` picks each piece), polished boxwood and ebony on an inlaid board, through the double Gauss wide open (f/2.02) focused on Black's pawn on e5, with twelve small lights behind the board that blur into bokeh discs; 160×120, a 3×3 stratified sampler. Written by `tools/make_showcase_scenes.py` |
+| `as11_40_5903_test.ray` | | A recreation of NASA photograph AS11-40-5903: Buzz Aldrin (NASA's public-domain astronaut model, its arms lowered by `tools/pose_astronaut.py`) in a white suit with a gold `metal` visor that reflects Neil Armstrong (a second copy, behind the camera) and the lunar module (NASA's model, its glTF base colors through `faceColors`), the Solar Wind Composition foil and the flag (from ALSJ dimensions), on regolith under a 15° sun and a black sky, with Earth small and high; shot on the Data Camera with its 60 mm Biogon, Réseau plate and Ektachrome MS, one bounce of indirect light; 128×128. Written by `tools/make_showcase_scenes.py`. The camera was placed by eye against the photograph, not from a recovered camera station |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
 | `teapot.ray` | | The Utah teapot (Martin Newell, 1975): a smooth, double-sided mesh of 6,320 triangles, from the triangulated model in [alecjacobson/common-3d-test-models](https://github.com/alecjacobson/common-3d-test-models), converted with `tools/obj_to_ray.py --smooth --double-sided --weld` |
@@ -196,7 +198,12 @@ A sampler or color model is a name, or an object with a `type` and its settings:
 gives the same image), `{ "type": "stratified", "grid": 5 }` (n from 1 to 32, default 4),
 `{ "type": "adaptive", "min": 9, "max": 64, "threshold": 0.01 }` (each pixel gets at least `min`
 rays, then more until the standard error of its brightness, on the scale where 1 is white, is under
-`threshold`, or it has `max`; rays follow a low-discrepancy sequence, reproducible like the others),
+`threshold`, or it has `max`; rays follow a low-discrepancy sequence, reproducible like the others;
+two opt-in refinements, added in 2026-alpha-0.20.1: `"confidence": 0.95` (default `0`, off; else 0.5
+to 0.999) stops once Student's t for that confidence times the standard error is under `threshold`,
+so a few rays that happen to agree must agree much more closely (t is 3.18 at 4 rays; keep `min` at
+about 16 all the same, since rays that agree exactly have no spread for t to widen), and `"channels": "rgb"` (default `"brightness"`) measures red, green and blue apart
+and uses the worst, so a pixel that changes color but not brightness keeps sampling),
 `{ "type": "gamma", "gamma": 2.2 }`, or
 `{ "type": "reinhard", "exposure": 1, "white": 4 }`
 (`exposure` scales the colors first; with a `white` luminance, that and anything brighter maps to
@@ -531,6 +538,24 @@ scene each networked engine gets) the same way:
   likewise, and an OBJ's normals make the mesh smooth. Objects, groups, smoothing groups and
   materials (`o`, `g`, `s`, `usemtl`, `mtllib`) are ignored: the mesh's own `materials` cover all of
   it.
+- **glTF 2.0** (added in 2026-alpha-0.20.1): `.gltf` (JSON, its buffers in `data:` URIs or in
+  files beside it) or `.glb` (the binary container, told by its `glTF` magic whatever its name).
+  Every mesh of the default scene is read, each node's `matrix` or `translation`, `rotation` and
+  `scale` flattened in; triangles, strips and fans (points and lines are skipped); accessors of
+  every component type, with `byteStride`, normalized integers and sparse substitution; `POSITION`,
+  `NORMAL` (kept if every primitive has them, and then the mesh is smooth) and `TEXCOORD_0` (likewise).
+  Each primitive's material's `pbrMetallicRoughness` `baseColorFactor` becomes its faces' color,
+  times its `baseColorTexture` at the middle of each face when that image is a PNG (in the file,
+  beside it, or in a `data:` URI); a JPEG or WebP image is skipped and the factor alone used (a
+  texture's plain `source`, often a PNG fallback beside a WebP, is used when there is one). The
+  colors show through the `faceColors` texture, as a colored STL's do. Metallic and roughness,
+  normal maps, cameras, lights, skins, morph targets and animation are ignored. glTF is right-handed
+  and Ray's scenes are left-handed, so z is negated and each face turned back round: the model isn't
+  mirrored. Draco- and meshopt-compressed files are refused with the extension's name;
+  `tools/gltf_decompress.py` writes a Draco `.glb` back out plain. A `.gltf`'s buffers and PNG images
+  go into a saved scene's archive beside it, under the names it gives them, and into a networked
+  engine's copy of the scene (as `files`, an object of base64 data by URI); a URI that leaves the
+  model's folder is refused.
 
 A file is named `.stl` or `.obj`; another name is told apart by its contents. The model is placed
 by these fields, in this order:
@@ -542,6 +567,8 @@ by these fields, in this order:
 | `rotation` | `[0, 0, 0]` | Degrees about x, then y, then z, as a box turns. Most printable models stand on z: `[-90, 0, 0]` stands them on y |
 | `align` | `"none"` | `"center"` centers the turned model's box on the origin; `"bottom"` centers it in x and z with its lowest point at y = 0 |
 | `translation` | `[0, 0, 0]` | Moves it, last |
+| `node` | | glTF only: read just the node with this `name` and its children, in that node's own frame (its own and its parents' placement left out), as for one piece of a chess set |
+| `gltfMaterial` | | glTF only: read just the primitives whose material has this `name`, so one part of a model (a visor) can wear different materials from the rest |
 
 `smooth`, `doubleSided`, `uvMap`, `materials` and `bump` work as for any mesh. Textures and bump
 maps on a model are looked up in the file's own coordinates, before its placement, so they move,
@@ -576,6 +603,7 @@ make the shape smooth (`"smooth": false` with them is an error).
 |--------|--------------|
 | `ambient` | none |
 | `diffuse` | `diffuseCast` (default `false`) |
+| `metal` | A conductor (added in 2026-alpha-0.20.1): a mirror whose reflectance in red, green and blue comes from the metal's complex index of refraction n + ik by the exact Fresnel equations for a conductor, so gold is yellow face on and whitens toward grazing. `metal` names a preset (`gold`, `silver`, `copper`, `aluminum`, `iron`, `chromium`, `titanium`, `platinum`: representative optical constants near 650, 550 and 450 nm), or `n` and `k` (`[red, green, blue]`) give the index (and override a preset's); `roughness` (default `0`, up to `1`) blurs the reflection as a rough mirror's does; `tint` (default white; a color or a map) multiplies it. A gold visor is `metal` at most of the influence beside a `transparent` material for what gets through |
 | `regolith` | Lunar soil after Hapke: the Lommel-Seeliger law (light scattered back toward where it came from, with no limb darkening) times an opposition surge that brightens it where the viewer looks along the light. `surge` (default `1`, Hapke's B0) is the surge's strength and `width` (default `0.06`, his h) its angular width; seen along the light at normal incidence it is exactly `color` (default `[0.12, 0.12, 0.12]`, about the Moon's albedo) |
 | `specular` | A Cook–Torrance highlight. `power` (default `1`) is the surface's Beckmann roughness: smaller is a smaller, sharper highlight (0.1–0.3 is glossy; 1 is very rough). `indexOfRefraction` (default `1.5`) sets the Fresnel reflection, stronger at grazing angles; `materialHighlight` (default `false`) |
 | `reflective` | A mirror reflection, tinted by `color` with `filterReflection` (default `false`); `diffuseReflectivity` (default `0`). `roughness` (default `0`, a perfect mirror; up to `1`) blurs the reflection, as of brushed or satin metal: each ray reflects about a microfacet normal drawn from a GGX distribution of that roughness (0.05 is satin, 0.3 very rough) |
@@ -863,7 +891,8 @@ same image, and networked engines give exactly the same as threads.
   and texture maps for material, bump and light settings, and a transparent material's
   `attenuationStep` (2026-alpha-0.15), and the `torus`, `disc`, `annulus`, `paraboloid`, `hyperboloid`,
   `superquadric`, `roundedBox` and `text` objects (2026-alpha-0.16), and the `bezier` and `bspline`
-  objects (2026-alpha-0.17).
+  objects (2026-alpha-0.17), and glTF model files with a mesh's `node`, `gltfMaterial` and `files`,
+  the `metal` material, and the adaptive sampler's `confidence` and `channels` (2026-alpha-0.20.1).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

@@ -98,6 +98,7 @@ set(RAY_CORE_SOURCES
     core/src/Matrix.cpp
     core/src/Mesh.cpp
     core/src/ModelFile.cpp
+    core/src/GltfFile.cpp
     core/src/NoiseTexture.cpp
     core/src/Objects.cpp
     core/src/ObjectsArray.cpp
@@ -109,10 +110,12 @@ set(RAY_CORE_SOURCES
     core/src/PtLight.cpp
     core/src/Rays.cpp
     core/src/RandomSampler.cpp
+    core/src/RayCountMap.cpp
     core/src/RaySettings.cpp
     core/src/RectangleLight.cpp
     core/src/ReflectiveMaterial.cpp
     core/src/RegolithMaterial.cpp
+    core/src/MetalMaterial.cpp
     core/src/ReinhardColorModel.cpp
     core/src/Scene.cpp
     core/src/SceneJson.cpp

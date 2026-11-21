@@ -1,0 +1,2626 @@
+{
+  "format": "Ray scene",
+  "version": 3,
+  "settings": {
+    "imageWidth": 160,
+    "imageHeight": 120,
+    "imageFile": "chess_dof_test.out",
+    "colorDepth": 8,
+    "maximumDepth": 8,
+    "depthThreshold": 0.01
+  },
+  "background": [
+    0.015,
+    0.013,
+    0.012
+  ],
+  "camera": {
+    "position": [
+      -4.4,
+      3.0,
+      -9.2
+    ],
+    "lookAt": [
+      0.4,
+      0.3,
+      0.9
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "verticalAngle": 30.0,
+    "horizontalAngle": 40.0,
+    "aspectRatio": 1.333333,
+    "sampler": {
+      "type": "stratified",
+      "grid": 3,
+      "seed": 0
+    },
+    "colorModel": "srgb",
+    "clamp": 4.0,
+    "lens": {
+      "prescription": "double-gauss-50mm",
+      "focusDistance": 11.1625,
+      "sensorWidth": 36.0,
+      "millimetersPerUnit": 57.88,
+      "seed": 0
+    }
+  },
+  "objects": [
+    {
+      "type": "plane",
+      "position": [
+        0.0,
+        -0.35,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.02,
+            0.012,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "diffuseCast": false,
+          "texture": {
+            "preset": "walnut",
+            "scale": 0.08
+          }
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        0.0,
+        -0.2,
+        0.0
+      ],
+      "size": [
+        9.2,
+        0.3,
+        9.2
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.02,
+            0.012,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.3,
+            0.17,
+            0.08
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.3,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.1,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.05,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "center": [
+        0.0,
+        -0.025,
+        0.0
+      ],
+      "size": [
+        8.0,
+        0.05,
+        8.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.03,
+            0.025,
+            0.02
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.78,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "diffuseCast": false,
+          "texture": {
+            "type": "checker",
+            "colors": [
+              [
+                0.22,
+                0.12,
+                0.06
+              ],
+              [
+                0.8,
+                0.64,
+                0.42
+              ]
+            ],
+            "size": 1.0,
+            "solid": true
+          }
+        },
+        {
+          "type": "specular",
+          "influence": 0.35,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.08,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.1,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -3.5,
+        0.0,
+        -2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -3.5,
+        0.0,
+        1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_rook_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -3.5,
+        0.0,
+        3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -2.5,
+        0.0,
+        -2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_knight_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -2.5,
+        0.0,
+        -1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -2.5,
+        0.0,
+        0.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_king_white",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -1.5,
+        0.0,
+        -3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -1.5,
+        0.0,
+        -2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_knight_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -1.5,
+        0.0,
+        -1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_rook_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -0.5,
+        0.0,
+        -3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_queen_white",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -0.5,
+        0.0,
+        -2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -0.5,
+        0.0,
+        1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_knight_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -0.5,
+        0.0,
+        2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_queen_white",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        -0.5,
+        0.0,
+        3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_bishop_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        0.5,
+        0.0,
+        -1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        0.5,
+        0.0,
+        -0.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        0.5,
+        0.0,
+        0.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_bishop_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        0.5,
+        0.0,
+        1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_bishop_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        0.5,
+        0.0,
+        2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_bishop_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        1.5,
+        0.0,
+        -3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        1.5,
+        0.0,
+        -1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_knight_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        1.5,
+        0.0,
+        1.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        1.5,
+        0.0,
+        2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_rook_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        1.5,
+        0.0,
+        3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        2.5,
+        0.0,
+        -0.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        2.5,
+        0.0,
+        2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_king_white",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        2.5,
+        0.0,
+        3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_rook_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        3.5,
+        0.0,
+        -3.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        3.5,
+        0.0,
+        -2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.06,
+            0.055,
+            0.045
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.75,
+          "color": [
+            0.88,
+            0.8,
+            0.66
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.55,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.07,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.07,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "piece_pawn_white_01",
+      "scale": 17.277125086385624,
+      "rotation": [
+        0.0,
+        -90.0,
+        0.0
+      ],
+      "align": "none",
+      "translation": [
+        3.5,
+        0.0,
+        2.5
+      ],
+      "smooth": true,
+      "doubleSided": false,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.012,
+            0.01,
+            0.008
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.8,
+          "color": [
+            0.07,
+            0.05,
+            0.035
+          ],
+          "diffuseCast": false
+        },
+        {
+          "type": "specular",
+          "influence": 0.6,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "power": 0.06,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        },
+        {
+          "type": "reflective",
+          "influence": 0.12,
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "diffuseReflectivity": 0.0,
+          "filterReflection": false
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -9.0,
+        1.2,
+        14.0
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            9.0,
+            6.5,
+            3.5
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -6.5,
+        2.4,
+        17.0
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            8.0,
+            7.0,
+            5.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -4.0,
+        0.6,
+        12.5
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            9.0,
+            7.5,
+            6.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -1.5,
+        3.2,
+        19.0
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            7.0,
+            6.0,
+            4.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        1.0,
+        1.4,
+        15.5
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            9.0,
+            6.5,
+            3.5
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        3.5,
+        2.8,
+        18.0
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            8.0,
+            7.0,
+            5.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        6.0,
+        0.9,
+        13.5
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            9.0,
+            7.5,
+            6.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        8.5,
+        2.1,
+        16.5
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            7.0,
+            6.0,
+            4.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        11.0,
+        3.5,
+        20.0
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            9.0,
+            6.5,
+            3.5
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -11.5,
+        3.0,
+        19.5
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            8.0,
+            7.0,
+            5.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        2.5,
+        4.4,
+        22.0
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            9.0,
+            7.5,
+            6.0
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sphere",
+      "center": [
+        -7.5,
+        4.6,
+        23.0
+      ],
+      "radius": 0.14,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            7.0,
+            6.0,
+            4.0
+          ]
+        }
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "type": "rectangleLight",
+      "position": [
+        -3.0,
+        9.0,
+        -6.0
+      ],
+      "color": [
+        0.95,
+        0.9,
+        0.82
+      ],
+      "edge1": [
+        3.0,
+        0.0,
+        0.0
+      ],
+      "edge2": [
+        0.0,
+        0.6,
+        1.5
+      ],
+      "samples": 2
+    },
+    {
+      "type": "point",
+      "position": [
+        7.0,
+        5.0,
+        -2.0
+      ],
+      "color": [
+        0.35,
+        0.32,
+        0.3
+      ]
+    }
+  ]
+}

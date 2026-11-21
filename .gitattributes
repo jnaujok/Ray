@@ -26,6 +26,10 @@
 # Model files: STL is binary (or, rarely, ASCII kept byte for byte); OBJ is text.
 *.stl binary
 *.obj text eol=lf
+# glTF: binary containers and buffers, and .gltf JSON kept byte for byte as published.
+*.glb binary
+*.bin binary
+*.gltf -text
 
 # Fonts
 *.ttf binary

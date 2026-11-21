@@ -52,6 +52,38 @@ tools/bounce_sweep.py build/raythrower --scene scenes/torture_test.ray --size 16
     --counts 1,4,9 --hemisphere 1,4,9 --reference 49 --out sweep-torture
 ```
 
+## `adaptive_sweep.py`
+
+Measures the adaptive sampler's noise against its cost, to choose its settings:
+
+```sh
+python3 tools/adaptive_sweep.py build/raythrower --scene scenes/torture_test.ray --size 240x180
+```
+
+Renders each scene with a reference sampler (256 rays a pixel) and with each `--sampler` (the
+original rule and the confidence-aware, per-channel one at several settings by default), and prints
+a table of rays a pixel, wall and CPU time, and the root mean square error against the reference,
+over the whole image and its worst tenth of pixels. Each adaptive render also leaves a heat map of
+its rays a pixel (`raythrower --ray-count`). It found the full-size torture test's settings in
+2026-alpha-0.20.1.
+
+## `make_showcase_scenes.py`
+
+Writes `scenes/chess_dof_test.ray` (the Najdorf Sicilian on a full board in depth of field, the
+position played out by python-chess: `pip install chess`), `scenes/as11_40_5903_test.ray` (the
+AS11-40-5903 recreation) and the indirect-light study scenes in `scenes/studies/`.
+
+## `gltf_decompress.py`
+
+Writes a Draco-compressed `.glb` back out with plain accessors, so Ray's glTF reader can load it
+(`pip install DracoPy numpy`). NASA's 3D Resources models are Draco-compressed; the copies in
+`scenes/models/apollo/` were made with it.
+
+## `pose_astronaut.py`
+
+Lowers the arms of NASA's astronaut model (decompressed) from its T-pose, about the shoulders, for
+the AS11-40-5903 recreation.
+
 ## `make_textures.py`
 
 Makes the textures in `scenes/textures/`. The bricks, which `bump_test.ray` and the torture test use:

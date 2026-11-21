@@ -209,14 +209,19 @@ The ray tracing itself is the 1997 code.
   scenes keep the name and the changes.
 
   <img src="docs/images/tests/materials_test.png" alt="Thirty spheres, one of each material preset: marbles, granites, stones, woods, gems and brushed metals" width="320">
-- **Model files and printed plastic:** a mesh can load an STL or OBJ `file` and place it with a
+- **Model files and printed plastic:** a mesh can load an STL, OBJ or glTF 2.0 (`.gltf` or
+  `.glb`) `file` and place it with a
   `scale` (or `fitSize`), `rotation`, `align` and `translation`; the file goes into the saved scene
   and, inside the scene, to networked engines. Colored STL files (the VisCAM/SolidView and
   Materialise Magics conventions) give each face its color through the `faceColors` texture. The
   `layers` texture draws the rounded 0.1 mm layer lines of a 3D print, as a color and as a bump map;
   a model's textures are looked up in its file's own coordinates (millimeters for a printable
-  model), so the layers follow its print axis however it is turned. The sample scenes include
-  [#3DBenchy](https://3dbenchy.com) (225,706 triangles).
+  model), so the layers follow its print axis however it is turned. glTF models bring their node
+  transforms and their materials' base colors (through `faceColors`), and a mesh can pick one `node`
+  (a chess piece from a whole set) or one material's primitives (`gltfMaterial`: a visor apart from
+  its suit); Draco-compressed files are refused (`tools/gltf_decompress.py` writes them back out
+  plain). The sample scenes include [#3DBenchy](https://3dbenchy.com) (225,706 triangles), Poly
+  Haven's chess set and NASA's lunar module and astronaut.
 
   <img src="docs/images/tests/benchy_test.png" alt="3DBenchy in orange plastic, close up on its bow, with the layer lines of a print" width="320"> <img src="docs/images/tests/models_test.png" alt="A puzzle cube and a gem from colored STL files and a textured ring from an OBJ file on a checkered floor" width="320">
 - **Bump and normal maps:** an object's `bump` tilts the normal it is shaded with, so it looks
@@ -232,7 +237,10 @@ The ray tracing itself is the 1997 code.
   the pixel plus N random rays), `stratified` (an n×n grid of equally weighted rays, each at a
   random point in its cell; best for real lenses), or `adaptive` (at least 9 rays a pixel, then
   more only where they disagree: on the torture test, 28% less error than a 5×5 grid for the same
-  rays). Random points are reproducible, so every run gives the same image.
+  rays; with `confidence` it trusts agreeing rays only once Student's t says they really agree, which
+  halves the torture test's error (for about three times the rays), and with `"channels": "rgb"` it watches color as well as brightness). Random points
+  are reproducible, so every run gives the same image. `raythrower --ray-count heat.png` draws how
+  many rays each pixel took.
 - **Camera:** pinhole camera with position, look-at point, up vector, and vertical field of view;
   square pixels at any image size.
 - **Real lenses:** give the camera a lens prescription (spherical glass surfaces, front to back, as
@@ -247,6 +255,13 @@ The ray tracing itself is the 1997 code.
   vignetting comes from the measured share of rays that get through.
 
   <img src="docs/images/lens.png" alt="scan_test through a pinhole, and through the double Gauss at f/2 focused on the glass sphere" width="650">
+
+  Depth of field through the double Gauss wide open: the Najdorf Sicilian (English Attack, after
+  11...b5) on a full board, Poly Haven's chess set, focused on Black's e5 pawn, with lights behind
+  the board blurring into bokeh discs (`scenes/chess_dof_test.ray` at 1024×768 with `--aa
+  adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb`):
+
+  <img src="docs/images/chess_dof.png" alt="A chessboard in the Najdorf Sicilian through a wide-open lens: the near white pieces blurred, the pieces in the middle of the board sharp, the far ones softening, and warm lights behind the board blurred into discs" width="720">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
   look, and the default), `gamma`, `srgb`, `reinhard` tone mapping, `hdr`, and `film`.
 - **The Apollo cameras:** the Hasselblads flown to the Moon, as camera `body` presets: the Electric
@@ -261,7 +276,12 @@ The ray tracing itself is the 1997 code.
   halation), with exposure from ISO, shutter and f-stop. The Data Camera's Réseau plate prints its
   5 × 5 crosses on every frame, and overexposed subjects bloom over them as on the real frames. A
   `regolith` material (Lommel-Seeliger with Hapke's opposition surge) lights lunar soil, and
-  `tranquility_test.ray` shoots a lunar module on it with the Data Camera.
+  `tranquility_test.ray` shoots a lunar module on it with the Data Camera. `as11_40_5903_test.ray`
+  recreates NASA photograph AS11-40-5903, Aldrin with Armstrong and the lunar module in his gold
+  visor, from NASA's own astronaut and lunar module models.
+- **Metals:** the `metal` material reflects by a conductor's exact Fresnel equations from its complex
+  index n + ik in red, green and blue, so gold, copper, silver, aluminum, iron, chromium, titanium
+  and platinum (presets, or your own n and k) shift color toward grazing as real metals do.
 
   <img src="docs/images/changelog/apollo-tranquility.png" alt="A lunar module on regolith in low sun, before (diffuse soil, sRGB) and after (regolith, the Data Camera's Biogon and Réseau crosses, Ektachrome MS)" width="650">
 - **Image output:** PNG (`--png`) and PPM (`--ppm`) beside the original raw format, and high
@@ -435,7 +455,7 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
 **Render the torture test**, every kind of object (the teapot too, in marble, traced from its 32 Bézier patches, and a layer-lined
-3DBenchy, a colored-STL puzzle cube, an OBJ ring, a gold torus, "RAY" in beveled letters set in
+3DBenchy, a colored-STL puzzle cube, an OBJ ring, a gold torus that reflects as gold does (the `metal` material), "RAY" in beveled letters set in
 Lato Bold on top of the mirror frame, a glass goblet and a black queen turned on a lathe, a twisted, tapered star, a steel spring
 and a purple cluster of metaballs), mirrors, glass
 (the cube with green swirls inside, the ball frosted, the mirror frosted in patches, a flint prism fanning colors into a spectrum), a die with drilled
@@ -443,7 +463,7 @@ pips (constructive solid geometry), textures and presets (a walnut mirror frame,
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light with a Fresnel beam
 that projects dappled caustics onto the teapot, and a low sun under drifting cloud shadows (its intensity a noise texture), and an
 HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
-light haze, through the double Gauss lens, each ray traced at four wavelengths (spectral
+light haze, through the double Gauss lens stopped down to f/8 so it is sharp from front to back, each ray traced at four wavelengths (spectral
 dispersion) and clamped at 1.5. With the scene's own 5×5 stratified sampler (25 rays a pixel), its
 full 1024×768 takes about eight and a half minutes on an idle 16-core machine with a Release build:
 
@@ -451,12 +471,13 @@ full 1024×768 takes about eight and a half minutes on an idle 16-core machine w
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
-The image below is rendered with the adaptive sampler instead (at least 25 rays a pixel, up to 256
-where they disagree), which is much cleaner and takes about eight times as long (about 68 minutes on an idle
-16-core machine):
+The image below is rendered with the adaptive sampler instead (at least 16 rays a pixel, up to 100
+where Student's t says they don't yet agree, watching red, green and blue apart), which is much
+cleaner: 69 rays a pixel on average, about 20 minutes on an idle 16-core machine (19,329
+CPU-seconds):
 
 ```sh
-raythrower scenes/torture_test.ray --aa adaptive:min=25,max=256,threshold=0.004 --png torture.png
+raythrower scenes/torture_test.ray --aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb --png torture.png
 ```
 
 <img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, a lump of regolith, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
@@ -542,16 +563,20 @@ The presets (`CMakePresets.json`) build optimized, as CI does, and run 8 tests a
 and the prism are labelled `slow`. `cmake --preset asan` and `ctest --preset asan-fast` run the fast
 tests under AddressSanitizer and UndefinedBehaviorSanitizer (about 4 minutes). A Debug build runs
 the suite about three times slower; use it for the debugger. CI runs every test on every system, and
-every test under the sanitizers.
+every test under the sanitizers, except the torture test (labelled `torture`), which is too heavy
+for the runners: CI runs `ctest -LE torture`, and the `full` preset runs it locally before every
+merge.
 
 `tools/bounce_sweep.py` measures indirect light's noise and render time against its number of rays
-(see the 2026-alpha-0.14.1 changelog); it is a measurement, not a test.
+(see the 2026-alpha-0.14.1 changelog; the scenes in `scenes/studies/` compare the two methods), and
+`tools/adaptive_sweep.py` the adaptive sampler's noise against its cost (2026-alpha-0.20.1); they
+are measurements, not tests.
 
 The tests render every sample scene and compare it with a reference render (four of them again with
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, the Apollo cameras (a Hasselblad and its lens, Kodak film with grain and halation, the Réseau crosses blooming over, and Tranquility Base on regolith), and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, the Apollo cameras (a Hasselblad and its lens, Kodak film with grain and halation, the Réseau crosses blooming over, and Tranquility Base on regolith), a chessboard in depth of field from glTF pieces, the AS11-40-5903 recreation with a gold metal visor, and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -618,6 +643,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/extrusion_test.png" alt="render_extrusion" width="260"><br><code>render_extrusion</code></td><td align="center"><img src="docs/images/tests/implicit_test.png" alt="render_implicit" width="260"><br><code>render_implicit</code></td><td align="center"><img src="docs/images/tests/blob_test.png" alt="render_blob" width="260"><br><code>render_blob</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/fractal_test.png" alt="render_fractal" width="260"><br><code>render_fractal</code></td><td align="center"><img src="docs/images/tests/apollo_lenses_test.png" alt="render_apollo_lenses" width="160"><br><code>render_apollo_lenses</code></td><td align="center"><img src="docs/images/tests/film_test.png" alt="render_film" width="240"><br><code>render_film</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/reseau_test.png" alt="render_reseau" width="260"><br><code>render_reseau</code></td><td align="center"><img src="docs/images/tests/tranquility_test.png" alt="render_tranquility" width="192"><br><code>render_tranquility</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/chess_dof_test.png" alt="render_chess_dof" width="260"><br><code>render_chess_dof</code></td><td align="center"><img src="docs/images/tests/as11_40_5903_test.png" alt="render_as11_40_5903" width="192"><br><code>render_as11_40_5903</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -713,7 +739,8 @@ from TrueType fonts, Bézier patches and B-spline and NURBS surfaces traced exac
 and sweeps along a path, implicit surfaces from formulas, metaballs and fractals, and JSON scenes
 so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both
 editors reach every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
-seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and lunar regolith.
+seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and lunar regolith,
+and a recreation of AS11-40-5903. Models load from glTF as well as STL and OBJ.
 
 ## Changelog
 

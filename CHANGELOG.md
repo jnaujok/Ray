@@ -10,6 +10,153 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.20.1] - 2026-11-21
+
+Studies and showcases: the torture test sharpened and out of CI, the adaptive sampler able to trust
+a few rays only when they really agree, a glTF 2.0 reader, a `metal` material, two showcase scenes
+(a chessboard in depth of field and a recreation of NASA photograph AS11-40-5903), and studies of
+which indirect-light method works where. Scenes without the new fields render byte for byte as
+before; only the torture test changes.
+
+### Added
+
+- **A glTF 2.0 reader** (`core/src/GltfFile.cpp`): a mesh's `file` can be a `.gltf` (JSON, its
+  buffers in `data:` URIs or in files beside it) or a `.glb`, read through `RayJson::ReadSceneFile`
+  like the other model files, so it goes into a saved archive (a `.gltf`'s buffers and PNG images
+  beside it, under their own names) and to networked engines (as `files`). It reads every mesh of
+  the default scene with the node hierarchy's matrices or translation, rotation and scale flattened
+  in; triangles, strips and fans; accessors of every component type with `byteStride`, normalized
+  integers and sparse substitution; `POSITION`, `NORMAL` and `TEXCOORD_0`; and each material's
+  `baseColorFactor`, times its `baseColorTexture` at each face's middle when that image is a PNG,
+  as per-face colors for the `faceColors` texture. JPEG and WebP images fall back to the factor (a
+  texture's plain `source`, often a PNG beside a WebP, is used when there is one); the rest of a
+  material, cameras, lights, skins and animation are ignored. glTF is right-handed, so z is negated
+  and faces turned back round. A mesh's `node` reads one named node in its own frame (a chess piece
+  from a whole set) and `gltfMaterial` only one material's primitives (a visor apart from its suit).
+  Draco- and meshopt-compressed files are refused with the extension's name. Of the 257 `.glb` files
+  in NASA's 3D Resources, 221 are Draco-compressed, 100 have WebP images, 83 PNG and 31 JPEG (one
+  only JPEG), so most need `tools/gltf_decompress.py` (DracoPy) first, which writes them back out
+  plain; their colors mostly survive through the PNG fallbacks.
+- **The `metal` material:** a conductor's exact Fresnel reflectance from its complex index n + ik in
+  red, green and blue, with presets for gold, silver, copper, aluminum, iron, chromium, titanium and
+  platinum, your own `n` and `k`, `roughness` and `tint`. The torture test's torus is true gold now,
+  and the AS11-40-5903 visor gold over tinted polycarbonate.
+- **Adaptive sampling that trusts a few rays only when they agree** (opt-in; existing `adaptive`
+  settings sample exactly as before): `confidence` stops once Student's t for that confidence times
+  the standard error is under `threshold`, so four rays that happen to agree must agree about three
+  times more closely than the plain rule asks before they are believed (though `min` should stay
+  near 16, below);
+  `"channels": "rgb"` measures red, green and blue apart. `raythrower --ray-count heat.png` writes a
+  heat map of each pixel's rays (threads only). Measured with the new `tools/adaptive_sweep.py` at
+  240×180 against 256 rays a pixel (CPU seconds on a machine running other work):
+
+  | Sampler | Rays a pixel | CPU (s) | RMS, whole | RMS, worst tenth |
+  |---|---|---|---|---|
+  | `min=25,max=256,threshold=0.004` (the 0.20 command) | 25.1 | 466 | 9.78 | 20.95 |
+  | `min=4,max=256,threshold=0.004,confidence=0.95,channels=rgb` | 85.4 | 1,529 | 6.21 | 14.56 |
+  | `min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 71.1 | 1,061 | 5.70 | 14.76 |
+  | **`min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb`** | **71.8** | **1,273** | **4.94** | **12.07** |
+  | `min=4,max=100,threshold=0.006,confidence=0.95,channels=rgb` | 38.9 | 545 | 9.28 | 22.24 |
+  | `min=4,max=64,threshold=0.006,confidence=0.9,channels=rgb` | 27.3 | 399 | 11.14 | 27.01 |
+  | `min=9,max=100,threshold=0.004` (the plain rule) | 9.4 | 148 | 15.92 | 33.89 |
+
+  On the sharpened torture test the plain rule believes nearly every pixel at its first 25 rays
+  (25.1 on average) though they are still noisy (9.78), which is the trap the confidence factor is
+  for: with it, pixels whose rays only seem to agree keep going. The bold row is the new full-size
+  torture command: half the error of the 0.20 command (4.94 against 9.78) for 2.9 times its rays.
+  A cap of 100 measured better than 256 at fewer rays, since a pixel's wavelength strata are
+  counted out of the cap and a pixel that stops early covers more of them when the cap is near what
+  it uses. **Starting at 4 rays is not safe, though:** on the soft test (frosted glass and area
+  lights) and the chessboard, `min=4` gave about twice the error of the plain rule at similar rays,
+  because four rays that happen to agree have no spread at all, and no confidence factor can widen
+  a zero. Minimum 16 with the confidence factor fixed both:
+
+  | Scene, sampler | Rays a pixel | RMS, whole | RMS, worst tenth |
+  |---|---|---|---|
+  | soft, `min=25,max=256,threshold=0.004` (plain) | 114.2 | 2.49 | 7.19 |
+  | soft, `min=9,max=100,threshold=0.004` (plain) | 44.7 | 3.71 | 10.79 |
+  | soft, `min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 48.3 | 5.52 | 16.76 |
+  | soft, `min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 56.6 | 3.28 | 9.57 |
+  | chess, `min=25,max=256,threshold=0.004` (plain) | 89.7 | 2.17 | 6.22 |
+  | chess, `min=9,max=100,threshold=0.004` (plain) | 39.0 | 4.21 | 12.68 |
+  | chess, `min=4,max=100,threshold=0.004,confidence=0.95,channels=rgb` | 56.3 | 4.67 | 14.43 |
+
+  So the confidence factor and per-channel errors earn their keep, but `min` stays at 16.
+
+  ![The torture test's rays a pixel under the old and new adaptive settings](docs/images/changelog/adaptive-rays.png)
+
+  Top: the old command, the new one and the 256-ray reference. Below: their rays a pixel. The old
+  rule stops almost everywhere at its minimum; the new one spends its rays on the teapot, the frosted
+  mirror, the glass and the haze, and leaves the plain floor squares with few.
+- **A depth-of-field showcase** (`chess_dof_test.ray`): the Najdorf Sicilian, English Attack, after
+  1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 6.Be3 e5 7.Nb3 Be6 8.f3 Be7 9.Qd2 O-O 10.O-O-O
+  Nbd7 11.g4 b5, played out by python-chess in the new `tools/make_showcase_scenes.py`, on a full
+  board with Poly Haven's Chess Set (CC0, its glTF committed unmodified), through the double Gauss
+  wide open and focused on Black's e5 pawn, with lights behind the board blurring into bokeh discs.
+  The README's lens section shows it at 1024×768 (with `--aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb`: 3,131 CPU-seconds).
+
+  ![The Najdorf chessboard in depth of field](docs/images/chess_dof.png)
+- **A recreation of NASA photograph AS11-40-5903** (`as11_40_5903_test.ray`): Aldrin in a white
+  suit with a gold visor in which Armstrong (a second astronaut behind the camera) and the lunar
+  module are reflected, the Solar Wind Composition foil and the flag from ALSJ dimensions, Earth
+  small and high, on regolith under a 15° sun, on the Data Camera with the 60 mm Biogon, Réseau
+  plate and Ektachrome MS. The astronaut and lunar module are NASA's own models (free and without
+  copyright; decompressed, and the astronaut's arms lowered from a T-pose by the new
+  `tools/pose_astronaut.py`).
+
+  ![The recreation beside NASA's AS11-40-5903](docs/images/changelog/as11-40-5903.png)
+
+  Left, the render; right, NASA's frame (public domain). The camera was placed by eye, not from a
+  recovered station; NASA's astronaut is a generic suited figure (no chest pack, flag patch or arm
+  pose of Aldrin's), and the ground is noise, not the footprinted soil.
+- **Indirect light studies** (`scenes/studies/`): six scenes comparing the `"objects"` and
+  `"hemisphere"` methods at the same rays a point, measured with `tools/bounce_sweep.py` (RMS on a
+  0–255 scale over the pixels only bounced light lights, against the objects method at 64 rays an
+  object):
+
+  | Scene | Objects in reach | Objects, 4 rays an object | Hemisphere, same rays | Objects, 16 | Hemisphere, same rays |
+  |---|---|---|---|---|---|
+  | open floor | 2 | 4.49 | 2.38 | 1.20 | 1.13 |
+  | sparse balls | 5 | 3.90 | 1.70 | 1.17 | 0.73 |
+  | cluttered room | 8 | 7.16 | 2.69 | 3.42 | 1.48 |
+  | large wall close by | 3 | 4.64 | 2.13 | 1.45 | 0.94 |
+  | small bright object | 3 | 2.41 | 4.34 | 0.92 | 1.70 |
+  | distance cutoff | 3 | 4.39 | 2.67 | 1.19 | 1.18 |
+
+  ![The six study scenes with each method](docs/images/changelog/bounce-studies.png)
+
+  At the same rays a point the hemisphere is smoother in five of the six, by about two to one at a
+  few rays, and the gap closes as rays grow; the objects method wins clearly only where a small,
+  bright object does most of the lighting (half the hemisphere's noise), since it aims every ray at
+  it while the hemisphere finds it by chance (the speckles in the middle column). So the hemisphere
+  is the better default for ordinary scenes, and `"objects"` for small bright sources, such as the
+  glowing objects planned for 0.22. (Both are measured against the objects method's reference, as in
+  2026-alpha-0.14.1.)
+
+### Changed
+
+- **The torture test is out of CI:** `render_torture` is labelled `torture` (and still `slow`), and
+  every CI job runs `ctest -LE torture`; the `full` preset runs it locally before every merge.
+- **The torture test is sharper:** its double Gauss is stopped down to f/8 and focused at 18 units
+  with 200 mm a unit (the scene stands for a set four times larger), so everything from the front
+  row to the mirror is sharp, where at f/2 the front row was a blur. Its gold torus is the `metal`
+  material. The reference render, README preview and full-size image are regenerated; the
+  full-size image now uses `--aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb` (19,329 CPU-seconds, 69.4 rays a pixel on average; 43 minutes on a machine busy with other work, about 20 idle on 16 cores; against 67,301 CPU-seconds for 0.20).
+
+  ![The torture test at 0.20 and 0.20.1](docs/images/changelog/torture-sharp.png)
+
+  Look at the front row (the goblet, queen, star, spring and torus), which is sharp now, and the
+  gold torus, which reflects as gold does. The frame is brighter at the edges too: stopped down,
+  the lens vignettes far less.
+- **Tests:** `render_`, `roundtrip_` and `network_` tests for the two showcase scenes, and
+  `ShowcaseChecks` in `format_test`: a hand-built `.glb` (a padded stride, unsigned short indices,
+  a parent's translation and a child's rotation, a base color), the same as a `.gltf` with its
+  buffer beside it and in a `data:` URI, a named node in its own frame, the material filter, a
+  sparse accessor, and the refusals (Draco, glTF 1.0, a cut-short file, an index out of range, a
+  URI leaving the folder); metal reflectance face on, toward grazing and as a dielectric with k 0;
+  Student's t against its tables; the adaptive sampler's new fields and their errors; and the ray
+  count map.
+
 ## [2026-alpha-0.20] - 2026-11-21
 
 The Apollo cameras: the Hasselblads flown to the Moon as camera bodies, seven of their Carl Zeiss
@@ -1972,7 +2119,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.1...HEAD
+[2026-alpha-0.20.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20...2026-alpha-0.20.1
 [2026-alpha-0.20]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.19...2026-alpha-0.20
 [2026-alpha-0.19]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.18...2026-alpha-0.19
 [2026-alpha-0.18]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.17...2026-alpha-0.18

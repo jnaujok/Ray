@@ -64,16 +64,32 @@ namespace
     std::mutex                                                          s_oModelLock;
     std::map< SModelKey, std::weak_ptr<const ModelFile::SModel> >       s_oModels;
 
-    std::shared_ptr<const ModelFile::SModel> ReadModelOnce( const std::string &strData, const std::string &strName, std::string &strError )
+    std::shared_ptr<const ModelFile::SModel> ReadModelOnce( const std::string &strData, const std::string &strName,
+                                                            const ModelFile::SGltfFiles &oFiles, const std::string &strNode,
+                                                            const std::string &strMaterial, std::string &strError )
     {
         SModelKey oKey;
         uint64_t  nHash = 1469598103934665603ULL;
 
         for ( size_t nIndex = 0; nIndex < strData.size(); nIndex++ )
             nHash = ( nHash ^ (unsigned char)strData[ nIndex ] ) * 1099511628211ULL;
-            // The name picks the format, so it is part of the key.
+            // The name picks the format, so it is part of the key, as are a
+            // glTF model's node and other files.
         for ( size_t nIndex = 0; nIndex < strName.size(); nIndex++ )
             nHash = ( nHash ^ (unsigned char)strName[ nIndex ] ) * 1099511628211ULL;
+        nHash = ( nHash ^ 0x23 ) * 1099511628211ULL;
+        for ( size_t nIndex = 0; nIndex < strNode.size(); nIndex++ )
+            nHash = ( nHash ^ (unsigned char)strNode[ nIndex ] ) * 1099511628211ULL;
+        nHash = ( nHash ^ 0x24 ) * 1099511628211ULL;
+        for ( size_t nIndex = 0; nIndex < strMaterial.size(); nIndex++ )
+            nHash = ( nHash ^ (unsigned char)strMaterial[ nIndex ] ) * 1099511628211ULL;
+        for ( const auto &oFile : oFiles.aoFiles )
+        {
+            for ( char chNext : oFile.first )
+                nHash = ( nHash ^ (unsigned char)chNext ) * 1099511628211ULL;
+            for ( size_t nIndex = 0; oFile.second && nIndex < oFile.second->size(); nIndex++ )
+                nHash = ( nHash ^ (unsigned char)( *oFile.second )[ nIndex ] ) * 1099511628211ULL;
+        }
         oKey.nSize = strData.size();
         oKey.nHash = nHash;
 
@@ -87,7 +103,10 @@ namespace
 
         std::shared_ptr<ModelFile::SModel> pModel( new ModelFile::SModel );
 
-        if ( ! ModelFile::Read( strData, strName, *pModel, strError ) )
+        BOOL bRead = ModelFile::IsGltf( strData, strName ) ? ModelFile::ReadGltf( strData, &oFiles, strNode, strMaterial, *pModel, strError )
+                                                           : ModelFile::Read( strData, strName, *pModel, strError );
+
+        if ( ! bRead )
             return std::shared_ptr<const ModelFile::SModel>();
 
         std::lock_guard<std::mutex> oLock( s_oModelLock );
@@ -126,7 +145,7 @@ namespace
 
 BOOL CMesh::LoadModel( const std::string &strData, const std::string &strName, std::string &strError )
 {
-    std::shared_ptr<const ModelFile::SModel> pModel = ReadModelOnce( strData, strName, strError );
+    std::shared_ptr<const ModelFile::SModel> pModel = ReadModelOnce( strData, strName, m_oGltfFiles, m_strNode, m_strGltfMaterial, strError );
 
     if ( ! pModel )
         return FALSE;
@@ -1408,6 +1427,31 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
 
             oNode.putBinary( "data", anData );
         }
+        if ( ! m_strNode.empty() )
+            oNode.put( "node", m_strNode.c_str() );
+        if ( ! m_strGltfMaterial.empty() )
+            oNode.put( "gltfMaterial", m_strGltfMaterial.c_str() );
+        if ( ! m_oGltfFiles.aoFiles.empty() )
+        {
+                // A .gltf's buffers and images go into an archive beside it,
+                // under the names it gives them, and into a task's copy.
+            std::string             strFolder = GltfFolder();
+            IASLib::CObjectNode    *pFiles = RayJson::EmbeddingData() ? oNode.putObject( "files" ) : NULL;
+
+            for ( size_t nFile = 0; nFile < m_oGltfFiles.aoFiles.size(); nFile++ )
+            {
+                const auto &oFile = m_oGltfFiles.aoFiles[ nFile ];
+
+                RayJson::SceneFileName( strFolder + ModelFile::UnescapeUri( oFile.first ),
+                                        ( nFile < m_astrGltfPaths.size() ) ? m_astrGltfPaths[ nFile ] : std::string(), oFile.second );
+                if ( pFiles && oFile.second )
+                {
+                    std::vector<unsigned char> anData( oFile.second->begin(), oFile.second->end() );
+
+                    pFiles->putBinary( oFile.first, anData );
+                }
+            }
+        }
         if ( m_nFitSize > 0.0 )
             RayJson::PutNumber( oNode, "fitSize", m_nFitSize );
         else
@@ -1509,6 +1553,13 @@ BOOL CMesh::ReadUVMap( const IASLib::CJsonNode &oNode, BOOL bUnused )
     return TRUE;
 }
 
+std::string CMesh::GltfFolder( void ) const
+{
+    size_t nSlash = m_strFile.find_last_of( "/\\" );
+
+    return ( nSlash == std::string::npos ) ? std::string() : m_strFile.substr( 0, nSlash + 1 );
+}
+
 BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bDoubleSided )
 {
     static const char *const astrAligns[] = { "none", "center", "bottom" };
@@ -1559,6 +1610,12 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
     std::string                 strError;
     const IASLib::CJsonNode    *pData = oNode.get( "data" );
 
+    m_strNode.clear();
+    m_strGltfMaterial.clear();
+    if ( ! RayJson::GetString( oNode, "node", m_strNode, FALSE ) ||
+         ! RayJson::GetString( oNode, "gltfMaterial", m_strGltfMaterial, FALSE ) )
+        return FALSE;
+
     if ( pData )
     {
             // The file's bytes, carried in a copy of the scene sent to a task.
@@ -1572,6 +1629,50 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
     else if ( ! RayJson::ReadSceneFile( m_strFile, strData, m_strFilePath, strError ) )
         return RayJson::Fail( "can't open the model \"" + m_strFile + "\"" );
 
+    m_oGltfFiles.aoFiles.clear();
+    m_astrGltfPaths.clear();
+    if ( ModelFile::IsGltf( strData, m_strFile ) )
+    {
+            // A .gltf names its buffers (and maybe PNG images) as other
+            // files, beside it; a task's copy carries them in "files".
+        std::vector<std::string>    astrUris;
+        const IASLib::CJsonNode    *pFiles = oNode.get( "files" );
+
+        if ( pFiles && ! pFiles->isObject() )
+            return RayJson::Fail( "files must be an object of the files a .gltf names, in base64" );
+        if ( ! ModelFile::GltfUris( strData, astrUris, strError ) )
+            return RayJson::Fail( "the model \"" + m_strFile + "\" " + strError );
+        for ( const std::string &strUri : astrUris )
+        {
+            std::string                 strFile, strPath;
+            const IASLib::CJsonNode    *pFile = pFiles ? pFiles->get( strUri ) : NULL;
+
+            if ( pFile )
+            {
+                std::vector<unsigned char> anData;
+
+                if ( ! pFile->binaryValue( anData ) )
+                    return RayJson::Fail( "files: \"" + strUri + "\" must be the file's bytes, in base64" );
+                strFile.assign( anData.begin(), anData.end() );
+            }
+            else if ( ! RayJson::ReadSceneFile( GltfFolder() + ModelFile::UnescapeUri( strUri ), strFile, strPath, strError ) )
+            {
+                    // A missing image only loses its color; a missing buffer is an error.
+                std::string strLower( strUri );
+
+                for ( char &chNext : strLower )
+                    chNext = (char)tolower( (unsigned char)chNext );
+                if ( strLower.size() >= 4 && strLower.compare( strLower.size() - 4, 4, ".png" ) == 0 )
+                    continue;
+                return RayJson::Fail( "can't open \"" + strUri + "\", which the model \"" + m_strFile + "\" names" );
+            }
+            m_oGltfFiles.aoFiles.push_back( std::make_pair( strUri, ShareFileData( strFile ) ) );
+            m_astrGltfPaths.push_back( strPath );
+        }
+    }
+    else if ( ! m_strNode.empty() || ! m_strGltfMaterial.empty() || oNode.get( "files" ) )
+        return RayJson::Fail( "\"node\", \"gltfMaterial\" and \"files\" are for glTF models" );
+
     m_bSmooth = bSmooth;
     m_bDoubleSided = bDoubleSided;
     if ( ! LoadModel( strData, m_strFile, strError ) )
@@ -1583,8 +1684,8 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
 BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "vertices", "faces", "normals", "uvs", "uvMap", "smooth", "doubleSided", "color", "materials", "bump",
-                                              "file", "data", "scale", "fitSize", "rotation", "align", "translation", NULL };
-    static const char *const astrModelOnly[] = { "data", "scale", "fitSize", "rotation", "align", "translation", NULL };
+                                              "file", "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files", NULL };
+    static const char *const astrModelOnly[] = { "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files", NULL };
     static const char *const astrInlineOnly[] = { "vertices", "faces", "normals", "uvs", NULL };
     std::vector<CVector>    aoVertices;
     std::vector<int>        anFaces;

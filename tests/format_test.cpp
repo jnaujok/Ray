@@ -64,6 +64,8 @@
 #include "Expression.h"
 #include "Implicit.h"
 #include "Blob.h"
+#include "MetalMaterial.h"
+#include "RayCountMap.h"
 #include "Fractal.h"
 #include "Extrusion.h"
 #include "Sweep.h"
@@ -5286,6 +5288,292 @@ static std::string FormulaError( const char *strFormula )
 
     // The Apollo cameras: their lenses, Sellmeier glasses, film, the Reseau
     // plate, camera bodies and the regolith material.
+    // A little-endian glTF binary container: the JSON (padded with spaces)
+    // and the binary chunk (padded with zeros).
+static std::string MakeGlb( std::string strJson, std::string strBinary )
+{
+    while ( strJson.size() % 4 )
+        strJson += ' ';
+    while ( strBinary.size() % 4 )
+        strBinary += '\0';
+
+    std::string strOut;
+    auto        Put32 = [ &strOut ]( uint32_t nValue ) { for ( int nByte = 0; nByte < 4; nByte++ ) strOut += (char)( ( nValue >> ( 8 * nByte ) ) & 0xFF ); };
+
+    strOut = "glTF";
+    Put32( 2 );
+    Put32( (uint32_t)( 12 + 8 + strJson.size() + ( strBinary.empty() ? 0 : 8 + strBinary.size() ) ) );
+    Put32( (uint32_t)strJson.size() );
+    Put32( 0x4E4F534A );
+    strOut += strJson;
+    if ( ! strBinary.empty() )
+    {
+        Put32( (uint32_t)strBinary.size() );
+        Put32( 0x004E4942 );
+        strOut += strBinary;
+    }
+    return strOut;
+}
+
+static void PutFloat( std::string &strOut, float fValue )
+{
+    uint32_t nBits;
+
+    memcpy( &nBits, &fValue, 4 );
+    for ( int nByte = 0; nByte < 4; nByte++ )
+        strOut += (char)( ( nBits >> ( 8 * nByte ) ) & 0xFF );
+}
+
+static std::string ToBase64( const std::string &strData )
+{
+    static const char *strDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string        strOut;
+
+    for ( size_t nAt = 0; nAt < strData.size(); nAt += 3 )
+    {
+        uint32_t nBits = (uint32_t)(unsigned char)strData[ nAt ] << 16;
+        size_t   nLeft = strData.size() - nAt;
+
+        if ( nLeft > 1 )
+            nBits |= (uint32_t)(unsigned char)strData[ nAt + 1 ] << 8;
+        if ( nLeft > 2 )
+            nBits |= (uint32_t)(unsigned char)strData[ nAt + 2 ];
+        strOut += strDigits[ ( nBits >> 18 ) & 63 ];
+        strOut += strDigits[ ( nBits >> 12 ) & 63 ];
+        strOut += ( nLeft > 1 ) ? strDigits[ ( nBits >> 6 ) & 63 ] : '=';
+        strOut += ( nLeft > 2 ) ? strDigits[ nBits & 63 ] : '=';
+    }
+    return strOut;
+}
+
+    // glTF 2.0 models, CMetalMaterial, the adaptive sampler's confidence and
+    // channels, and CRayCountMap (2026-alpha-0.20.1).
+static void ShowcaseChecks( void )
+{
+    std::string strError;
+
+    {
+            // One triangle, its corners as floats 16 bytes apart (a stride
+            // with padding), indices as unsigned shorts, under a parent node
+            // that moves it by (10, 0, 0) and a child that turns it 90
+            // degrees about y; its material's base color is (0.2, 0.4, 0.6).
+        std::string strBinary;
+        const float afCorners[ 3 ][ 3 ] = { { 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 } };
+
+        for ( int nCorner = 0; nCorner < 3; nCorner++ )
+        {
+            for ( int nAxis = 0; nAxis < 3; nAxis++ )
+                PutFloat( strBinary, afCorners[ nCorner ][ nAxis ] );
+            PutFloat( strBinary, 99.0f );           // padding the stride skips
+        }
+
+        const unsigned short anIndices[] = { 0, 1, 2 };
+
+        for ( unsigned short nIndex : anIndices )
+        {
+            strBinary += (char)( nIndex & 0xFF );
+            strBinary += (char)( nIndex >> 8 );
+        }
+
+        const double dHalf = sqrt( 0.5 );
+        char         achJson[ 2048 ];
+
+        snprintf( achJson, sizeof( achJson ),
+                  "{\"asset\":{\"version\":\"2.0\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],"
+                  "\"nodes\":[{\"translation\":[10,0,0],\"children\":[1]},{\"rotation\":[0,%.17g,0,%.17g],\"mesh\":0}],"
+                  "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0},\"indices\":1,\"material\":0}]}],"
+                  "\"materials\":[{\"name\":\"blue\",\"pbrMetallicRoughness\":{\"baseColorFactor\":[0.2,0.4,0.6,1]}}],"
+                  "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\"},"
+                  "{\"bufferView\":1,\"componentType\":5123,\"count\":3,\"type\":\"SCALAR\"}],"
+                  "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":48,\"byteStride\":16},"
+                  "{\"buffer\":0,\"byteOffset\":48,\"byteLength\":6}],"
+                  "\"buffers\":[{\"byteLength\":54}]}", dHalf, dHalf );
+
+        std::string       strGlb = MakeGlb( achJson, strBinary );
+        ModelFile::SModel oModel;
+
+        Check( ModelFile::IsGltf( strGlb, "anything.dat" ) == TRUE, "a .glb is recognized by its magic, whatever its name" );
+        Check( ModelFile::Read( strGlb, "tri.glb", oModel, strError ) == TRUE, "a .glb reads" );
+            // The child turns (1, 0, 0) to (0, 0, -1), the parent moves it to
+            // (10, 0, -1), and z is negated for Ray's left-handed scenes.
+        Check( oModel.aoVertices.size() == 3 && oModel.anFaces.size() == 3 &&
+               ABS( oModel.aoVertices[ 1 ].GetX() - 10.0 ) < 1e-6 && ABS( oModel.aoVertices[ 1 ].GetY() ) < 1e-6 &&
+               ABS( oModel.aoVertices[ 1 ].GetZ() - 1.0 ) < 1e-6 && ABS( oModel.aoVertices[ 2 ].GetY() - 1.0 ) < 1e-6,
+               "a glTF node's translation and rotation are flattened in, the stride is followed, and z is negated" );
+        Check( oModel.anFaces.size() == 3 && oModel.anFaces[ 0 ] == 0 && oModel.anFaces[ 1 ] == 2 && oModel.anFaces[ 2 ] == 1,
+               "a glTF face is turned back round when z is negated, so it isn't mirrored" );
+        Check( oModel.aoFaceColors.size() == 1 && oModel.abHasColor.size() == 1 && oModel.abHasColor[ 0 ] &&
+               ABS( oModel.aoFaceColors[ 0 ].GetB() - 0.6 ) < 1e-6 && ABS( oModel.aoFaceColors[ 0 ].GetR() - 0.2 ) < 1e-6,
+               "a glTF material's baseColorFactor becomes its faces' color" );
+
+            // The same as a .gltf whose buffer is a separate file, and as a
+            // data: URI; a node by name; a material filter.
+        std::string strText( achJson );
+        std::string strExternal = strText;
+
+        strExternal.replace( strExternal.find( "{\"byteLength\":54}" ), 17, "{\"byteLength\":54,\"uri\":\"tri.bin\"}" );
+
+        ModelFile::SGltfFiles oFiles;
+        std::vector<std::string> astrUris;
+
+        oFiles.aoFiles.push_back( std::make_pair( std::string( "tri.bin" ), std::make_shared<const std::string>( strBinary ) ) );
+        Check( ModelFile::GltfUris( strExternal, astrUris, strError ) == TRUE && astrUris.size() == 1 && astrUris[ 0 ] == "tri.bin",
+               "a .gltf's other files are listed" );
+        Check( ModelFile::ReadGltf( strExternal, &oFiles, "", "", oModel, strError ) == TRUE && oModel.aoVertices.size() == 3,
+               "a .gltf reads its buffer from a file beside it" );
+        Check( ModelFile::ReadGltf( strExternal, NULL, "", "", oModel, strError ) == FALSE && strError.find( "tri.bin" ) != std::string::npos,
+               "a .gltf whose buffer is missing is refused, naming it" );
+
+        std::string strData = strText;
+
+        strData.replace( strData.find( "{\"byteLength\":54}" ), 17,
+                         "{\"byteLength\":54,\"uri\":\"data:application/octet-stream;base64," + ToBase64( strBinary ) + "\"}" );
+        Check( ModelFile::ReadGltf( strData, NULL, "", "", oModel, strError ) == TRUE && oModel.aoVertices.size() == 3 &&
+               ABS( oModel.aoVertices[ 1 ].GetX() - 10.0 ) < 1e-6, "a .gltf with its buffer in a data: URI reads" );
+
+        std::string strNamed = strData;
+
+        strNamed.replace( strNamed.find( "{\"rotation\"" ), 1, "{\"name\":\"tri\"," );
+        Check( ModelFile::ReadGltf( strNamed, NULL, "tri", "", oModel, strError ) == TRUE && oModel.aoVertices.size() == 3 &&
+               ABS( oModel.aoVertices[ 1 ].GetX() - 1.0 ) < 1e-6 && ABS( oModel.aoVertices[ 1 ].GetZ() ) < 1e-6,
+               "a named glTF node is read in its own frame (its own and its parents' placement left out)" );
+        Check( ModelFile::ReadGltf( strNamed, NULL, "nothing", "", oModel, strError ) == FALSE,
+               "a glTF node that isn't there is an error" );
+        Check( ModelFile::ReadGltf( strData, NULL, "", "blue", oModel, strError ) == TRUE &&
+               ModelFile::ReadGltf( strData, NULL, "", "red", oModel, strError ) == FALSE,
+               "a glTF material filter keeps only that material's triangles" );
+
+            // A sparse accessor moves corner 2 to (0, 2, 0).
+        std::string strSparseBinary = strBinary;
+
+        while ( strSparseBinary.size() % 4 )
+            strSparseBinary += '\0';
+
+        size_t nSparseAt = strSparseBinary.size();
+
+        strSparseBinary += (char)2;                 // index 2, an unsigned byte
+        strSparseBinary += std::string( 3, '\0' );
+        PutFloat( strSparseBinary, 0.0f );
+        PutFloat( strSparseBinary, 2.0f );
+        PutFloat( strSparseBinary, 0.0f );
+
+        std::string strSparse = strText;
+        char        achViews[ 256 ];
+
+        strSparse.replace( strSparse.find( "\"type\":\"VEC3\"}" ), 14,
+                           "\"type\":\"VEC3\",\"sparse\":{\"count\":1,\"indices\":{\"bufferView\":2,\"componentType\":5121},"
+                           "\"values\":{\"bufferView\":3}}}" );
+        snprintf( achViews, sizeof( achViews ), ",{\"buffer\":0,\"byteOffset\":%d,\"byteLength\":1},{\"buffer\":0,\"byteOffset\":%d,\"byteLength\":12}]",
+                  (int)nSparseAt, (int)( nSparseAt + 4 ) );
+        strSparse.replace( strSparse.find( "\"byteLength\":6}]" ) + 15, 1, achViews );
+        strSparse.replace( strSparse.find( "{\"byteLength\":54}" ), 17, "{\"byteLength\":" + std::to_string( strSparseBinary.size() ) + "}" );
+        Check( ModelFile::Read( MakeGlb( strSparse, strSparseBinary ), "sparse.glb", oModel, strError ) == TRUE &&
+               oModel.aoVertices.size() == 3 && ABS( oModel.aoVertices[ 2 ].GetY() - 2.0 ) < 1e-6,
+               "a glTF sparse accessor replaces the elements it lists" );
+
+            // Refusals.
+        std::string strDraco = strText;
+
+        strDraco.replace( strDraco.find( "\"scene\":0" ), 9, "\"extensionsRequired\":[\"KHR_draco_mesh_compression\"],\"scene\":0" );
+        Check( ModelFile::Read( MakeGlb( strDraco, strBinary ), "d.glb", oModel, strError ) == FALSE &&
+               strError.find( "Draco" ) == std::string::npos && strError.find( "KHR_draco_mesh_compression" ) != std::string::npos,
+               "a Draco-compressed glTF is refused, naming the extension" );
+
+        std::string strVersion1 = strGlb;
+
+        strVersion1[ 4 ] = 1;
+        Check( ModelFile::Read( strVersion1, "v1.glb", oModel, strError ) == FALSE, "a glTF 1.0 binary is refused" );
+        Check( ModelFile::Read( strGlb.substr( 0, 40 ), "short.glb", oModel, strError ) == FALSE, "a cut-short .glb is refused" );
+
+        std::string strBadIndex = strBinary;
+
+        strBadIndex[ 48 ] = 9;                      // index 0 becomes 9, past the 3 corners
+        Check( ModelFile::Read( MakeGlb( achJson, strBadIndex ), "bad.glb", oModel, strError ) == FALSE,
+               "a glTF index past its corners is refused" );
+        Check( ModelFile::GltfUris( "{\"asset\":{\"version\":\"2.0\"},\"buffers\":[{\"uri\":\"../secret.bin\",\"byteLength\":1}]}",
+                                    astrUris, strError ) == FALSE, "a .gltf naming a file outside its folder is refused" );
+    }
+
+    {
+            // Metals: the Fresnel reflectance of a conductor.
+        FLT anN[ 3 ], anK[ 3 ];
+
+        Check( CMetalMaterial::Preset( "gold", anN, anK ) == TRUE && CMetalMaterial::Preset( "unobtainium", anN, anK ) == FALSE,
+               "metal presets are found by name" );
+        CMetalMaterial::Preset( "gold", anN, anK );
+
+        double dNormal = ( ( anN[ 0 ] - 1.0 ) * ( anN[ 0 ] - 1.0 ) + anK[ 0 ] * anK[ 0 ] ) /
+                         ( ( anN[ 0 ] + 1.0 ) * ( anN[ 0 ] + 1.0 ) + anK[ 0 ] * anK[ 0 ] );
+
+        Check( ABS( CMetalMaterial::Reflectance( 1.0, anN[ 0 ], anK[ 0 ] ) - dNormal ) < 1e-9,
+               "a metal's reflectance face on is ((n-1)^2 + k^2) / ((n+1)^2 + k^2)" );
+        Check( CMetalMaterial::Reflectance( 1.0, anN[ 0 ], anK[ 0 ] ) > CMetalMaterial::Reflectance( 1.0, anN[ 2 ], anK[ 2 ] ) + 0.3,
+               "gold reflects red far more than blue" );
+        Check( CMetalMaterial::Reflectance( 0.01, anN[ 2 ], anK[ 2 ] ) > 0.9 && CMetalMaterial::Reflectance( 0.0, anN[ 2 ], anK[ 2 ] ) == 1.0,
+               "a metal whitens toward grazing" );
+            // A dielectric (k 0) agrees with the Schlick-free Fresnel value face on.
+        Check( ABS( CMetalMaterial::Reflectance( 1.0, 1.5, 0.0 ) - 0.04 ) < 1e-9, "with k 0 it is the dielectric's 4%" );
+
+        CScene oScene;
+
+        Check( oScene.FromJson( "{\"format\":\"Ray scene\",\"version\":3,\"camera\":{\"position\":[0,0,-5],\"lookAt\":[0,0,0]},\"objects\":[{\"type\":\"sphere\",\"center\":[0,0,0],\"radius\":1,"
+                                "\"materials\":[{\"type\":\"metal\",\"metal\":\"copper\",\"roughness\":0.2}]}]}" ) == 0,
+               "a metal material loads" );
+        Check( oScene.FromJson( "{\"format\":\"Ray scene\",\"version\":3,\"camera\":{\"position\":[0,0,-5],\"lookAt\":[0,0,0]},\"objects\":[{\"type\":\"sphere\",\"center\":[0,0,0],\"radius\":1,"
+                                "\"materials\":[{\"type\":\"metal\",\"metal\":\"brass\"}]}]}" ) != 0 &&
+               oScene.FromJson( "{\"format\":\"Ray scene\",\"version\":3,\"camera\":{\"position\":[0,0,-5],\"lookAt\":[0,0,0]},\"objects\":[{\"type\":\"sphere\",\"center\":[0,0,0],\"radius\":1,"
+                                "\"materials\":[{\"type\":\"metal\",\"n\":[1,1,1],\"k\":[1,-1,1]}]}]}" ) != 0,
+               "an unknown metal and a negative k are refused" );
+    }
+
+    {
+            // Student's t, against its tables (two-sided 95% and 99%).
+        Check( ABS( CAdaptiveSampler::StudentT( 0.95, 1 ) - 12.706 ) < 0.01 && ABS( CAdaptiveSampler::StudentT( 0.95, 2 ) - 4.303 ) < 0.005,
+               "Student's t at 1 and 2 degrees of freedom is exact" );
+        Check( ABS( CAdaptiveSampler::StudentT( 0.95, 3 ) - 3.182 ) < 0.02 * 3.182 && ABS( CAdaptiveSampler::StudentT( 0.95, 8 ) - 2.306 ) < 0.01 * 2.306 &&
+               ABS( CAdaptiveSampler::StudentT( 0.95, 30 ) - 2.042 ) < 0.002 * 2.042 && ABS( CAdaptiveSampler::StudentT( 0.99, 10 ) - 3.169 ) < 0.01 * 3.169,
+               "Student's t from 3 degrees of freedom up is within 2% of its table" );
+
+        CScene oScene;
+        auto   Sampler = []( const char *strSettings ) -> std::string
+        {
+            return std::string( "{\"format\":\"Ray scene\",\"version\":3,\"camera\":{\"position\":[0,0,-5],\"lookAt\":[0,0,0],"
+                                "\"sampler\":{\"type\":\"adaptive\"" ) + strSettings + "}}}";
+        };
+
+        Check( oScene.FromJson( Sampler( ",\"min\":4,\"confidence\":0.95,\"channels\":\"rgb\"" ) ) == 0,
+               "the adaptive sampler takes a confidence and per-channel errors" );
+
+        IASLib::CObjectNode oSaved;
+
+        oScene.GetCamera().GetSampler().ToJson( oSaved );
+        Check( oSaved.get( "confidence" ) && ABS( oSaved.get( "confidence" )->doubleValue() - 0.95 ) < 1e-12 &&
+               oSaved.get( "channels" ) && oSaved.get( "channels" )->textString() == "rgb",
+               "the adaptive sampler saves its confidence and channels" );
+        Check( oScene.FromJson( Sampler( "" ) ) == 0, "a plain adaptive sampler still loads" );
+
+        IASLib::CObjectNode oPlain;
+
+        oScene.GetCamera().GetSampler().ToJson( oPlain );
+        Check( oPlain.get( "confidence" ) == NULL && oPlain.get( "channels" ) == NULL,
+               "a plain adaptive sampler saves as it always did" );
+        Check( oScene.FromJson( Sampler( ",\"confidence\":0.3" ) ) != 0 && oScene.FromJson( Sampler( ",\"channels\":\"hsv\"" ) ) != 0,
+               "a confidence under 0.5 and unknown channels are refused" );
+    }
+
+    {
+            // The ray count map.
+        CRayCountMap::Enable( 4, 3 );
+        CRayCountMap::Record( 2, 1, 17 );
+        CRayCountMap::Record( 9, 9, 5 );        // outside: ignored
+        Check( CRayCountMap::IsEnabled() && CRayCountMap::GetCounts().size() == 12 && CRayCountMap::GetCounts()[ 6 ] == 17,
+               "the ray count map records a pixel's rays" );
+        CRayCountMap::Disable();
+        CRayCountMap::Record( 2, 1, 3 );
+        Check( ! CRayCountMap::IsEnabled() && CRayCountMap::GetCounts().empty(), "the ray count map records nothing when off" );
+    }
+}
+
 static void ApolloChecks( void )
 {
     CScene  oScene;
@@ -6068,6 +6356,7 @@ int main( int argc, char **argv )
         ExtrusionChecks();
         MathShapeChecks();
         ApolloChecks();
+        ShowcaseChecks();
     }
 
     if ( g_nFailures == 0 )
