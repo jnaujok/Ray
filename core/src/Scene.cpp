@@ -386,6 +386,62 @@ CObjects *CScene::ClosestHit( CRay &oRay, CVector &oIntersect, CObjects *pDeny )
     return m_oObjects[ nWinner ];
 }
 
+void CScene::Nearby( const CVector &oPoint, FLT nDistance, std::vector<int> &anObjects )
+{
+    if ( ! m_bTreeBuilt )
+        BuildTree();
+
+    CVector oAt( oPoint );
+    FLT     anAt[ 3 ] = { oAt.GetX(), oAt.GetY(), oAt.GetZ() };
+    FLT     nLimit = nDistance * nDistance;
+    auto    Within = [ & ]( const FLT anMin[ 3 ], const FLT anMax[ 3 ] )
+    {
+        FLT nSum = 0.0;
+
+        for ( int nAxis = 0; nAxis < 3; nAxis++ )
+        {
+            FLT nOut = ( anAt[ nAxis ] < anMin[ nAxis ] ) ? anMin[ nAxis ] - anAt[ nAxis ] :
+                       ( anAt[ nAxis ] > anMax[ nAxis ] ) ? anAt[ nAxis ] - anMax[ nAxis ] : 0.0;
+
+            nSum += nOut * nOut;
+        }
+        return nSum <= nLimit;
+    };
+
+    anObjects.clear();
+    for ( size_t nIndex = 0; nIndex < m_anUnbounded.size(); nIndex++ )
+        anObjects.push_back( m_anUnbounded[ nIndex ] );
+    if ( ! m_aoTree.empty() )
+    {
+        int anStack[ 128 ];
+        int nStack = 0;
+
+        anStack[ nStack++ ] = 0;
+        while ( nStack > 0 )
+        {
+            const STreeNode &oNode = m_aoTree[ (size_t)anStack[ --nStack ] ];
+
+            if ( ! Within( oNode.anMin, oNode.anMax ) )
+                continue;
+            if ( oNode.nCount == 0 )
+            {
+                anStack[ nStack++ ] = oNode.nRight;
+                anStack[ nStack++ ] = oNode.nLeft;
+                continue;
+            }
+            for ( int nIndex = oNode.nFirst; nIndex < oNode.nFirst + oNode.nCount; nIndex++ )
+            {
+                int nObject = m_anTreeObjects[ (size_t)nIndex ];
+
+                if ( Within( &m_anObjectBounds[ (size_t)nObject * 6 ], &m_anObjectBounds[ (size_t)nObject * 6 + 3 ] ) )
+                    anObjects.push_back( nObject );
+            }
+        }
+    }
+        // In scene order, whatever order the tree gave them in.
+    std::sort( anObjects.begin(), anObjects.end() );
+}
+
 CObjects *CScene::ClosestHitByEachObject( CRay &oRay, CVector &oIntersect, CObjects *pDeny )
 {
     CObjects *pIntersection = NULL;

@@ -95,10 +95,12 @@ The ray tracing itself is the 1997 code.
   makes an HDR sky for the tests.
 
   <img src="docs/images/tests/environment_test.png" alt="An HDR sky with clouds behind a mirror ball, a glass ball, a white ball and a red ball on a checkered floor, lit by the sky" width="320">
-- **Indirect light:** light bounced between surfaces (`settings.indirect`), so a red wall tints the
-  white floor beside it pink and shadows and ceilings get fill light. Matte surfaces gather light
-  from the surfaces near them with rays spread from each sample's point in its pixel, so a
-  stratified sampler smooths it, and every thread and engine gives the same image.
+- **Indirect light:** light bounced between surfaces (`settings.indirect`), a "poor man's
+  radiosity", so a red wall tints the white floor beside it pink and shadows and ceilings get fill
+  light. Each matte point treats the objects near it (found through the scene's tree) as lights
+  and aims a few rays at each, or gathers over the whole half above it (`"hemisphere"`). The rays
+  come from each sample's point in its pixel, so a stratified sampler smooths it, and every thread
+  and engine gives the same image; there is no cache.
 
   <img src="docs/images/tests/bounce_test.png" alt="A white box room with a red left wall and a green right wall, a white block and ball, the walls' colors bleeding onto them" width="320">
 - **Haze:** an atmosphere (`haze`) that far things fade into and that dims light on its way to a
@@ -343,8 +345,8 @@ pips (constructive solid geometry), textures (a wooden mirror frame), a brushed
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light and a low sun, and an
 HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
 light haze, through the double Gauss lens at 25 rays a pixel, each traced at four wavelengths
-(spectral dispersion) and clamped at 1.5, at its full 1024×768 (about three and a half minutes on
-an idle 16-core machine, with a Release build):
+(spectral dispersion) and clamped at 1.5, at its full 1024×768 (about four minutes on an idle
+16-core machine, with a Release build):
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr

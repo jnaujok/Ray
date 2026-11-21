@@ -2931,9 +2931,13 @@ static void IndirectChecks( void )
         // sees the same light, so the answer is exact whatever the samples:
         // g ( 1 + a + ... + a^bounces ).
     const double adAlbedo[] = { 0.5, 0.8 };
+    const char  *astrMethod[] = { "objects", "hemisphere" };
 
-    for ( int nAlbedo = 0; nAlbedo < 2; nAlbedo++ )
+    for ( int nCase = 0; nCase < 4; nCase++ )
     {
+        int         nAlbedo = nCase % 2;
+        const char *strMethod = astrMethod[ nCase / 2 ];
+
         for ( int nBounces = 1; nBounces <= 4; nBounces++ )
         {
             CScene  oRoom;
@@ -2941,7 +2945,8 @@ static void IndirectChecks( void )
             double  dExpected = 0.0;
             double  dTerm = 0.1;
 
-            snprintf( achIndirect, sizeof( achIndirect ), ", \"indirect\": { \"bounces\": %d, \"samples\": 3, \"distance\": 20 }", nBounces );
+            snprintf( achIndirect, sizeof( achIndirect ), ", \"indirect\": { \"method\": \"%s\", \"bounces\": %d, \"samples\": 3, \"distance\": 20 }",
+                      strMethod, nBounces );
             for ( int nTerm = 0; nTerm <= nBounces; nTerm++ )
             {
                 dExpected += dTerm;
@@ -2953,37 +2958,89 @@ static void IndirectChecks( void )
 
             if ( ABS( oSeen.GetR() - dExpected ) > 1e-9 || ABS( oSeen.GetB() - dExpected ) > 1e-9 )
             {
-                fprintf( stderr, "FAILED: glowing room, albedo %g, %d bounces: %.12f, expected %.12f\n", adAlbedo[ nAlbedo ],
-                         nBounces, (double)oSeen.GetR(), dExpected );
+                fprintf( stderr, "FAILED: glowing room, %s, albedo %g, %d bounces: %.12f, expected %.12f\n", strMethod,
+                         adAlbedo[ nAlbedo ], nBounces, (double)oSeen.GetR(), dExpected );
                 g_nFailures++;
             }
         }
     }
 
-        // A shorter reach than the room brings nothing back.
+        // Gathering over the half above, a shorter reach than the room brings
+        // nothing back; aimed at objects, one farther than the distance is
+        // left out.
     CScene oShort;
+    CScene oFar;
 
-    Check( oShort.FromJson( GlowingRoom( 0.1, 0.5, ", \"indirect\": { \"bounces\": 2, \"distance\": 0.5 }" ) ) == 0 &&
+    Check( oShort.FromJson( GlowingRoom( 0.1, 0.5, ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 2, \"distance\": 0.5 }" ) ) == 0 &&
            ABS( TraceFrom( oShort, CVector( 0, 0, 0 ), CVector( 0, 0, 1 ) ).GetR() - 0.1 ) < 1e-12,
            "gathering rays bring back nothing from beyond their distance" );
+    Check( oFar.FromJson( RedWallFloor( ", \"indirect\": { \"bounces\": 1, \"distance\": 0.5 }" ) ) == 0,
+           "a scene with a short reach loads" );
+
+    CColor oFarColor = TraceFrom( oFar, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+
+    Check( memcmp( &oFarColor, &oPlainColor, sizeof( CColor ) ) == 0, "an object farther than the distance sends no light" );
 
         // Beside a red wall, the floor picks up red; and the same ray always
         // gives the same color.
     CScene oBounce;
     CScene oAgain;
+    CScene oHemisphere;
     const char *strBounce = ", \"indirect\": { \"bounces\": 1, \"samples\": 16, \"distance\": 10 }";
 
-    Check( oBounce.FromJson( RedWallFloor( strBounce ) ) == 0 && oAgain.FromJson( RedWallFloor( strBounce ) ) == 0,
+    Check( oBounce.FromJson( RedWallFloor( strBounce ) ) == 0 && oAgain.FromJson( RedWallFloor( strBounce ) ) == 0 &&
+           oHemisphere.FromJson( RedWallFloor( ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 1, \"samples\": 64, \"distance\": 10 }" ) ) == 0,
            "a scene with indirect light loads" );
 
     CColor oBounceColor = TraceFrom( oBounce, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
     CColor oAgainColor = TraceFrom( oAgain, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
     CColor oRepeat = TraceFrom( oBounce, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
+    CColor oHemisphereColor = TraceFrom( oHemisphere, CVector( 0.8, 0.5, 0.3 ), CVector( 0.0, -1.0, 0.0 ) );
 
     Check( oBounceColor.GetR() > oPlainColor.GetR() + 0.01 && ABS( oBounceColor.GetG() - oPlainColor.GetG() ) < 1e-12,
            "light bounced off a red wall adds red to the floor beside it, and only red" );
+    Check( oHemisphereColor.GetR() > oPlainColor.GetR() + 0.01 && ABS( oHemisphereColor.GetG() - oPlainColor.GetG() ) < 1e-12,
+           "gathered over the half above, too" );
     Check( memcmp( &oBounceColor, &oAgainColor, sizeof( CColor ) ) == 0 && memcmp( &oBounceColor, &oRepeat, sizeof( CColor ) ) == 0,
            "indirect light is the same every time, in every copy of the scene" );
+
+        // Both ways estimate the same light: averaged over many rays and
+        // points, the red each adds beside the wall agrees.
+    {
+        double adRed[ 2 ] = { 0.0, 0.0 };
+        int    nPoints = 0;
+
+        for ( int nMethod = 0; nMethod < 2; nMethod++ )
+        {
+            CScene oMany;
+
+            Check( oMany.FromJson( RedWallFloor( nMethod ? ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 1, \"samples\": 256, \"distance\": 20 }"
+                                                         : ", \"indirect\": { \"bounces\": 1, \"samples\": 256, \"distance\": 20 }" ) ) == 0,
+                   "the comparison scenes load" );
+            nPoints = 0;
+            for ( double dX = 0.2; dX < 1.4; dX += 0.3 )
+            {
+                for ( double dZ = -1.0; dZ <= 1.0; dZ += 0.5 )
+                {
+                    adRed[ nMethod ] += TraceFrom( oMany, CVector( dX, 0.5, dZ ), CVector( 0.0, -1.0, 0.0 ) ).GetR() -
+                                        TraceFrom( oPlain, CVector( dX, 0.5, dZ ), CVector( 0.0, -1.0, 0.0 ) ).GetR();
+                    nPoints++;
+                }
+            }
+        }
+        if ( ! ( ABS( adRed[ 0 ] - adRed[ 1 ] ) < 0.05 * adRed[ 1 ] ) )
+        {
+            fprintf( stderr, "FAILED: aimed at objects (%.5f) and over the half above (%.5f) gather different light\n",
+                     adRed[ 0 ] / nPoints, adRed[ 1 ] / nPoints );
+            g_nFailures++;
+        }
+    }
+
+        // The cap on how many objects one point gathers from.
+    CScene oCapped;
+
+    Check( oCapped.FromJson( RedWallFloor( ", \"indirect\": { \"bounces\": 1, \"objects\": 1 }" ) ) == 0 &&
+           oCapped.GetSettings().GetIndirectObjects() == 1, "the objects cap is read" );
 
         // Saved and read back.
     std::string strSaved = oBounce.ToJson();
@@ -3005,6 +3062,12 @@ static void IndirectChecks( void )
                  BAD_FILE, "bounces" );
     ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"rays\": 2 } }," ),
                  BAD_FILE, "rays" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"method\": \"cache\" } }," ),
+                 BAD_FILE, "unknown method \"cache\" (objects or hemisphere)" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"method\": \"hemisphere\", \"objects\": 2 } }," ),
+                 BAD_FILE, "objects is only for the objects method" );
+    ExpectError( Minimal( "\"format\": \"Ray scene\",", "\"format\": \"Ray scene\", \"settings\": { \"indirect\": { \"bounces\": 1, \"objects\": 0 } }," ),
+                 BAD_FILE, "objects must be a whole number from 1 to 64" );
 }
 
 static void HazeChecks( void )

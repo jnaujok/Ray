@@ -21,6 +21,7 @@ class CPlane : public CObjects
         virtual    ~CPlane( void );
 
         virtual BOOL        Intersect( CRay &oRay, CVector &oIntersect );
+        virtual BOOL        PlaneOf( CVector &oPoint, CVector &oNormal ) { oPoint = m_oPosition; oNormal = m_oNormal; return TRUE; }
             // Distances from the plane's position along two axes across it,
             // in scene units: on a floor, u along +x and v along +z; on a
             // wall facing -z, u along +x and v up.

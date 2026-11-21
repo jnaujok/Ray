@@ -46,9 +46,11 @@ CSettings::CSettings( int nWidth, int nHeight, int nColorDepth, LPCSTR strOutput
     m_bFractalTurbulence = FALSE;
     m_nFractalSeed = 0.04;
     m_nIndirectBounces = 0;
-    m_nIndirectSamples = 8;
+    m_nIndirectSamples = 4;
     m_nIndirectDistance = 10.0;
     m_nIndirectStrength = 1.0;
+    m_nIndirectMethod = INDIRECT_OBJECTS;
+    m_nIndirectObjects = 8;
 }
 
 #ifdef RAY_GUI
@@ -98,8 +100,11 @@ void CSettings::ToJson( IASLib::CObjectNode &oNode )
     {
         IASLib::CObjectNode *pIndirect = oNode.putObject( "indirect" );
 
+        pIndirect->put( "method", ( m_nIndirectMethod == INDIRECT_HEMISPHERE ) ? "hemisphere" : "objects" );
         pIndirect->put( "bounces", m_nIndirectBounces );
         pIndirect->put( "samples", m_nIndirectSamples );
+        if ( m_nIndirectMethod == INDIRECT_OBJECTS )
+            pIndirect->put( "objects", m_nIndirectObjects );
         RayJson::PutNumber( *pIndirect, "distance", m_nIndirectDistance );
         RayJson::PutNumber( *pIndirect, "strength", m_nIndirectStrength );
     }
@@ -138,7 +143,7 @@ BOOL CSettings::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "imageWidth", "imageHeight", "imageFile", "colorDepth", "maximumDepth",
                                               "depthThreshold", "indirect", "reserved1997", NULL };
-    static const char *const astrIndirect[] = { "bounces", "samples", "distance", "strength", NULL };
+    static const char *const astrIndirect[] = { "method", "bounces", "samples", "objects", "distance", "strength", NULL };
     static const char *const astrReserved[] = { "gammaCorrect", "gammaCorrection", "adaptiveDepth", "antialias", "adaptiveAntialiasing", "antialiasThreshold", "maximumAntialiasDepth", "atmosphericEffects", "distanceAttenuation", "distanceHazeHemidepth", "caustics", "adaptiveCaustics", "maximumCausticDepth", "causticThreshold", "simpleRadiosity", "traceByColor", "focalBlur", "depthOfField", "focalDisplacement", "adaptiveFocalBlur", "adaptiveFocalThreshold", "fractalTurbulence", "fractalSeed", NULL };
     std::string strImageFile = (const char *)m_strImageFile;
 
@@ -158,14 +163,27 @@ BOOL CSettings::FromJson( const IASLib::CJsonNode &oNode )
     {
         RayJson::CWhere oWhere( "indirect" );
 
+        std::string strMethod = "objects";
+
         if ( ! pIndirect->isObject() )
             return RayJson::Fail( "must be an object" );
+        m_nIndirectObjects = 8;
         if ( ! RayJson::OnlyFields( *pIndirect, astrIndirect ) ||
+             ! RayJson::GetString( *pIndirect, "method", strMethod, FALSE ) ||
+             ! RayJson::GetInt( *pIndirect, "objects", m_nIndirectObjects, 1, MAXIMUM_INDIRECT_OBJECTS, FALSE ) ||
              ! RayJson::GetInt( *pIndirect, "bounces", m_nIndirectBounces, 0, MAXIMUM_INDIRECT_BOUNCES, TRUE ) ||
              ! RayJson::GetInt( *pIndirect, "samples", m_nIndirectSamples, 1, MAXIMUM_INDIRECT_SAMPLES, FALSE ) ||
              ! RayJson::GetNumber( *pIndirect, "distance", m_nIndirectDistance, FALSE ) ||
              ! RayJson::GetNumber( *pIndirect, "strength", m_nIndirectStrength, FALSE ) )
             return FALSE;
+        if ( strMethod == "objects" )
+            m_nIndirectMethod = INDIRECT_OBJECTS;
+        else if ( strMethod == "hemisphere" )
+            m_nIndirectMethod = INDIRECT_HEMISPHERE;
+        else
+            return RayJson::Fail( "unknown method \"" + strMethod + "\" (objects or hemisphere)" );
+        if ( m_nIndirectMethod == INDIRECT_HEMISPHERE && pIndirect->get( "objects" ) )
+            return RayJson::Fail( "objects is only for the objects method" );
         if ( ! ( m_nIndirectDistance > 0.0 ) || m_nIndirectDistance > RAY_FAR_AWAY )
             return RayJson::Fail( "distance must be more than 0 and at most 1000000" );
         if ( ! ( m_nIndirectStrength >= 0.0 ) || m_nIndirectStrength > 100.0 )
@@ -177,6 +195,7 @@ BOOL CSettings::FromJson( const IASLib::CJsonNode &oNode )
 
         SetIndirect( oDefault.m_nIndirectBounces, oDefault.m_nIndirectSamples, oDefault.m_nIndirectDistance,
                      oDefault.m_nIndirectStrength );
+        SetIndirectMethod( oDefault.m_nIndirectMethod, oDefault.m_nIndirectObjects );
     }
 
     const IASLib::CJsonNode *pReserved = oNode.get( "reserved1997" );

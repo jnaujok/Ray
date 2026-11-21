@@ -115,6 +115,9 @@ class CObjects
             // The object's bounding box, for the scene's tree. FALSE if it
             // has none (an infinite plane).
         virtual BOOL        GetBounds( CVector &oMinimum, CVector &oMaximum ) { (void)oMinimum; (void)oMaximum; return FALSE; }
+            // A point on the object and its normal, if it is an infinite
+            // plane (which has no bounds); FALSE for anything else.
+        virtual BOOL        PlaneOf( CVector &oPoint, CVector &oNormal ) { (void)oPoint; (void)oNormal; return FALSE; }
             // The outward normal of the surface at a point on it, as Shade
             // shades it before any bump map. FALSE if the object can't say.
         virtual BOOL        SurfaceNormal( CVector &oPoint, CVector &oNormal ) { (void)oPoint; (void)oNormal; return FALSE; }
@@ -168,6 +171,13 @@ class CObjects
             // Adds the light bounced off other surfaces nearby (the scene's
             // "indirect" settings) to the point's diffuse materials.
         void                IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CColor &oReturn );
+            // Traces one gathering ray from oFrom along the unit oDirection,
+            // nLength at most, and gives the light the surface it meets first
+            // sends back (through any haze, clamped as the camera clamps).
+            // FALSE if it meets nothing, or something other than pTarget
+            // (when pTarget isn't NULL).
+        BOOL                GatherAlong( CScene &oScene, CRay &oRay, CVector &oFrom, CVector &oUp, CVector &oDirection, FLT nLength,
+                                         uint64_t nBranch, CObjects *pTarget, CColor &oBounced );
 };
 
 

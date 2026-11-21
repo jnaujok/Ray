@@ -21,6 +21,8 @@
 #include "SceneJson.h"
 
 #include <string.h>
+#include <algorithm>
+#include <vector>
 
 #if defined(RAY_GUI) && defined(_DEBUG)
 #define new DEBUG_NEW
@@ -376,6 +378,91 @@ void CObjects::EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect
     }
 }
 
+BOOL CObjects::GatherAlong( CScene &oScene, CRay &oRay, CVector &oFrom, CVector &oUp, CVector &oDirection, FLT nLength,
+                            uint64_t nBranch, CObjects *pTarget, CColor &oBounced )
+{
+    CSettings  &oSettings = oScene.GetSettings();
+    CVector     oReach( oDirection * nLength );
+    CVector     oHit;
+    CRay        oGather;
+
+        // The ray reaches nLength at most: CreateRay keeps hits within the
+        // length of its vector.
+    oGather.CreateRay( oReach, oFrom, oRay.GetInfluence(), oRay.GetPixelX(), oRay.GetPixelY() );
+    oGather.InheritSample( oRay, (uint64_t)RaySampling::PURPOSE_INDIRECT + nBranch );
+    oGather.CopySampleIndex( oRay );
+    oGather.SetDepth( oRay.GetDepth() );
+    oGather.SetGather( oRay.GetBounce() + 1 );
+    oGather.Increment();
+    if ( oGather.GetDepth() > oSettings.GetMaximumDepth() )
+        return FALSE;
+
+    CObjects   *pHit = oScene.ClosestHit( oGather, oHit, this );
+
+        // The scene skips the object the ray leaves, but a closed one (a
+        // sphere, a box) can light itself from inside: try it alone, from
+        // just off the surface.
+    if ( pHit != this && IsClosed() && ( pTarget == NULL || pTarget == this ) )
+    {
+        FLT     nScale = 1.0 + ABS( oFrom.GetX() ) + ABS( oFrom.GetY() ) + ABS( oFrom.GetZ() );
+        CVector oNudge( oUp * ( 1e-7 * nScale ) );
+        CVector oNudged( oFrom + oNudge );
+        CRay    oSelf( oGather );
+        CVector oSelfHit;
+
+        oSelf.CreateRay( oReach, oNudged, oRay.GetInfluence(), oRay.GetPixelX(), oRay.GetPixelY() );
+        if ( Intersect( oSelf, oSelfHit ) )
+        {
+            CVector oToSelf( oSelfHit - oFrom );
+            CVector oToOther( oHit - oFrom );
+
+            if ( pHit == NULL || oToSelf.Magnitude() < oToOther.Magnitude() )
+            {
+                pHit = this;
+                oHit = oSelfHit;
+            }
+        }
+    }
+        // Light from a direction counts once, for the object the ray meets
+        // first: a ray aimed at one object that meets another on the way
+        // is that one's light, gathered when it is aimed at.
+    if ( pHit == NULL || ( pTarget && pHit != pTarget ) )
+        return FALSE;
+
+    oBounced = pHit->Shade( oScene, oGather, oHit );
+
+    const CHaze *pHaze = oScene.GetHaze();
+
+    if ( pHaze )
+    {
+        CVector oPath( oHit - oFrom );
+
+        oBounced = pHaze->Through( oBounced, pHaze->Transmittance( oFrom, oDirection, oPath.Magnitude() ) );
+    }
+    oBounced = oScene.GetCamera().ClampSample( oBounced );
+    return TRUE;
+}
+
+    // A direction about the unit vector oUp from the point (nU, nV) of the
+    // unit square, spread by the cosine (Malley's method: the concentric
+    // disc lifted onto the half sphere).
+static CVector CosineDirection( CVector &oUp, CVector &oFirst, CVector &oSecond, FLT nU, FLT nV )
+{
+    FLT     nX;
+    FLT     nY;
+
+    RaySampling::ConcentricDisc( nU, nV, nX, nY );
+
+    FLT     nRest = 1.0 - ( nX * nX ) - ( nY * nY );
+    FLT     nAlongUp = ( nRest > 0.0 ) ? SQRT( nRest ) : 0.0;
+    CVector oAcross1( oFirst * nX );
+    CVector oAcross2( oSecond * nY );
+    CVector oAlong( oUp * nAlongUp );
+    CVector oPartway( oAcross1 + oAcross2 );
+
+    return oPartway + oAlong;
+}
+
 void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CColor &oReturn )
 {
     CMaterialList  &oMaterials = m_pShadeMaterials ? *m_pShadeMaterials : m_oMaterials;
@@ -386,112 +473,244 @@ void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, C
     if ( ! bDiffuse )
         return;
 
-        // Light bounced off the surfaces near the point: gathering rays, as
-        // many as "samples" at the first bounce (one at each bounce after
-        // it, so the cost doesn't multiply), spread by the cosine over the
-        // half on the side the ray came from, from the ray's sample point
-        // (CRay::SamplePoint), so a stratified sampler covers the half
-        // evenly over a pixel's rays. Each goes "distance" at most; the
-        // surface it hits sends back the light it scatters diffusely (lit
-        // by the lights and the sky, plus what glows, plus its own bounced
-        // light while bounces are left). Rays that hit nothing in reach
-        // bring nothing: distant light is the sky's and ambient's to give.
-        // Nothing is cached and nothing depends on the order pixels are
-        // traced in, so every task, thread or engine, gives the same result.
     CSettings  &oSettings = oScene.GetSettings();
     int         nSamples = ( oRay.GetBounce() == 0 ) ? oSettings.GetIndirectSamples() : 1;
     FLT         nDistance = oSettings.GetIndirectDistance();
-    const CHaze *pHaze = oScene.GetHaze();
-    FLT         nFirstU;
-    FLT         nFirstV;
     CVector     oUp( oNormal );
+    CVector     oRayDirection( oRay.GetI(), oRay.GetJ(), oRay.GetK() );
     CVector     oView( oIntersect.GetX() - oRay.GetX(), oIntersect.GetY() - oRay.GetY(), oIntersect.GetZ() - oRay.GetZ() );
     CVector     oFirst;
     CVector     oSecond;
-    CColor      oSum( 0, 0, 0 );
+        // The light reaching the point from around it, as the integral of
+        // the light arriving from each direction times the cosine there.
+    CColor      oIncoming( 0, 0, 0 );
 
     if ( nSamples < 1 )
         return;
     oUp.Normalize();
+        // Whether the ray reached the surface from inside the object.
+    BOOL        bFromInside = ( oUp.Dot( oRayDirection ) > 0.0 );
+
     if ( oUp.Dot( oView ) > 0.0 )
         oUp = oUp * -1.0;
     RaySampling::Basis( oUp, oFirst, oSecond );
-    oRay.SamplePoint( (uint64_t)RaySampling::PURPOSE_INDIRECT, nFirstU, nFirstV );
 
-    for ( int nSample = 0; nSample < nSamples; nSample++ )
+    if ( oSettings.GetIndirectMethod() == CSettings::INDIRECT_HEMISPHERE )
     {
-        FLT     nU;
-        FLT     nV;
-        FLT     nX;
-        FLT     nY;
+            // Gathering over the whole half above the point: rays spread by
+            // the cosine, each reaching nDistance, from the ray's sample
+            // point, so a stratified sampler covers the half evenly over a
+            // pixel's rays. Each one's light counts pi / n.
+        FLT nFirstU;
+        FLT nFirstV;
 
-        RaySampling::Spread( nFirstU, nFirstV, nSample, nU, nV );
-        RaySampling::ConcentricDisc( nU, nV, nX, nY );
-
-        FLT     nRest = 1.0 - ( nX * nX ) - ( nY * nY );
-        FLT     nAlongUp = ( nRest > 0.0 ) ? SQRT( nRest ) : 0.0;
-        CVector oAcross1( oFirst * nX );
-        CVector oAcross2( oSecond * nY );
-        CVector oAlong( oUp * nAlongUp );
-        CVector oPartway( oAcross1 + oAcross2 );
-        CVector oDirection( oPartway + oAlong );
-        CVector oReach( oDirection * nDistance );
-        CVector oFrom( oIntersect );
-        CVector oHit;
-        CRay    oGather;
-
-            // The ray reaches nDistance at most: CreateRay keeps hits within
-            // the length of its vector.
-        oGather.CreateRay( oReach, oFrom, oRay.GetInfluence(), oRay.GetPixelX(), oRay.GetPixelY() );
-        oGather.InheritSample( oRay, (uint64_t)RaySampling::PURPOSE_INDIRECT + (uint64_t)nSample );
-        oGather.CopySampleIndex( oRay );
-        oGather.SetDepth( oRay.GetDepth() );
-        oGather.SetGather( oRay.GetBounce() + 1 );
-        oGather.Increment();
-        if ( oGather.GetDepth() > oSettings.GetMaximumDepth() )
-            continue;
-
-        CObjects   *pHit = oScene.ClosestHit( oGather, oHit, this );
-
-            // The scene skips the object the ray leaves, but a closed one
-            // (a sphere, a box) can light itself from inside: try it alone,
-            // from just off the surface.
-        if ( pHit != this && IsClosed() )
+        oRay.SamplePoint( (uint64_t)RaySampling::PURPOSE_INDIRECT, nFirstU, nFirstV );
+        for ( int nSample = 0; nSample < nSamples; nSample++ )
         {
-            FLT     nScale = 1.0 + ABS( oFrom.GetX() ) + ABS( oFrom.GetY() ) + ABS( oFrom.GetZ() );
-            CVector oNudge( oUp * ( 1e-7 * nScale ) );
-            CVector oNudged( oFrom + oNudge );
-            CRay    oSelf( oGather );
-            CVector oSelfHit;
+            FLT     nU;
+            FLT     nV;
+            CColor  oBounced;
 
-            oSelf.CreateRay( oReach, oNudged, oRay.GetInfluence(), oRay.GetPixelX(), oRay.GetPixelY() );
-            if ( Intersect( oSelf, oSelfHit ) )
+            RaySampling::Spread( nFirstU, nFirstV, nSample, nU, nV );
+
+            CVector oDirection( CosineDirection( oUp, oFirst, oSecond, nU, nV ) );
+
+            if ( GatherAlong( oScene, oRay, oIntersect, oUp, oDirection, nDistance, (uint64_t)nSample, NULL, oBounced ) )
+                oIncoming = oIncoming + ( oBounced * ( PI / (FLT)nSamples ) );
+        }
+    }
+    else
+    {
+            // Aimed at the objects near the point, each treated as a light:
+            // the objects whose bounds come within nDistance (by the scene's
+            // tree), the "objects" setting's worth of them that cover the
+            // most of the point's view, each gets nSamples rays aimed at it.
+            // A ray counts only if that object is the first thing it meets,
+            // so no direction counts twice, and each counts by the cosine at
+            // the point and the share of the view it stands for, so the sum
+            // is right whatever the number of rays.
+        enum { AIM_CONE = 0, AIM_HALF = 1, AIM_DISC = 2 };
+        struct STarget
+        {
+            int         nObject;            // -1: the object itself, from inside
+            CObjects   *pObject;
+            int         nAim;
+            FLT         nSolidAngle;
+            CVector     oCenter;            // cone: the bounding sphere's center; disc: its center on the plane
+            CVector     oNormal;            // disc: the plane's normal
+            FLT         nRadius;            // cone: the bounding sphere's; disc: the disc's
+            FLT         nCenterDistance;
+        };
+        std::vector<int>        anNearby;
+        std::vector<STarget>    aoTargets;
+        CVector                 oAt( oIntersect );
+
+        oScene.Nearby( oAt, nDistance, anNearby );
+        for ( size_t nIndex = 0; nIndex < anNearby.size(); nIndex++ )
+        {
+            STarget     oTarget;
+            CObjects   *pObject = oScene.GetObjectAt( anNearby[ nIndex ] );
+            CVector     oMinimum;
+            CVector     oMaximum;
+            CVector     oPlanePoint;
+            CVector     oPlaneNormal;
+
+            if ( pObject == NULL || pObject == this )
+                continue;
+            oTarget.nObject = anNearby[ nIndex ];
+            oTarget.pObject = pObject;
+            if ( pObject->GetBounds( oMinimum, oMaximum ) )
             {
-                CVector oToSelf( oSelfHit - oFrom );
-                CVector oToOther( oHit - oFrom );
+                CVector oSum( oMinimum + oMaximum );
+                CVector oSpan( oMaximum - oMinimum );
 
-                if ( pHit == NULL || oToSelf.Magnitude() < oToOther.Magnitude() )
+                oTarget.oCenter = oSum * 0.5;
+                oTarget.nRadius = oSpan.Magnitude() * 0.5;
+
+                CVector oToCenter( oTarget.oCenter - oAt );
+
+                oTarget.nCenterDistance = oToCenter.Magnitude();
+                if ( oTarget.nCenterDistance <= oTarget.nRadius * 1.000001 )
                 {
-                    pHit = this;
-                    oHit = oSelfHit;
+                    oTarget.nAim = AIM_HALF;
+                    oTarget.nSolidAngle = 2.0 * PI;
+                }
+                else
+                {
+                    FLT nSin = oTarget.nRadius / oTarget.nCenterDistance;
+                    FLT nCos = SQRT( 1.0 - ( nSin * nSin ) );
+
+                        // Wholly below the point's horizon: nothing to gather.
+                    if ( oUp.Dot( oToCenter ) < - nSin * oTarget.nCenterDistance )
+                        continue;
+                    oTarget.nAim = AIM_CONE;
+                    oTarget.nSolidAngle = 2.0 * PI * ( 1.0 - nCos );
+                }
+            }
+            else if ( pObject->PlaneOf( oPlanePoint, oPlaneNormal ) )
+            {
+                CVector oOffset( oAt - oPlanePoint );
+
+                oPlaneNormal.Normalize();
+
+                FLT     nHeight = oPlaneNormal.Dot( oOffset );
+                FLT     nAbove = ABS( nHeight );
+
+                if ( nAbove < 1e-9 * ( 1.0 + oAt.Magnitude() ) || nAbove >= nDistance )
+                    continue;
+
+                CVector oDown( oPlaneNormal * nHeight );
+
+                oTarget.nAim = AIM_DISC;
+                oTarget.oCenter = oAt - oDown;
+                oTarget.oNormal = oPlaneNormal;
+                oTarget.nRadius = SQRT( ( nDistance * nDistance ) - ( nHeight * nHeight ) );
+                oTarget.nCenterDistance = nAbove;
+                oTarget.nSolidAngle = 2.0 * PI * ( 1.0 - ( nAbove / nDistance ) );
+            }
+            else
+                continue;
+            aoTargets.push_back( oTarget );
+        }
+        if ( bFromInside && IsClosed() )
+        {
+            STarget     oSelf;
+            CVector     oMinimum;
+            CVector     oMaximum;
+
+            if ( GetBounds( oMinimum, oMaximum ) )
+            {
+                CVector oSpan( oMaximum - oMinimum );
+
+                oSelf.nObject = -1;
+                oSelf.pObject = this;
+                oSelf.nAim = AIM_HALF;
+                oSelf.nSolidAngle = 2.0 * PI;
+                oSelf.nRadius = 0.0;
+                oSelf.nCenterDistance = oSpan.Magnitude();
+                aoTargets.push_back( oSelf );
+            }
+        }
+            // The ones that cover the most of the view first (in scene order
+            // where they tie), as many as "objects" allows.
+        std::stable_sort( aoTargets.begin(), aoTargets.end(),
+                          []( const STarget &oA, const STarget &oB ) { return oA.nSolidAngle > oB.nSolidAngle; } );
+        if ( (int)aoTargets.size() > oSettings.GetIndirectObjects() )
+            aoTargets.resize( (size_t)oSettings.GetIndirectObjects() );
+
+        for ( size_t nTarget = 0; nTarget < aoTargets.size(); nTarget++ )
+        {
+            STarget    &oTarget = aoTargets[ nTarget ];
+            uint64_t    nStream = ( (uint64_t)( oTarget.nObject + 1 ) << 20 );
+            FLT         nFirstU;
+            FLT         nFirstV;
+            CVector     oAxis;
+            CVector     oAcrossA;
+            CVector     oAcrossB;
+            FLT         nCosLimit = 1.0;
+
+            oRay.SamplePoint( (uint64_t)RaySampling::PURPOSE_INDIRECT + nStream, nFirstU, nFirstV );
+                // A bounding sphere fills a cone of directions from the
+                // point, and so does the disc of a plane within nDistance
+                // (about the line straight down to the plane).
+            if ( oTarget.nAim != AIM_HALF )
+            {
+                CVector oToCenter( oTarget.oCenter - oAt );
+
+                oAxis = oToCenter * ( 1.0 / oTarget.nCenterDistance );
+                RaySampling::Basis( oAxis, oAcrossA, oAcrossB );
+                nCosLimit = 1.0 - ( oTarget.nSolidAngle / ( 2.0 * PI ) );
+            }
+
+            for ( int nSample = 0; nSample < nSamples; nSample++ )
+            {
+                FLT     nU;
+                FLT     nV;
+                CColor  oBounced;
+
+                RaySampling::Spread( nFirstU, nFirstV, nSample, nU, nV );
+                if ( oTarget.nAim == AIM_HALF )
+                {
+                    CVector oDirection( CosineDirection( oUp, oFirst, oSecond, nU, nV ) );
+                    FLT     nReach = oTarget.nCenterDistance + oTarget.nRadius;
+
+                    if ( GatherAlong( oScene, oRay, oIntersect, oUp, oDirection, nReach * 1.0001 + 1e-9, nStream + (uint64_t)nSample,
+                                      oTarget.pObject, oBounced ) )
+                        oIncoming = oIncoming + ( oBounced * ( PI / (FLT)nSamples ) );
+                }
+                else
+                {
+                        // Evenly over the cone: each direction stands for an
+                        // equal share of its solid angle, so no direction
+                        // counts for more than that, however near the surface.
+                    FLT     nCos = 1.0 - ( nU * ( 1.0 - nCosLimit ) );
+                    FLT     nSinSquared = 1.0 - ( nCos * nCos );
+                    FLT     nSin = ( nSinSquared > 0.0 ) ? SQRT( nSinSquared ) : 0.0;
+                    FLT     nTurn = 2.0 * PI * nV;
+                    CVector oAlong( oAxis * nCos );
+                    CVector oSide1( oAcrossA * ( nSin * (FLT)cos( (double)nTurn ) ) );
+                    CVector oSide2( oAcrossB * ( nSin * (FLT)sin( (double)nTurn ) ) );
+                    CVector oPartway( oAlong + oSide1 );
+                    CVector oDirection( oPartway + oSide2 );
+                    FLT     nFacing = oDirection.Dot( oUp );
+
+                    FLT     nReach = ( oTarget.nAim == AIM_DISC ) ? oTarget.nCenterDistance / ( nCos > 1e-12 ? nCos : 1e-12 )
+                                                                  : oTarget.nCenterDistance + oTarget.nRadius;
+
+                    if ( nFacing <= 0.0 )
+                        continue;
+                    if ( GatherAlong( oScene, oRay, oIntersect, oUp, oDirection, nReach * 1.0001, nStream + (uint64_t)nSample,
+                                      oTarget.pObject, oBounced ) )
+                        oIncoming = oIncoming + ( oBounced * ( nFacing * oTarget.nSolidAngle / (FLT)nSamples ) );
                 }
             }
         }
-        if ( pHit == NULL )
-            continue;
-
-        CColor  oBounced( pHit->Shade( oScene, oGather, oHit ) );
-
-        if ( pHaze )
-        {
-            CVector oPath( oHit - oFrom );
-
-            oBounced = pHaze->Through( oBounced, pHaze->Transmittance( oFrom, oDirection, oPath.Magnitude() ) );
-        }
-        oSum = oSum + oScene.GetCamera().ClampSample( oBounced );
     }
 
-    CColor  oLight( oSum * ( oSettings.GetIndirectStrength() / (FLT)nSamples ) );
+        // A diffuse surface lit by incoming light E (the integral above)
+        // sends out E / pi; as a light straight along the normal that is a
+        // light of E / pi.
+    CColor  oLight( oIncoming * ( oSettings.GetIndirectStrength() / PI ) );
 
     for ( int nMaterial = 0; nMaterial < oMaterials.GetSize(); nMaterial++ )
     {

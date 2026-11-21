@@ -19,26 +19,36 @@ fields render byte for byte as before.
 
 ### Added
 
-- **Indirect light** (`settings.indirect`: `bounces`, `samples`, `distance`, `strength`; off unless
-  `bounces` is set). At every point a ray hits on a surface with a `diffuse` material, `samples`
-  gathering rays go out over the half the ray came from, spread by the cosine from the ray's sample
-  point (`CRay::SamplePoint`, a new purpose `PURPOSE_INDIRECT`), each reaching `distance` at most
-  through the scene's bounding volume hierarchy. The surface a gathering ray hits sends back only
-  the light it scatters diffusely: its diffuse materials lit by the lights (point and area, with
-  shadows) and the sky, what glows (`ambient`, the new `CMaterial::Glows`), and its own gathered
-  light while bounces are left; no highlights, reflections or refraction (rays carry
-  `CRay::IsGather` and their bounce count). The average, times `strength`, lights the point's
-  diffuse materials like a light along its normal. A ray that hits nothing in reach brings nothing:
-  distant light stays the sky's and ambient's. Each sample gathers with `samples` rays at the first
-  bounce and one at each bounce after, so the cost grows with bounces instead of multiplying; with
-  a stratified sampler the pixel's samples spread the directions evenly. Closed objects (spheres,
-  boxes, capped cylinders and cones) light themselves from inside. Each gathered sample respects
-  the camera's `clamp`.
+- **Indirect light, a "poor man's radiosity"** (`settings.indirect`: `method`, `bounces`,
+  `samples`, `objects`, `distance`, `strength`; off unless `bounces` is set). At every point a ray
+  hits on a surface with a `diffuse` material, light bounced off nearby surfaces is gathered and
+  lights the point's diffuse materials like a light along its normal. Whatever a gathering ray
+  meets sends back only the light it scatters diffusely: its diffuse materials lit by the lights
+  (point and area, with shadows) and the sky, what glows (`ambient`, the new `CMaterial::Glows`),
+  and its own gathered light while bounces are left; no highlights, reflections or refraction (rays
+  carry `CRay::IsGather` and their bounce count). Two methods:
+  - **`"objects"`** (the default): the nearby objects are treated as lights. `CScene::Nearby` walks
+    the scene's bounding volume hierarchy for the objects whose bounds come within `distance`; the
+    `objects` (default 8) that fill the most of the point's view each get `samples` rays aimed
+    evenly over the cone their bounding sphere fills (a plane: the cone of its disc within
+    `distance`). Each ray is traced normally and counts only if that object is the first thing it
+    meets, so no direction counts twice, weighted by the cosine at the point and the solid angle it
+    stands for, so the estimate is right whatever the number of rays. An object whose bounds hold
+    the point (its room, its own mesh) is gathered from over the half above it instead, and a
+    closed object lights itself from inside. Cost: at most `objects` × `samples` rays a diffuse
+    hit, each shading what it meets with direct light only unless `bounces` is above 1.
+  - **`"hemisphere"`**: `samples` rays spread by the cosine over the half above the point, each
+    reaching `distance`; a ray that reaches nothing brings nothing. Cost: `samples` rays a hit.
+
+  Both take their directions from the ray's sample point (`CRay::SamplePoint`, a new purpose
+  `PURPOSE_INDIRECT`), so a stratified sampler spreads them evenly over a pixel's samples; both
+  gather with `samples` rays at the first bounce and one at each bounce after, so the cost grows
+  with bounces instead of multiplying; both respect the camera's `clamp`. Averaged over many rays
+  they agree within a few percent (`format_test` holds them to 5%).
   - **Why no cache:** an irradiance cache filled as pixels are traced depends on which pixel asks
     first, so threads and networked engines (which trace tiles in any order) would disagree.
     Everything here is worked out from the ray alone, so every task gives exactly the same image,
-    and the network tests hold it to that. The cost is `samples` gathering rays (each with its own
-    shadow rays) at every diffuse hit.
+    and the network tests hold it to that.
 - **Haze** (the scene's `haze`: `color`, `density`, `heightFalloff`, `baseHeight`). Every ray is
   blended toward the haze's color by the transmittance `exp( -∫ density )` along it, as far as its
   hit or 1,000,000 units for a ray that leaves the scene, and light from a light to a surface is
@@ -46,13 +56,15 @@ fields render byte for byte as before.
   height, like ground mist; its integral has a closed form, so haze is exact and nearly free.
   Sunlight (a `directional` light) isn't dimmed by haze that is the same everywhere, since its path
   would never end there.
-- `scenes/bounce_test.ray` (a box room with red and green walls, two bounces) and
+- `scenes/bounce_test.ray` (a box room with red and green walls, one bounce aimed at the nearby
+  objects) and
   `scenes/haze_test.ray` (an avenue of columns fading into ground mist), each with render,
   round-trip and network tests, reference renders, README previews and places in the Expected
   output table. `format_test` checks that bounces 0 traces exactly what no indirect light does;
   that a closed room glowing g and scattering a gives exactly g (1 + a + … + aⁿ) for n bounces
-  (every gathering ray sees the same light there, so the answer is exact at any sample count); that
-  nothing comes back from beyond `distance`; that a red wall adds red, and only red, to the floor
+  (every gathering ray sees the same light there, so the answer is exact at any sample count), by
+  both methods; that nothing comes back from beyond `distance`, or from an object farther than it;
+  that the two methods agree on the red a wall adds beside it; the method and `objects` fields; that a red wall adds red, and only red, to the floor
   beside it; that indirect light is the same every time and in every copy of the scene; haze
   transmittance for constant density and against a fine numerical integral of height-falloff
   density; that haze dims the light on its way to a surface and the view of it exactly; that
@@ -64,20 +76,25 @@ fields render byte for byte as before.
 
 ### Changed
 
-- **The torture test** has one bounce of indirect light (`samples` 1, so 25 gathering directions a
-  pixel from its 5×5 sampler, reaching 6 units) and a light haze that thins with height, which
+- **The torture test** has one bounce of indirect light by the `"objects"` method (`samples` 1 and
+  `objects` 2: one ray a sample aimed at each of the two objects within 4 units that fill the most
+  of the view, so 50 a pixel from its 5×5 sampler) and a light haze that thins with height, which
   fades the far floor and the horizon band into it. Its reference render, README preview and the
-  full-size image are regenerated. A full-size Release render takes 3,060 CPU-seconds against 2,229
-  before (37% more; 248 s wall on a busy 16-core machine), about three and a half minutes on an
-  idle one.
+  full-size image are regenerated. A full-size Release render takes 3,751 CPU-seconds against 2,229
+  before (68% more; 486 s wall on a busy 16-core machine), about four minutes on an idle one.
 
   ![Before and after: the bounce test without and with indirect light, the haze test without and with haze, and the torture test at 0.12.1 and 0.13](docs/images/changelog/bounce-haze.png)
 
-  Top, the bounce test without indirect light and with two bounces: the ceiling and the shadows are
-  no longer black, and the block and ball pick up red and green from the walls. Middle, the haze
-  test in clear air and in ground mist: the far columns fade, their bottoms more than their tops.
-  Bottom, the torture test before and after: the horizon band and the far floor fade into the haze,
-  and the floor and the shadows are a little lighter.
+  Top, the bounce test without indirect light and with one bounce gathered from the nearby objects:
+  the ceiling and the shadows are no longer black, and the block and ball pick up red and green from
+  the walls. Middle, the haze test in clear air and in ground mist: the far columns fade, their
+  bottoms more than their tops. Bottom, the torture test before and after: the horizon band and the
+  far floor fade into the haze, and the floor and the shadows are a little lighter.
+
+  ![The bounce test without indirect light, by the objects method and by the hemisphere method](docs/images/changelog/bounce-methods.png)
+
+  The two methods side by side on the bounce test at 320×240: the same light (the objects method in
+  about half the time here), with grain from their few rays a sample.
 
 ## [2026-alpha-0.12.1] - 2026-11-20
 

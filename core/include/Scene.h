@@ -105,6 +105,10 @@ class CScene
             /// order. The tree must find exactly what these do; the tests
             /// hold it to that.
         CObjects           *ClosestHitByEachObject( CRay &oRay, CVector &oIntersect, CObjects *pDeny );
+            /// The numbers of the objects that may come within nDistance of
+            /// oPoint (their bounding boxes do, by the tree), and every
+            /// unbounded object (planes), in scene order.
+        void                Nearby( const CVector &oPoint, FLT nDistance, std::vector<int> &anObjects );
         BOOL                IntersectEachObject( CRay &oRay, CObjects *pIgnore );
 
             /// The scene as JSON text (version 3 of the .ray format): indented
