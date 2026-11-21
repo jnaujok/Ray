@@ -386,7 +386,38 @@ BOOL CPngImage::Inflate( const BYTE *pData, size_t nSize, std::vector<BYTE> &anO
         return FALSE;
     }
 
-    SBits oBits = { pData + 2, nSize - 2, 0, 0, 0, FALSE };
+    size_t nConsumed = 0;
+
+    if ( ! InflateRaw( pData + 2, nSize - 2, anOut, nLimit, strError, &nConsumed ) )
+        return FALSE;
+
+        // The Adler-32 checksum of what came out.
+    if ( 2 + nConsumed + 4 > nSize )
+    {
+        strError = "the compressed data has no checksum";
+        return FALSE;
+    }
+
+    uint32_t nA = 1;
+    uint32_t nB = 0;
+
+    for ( size_t nIndex = 0; nIndex < anOut.size(); nIndex++ )
+    {
+        nA = ( nA + anOut[ nIndex ] ) % 65521u;
+        nB = ( nB + nA ) % 65521u;
+    }
+    if ( BigEndian( pData + 2 + nConsumed ) != ( ( nB << 16 ) | nA ) )
+    {
+        strError = "the compressed data's checksum is wrong";
+        return FALSE;
+    }
+    return TRUE;
+}
+
+BOOL CPngImage::InflateRaw( const BYTE *pData, size_t nSize, std::vector<BYTE> &anOut, size_t nLimit, std::string &strError,
+                            size_t *pnConsumed )
+{
+    SBits oBits = { pData, nSize, 0, 0, 0, FALSE };
     BOOL  bLast = FALSE;
 
     while ( ! bLast )
@@ -449,27 +480,9 @@ BOOL CPngImage::Inflate( const BYTE *pData, size_t nSize, std::vector<BYTE> &anO
         }
     }
 
-        // The Adler-32 checksum of what came out.
     oBits.Align();
-    if ( oBits.nAt + 4 > oBits.nSize )
-    {
-        strError = "the compressed data has no checksum";
-        return FALSE;
-    }
-
-    uint32_t nA = 1;
-    uint32_t nB = 0;
-
-    for ( size_t nIndex = 0; nIndex < anOut.size(); nIndex++ )
-    {
-        nA = ( nA + anOut[ nIndex ] ) % 65521u;
-        nB = ( nB + nA ) % 65521u;
-    }
-    if ( BigEndian( oBits.pData + oBits.nAt ) != ( ( nB << 16 ) | nA ) )
-    {
-        strError = "the compressed data's checksum is wrong";
-        return FALSE;
-    }
+    if ( pnConsumed )
+        *pnConsumed = oBits.nAt;
     return TRUE;
 }
 

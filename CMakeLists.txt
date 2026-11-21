@@ -100,6 +100,8 @@ set(RAY_CORE_SOURCES
     core/src/ModelFile.cpp
     core/src/GltfFile.cpp
     core/src/DracoDecoder.cpp
+    core/src/BlendFile.cpp
+    core/src/Decompress.cpp
     core/src/NoiseTexture.cpp
     core/src/Objects.cpp
     core/src/ObjectsArray.cpp
