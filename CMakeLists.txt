@@ -12,6 +12,17 @@ endif()
 option(RAY_BUILD_GUI   "Build the Windows MFC scene editor (MSVC only)" OFF)
 option(RAY_BUILD_TESTS "Build the regression tests" ON)
 option(RAY_BUILD_EDITOR "Build the cross-platform wxWidgets scene editor (ray-editor)" OFF)
+option(RAY_USE_CCACHE  "Compile through ccache when it is installed" ON)
+
+# ccache keeps compiled objects between builds, so rebuilding a tree (or a
+# second build directory) after a small change takes seconds.
+if(RAY_USE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    find_program(RAY_CCACHE_PROGRAM ccache)
+    if(RAY_CCACHE_PROGRAM)
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${RAY_CCACHE_PROGRAM}")
+        message(STATUS "Compiling through ccache: ${RAY_CCACHE_PROGRAM}")
+    endif()
+endif()
 
 # ---------------------------------------------------------------------------
 # IASLib: strings, files, threads, sockets, JSON (scene files) and SJSON (the

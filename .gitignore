@@ -1,5 +1,6 @@
-# Build output
+# Build output (build-debug and build-asan are the CMake presets' trees)
 /build/
+/build-*/
 Debug/
 Release/
 *.o

@@ -1,0 +1,64 @@
+{
+  "version": 2,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "release",
+      "displayName": "Release (what CI tests)",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (for a debugger; the tests are several times slower)",
+      "binaryDir": "${sourceDir}/build-debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "asan",
+      "displayName": "AddressSanitizer and UndefinedBehaviorSanitizer, optimized (as in CI)",
+      "binaryDir": "${sourceDir}/build-asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release" },
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "asan", "configurePreset": "asan" }
+  ],
+  "testPresets": [
+    {
+      "name": "fast",
+      "displayName": "Every test but the ones labelled slow",
+      "configurePreset": "release",
+      "output": { "outputOnFailure": true },
+      "filter": { "exclude": { "label": "slow" } },
+      "execution": { "jobs": 8 }
+    },
+    {
+      "name": "full",
+      "displayName": "Every test",
+      "configurePreset": "release",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 8 }
+    },
+    {
+      "name": "asan-fast",
+      "displayName": "The fast tests under the sanitizers",
+      "configurePreset": "asan",
+      "output": { "outputOnFailure": true },
+      "filter": { "exclude": { "label": "slow" } },
+      "execution": { "jobs": 8 }
+    },
+    {
+      "name": "asan-full",
+      "displayName": "Every test under the sanitizers",
+      "configurePreset": "asan",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 8 }
+    }
+  ]
+}

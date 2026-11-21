@@ -23,6 +23,23 @@ section. It needs only Python 3. Run it from the repository root whenever the re
 tools/render_previews.py
 ```
 
+## `bounce_sweep.py`
+
+Measures indirect light's noise and render time against its number of rays. It renders a scene
+(`scenes/bounce_test.ray` by default) with the `"objects"` method at 1, 4, 9, 16, 25, 36, 49 and 64
+rays an object, and with the `"hemisphere"` method at the same rays a point for a few of them, timing
+each render and measuring its noise as the root mean square difference (0–255) from a reference with
+256 rays an object, over the whole image and over the pixels only bounced light lights. It prints a
+Markdown table and, with `--image`, writes a labelled grid of the renders (that needs Pillow).
+`--scene`, `--size`, `--counts`, `--hemisphere` and `--reference` measure other scenes and counts.
+It is a measurement, not a test; the 2026-alpha-0.14.1 changelog has its results.
+
+```sh
+tools/bounce_sweep.py build/raythrower --out sweep --image sweep/grid.png
+tools/bounce_sweep.py build/raythrower --scene scenes/torture_test.ray --size 160x120 \
+    --counts 1,4,9 --hemisphere 1,4,9 --reference 49 --out sweep-torture
+```
+
 ## `make_textures.py`
 
 Makes the textures in `scenes/textures/`. The bricks, which `bump_test.ray` and the torture test use:

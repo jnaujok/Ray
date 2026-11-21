@@ -27,7 +27,8 @@ when the binary format was dropped; they are in the repository's history.
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
 | `environment_test.ray` | | An environment map: the HDR sky `textures/sky.hdr` behind the scene, in a mirror ball and through a glass one, lighting a white ball, a small red one and a checkered floor (`samples` 8, so the floor darkens under the balls), with a sun whose direction matches the sky's, with a 4×4 stratified sampler |
-| `bounce_test.ray` | | Indirect light: a box room with a red wall on the left and a green one on the right, a white block and a white ball, lit only by a small rectangle light under the ceiling. One bounce of light gathered from the nearby objects (`"objects"`, 2 rays an object) bleeds red and green onto the white surfaces and fills the shadows and the ceiling, with a 3×3 stratified sampler at 160×120 |
+| `bounce_test.ray` | | Indirect light: a box room with a red wall on the left and a green one on the right, a white block and a white ball, lit only by a small rectangle light under the ceiling. One bounce of light gathered from the nearby objects (`"objects"`, 9 rays an object) bleeds red and green onto the white surfaces and fills the shadows and the ceiling, with a 3×3 stratified sampler at 160×120 |
+| `bounce_hemisphere_test.ray` | | `bounce_test` gathered with the `"hemisphere"` method instead, at the same 54 rays a point (9 an object for the 6 objects in reach), for contrast: in a closed room none of its rays escape, so it is smoother for the same rays |
 | `haze_test.ray` | | Haze: an avenue of colored columns and balls receding along a checkered floor under a sky, fading into ground mist that thins with height (`density` 0.16, `heightFalloff` 0.7), lit by two point lights (one far down the avenue) and a sun, with a 2×2 stratified sampler at 160×120 |
 | `materials_test.ray` | | The material presets: thirty spheres before a gray wall, one of each finish in the library (`{ "preset": name }`), in its order: the marbles, travertine, the granites, slate, sandstone, basalt, sand, concrete, terrazzo and terracotta, the seven woods, jade, amber, obsidian, malachite and lapis lazuli, the brushed metals and rust, lit by two point lights with the `corners` sampler |
 | `projector_test.ray` | | Light profiles and filters: six spot lights on a wall, one of each beam `profile` (smoothstep, linear, cosine, gaussian, fresnel and a table with rings), a spot that projects `textures/uv_grid.ppm` onto the floor like a slide (its `filter`), a black marble ball in its beam, and a warm point light near the floor that falls off with the square of distance (`attenuation`) |
@@ -117,6 +118,20 @@ Gathered light respects the camera's `clamp`. Two methods:
 With either, each sample gathers with `samples` rays (per object) at the first bounce and one at
 every bounce after it, so the cost grows with `bounces` instead of multiplying; a scene with a 5×5
 sampler and `samples` 1 still gathers 25 directions a pixel. One bounce is usually enough.
+
+A sample's rays start from its sample point (where it fell in its pixel, as a rough mirror's
+direction does) and spread from there by the R2 sequence, so over a stratified sampler's samples
+they cover each object's cone evenly: `samples` 9 with a 3×3 sampler gathers 81 directions an
+object a pixel. (2026-alpha-0.14.1 measured an even grid of rays, one a cell, laid out by the
+sample's index: it was 10 to 20% noisier than this.) Each gathered ray is limited by the camera's
+`clamp`, as samples are.
+
+How many rays: `tools/bounce_sweep.py` measures noise and time against `samples`. On
+`bounce_test` (a closed room) the noise falls about as one over the square root of the rays and
+the time grows with them: 1 ray an object is grainy, 9 halves the noise of 2, and past 25 each
+step buys little. In a closed room `"hemisphere"` is several times smoother for the same rays a
+point, since none of its rays escape; `"objects"` pays off in open scenes, where most of the
+hemisphere's rays find nothing.
 
 | Field | Default | |
 |-------|---------|-|
