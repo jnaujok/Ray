@@ -57,7 +57,8 @@ properties on the right.
   `raythrower`. Moving the view or changing the scene stops it (or press Esc). **Save Render as
   PNG** saves the finished image.
 - **Edit:** undo and redo (every change, back to the last open), add objects (sphere, box, plane,
-  cylinder, cone, triangle) and lights (point, spot, directional, sphere, rectangle), add a sky,
+  cylinder, cone, triangle, torus, disc, annulus, paraboloid, hyperboloid, superquadric, rounded box)
+  and lights (point, spot, directional, sphere, rectangle), add a sky,
   duplicate and delete.
 - **File:** new, open (scene archives and JSON), save (a `.ray` archive with every file the scene
   uses, or plain `.json` with the files beside it), and **Import Model** (STL or OBJ), which adds
@@ -67,7 +68,7 @@ properties on the right.
 
 - Moving objects by dragging them in the view: positions are edited in the properties.
 - Textures, reflections and soft shadows in the shaded view (use Render).
-- Adding csgs and meshes from the menus: add another object and change its JSON.
+- Adding csgs, meshes and text from the menus: add another object and change its JSON.
 
 ## How it's built
 

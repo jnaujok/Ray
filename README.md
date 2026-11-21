@@ -60,8 +60,23 @@ The ray tracing itself is the 1997 code.
 
 ## Features
 
-- **Primitives:** spheres, planes, cylinders, cones, boxes, triangles, and triangle meshes, typed
-  into the scene or loaded from STL (binary, ASCII, or colored) and OBJ model files.
+- **Primitives:** spheres, planes, cylinders, cones, boxes, tori, discs and annuli, paraboloids,
+  hyperboloids, superquadrics, rounded boxes, triangles, and triangle meshes, typed into the scene
+  or loaded from STL (binary, ASCII, or colored) and OBJ model files. A torus is found by a quartic
+  set up close to it, so it keeps its precision far from the origin; a superquadric (from a sphere
+  through a rounded cube to a pinched star) by golden-section search and bisection, grazing rays
+  too; a rounded box exactly, as a smaller box grown by its radius.
+
+  <img src="docs/images/tests/shapes_test.png" alt="A red torus, a gold disc, a blue annulus, a mirror-polished dish (a paraboloid), a green hyperboloid, a purple superquadric like a rounded cube, an orange pinched star and a rounded box on a checkered floor" width="320">
+- **Text:** a `text` object sets a string in a TrueType font, its glyphs' curves flattened, holes
+  found from how the outlines nest, and the faces cut into triangles, then extruded into a closed
+  solid with smooth curved sides, sharp corners and an optional beveled front: any material, a
+  csg (letters carved out of a slab), shadows. Lines can be set left, centered or right, and
+  kerned with the font's own kerning (the `kern` table or OpenType GPOS pairs). The font goes into
+  a saved scene's archive and to networked engines inside the scene.
+
+  <img src="docs/images/tests/text_test.png" alt="Beveled gold letters reading Ray 0.16, two blue lines reading Typeset in Lato Bold, and the word CSG carved into a gray slab" width="320">
+- **More about the primitives:**
   Cylinders and cones run between any two points, capped or open (an open one can be seen into and
   shadows itself inside); a cone can be cut off flat at the top, and a box can be any size along
   each axis and turned any way. A triangle's normal comes from
@@ -73,8 +88,9 @@ The ray tracing itself is the 1997 code.
   tree), and every thread's copy of a scene shares one copy of each mesh's shape, built once. The scene keeps its objects
   in one too (planes, which are infinite, are tested every time), and shadow rays stop at the
   first thing in the way.
-- **Constructive solid geometry:** a `csg` object combines closed shapes (spheres, boxes, capped
-  cylinders and cones, closed meshes, and other csgs) by union, intersection or difference: a lens
+- **Constructive solid geometry:** a `csg` object combines closed shapes (spheres, boxes, tori,
+  superquadrics, rounded boxes, capped cylinders, cones and quadrics, text, closed meshes, and other
+  csgs) by union, intersection or difference: a lens
   blank from two balls, a bowl from a ball with a ball taken out, a die with drilled pips. It shades
   as one object with its own materials, or with each shape's own (`childMaterials`), shadows and
   reflects itself, and takes bump maps and textures like any object.
@@ -474,7 +490,7 @@ The tests render every sample scene and compare it with a reference render (four
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -536,7 +552,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/models_test.png" alt="render_models" width="260"><br><code>render_models</code></td><td align="center"><img src="docs/images/tests/benchy_test.png" alt="render_benchy" width="260"><br><code>render_benchy</code></td><td align="center"><img src="docs/images/tests/bounce_test.png" alt="render_bounce (160x120)" width="160"><br><code>render_bounce (160x120)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/haze_test.png" alt="render_haze (160x120)" width="160"><br><code>render_haze (160x120)</code></td><td align="center"><img src="docs/images/tests/materials_test.png" alt="render_materials" width="260"><br><code>render_materials</code></td><td align="center"><img src="docs/images/tests/projector_test.png" alt="render_projector" width="260"><br><code>render_projector</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/underwater_test.png" alt="render_underwater" width="260"><br><code>render_underwater</code></td><td align="center"><img src="docs/images/tests/bounce_hemisphere_test.png" alt="render_bounce_hemisphere (160x120)" width="160"><br><code>render_bounce_hemisphere (160x120)</code></td><td align="center"><img src="docs/images/tests/maps_test.png" alt="render_maps" width="260"><br><code>render_maps</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/volume_test.png" alt="render_volume" width="260"><br><code>render_volume</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/volume_test.png" alt="render_volume" width="260"><br><code>render_volume</code></td><td align="center"><img src="docs/images/tests/shapes_test.png" alt="render_shapes" width="260"><br><code>render_shapes</code></td><td align="center"><img src="docs/images/tests/text_test.png" alt="render_text" width="260"><br><code>render_text</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -570,7 +586,7 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`src/`](src), [`include/`](include) | MFC scene editor |
 | [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
 | [`help/`](help) | WinHelp project for the scene editor |
-| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images and `scenes/models/` model files, among them 3DBenchy (CC0, see [NOTICE](NOTICE)) |
+| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images, `scenes/models/` model files, among them 3DBenchy (CC0), and `scenes/fonts/` fonts, Lato Bold (SIL Open Font License; see [NOTICE](NOTICE)) |
 | [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editors' builds: `RayEditor.cmake` (wxWidgets) and `RayGui.cmake` (MFC) |
@@ -627,9 +643,10 @@ directional lights, environment maps with image-based lighting, constructive sol
 dispersive glass with spectral dispersion, STL and OBJ model files with printed layer lines and
 lean, shared meshes, light bounced between surfaces, haze, a library of natural material presets,
 beam profiles, attenuation and projected light filters, texture maps for every material and
-light setting, textures inside glass, and JSON scenes so far, and a cross-platform scene editor
+light setting, textures inside glass, tori, discs, quadrics, superquadrics and rounded boxes, 3D text
+from TrueType fonts, and JSON scenes so far, and a cross-platform scene editor
 with a shaded OpenGL view and progressive rendering. Both editors reach every feature through JSON
-editing; next up are more primitives and 3D text from font outlines.
+editing; next up are Bézier patches and B-spline surfaces.
 
 ## Changelog
 

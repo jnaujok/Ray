@@ -10,6 +10,100 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.16] - 2026-11-21
+
+More shapes, and letters: tori, discs and annuli, paraboloids, hyperboloids, superquadrics and
+rounded boxes, each worked out exactly (or, for pinched superquadrics, by careful stepping), and a
+`text` object that sets a string in a TrueType font and extrudes it into a closed, beveled solid.
+Plus a lint test that catches the Windows `min`/`max` macro mistake on every platform, and the
+README's full-size torture image rendered with the adaptive sampler. Scenes without the new objects
+render byte for byte as before.
+
+### Added
+
+- **Seven new shapes.** Each stands on its own +y before a `rotation` (degrees about x, then y,
+  then z, as a box's) and is centered on `center`; each has surface coordinates, takes bump maps,
+  textures and maps, and shows in `ray-editor`'s preview and *Add* menu (and the MFC editor's tree):
+  - `torus` (`majorRadius`, `minorRadius`): a ring around +y. The quartic it solves is set up from
+    where the ray enters its bounding sphere, so a torus a million units from the camera, or
+    hundreds of thousands from the origin, is still hit to about 1e-9; each root is found by
+    bisection between the turning points (`CLocalShape::PolynomialRoots`, roots of any degree,
+    exact to rounding).
+  - `disc` (`radius`, `innerRadius` default 0) and `annulus` (a disc whose `innerRadius` is
+    required): flat, shaded on whichever side a ray sees.
+  - `paraboloid` (`radius`, `height`, `capped` default false): a bowl from its lowest point up to
+    its rim. `hyperboloid` (`radius` at the waist, `topRadius` at both ends, `height`, `capped`):
+    one sheet, like a cooling tower.
+  - `superquadric` (`radius`, one number or `[x, y, z]`; `e1`, `e2` default 1): from an ellipsoid
+    through a rounded cube to a double cone and a pinched star. With both exponents at most 2 it is
+    convex, so the lowest point of its field along a ray is found by golden-section search and the
+    surface by bisection on either side: grazing rays are found, and both exponents 1 is exactly a
+    sphere. Above 2 it is found by 256 steps through its box.
+  - `roundedBox` (`size`, `radius` up to half the smallest size): exactly a smaller box grown by
+    the radius, the union of three slabs, twelve edge cylinders and eight corner spheres; being
+    convex, a ray is inside from the earliest of them it enters to the latest it leaves, so it is
+    found with no stepping. Half every size is a sphere.
+
+  The torus, superquadric, rounded box, and capped paraboloid and hyperboloid are solids, so a csg
+  can use them. They share a new base class, `CLocalShape`, that turns rays into each shape's own
+  frame and reads the fields every shape has.
+- **Text from TrueType fonts.** A `text` object (`string`, `font`, `size` the em in scene units,
+  `depth`, `bevel`, `align` left, center or right, `lineSpacing`, `kerning`, `position`,
+  `rotation`) sets its string, `\n` for new lines, and extrudes it into a closed, double-sided mesh,
+  so it takes any material, casts shadows and works in a csg:
+  - `CFontFile` reads TrueType outlines (`.ttf`, or `.otf` with TrueType outlines): the cmap
+    (formats 4 and 12), advance widths, simple and composite glyphs, line metrics, and kerning from
+    the `kern` table (format 0) or OpenType GPOS pair adjustment (formats 1 and 2, through extension
+    lookups). Fonts with CFF outlines and font collections are refused, saying why.
+  - Curves are flattened to within 0.15% of the em; which outlines are holes comes from how they
+    nest, not which way they run; each hole is joined to the outline around it by a cut to a vertex
+    it can see (Eberly's method) and the face is cut into triangles by clipping ears (`Outline`).
+  - The sides are smooth around curves and sharp at corners of more than 35°; `bevel` cuts the
+    front edges at 45°. Surface coordinates are x and y in the text's plane, one unit per em.
+  - The font file goes into a saved scene's archive and to networked engines inside the scene, like
+    a model file. The sample font is Lato Bold (`scenes/fonts/Lato-Bold.ttf`), from the Google
+    Fonts repository, unmodified, under the SIL Open Font License 1.1 (credited in `NOTICE` and
+    `scenes/fonts/README.md`).
+
+  ![The new shapes (left) and text set in Lato Bold, beveled, in two centered lines, and carved out of a slab with a csg (right)](docs/images/changelog/shapes-text.png)
+
+  Left, every new shape: the red torus, the gold disc standing up, the blue annulus, the
+  mirror-polished paraboloid dish, the green hyperboloid, the purple superquadric that is nearly a
+  rounded cube, the orange pinched star and the rounded box. Right, the bevel's highlight along the
+  gold letters' front edges, the kerned "Ra", the counters of the a, 0, 6 and o left open, and "CSG"
+  cut through the slab.
+- **`scenes/shapes_test.ray` and `scenes/text_test.ray`,** with `render_shapes`, `render_text`,
+  their round-trip and network tests, references, README previews and places in the Expected
+  output table. New `format_test` checks: the root finder; hits and normals for every shape against
+  worked-out answers, from outside and inside, including a torus 300,000 units from the origin seen
+  from a million units away, a superquadric grazed and one with both exponents 1 as a sphere, a
+  rounded box's faces, edges and corners and one rounded to half its size as a sphere; each closed
+  shape in a csg hit exactly where it is hit alone; every shape saved and read back; and the errors.
+  With `--textures`: the font's metrics, glyphs (an o is two outlines, a B three), GPOS kerning of
+  A and V; thirteen glyphs whose triangles cover exactly the area their outlines enclose; extruded
+  text watertight (every edge shared by exactly two faces); a letter carved through a slab by a csg;
+  text saved and read back; CFF, cut-off and non-font files refused; and the errors.
+- **`lint_minmax` test.** Windows headers make `min` and `max` macros, which broke the MFC build in
+  0.14 and 0.15. This fast-tier test scans `core/`, `src/`, `include/` and `editor/` for
+  `std::min(`, `std::max(` and `numeric_limits<…>::max()` not wrapped in parentheses and fails,
+  listing each file and line, so the mistake shows up on Linux before CI. Five editor files had such
+  calls; they are wrapped now. `CLAUDE.md` has the rule.
+
+### Changed
+
+- **The torture test** gains a polished gold torus standing on its rim in front, and the word
+  "RAY" in beveled red letters standing on top of the mirror frame. Its reference render, README
+  preview and full-size image are regenerated.
+- **The README's full-size torture image is rendered with the adaptive sampler** (at least 25 rays
+  a pixel, up to 256 where they disagree, until the standard error is under 0.004):
+  `raythrower scenes/torture_test.ray --aa adaptive:min=25,max=256,threshold=0.004 --png torture.png`.
+  TORTURE_TIME_PLACEHOLDER The `render_torture` test still uses the scene's own 5×5 stratified
+  sampler at 160×120, so the test costs what it did. `CLAUDE.md`'s torture rule gives the command.
+
+  ![Before and after: the torture test at 0.15 (5×5 stratified) and at 0.16 (adaptive), with the gold torus and the RAY letters](docs/images/changelog/torture-shapes-text.png)
+
+  TORTURE_CAPTION_PLACEHOLDER
+
 ## [2026-alpha-0.15] - 2026-11-21
 
 Textures everywhere: every number and color of a material, a bump map's depth and strength, and a
@@ -1526,7 +1620,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.15...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.16...HEAD
+[2026-alpha-0.16]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.15...2026-alpha-0.16
 [2026-alpha-0.15]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14.1...2026-alpha-0.15
 [2026-alpha-0.14.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.14...2026-alpha-0.14.1
 [2026-alpha-0.14]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.13...2026-alpha-0.14

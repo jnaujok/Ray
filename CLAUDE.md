@@ -83,7 +83,10 @@ ctest --preset full             # every test
   what to look for. Make the "before" from the reference renders in git history.
 - **Every new feature goes into the torture test** (`scenes/torture_test.ray`): add it there in the
   same change, and regenerate its reference render, README preview and the full-size
-  `docs/images/torture_test.png`.
+  `docs/images/torture_test.png`. Render the full-size image with a Release build and the adaptive
+  sampler, always the same way: `raythrower scenes/torture_test.ray --aa
+  adaptive:min=25,max=256,threshold=0.004 --png docs/images/torture_test.png` (the `render_torture`
+  test keeps the scene's own 5×5 stratified sampler at 160×120). Report its time in the changelog.
 - **Every release updates the release gallery** (the claude.ai artifact
   https://claude.ai/artifact/XScoVjKwNUscrc3fhGN35Z): add the release's full-size torture test to its
   comparison slider and a section with the release's summary and changelog before and after images,
@@ -174,6 +177,11 @@ ctest --preset full             # every test
 - **New object, light, or material classes** register a JSON `type` name in
   `DYNAMIC_IMPLEMENTS( CClass, "name" )` or `IMPLEMENT_MATERIAL( CClass, Name, "name" )`, and the
   macros make them implement `ToJson` and `FromJson`.
+- **New shapes worked out in a frame of their own** (standing on +y, turned by a `rotation`) derive
+  from `CLocalShape`: answer `LocalHit`, `LocalNormal`, `LocalCoords`, `LocalBounds` and
+  `LocalTriangles` (for `ray-editor`'s preview) in that frame, and list their own JSON fields; the
+  base class turns rays and points, and reads and writes `center`, `rotation`, `color`, `materials`
+  and `bump`. Add the type to `editor/logic` (`Tessellator.cpp`, `EditorDocument.cpp`) too.
 - **Adding a source file:** add it to `RAY_CORE_SOURCES` in `CMakeLists.txt` (core) or to
   `cmake/RayGui.cmake` (GUI).
 - **Don't modify** `legacy/` (historical project files).
