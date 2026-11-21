@@ -145,6 +145,17 @@ The ray tracing itself is the 1997 code.
 
   Solid textures also include cellular noise (`cells`: granite flecks, spots, cracks) and the web of
   light under water (`caustics`), and any of them can be stretched along an axis (brushed metal).
+- **Texture maps for every setting:** any number or color of a material can be a texture instead of
+  a constant (`"roughness": { "type": "cells", ... }`, or `{ "texture": ..., "scale", "offset",
+  "channel" }`): a mirror polished in patches, glass frosted in places, an index of refraction
+  that wanders, a lace of glass and paint by each material's `influence`, bumps whose depth
+  varies. A light's `tint` and `intensity` can be textures read at the point it lights, so what
+  light arrives depends on where (cloud shadows from a noise texture on sunlight). And when glass's
+  absorption is a texture, it is added up along the path inside, a step at a time, so a solid
+  texture colors the glass from within: art glass swirls, smoky quartz, amber with inclusions,
+  veins floating in a clear block.
+
+  <img src="docs/images/tests/maps_test.png" alt="A glass ball frosted in patches, a mirror ball polished in patches, a glass ball whose refraction wanders, a lace panel of glass and blue paint, under a spot light colored by a marble texture" width="320"> <img src="docs/images/tests/volume_test.png" alt="Art glass with blue and red swirls inside, smoky quartz, amber with dark flecks, and a clear block with gray veins inside" width="320">
 - **Natural materials by name:** a library of 31 presets (marbles, granites, slate, sandstone and
   other stones; oak, pine, walnut, cherry, mahogany, ebony and birch; jade, amber, obsidian,
   malachite and lapis lazuli; brushed steel, gold and copper, and rust) that a scene names as a
@@ -358,10 +369,10 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 
 **Render the torture test**, every kind of object (the teapot too, in marble, and a layer-lined
 3DBenchy, a colored-STL puzzle cube and an OBJ ring), mirrors, glass
-(the cube absorbing by thickness, the ball frosted, a flint prism fanning colors into a spectrum), a die with drilled
+(the cube with green swirls inside, the ball frosted, the mirror frosted in patches, a flint prism fanning colors into a spectrum), a die with drilled
 pips (constructive solid geometry), textures and presets (a walnut mirror frame, a malachite cone), a brushed
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light with a Fresnel beam
-that projects dappled caustics onto the teapot, and a low sun, and an
+that projects dappled caustics onto the teapot, and a low sun under drifting cloud shadows (its intensity a noise texture), and an
 HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
 light haze, through the double Gauss lens at 25 rays a pixel, each traced at four wavelengths
 (spectral dispersion) and clamped at 1.5, at its full 1024×768 (about four and a half minutes on an idle
@@ -463,7 +474,7 @@ The tests render every sample scene and compare it with a reference render (four
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -524,7 +535,8 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/environment_test.png" alt="render_environment (160x120)" width="160"><br><code>render_environment (160x120)</code></td><td align="center"><img src="docs/images/tests/csg_test.png" alt="render_csg" width="260"><br><code>render_csg</code></td><td align="center"><img src="docs/images/tests/prism_test.png" alt="render_prism" width="260"><br><code>render_prism</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/models_test.png" alt="render_models" width="260"><br><code>render_models</code></td><td align="center"><img src="docs/images/tests/benchy_test.png" alt="render_benchy" width="260"><br><code>render_benchy</code></td><td align="center"><img src="docs/images/tests/bounce_test.png" alt="render_bounce (160x120)" width="160"><br><code>render_bounce (160x120)</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/haze_test.png" alt="render_haze (160x120)" width="160"><br><code>render_haze (160x120)</code></td><td align="center"><img src="docs/images/tests/materials_test.png" alt="render_materials" width="260"><br><code>render_materials</code></td><td align="center"><img src="docs/images/tests/projector_test.png" alt="render_projector" width="260"><br><code>render_projector</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/underwater_test.png" alt="render_underwater" width="260"><br><code>render_underwater</code></td><td align="center"><img src="docs/images/tests/bounce_hemisphere_test.png" alt="render_bounce_hemisphere (160x120)" width="160"><br><code>render_bounce_hemisphere (160x120)</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/underwater_test.png" alt="render_underwater" width="260"><br><code>render_underwater</code></td><td align="center"><img src="docs/images/tests/bounce_hemisphere_test.png" alt="render_bounce_hemisphere (160x120)" width="160"><br><code>render_bounce_hemisphere (160x120)</code></td><td align="center"><img src="docs/images/tests/maps_test.png" alt="render_maps" width="260"><br><code>render_maps</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/volume_test.png" alt="render_volume" width="260"><br><code>render_volume</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -614,10 +626,10 @@ and brushed mirrors, area lights with soft shadows, bump and normal maps, PNG te
 directional lights, environment maps with image-based lighting, constructive solid geometry,
 dispersive glass with spectral dispersion, STL and OBJ model files with printed layer lines and
 lean, shared meshes, light bounced between surfaces, haze, a library of natural material presets,
-beam profiles, attenuation and projected light filters, and JSON scenes so far, and a
-cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both editors
-reach every feature through JSON editing; next up is using any texture wherever a color or number
-goes (transparency, roughness, lights driven by a 3D texture) and 3D textures inside glass.
+beam profiles, attenuation and projected light filters, texture maps for every material and
+light setting, textures inside glass, and JSON scenes so far, and a cross-platform scene editor
+with a shaded OpenGL view and progressive rendering. Both editors reach every feature through JSON
+editing; next up are more primitives and 3D text from font outlines.
 
 ## Changelog
 

@@ -25,6 +25,8 @@ class CMaterialList
     protected:
         IASLib::TArray<CMaterial *> m_apoItems;
         IASLib::TArray<FLT>         m_anInfluence;
+            // A texture's influence for each material (NULL: its constant).
+        std::vector< std::shared_ptr<const CScalarMap> > m_apInfluenceMap;
 
         struct SPresetEntry
         {
@@ -50,10 +52,17 @@ class CMaterialList
         int             Insert( CMaterial *pObject, FLT nInfluence, int nIndex );
         CMaterial      *GetAt( int nIndex );
         CMaterial      *operator[] ( int nIndex ) { return GetAt( nIndex ); }
-        void            RemoveAll( void ) { m_apoItems.Clear(); m_anInfluence.Clear(); m_aoPresets.clear(); }
+        void            RemoveAll( void ) { m_apoItems.Clear(); m_anInfluence.Clear(); m_apInfluenceMap.clear(); m_aoPresets.clear(); }
         int             GetSize( void ) const { return (int)m_apoItems.Length(); }
         FLT             GetInfluence( int nIndex );
         void            SetInfluence( int nIndex, FLT nInfluence );
+            // An influence a texture drives (see Maps.h): material nIndex's
+            // share then varies over the surface.
+        void            SetInfluenceMap( int nIndex, const CScalarMap &oMap );
+        BOOL            IsInfluenceMapped( int nIndex ) const;
+            // Material nIndex's influence at a point: its constant, or its
+            // texture there.
+        FLT             InfluenceAt( int nIndex, CMapPoint &oAt );
 
             // The materials as a JSON array of objects, each with its "type"
             // and "influence".

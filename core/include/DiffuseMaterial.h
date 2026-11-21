@@ -7,7 +7,7 @@
 class CDiffuseMaterial : public CMaterial
 {
     protected:
-        CColor              m_oColor;
+        CColorMap           m_oColor;
         BOOL                m_bDiffuseCast;
 
     public:

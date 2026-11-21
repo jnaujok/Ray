@@ -88,7 +88,7 @@ void CAmbientMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
 
 void CAmbientMaterial::ToJson( IASLib::CObjectNode &oNode )
 {
-    RayJson::PutColor( oNode, "color", m_oColor );
+    m_oColor.Write( oNode, "color" );
 }
 
 BOOL CAmbientMaterial::FromJson( const IASLib::CJsonNode &oNode )
@@ -96,5 +96,5 @@ BOOL CAmbientMaterial::FromJson( const IASLib::CJsonNode &oNode )
     static const char *const astrFields[] = { "influence", "texture", "color", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
-           RayJson::GetColor( oNode, "color", m_oColor, FALSE );
+           m_oColor.Read( oNode, "color", FALSE );
 }

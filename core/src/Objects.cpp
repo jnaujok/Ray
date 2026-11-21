@@ -144,6 +144,8 @@ BOOL CObjects::BumpFromJson( const IASLib::CJsonNode &oNode )
 CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oSmoothNormal )
 {
     CMaterialList  &oMaterials = m_pShadeMaterials ? *m_pShadeMaterials : m_oMaterials;
+        // Where a material's influence is read, if a texture drives it.
+    CMapPoint       oInfluenceAt( oIntersect, this );
         // A bump map tilts the normal every material shades with. The smooth
         // normal is left as it is (a plane's is its own member).
     CVector     oNormal( oSmoothNormal );
@@ -192,7 +194,7 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
             while ( nMaterial < oMaterials.GetSize() )
             {
                 pMaterial = oMaterials[ nMaterial ];
-                if ( oMaterials.GetInfluence( nMaterial ) != 0.0 && ( ! bGather || pMaterial->LitBySky() ) )
+                if ( oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) != 0.0 && ( ! bGather || pMaterial->LitBySky() ) )
                 {
                         // Each material gets its own copies: materials adjust
                         // the normal and light vector (normalizing them, turning
@@ -207,7 +209,7 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
                     if ( bHaze )
                         oLight = oLight * oScene.LightThrough( oIntersect, oToLight );
                     oColor = pMaterial->GetColor( oScene, oRay, oLight, oMaterialToLight, oPoint, oMaterialNormal, this );
-                    oReturn = oReturn + ( oColor * oMaterials.GetInfluence( nMaterial ) );
+                    oReturn = oReturn + ( oColor * oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) );
                 }
                 nMaterial++;
             }
@@ -231,7 +233,7 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
     while ( nMaterial < oMaterials.GetSize() )
     {
         pMaterial = oMaterials[ nMaterial ];
-        if ( oMaterials.GetInfluence( nMaterial ) != 0.0 && ( ! bGather || pMaterial->Glows() ) )
+        if ( oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) != 0.0 && ( ! bGather || pMaterial->Glows() ) )
         {
                 // The ray's influence on its pixel, scaled by this material's
                 // share: a reflected or refracted ray made from it carries that
@@ -243,9 +245,9 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
             CVector oMaterialNormal( oNormal );
             CVector oPoint( oIntersect );
 
-            oMaterialRay.SetInfluence( oRay.GetInfluence() * ABS( oMaterials.GetInfluence( nMaterial ) ) );
+            oMaterialRay.SetInfluence( oRay.GetInfluence() * ABS( oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) ) );
             oColor = pMaterial->GetColor( oScene, oMaterialRay, oPoint, oMaterialNormal, this );
-            oReturn = oReturn + ( oColor * oMaterials.GetInfluence( nMaterial ) );
+            oReturn = oReturn + ( oColor * oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) );
         }
         nMaterial++;
     }
@@ -257,6 +259,8 @@ void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, 
                                CColor &oReturn )
 {
     CMaterialList  &oMaterials = m_pShadeMaterials ? *m_pShadeMaterials : m_oMaterials;
+        // Where a material's influence is read, if a texture drives it.
+    CMapPoint       oInfluenceAt( oIntersect, this );
         // An area light is shaded from several of its points, each with its
         // own shadow ray and an even share of its light. The points spread
         // from the one the ray's sample point picks, so over a pixel's rays
@@ -293,7 +297,7 @@ void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, 
 
         for ( int nMaterial = 0; nMaterial < oMaterials.GetSize(); nMaterial++ )
         {
-            if ( oMaterials.GetInfluence( nMaterial ) == 0.0 )
+            if ( oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) == 0.0 )
                 continue;
             if ( oRay.IsGather() && ! oMaterials[ nMaterial ]->LitBySky() )
                 continue;
@@ -304,7 +308,7 @@ void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, 
             CColor  oColor = oMaterials[ nMaterial ]->GetColor( oScene, oRay, oLight, oMaterialToLight, oMaterialPoint,
                                                                   oMaterialNormal, this );
 
-            oReturn = oReturn + ( oColor * oMaterials.GetInfluence( nMaterial ) );
+            oReturn = oReturn + ( oColor * oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) );
         }
     }
 }
@@ -313,6 +317,8 @@ void CObjects::EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect
                                  const CEnvironment &oEnvironment, CColor &oReturn )
 {
     CMaterialList  &oMaterials = m_pShadeMaterials ? *m_pShadeMaterials : m_oMaterials;
+        // Where a material's influence is read, if a texture drives it.
+    CMapPoint       oInfluenceAt( oIntersect, this );
         // The sky's light for the way the surface faces (worked out once,
         // smooth), scaled by the share of the sky the point can see: that
         // many shadow rays toward it, spread by the cosine over the half on
@@ -365,7 +371,7 @@ void CObjects::EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect
 
     for ( int nMaterial = 0; nMaterial < oMaterials.GetSize(); nMaterial++ )
     {
-        if ( oMaterials.GetInfluence( nMaterial ) == 0.0 || ! oMaterials[ nMaterial ]->LitBySky() )
+        if ( oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) == 0.0 || ! oMaterials[ nMaterial ]->LitBySky() )
             continue;
 
         CVector oMaterialNormal( oNormal );
@@ -374,7 +380,7 @@ void CObjects::EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect
         CColor  oColor = oMaterials[ nMaterial ]->GetColor( oScene, oRay, oLight, oMaterialToLight, oMaterialPoint,
                                                               oMaterialNormal, this );
 
-        oReturn = oReturn + ( oColor * oMaterials.GetInfluence( nMaterial ) );
+        oReturn = oReturn + ( oColor * oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) );
     }
 }
 
@@ -466,10 +472,12 @@ static CVector CosineDirection( CVector &oUp, CVector &oFirst, CVector &oSecond,
 void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVector &oNormal, CColor &oReturn )
 {
     CMaterialList  &oMaterials = m_pShadeMaterials ? *m_pShadeMaterials : m_oMaterials;
+        // Where a material's influence is read, if a texture drives it.
+    CMapPoint       oInfluenceAt( oIntersect, this );
     BOOL            bDiffuse = FALSE;
 
     for ( int nMaterial = 0; nMaterial < oMaterials.GetSize() && ! bDiffuse; nMaterial++ )
-        bDiffuse = ( oMaterials.GetInfluence( nMaterial ) != 0.0 && oMaterials[ nMaterial ]->LitBySky() );
+        bDiffuse = ( oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) != 0.0 && oMaterials[ nMaterial ]->LitBySky() );
     if ( ! bDiffuse )
         return;
 
@@ -714,7 +722,7 @@ void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, C
 
     for ( int nMaterial = 0; nMaterial < oMaterials.GetSize(); nMaterial++ )
     {
-        if ( oMaterials.GetInfluence( nMaterial ) == 0.0 || ! oMaterials[ nMaterial ]->LitBySky() )
+        if ( oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) == 0.0 || ! oMaterials[ nMaterial ]->LitBySky() )
             continue;
 
         CVector oMaterialNormal( oNormal );
@@ -723,7 +731,7 @@ void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, C
         CColor  oColor = oMaterials[ nMaterial ]->GetColor( oScene, oRay, oLight, oMaterialToLight, oMaterialPoint,
                                                               oMaterialNormal, this );
 
-        oReturn = oReturn + ( oColor * oMaterials.GetInfluence( nMaterial ) );
+        oReturn = oReturn + ( oColor * oMaterials.InfluenceAt( nMaterial, oInfluenceAt ) );
     }
 }
 

@@ -22,7 +22,7 @@ when the binary format was dropped; they are in the repository's history.
 | `chromatic_test.ray` | | `scan_test` through an uncorrected BK7 singlet (stop behind it), whose colors focus apart: chromatic aberration (traced spectrally), plus the softness of one simple lens |
 | `texture_test.ray` | | Textures: a checkered floor, `textures/uv_grid.ppm` on a wall and a sphere, and a solid checker sphere |
 | `primitives_test.ray` | | Cylinders, cones and boxes: a capped cylinder, an open tube lying on its side (lit only where light gets in), a cone, a truncated cone and a turned cube with `textures/uv_grid.ppm`, and a turned glass box |
-| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a green glass cube that absorbs by thickness, a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
+| `torture_test.ray` | | Everything at once, at 1024×768: the teapot (polished marble) among a mirror sphere, a frosted glass sphere, a textured sphere, a solid-checker column, an open brushed and hammered gold tube, a hammered cone, a textured truncated cone, a glass cube with green swirls inside (its `attenuationColor` a `marble` texture), a brick box (a PNG texture with a PNG normal map), a textured triangle, a flint glass prism that splits what is seen through it into colors, and a die with drilled pips (both csgs), on a reflective checkered floor before a mirror wall frosted in patches (its `roughness` a `cells` texture) in a wooden frame whose grain is bumped (the `walnut` preset, turned along the frame), a malachite cone (a preset), lit by a sphere light, a point light, a rectangle light, a soft-edged spot light on the teapot with a `fresnel` beam that throws a dappled `caustics` pattern (its `filter`) and a low sun with an angle whose `intensity` is a `noise` texture, so cloud shadows lie across the floor, under the HDR sky `textures/sky.hdr` (turned so its sun is over the key light), which shows in the mirrors and glass and lights the diffuse surfaces, through the double Gauss at f/2 with a 5×5 stratified sampler (25 rays a pixel, each traced at four single wavelengths: spectral dispersion), each sample clamped at 1.5, with one bounce of indirect light (one ray a sample aimed at each of the two objects within 4 units that fill the most of the view) and a light haze that thins with height, so the far floor and the horizon fade into it |
 | `solid_textures_test.ray` | | Solid textures and absorbing glass: a white marble sphere, a green marble cube, a wooden log and a wooden floor before a granite wall, three green glass slabs 0.15, 0.5 and 1.2 thick (the thicker, the darker), and an amber glass ball |
 | `bump_test.ray` | | Bump and normal maps, and PNG textures: a brick wall (a PNG color texture and an interlaced PNG normal map) lit from the side, a hammered copper ball and an orange-peel ball (`noise` height maps), a box embossed with bricks by a 16-bit grayscale PNG height map, and a wood floor bumped by its own grain, with a 3×3 stratified sampler |
 | `lights_test.ray` | | Spot and directional lights: a warm spot with a hard edge on a box, a white spot with a soft edge on a ball, a blue spot with a soft edge that is also a disc (`radius`), so the cone's shadows are soft, and a dim low sun with an angle of 4°, whose shadows blur the farther they fall, with a 4×4 stratified sampler |
@@ -36,6 +36,8 @@ when the binary format was dropped; they are in the repository's history.
 | `soft_test.ray` | | Rough materials and area lights: three glass panes before a striped poster, clear, lightly frosted (roughness 0.08) and heavily frosted (0.3), a mirror ball and a brushed gold one (0.12), a post and a red ball casting soft shadows from a rectangle light overhead and a sphere light to the right, with a 6×6 stratified sampler |
 | `csg_test.ray` | | Constructive solid geometry: a glass lens blank (two balls' intersection), a bowl (a ball with a smaller one and a turned box taken out, blue outside, white inside and clay at the cut rim, by `childMaterials`), a die (a rounded cube, itself the intersection of a cube and a ball, with six pips drilled in and painted black) and a hammered gold capsule (a cylinder and two balls, with a bump map), with a 3×3 stratified sampler |
 | `models_test.ray` | | Model files: a puzzle cube from a VisCAM-colored STL, a gem from a Magics-colored STL (four faces with their own colors, four with the model's), both shown by the `faceColors` texture, and a ring from an OBJ file of quads with texture coordinates and normals, wearing an image texture, each placed by `fitSize` or `scale`, `rotation`, `align` and `translation`, with a 2×2 stratified sampler |
+| `maps_test.ray` | | Texture maps: a glass ball frosted in patches (its `roughness` a `cells` texture), a mirror ball polished in patches (`noise` roughness), a glass ball whose index wanders from 1.1 to 1.9, a lace panel of clear glass and blue paint in a solid checker (each material's `influence` a texture), a floor bumped by noise whose `depth` varies by `cells`, and a spot light whose `tint` is a `marble` texture and whose `intensity` is `cells`, both read at the point it lights; a 3×3 stratified sampler |
+| `volume_test.ray` | | Textures inside glass (`attenuationColor` as a texture): art glass with blue and red `marble` swirls, smoky quartz (`noise`), amber with dark flecks (`cells`), and gray veins floating in a clear block (`marble`); a 3×3 stratified sampler |
 | `benchy_test.ray` | | 3DBenchy (`models/3DBenchy.stl`, 225,706 triangles) printed in orange plastic, close up on its bow, its 0.1 mm layer lines a `layers` texture for both its color and its bump map, with a 3×3 stratified sampler |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
@@ -343,6 +345,41 @@ make the shape smooth (`"smooth": false` with them is an error).
 Absorption is measured from where a ray goes into an object through its transparent material to
 where it next meets that object, so the object should be closed (a sphere, a capped cylinder or
 cone, a box, or a closed mesh). A ray turned back inside past the critical angle keeps absorbing.
+
+**Textures inside glass.** When `attenuationColor` or `attenuationDistance` is a texture (see
+**Texture maps** below), the absorption varies inside the object: it is added up along the ray's
+path, `attenuationStep` (default `0.05` scene units) at a time, each step taking away −ln(color) ×
+step / distance with the texture read at a point within the step (shifted by the ray's sample, so a
+pixel's rays read between each other's). A solid texture then colors the glass from within:
+swirls of art glass (`marble`), smoky quartz (`noise`), dark flecks in amber (`cells`), or veins
+floating in a clear block. A texture that is the same everywhere absorbs exactly as the constant
+does. Each step costs a texture lookup, so smaller steps are finer and slower; a step about a
+tenth of the texture's features is plenty. Spectral dispersion uses the same absorption for
+every wavelength. `volume_test.ray` shows all four.
+
+**Texture maps.** Every number and color of a material can be a texture instead of a constant,
+so how see-through, rough, refractive or reflective a surface is can change from place to place:
+`color` (of any material), `influence`, a specular's `power` and `indexOfRefraction`, a
+reflective's `roughness` and `diffuseReflectivity`, and a transparent's `indexOfRefraction`,
+`roughness`, `attenuationColor` and `attenuationDistance`; and a bump map's `depth` and
+`strength`. A setting is written as before (a number, or a `[red, green, blue]` array), or as a
+texture:
+
+```json
+"roughness": { "type": "cells", "mode": "flecks", "colors": [[0, 0, 0], [1, 1, 1]] }
+"roughness": { "texture": { "preset": "travertine" }, "scale": 0.4, "offset": 0.05, "channel": "red" }
+```
+
+The first is any texture or texture preset, read as it is. The second wraps one: a number is
+`offset` (default `0`) + `scale` (default `1`) × the texture's `channel`, `"average"` of red, green
+and blue (the default), `"luminance"`, `"red"`, `"green"` or `"blue"`; a color is the texture's
+color × `scale` + `offset`. A texture is read at the point being shaded, as a material's texture
+is (solid textures need nothing; images need the object's surface coordinates). Values it gives
+are kept within the setting's range (roughness 0 to 1, an index from 0.001 to 50); a constant is
+checked when it is read, as before. A material's `texture` still takes the place of its `color`.
+Constants are saved exactly as before, so files without maps don't change. `maps_test.ray` shows
+frosted and polished patches, a varying index, a lace of glass and paint by `influence`, bumps of
+varying depth and a light colored by a 3D texture.
 Glass inside other glass is not tracked: a ray coming out of the inner piece is taken to be
 outside both. Shadows are not tinted; glass shadows like any other object. For glass whose color
 deepens with thickness, set `color` to white and give the color with `attenuationColor`.
@@ -513,6 +550,8 @@ before:
 |-------|---------|---------|
 | `attenuation` | `"none"` | How the light weakens with distance `d`: `"none"` (the same everywhere), `"inverse"` (by `distance` / d) or `"inverseSquare"` (by (`distance` / d)², as real light does). Not for `directional` |
 | `distance` | `1` | Where an attenuated light is its full `color` |
+| `tint` | `[1, 1, 1]` | A color the light is multiplied by at the point it lights: a color, or a texture map (see **Texture maps**) read at that point in the scene, so what light arrives depends on where it lands. Use a solid texture (`marble`, `noise`, `cells`, `caustics`): the lit point has no surface coordinates here |
+| `intensity` | `1` | A number the light is multiplied by there (0 or more), or a texture map read the same way: a `noise` intensity on sunlight gives drifting cloud shadows |
 | `filter` | none | An image or pattern the light shines through, like a slide in a projector or a gobo in a stage light: `{ "texture": ..., "size": 1 }`, any texture or texture preset, which colors the light it sends each way. A `spot` projects it across its cone: an image's (u, v) run from 0 to 1 over the square around the cone, and a solid texture reads the same place with the cone's edge `size` from its middle. A `directional` light projects it straight along its direction: a point is moved onto the plane across the light, an image spans `size` scene units, and a solid texture reads the point in units of `size`, so the pattern is the same all along the light. A `rectangleLight` projects it along its facing, the image over the rectangle. A `point` or `sphereLight` wraps it all around: an image by longitude and latitude, a solid texture on a sphere of radius `size`. With the `caustics` preset under haze, sunlight gives the rippling light seen under water (`underwater_test.ray`) |
 
 A `spot`, and a `rectangleLight` with an `angle`, shape their beam with a `profile`. Each is the
@@ -581,7 +620,9 @@ same image, and networked engines give exactly the same as threads.
   (2026-alpha-0.9), and `csg` objects, a transparent material's `abbe` and the camera's `clamp`
   (2026-alpha-0.10), and the camera's `dispersion` (2026-alpha-0.11.1), and the settings' `indirect` and the scene's `haze` (2026-alpha-0.13), and presets
   (`"preset"` in a texture or a materials entry), the `cells` and `caustics` textures, a solid
-  texture's `stretch`, and lights' `attenuation`, `filter` and beam `profile` (2026-alpha-0.14).
+  texture's `stretch`, and lights' `attenuation`, `filter` and beam `profile` (2026-alpha-0.14),
+  and texture maps for material, bump and light settings, and a transparent material's
+  `attenuationStep` (2026-alpha-0.15).
 
 `renders/` holds output files from 1997. `scan_test.raw` there is a partial trace from that time
 (a few scan lines over black), not a reference image.

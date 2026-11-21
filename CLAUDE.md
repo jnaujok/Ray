@@ -161,6 +161,11 @@ ctest --preset full             # every test
   Read and write textures with `CTexture::Read` and `CTexture::Write`, never `CTexture::Create`
   and `ToJson` by hand, so presets work wherever a texture goes. List every preset in
   `scenes/README.md`.
+- **Material and light settings are maps:** a new number or color setting is a `CScalarMap` or
+  `CColorMap` (`Maps.h`), read with `Read`, written with `Write` and evaluated with `At` at the
+  shading point (a `CMapPoint`), so a texture can drive it. Give a scalar map its valid range with
+  `SetRange`, and check a constant's range only when it isn't mapped. A constant must save and
+  shade exactly as a plain number did.
 - **New object, light, or material classes** register a JSON `type` name in
   `DYNAMIC_IMPLEMENTS( CClass, "name" )` or `IMPLEMENT_MATERIAL( CClass, Name, "name" )`, and the
   macros make them implement `ToJson` and `FromJson`.

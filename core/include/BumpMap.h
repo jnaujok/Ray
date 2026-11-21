@@ -43,6 +43,7 @@
 
 #include "Globals.h"
 #include "Vector.h"
+#include "Maps.h"
 
 #include <memory>
 
@@ -64,8 +65,8 @@ class CBumpMap
     protected:
         std::unique_ptr<CTexture>   m_pTexture;
         EMode                       m_eMode;
-        FLT                         m_nDepth;       // height mode: scene units at a texture value of 1
-        FLT                         m_nStrength;    // normal mode: how far the map tilts the normal
+        CScalarMap                  m_nDepth;       // height mode: scene units at a texture value of 1 (or a texture)
+        CScalarMap                  m_nStrength;    // normal mode: how far the map tilts the normal (or a texture)
         FLT                         m_nStep;        // how far apart the texture is looked up
 
     public:

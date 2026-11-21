@@ -22,6 +22,7 @@ IMPLEMENT_MATERIAL( CReflectiveMaterial, Reflective Material, "reflective" );
 CReflectiveMaterial::CReflectiveMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 )
 {
+    m_nRoughness.SetRange( 0.0, 1.0 );
     m_nDiffuseReflectivity = 0.00;
     m_bFilterReflection = FALSE;
     m_nRoughness = 0.0;
@@ -30,6 +31,7 @@ m_oColor( 0.5, 0.5, 0.5 )
 CReflectiveMaterial::CReflectiveMaterial( CColor oColor, FLT nReflect ) :
 m_oColor( oColor )
 {
+    m_nRoughness.SetRange( 0.0, 1.0 );
     m_nDiffuseReflectivity = nReflect;
     m_bFilterReflection = FALSE;
     m_nRoughness = 0.0;
@@ -64,7 +66,10 @@ CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVect
         // A rough mirror reflects about a microfacet normal drawn from
         // around the surface's; one that would send the ray into the
         // surface is passed over for the mirror direction.
-    if ( m_nRoughness > 0.0 )
+    CMapPoint   oAt( oIntersect, pIntersect );
+    FLT         nRoughness = m_nRoughness.At( oAt );
+
+    if ( nRoughness > 0.0 )
     {
         FLT     nU;
         FLT     nV;
@@ -74,7 +79,7 @@ CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVect
             oFacing = oFacing * -1.0;
         oViewIncident.SamplePoint( RaySampling::PURPOSE_REFLECT, nU, nV );
 
-        CVector oMicro = RaySampling::Microfacet( oFacing, m_nRoughness, nU, nV );
+        CVector oMicro = RaySampling::Microfacet( oFacing, nRoughness, nU, nV );
         CVector oStep = oMicro * ( 2.0 * oMicro.Dot( oView ) );
         CVector oRough = oView - oStep;
 
@@ -154,11 +159,11 @@ void CReflectiveMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
 
 void CReflectiveMaterial::ToJson( IASLib::CObjectNode &oNode )
 {
-    RayJson::PutColor( oNode, "color", m_oColor );
-    RayJson::PutNumber( oNode, "diffuseReflectivity", m_nDiffuseReflectivity );
+    m_oColor.Write( oNode, "color" );
+    m_nDiffuseReflectivity.Write( oNode, "diffuseReflectivity" );
     RayJson::PutBool( oNode, "filterReflection", m_bFilterReflection );
-    if ( m_nRoughness > 0.0 )
-        RayJson::PutNumber( oNode, "roughness", m_nRoughness );
+    if ( m_nRoughness.IsMapped() || m_nRoughness > 0.0 )
+        m_nRoughness.Write( oNode, "roughness" );
 }
 
 BOOL CReflectiveMaterial::FromJson( const IASLib::CJsonNode &oNode )
@@ -167,12 +172,12 @@ BOOL CReflectiveMaterial::FromJson( const IASLib::CJsonNode &oNode )
                                               "roughness", NULL };
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
-         ! RayJson::GetColor( oNode, "color", m_oColor, FALSE ) ||
-         ! RayJson::GetNumber( oNode, "diffuseReflectivity", m_nDiffuseReflectivity, FALSE ) ||
+         ! m_oColor.Read( oNode, "color", FALSE ) ||
+         ! m_nDiffuseReflectivity.Read( oNode, "diffuseReflectivity", FALSE ) ||
          ! RayJson::GetBool( oNode, "filterReflection", m_bFilterReflection, FALSE ) ||
-         ! RayJson::GetNumber( oNode, "roughness", m_nRoughness, FALSE ) )
+         ! m_nRoughness.Read( oNode, "roughness", FALSE ) )
         return FALSE;
-    if ( ( m_nRoughness < 0.0 ) || ( m_nRoughness > 1.0 ) )
+    if ( ! m_nRoughness.IsMapped() && ( ( m_nRoughness < 0.0 ) || ( m_nRoughness > 1.0 ) ) )
         return RayJson::Fail( "roughness must be between 0 and 1" );
     return TRUE;
 }

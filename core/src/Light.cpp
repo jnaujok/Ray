@@ -23,6 +23,8 @@ CLight::CLight( void ) :
 m_nAttenuation( ATTENUATION_NONE ),
 m_nDistance( 1.0 ),
 m_nFilterSize( 1.0 ),
+m_oTint( 1.0, 1.0, 1.0 ),
+m_nIntensity( 1.0 ),
 m_nProfile( PROFILE_SMOOTHSTEP ),
 m_nExponent( 8.0 ),
 m_nSpread( 0.0 ),
@@ -36,6 +38,8 @@ m_oColor( nRed, nGreen, nBlue ), m_oPosition( nX, nY, nZ ),
 m_nAttenuation( ATTENUATION_NONE ),
 m_nDistance( 1.0 ),
 m_nFilterSize( 1.0 ),
+m_oTint( 1.0, 1.0, 1.0 ),
+m_nIntensity( 1.0 ),
 m_nProfile( PROFILE_SMOOTHSTEP ),
 m_nExponent( 8.0 ),
 m_nSpread( 0.0 ),
@@ -183,11 +187,33 @@ CColor CLight::ShadeAt( const CVector &oPoint, const CVector &oToLight )
 
         oLight = CColor( oLight.GetR() * oFilter.GetR(), oLight.GetG() * oFilter.GetG(), oLight.GetB() * oFilter.GetB() );
     }
+    if ( m_oTint.IsMapped() || m_nIntensity.IsMapped() || m_nIntensity.Get() != 1.0 || HasTint() )
+    {
+            // The light's color and strength where it lands: a texture there
+            // is read at the lit point in the scene, so the light that
+            // arrives depends on where it arrives.
+        CMapPoint   oAt = CMapPoint::InSpace( oPoint, NULL );
+        CColor      oTint( m_oTint.At( oAt ) );
+
+        oLight = CColor( oLight.GetR() * oTint.GetR(), oLight.GetG() * oTint.GetG(), oLight.GetB() * oTint.GetB() ) *
+                 m_nIntensity.At( oAt );
+    }
     return oLight;
+}
+
+BOOL CLight::HasTint( void ) const
+{
+    CColor oTint( m_oTint.Get() );
+
+    return ( oTint.GetR() != 1.0 || oTint.GetG() != 1.0 || oTint.GetB() != 1.0 ) ? TRUE : FALSE;
 }
 
 void CLight::OptionsToJson( IASLib::CObjectNode &oNode, BOOL bProfile ) const
 {
+    if ( m_oTint.IsMapped() || HasTint() )
+        m_oTint.Write( oNode, "tint" );
+    if ( m_nIntensity.IsMapped() || m_nIntensity.Get() != 1.0 )
+        m_nIntensity.Write( oNode, "intensity" );
     if ( m_nAttenuation != ATTENUATION_NONE )
     {
         oNode.put( "attenuation", s_astrAttenuations[ m_nAttenuation ] );
@@ -259,6 +285,16 @@ namespace
 
 BOOL CLight::OptionsFromJson( const IASLib::CJsonNode &oNode, BOOL bAttenuation, BOOL bProfile )
 {
+    if ( ! m_oTint.Read( oNode, "tint", FALSE ) ||
+         ! m_nIntensity.Read( oNode, "intensity", FALSE ) )
+        return FALSE;
+    if ( ! m_nIntensity.IsMapped() && ! ( m_nIntensity.Get() >= 0.0 && m_nIntensity.Get() <= 1.0e6 ) )
+    {
+        RayJson::CWhere oWhere( "intensity" );
+
+        return RayJson::Fail( "must be 0 or more" );
+    }
+    m_nIntensity.SetRange( 0.0, 1.0e6 );
     if ( bAttenuation )
     {
         if ( ! PickName( oNode, "attenuation", s_astrAttenuations, 3, m_nAttenuation,
@@ -359,6 +395,8 @@ BOOL CLight::OnlyLightFields( const IASLib::CJsonNode &oNode, const char *const 
     for ( int nIndex = 0; astrOwn[ nIndex ]; nIndex++ )
         astrFields.push_back( astrOwn[ nIndex ] );
     astrFields.push_back( "filter" );
+    astrFields.push_back( "tint" );
+    astrFields.push_back( "intensity" );
     if ( bAttenuation )
     {
         astrFields.push_back( "attenuation" );

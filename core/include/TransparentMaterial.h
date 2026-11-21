@@ -7,16 +7,20 @@
 class CTransparentMaterial : public CMaterial
 {
     protected:
-        CColor              m_oColor;
-        FLT                 m_nIndexOfRefraction;
+        CColorMap           m_oColor;
+        CScalarMap          m_nIndexOfRefraction;
             // Absorption inside: light that has gone m_nAttenuationDistance
             // through the object is left m_oAttenuationColor (Beer-Lambert,
             // so twice as far is that color squared). 0 absorbs nothing.
-        CColor              m_oAttenuationColor;
-        FLT                 m_nAttenuationDistance;
+            // Either may be a texture: then the absorption is added up along
+            // the ray's path inside, a step (m_nAttenuationStep) at a time, so
+            // a solid texture colors the glass from within.
+        CColorMap           m_oAttenuationColor;
+        CScalarMap          m_nAttenuationDistance;
+        FLT                 m_nAttenuationStep;
             // GGX roughness: 0 is clear glass; more blurs what is seen
             // through it, as frosted glass does.
-        FLT                 m_nRoughness;
+        CScalarMap          m_nRoughness;
             // The glass's Abbe number: 0 doesn't disperse. Otherwise a ray in
             // every channel splits into red, green and blue rays here, each
             // bent by its own index (CLens::DispersedIndex).
@@ -40,8 +44,19 @@ class CTransparentMaterial : public CMaterial
             // object: m_oAttenuationColor to the power nDistance /
             // m_nAttenuationDistance, per channel.
         CColor              Attenuation( FLT nDistance ) const;
-            // The index a ray in nChannel (CLens::EChannel) is bent by.
-        FLT                 IndexFor( int nChannel ) const;
+            // Whether the absorption inside varies (a texture drives it).
+        BOOL                IsVolume( void ) const { return ( m_oAttenuationColor.IsMapped() || m_nAttenuationDistance.IsMapped() ) ? TRUE : FALSE; }
+            // What is left of light that has crossed the object from oFrom
+            // for nLength along the unit vector oDirection, adding up the
+            // absorption the textures give a step at a time. nJitter (0 to 1)
+            // shifts where in each step it is read.
+        CColor              VolumeTransmittance( const CVector &oFrom, const CVector &oDirection, FLT nLength,
+                                                 const CObjects *pObject, FLT nJitter ) const;
+        FLT                 GetAttenuationStep( void ) const { return m_nAttenuationStep; }
+            // The index a ray in nChannel (CLens::EChannel) is bent by, for
+            // glass of index nBase at the d line (the constant if not given).
+        FLT                 IndexFor( int nChannel ) const { return IndexFor( nChannel, m_nIndexOfRefraction ); }
+        FLT                 IndexFor( int nChannel, FLT nBase ) const;
         static BOOL         Refract( CVector oView, CVector oNormal, FLT nIndex, CVector &oTransmit );
 #ifdef RAY_GUI
         virtual void        Properties( void );

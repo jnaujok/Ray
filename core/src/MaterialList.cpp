@@ -9,6 +9,8 @@
 #include "SceneJson.h"
 #include "Presets.h"
 
+#include <algorithm>
+
 #define MATERIAL_LIST_VERSION       ((DWORD)1)
 
 CMaterialList::CMaterialList( int nSize )
@@ -23,6 +25,7 @@ CMaterialList::CMaterialList( int nSize )
 int CMaterialList::Add( CMaterial *pObject, FLT nInfluence )
 {
     m_anInfluence.Push( nInfluence );
+    m_apInfluenceMap.push_back( std::shared_ptr<const CScalarMap>() );
     return (int)m_apoItems.Push( pObject );
 }
 
@@ -33,6 +36,8 @@ BOOL CMaterialList::Delete( int nIndex )
     m_aoPresets.clear();
     m_apoItems.Remove( (size_t)nIndex );
     m_anInfluence.Remove( (size_t)nIndex );
+    if ( (size_t)nIndex < m_apInfluenceMap.size() )
+        m_apInfluenceMap.erase( m_apInfluenceMap.begin() + nIndex );
     return TRUE;
 }
 
@@ -44,6 +49,8 @@ int CMaterialList::Insert( CMaterial *pObject, FLT nInfluence, int nIndex )
         nIndex = GetSize();
     m_aoPresets.clear();
     m_anInfluence.Insert( (size_t)nIndex, nInfluence );
+    m_apInfluenceMap.insert( m_apInfluenceMap.begin() + (std::min)( (size_t)nIndex, m_apInfluenceMap.size() ),
+                             std::shared_ptr<const CScalarMap>() );
     return (int)m_apoItems.Insert( (size_t)nIndex, pObject );
 }
 
@@ -64,7 +71,34 @@ FLT CMaterialList::GetInfluence( int nIndex )
 void CMaterialList::SetInfluence( int nIndex, FLT nInfluence )
 {
     if ( ( nIndex >= 0 ) && ( nIndex < GetSize() ) )
+    {
         m_anInfluence[ (size_t)nIndex ] = nInfluence;
+        if ( (size_t)nIndex < m_apInfluenceMap.size() )
+            m_apInfluenceMap[ (size_t)nIndex ].reset();
+    }
+}
+
+void CMaterialList::SetInfluenceMap( int nIndex, const CScalarMap &oMap )
+{
+    if ( ( nIndex < 0 ) || ( nIndex >= GetSize() ) || (size_t)nIndex >= m_apInfluenceMap.size() )
+        return;
+    m_anInfluence[ (size_t)nIndex ] = oMap.Get();
+    if ( oMap.IsMapped() )
+        m_apInfluenceMap[ (size_t)nIndex ].reset( new CScalarMap( oMap ) );
+    else
+        m_apInfluenceMap[ (size_t)nIndex ].reset();
+}
+
+BOOL CMaterialList::IsInfluenceMapped( int nIndex ) const
+{
+    return ( nIndex >= 0 && (size_t)nIndex < m_apInfluenceMap.size() && m_apInfluenceMap[ (size_t)nIndex ] ) ? TRUE : FALSE;
+}
+
+FLT CMaterialList::InfluenceAt( int nIndex, CMapPoint &oAt )
+{
+    if ( IsInfluenceMapped( nIndex ) )
+        return m_apInfluenceMap[ (size_t)nIndex ]->At( oAt );
+    return GetInfluence( nIndex );
 }
 
 void CMaterialList::WriteMaterial( IASLib::CArrayNode &oArray, int nIndex )
@@ -75,7 +109,10 @@ void CMaterialList::WriteMaterial( IASLib::CArrayNode &oArray, int nIndex )
     LPCSTR               strType = oMats.JsonTypeOf( pMaterial->ClassType() );
 
     pNode->put( "type", strType ? strType : pMaterial->ClassType() );
-    RayJson::PutNumber( *pNode, "influence", GetInfluence( nIndex ) );
+    if ( IsInfluenceMapped( nIndex ) )
+        m_apInfluenceMap[ (size_t)nIndex ]->Write( *pNode, "influence" );
+    else
+        RayJson::PutNumber( *pNode, "influence", GetInfluence( nIndex ) );
     pMaterial->ToJson( *pNode );
     pMaterial->TextureToJson( *pNode );
 }
@@ -137,17 +174,19 @@ BOOL CMaterialList::ReadMaterial( const IASLib::CJsonNode &oMaterial )
 {
     CDynMaterialList    oMats;
     std::string         strType;
-    FLT                 nInfluence = 1.0;
+    CScalarMap          oInfluence( 1.0 );
 
     if ( ! RayJson::GetString( oMaterial, "type", strType, TRUE ) ||
-         ! RayJson::GetNumber( oMaterial, "influence", nInfluence, FALSE ) )
+         ! oInfluence.Read( oMaterial, "influence", FALSE ) )
         return FALSE;
 
     CMaterial *pMaterial = oMats.Create( strType.c_str() );
 
     if ( pMaterial == NULL )
         return RayJson::Fail( "unknown material type \"" + strType + "\"" );
-    Add( pMaterial, nInfluence );
+    Add( pMaterial, oInfluence.Get() );
+    if ( oInfluence.IsMapped() )
+        SetInfluenceMap( GetSize() - 1, oInfluence );
     return pMaterial->FromJson( oMaterial ) && pMaterial->TextureFromJson( oMaterial );
 }
 
@@ -205,7 +244,11 @@ BOOL CMaterialList::FromJson( const IASLib::CJsonNode &oNode, const char *strKey
         int nBase = GetSize();
 
         for ( int nIndex = 0; nIndex < oRead.GetSize(); nIndex++ )
+        {
             Add( oRead.GetAt( nIndex ), oRead.GetInfluence( nIndex ) );
+            if ( oRead.IsInfluenceMapped( nIndex ) )
+                m_apInfluenceMap.back() = oRead.m_apInfluenceMap[ (size_t)nIndex ];
+        }
         for ( size_t nPreset = 0; nPreset < oRead.m_aoPresets.size(); nPreset++ )
         {
             SPresetEntry oEntry( oRead.m_aoPresets[ nPreset ] );

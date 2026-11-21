@@ -24,6 +24,8 @@ IMPLEMENT_MATERIAL( CSpecularMaterial, Specular Material, "specular" );
 CSpecularMaterial::CSpecularMaterial( void ) :
 m_oColor( 0.5, 0.5, 0.5 )
 {
+    m_nPower.SetRange( 0.001, 100.0 );
+    m_nIOR.SetRange( 0.001, 50.0 );
     m_nPower = 1.0;
     m_nIOR = 1.5;           // an index of 1 gives no Fresnel reflection at all
     m_bMaterialHighlight = FALSE;
@@ -32,6 +34,8 @@ m_oColor( 0.5, 0.5, 0.5 )
 CSpecularMaterial::CSpecularMaterial( CColor oColor, FLT nPower ) :
 m_oColor( oColor )
 {
+    m_nPower.SetRange( 0.001, 100.0 );
+    m_nIOR.SetRange( 0.001, 50.0 );
     m_nPower = nPower;
     m_nIOR = 1.5;
     m_bMaterialHighlight = FALSE;
@@ -66,7 +70,9 @@ CColor CSpecularMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor 
     FLT         nCosAlpha;
     FLT         nSinAlpha;
     FLT         nTanAlpha;
-    FLT         nMSquared = m_nPower * m_nPower;
+    CMapPoint   oAt( oIntersect, pIntersect );
+    FLT         nPower = m_nPower.At( oAt );
+    FLT         nMSquared = nPower * nPower;
     FLT         c;
     FLT         g;
     FLT         gMinusc;
@@ -143,7 +149,9 @@ CColor CSpecularMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor 
             // An index below 1 can leave nothing under the root: all of it
             // is reflected.
         c = nVDotH;
-        g = ( m_nIOR * m_nIOR ) + ( c * c ) - 1.0;
+        FLT nIOR = m_nIOR.At( oAt );
+
+        g = ( nIOR * nIOR ) + ( c * c ) - 1.0;
 
         if ( g <= 0.0 )
             nF = 1.0;
@@ -223,9 +231,9 @@ void CSpecularMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
 
 void CSpecularMaterial::ToJson( IASLib::CObjectNode &oNode )
 {
-    RayJson::PutColor( oNode, "color", m_oColor );
-    RayJson::PutNumber( oNode, "power", m_nPower );
-    RayJson::PutNumber( oNode, "indexOfRefraction", m_nIOR );
+    m_oColor.Write( oNode, "color" );
+    m_nPower.Write( oNode, "power" );
+    m_nIOR.Write( oNode, "indexOfRefraction" );
     RayJson::PutBool( oNode, "materialHighlight", m_bMaterialHighlight );
 }
 
@@ -234,8 +242,8 @@ BOOL CSpecularMaterial::FromJson( const IASLib::CJsonNode &oNode )
     static const char *const astrFields[] = { "influence", "texture", "color", "power", "indexOfRefraction", "materialHighlight", NULL };
 
     return RayJson::OnlyFields( oNode, astrFields ) &&
-           RayJson::GetColor( oNode, "color", m_oColor, FALSE ) &&
-           RayJson::GetNumber( oNode, "power", m_nPower, FALSE ) &&
-           RayJson::GetNumber( oNode, "indexOfRefraction", m_nIOR, FALSE ) &&
+           m_oColor.Read( oNode, "color", FALSE ) &&
+           m_nPower.Read( oNode, "power", FALSE ) &&
+           m_nIOR.Read( oNode, "indexOfRefraction", FALSE ) &&
            RayJson::GetBool( oNode, "materialHighlight", m_bMaterialHighlight, FALSE );
 }
