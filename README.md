@@ -459,7 +459,7 @@ where they disagree), which is much cleaner and takes about eight times as long 
 raythrower scenes/torture_test.ray --aa adaptive:min=25,max=256,threshold=0.004 --png torture.png
 ```
 
-<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, a lump of regolith, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
 
 **Bring in a model**: name an STL or OBJ file in a mesh, and place it (here a printable model,
 which stands on z, turned to stand on y, 2 units across, on the floor):

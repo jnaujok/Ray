@@ -108,13 +108,13 @@ Scenes without the new fields render byte for byte as before.
 
 ### Changed
 
-- **Torture test:** a lump of regolith (a superquadric with a noise bump) at the front right. The
+- **Torture test:** a lump of regolith (a superquadric with a noise bump) at the front right. The camera stays a 5×5 lens camera with the clip color model: a body, film or Réseau plate would change every frame of the test. The
   reference, preview and full-size image are regenerated; the full-size adaptive render took
-  TORTURE_CPU CPU-seconds (TORTURE_WALL wall on a busy machine), against 66,659 for 0.19.
+  67,301 CPU-seconds (1 h 35 min wall on a busy machine), 1% more than 0.19's 66,659.
 
   ![The torture test at 0.19 and 0.20](docs/images/changelog/torture-regolith.png)
 
-  The regolith lump at the front right, beside the cone.
+  The regolith lump at the front right, behind the puzzle cube: dark, as lunar soil is (an albedo of 0.13), with the bump of its noise.
 
 ## [2026-alpha-0.19] - 2026-11-21
 
