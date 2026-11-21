@@ -353,7 +353,7 @@ namespace RayEditor
     std::vector<std::string> CEditorDocument::ObjectTypes( void )
     {
         return { "sphere", "box", "plane", "cylinder", "cone", "triangle", "torus", "disc", "annulus", "paraboloid", "hyperboloid",
-                 "superquadric", "roundedBox" };
+                 "superquadric", "roundedBox", "implicit", "blob", "fractal" };
     }
 
     std::vector<std::string> CEditorDocument::LightTypes( void )
@@ -390,6 +390,14 @@ namespace RayEditor
             return std::string( "{ \"type\": \"superquadric\", \"center\": [0.0, 1.0, 0.0], \"radius\": 1.0, \"e1\": 0.5, \"e2\": 0.5, " ) + MATERIALS;
         if ( strType == "roundedBox" )
             return std::string( "{ \"type\": \"roundedBox\", \"center\": [0.0, 0.5, 0.0], \"size\": 1.0, \"radius\": 0.15, " ) + MATERIALS;
+
+        if ( strType == "implicit" )
+            return std::string( "{ \"type\": \"implicit\", \"center\": [0.0, 1.0, 0.0], \"formula\": \"x^2 + y^2 + z^2 - 1\", \"bounds\": 1.0, " ) + MATERIALS;
+        if ( strType == "blob" )
+            return std::string( "{ \"type\": \"blob\", \"center\": [0.0, 0.0, 0.0], \"balls\": [ { \"center\": [-0.5, 1.0, 0.0], \"radius\": 1.2 }, "
+                                "{ \"center\": [0.5, 1.0, 0.0], \"radius\": 1.2 } ], " ) + MATERIALS;
+        if ( strType == "fractal" )
+            return std::string( "{ \"type\": \"fractal\", \"center\": [0.0, 1.0, 0.0], \"kind\": \"menger\", " ) + MATERIALS;
 
         strList = "lights";
         if ( strType == "point" )
