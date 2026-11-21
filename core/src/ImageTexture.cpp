@@ -260,7 +260,7 @@ BOOL CImageTexture::FromJson( const IASLib::CJsonNode &oNode )
         if ( ! RayJson::GetInt( oNode, "width", pImage->nWidth, 1, 65535, TRUE ) ||
              ! RayJson::GetInt( oNode, "height", pImage->nHeight, 1, 65535, TRUE ) )
             return FALSE;
-        if ( ! pPixels->binaryValue( pImage->anPixels ) ||
+        if ( ! RayJson::BinaryValue( *pPixels, pImage->anPixels ) ||
              pImage->anPixels.size() != (size_t)pImage->nWidth * (size_t)pImage->nHeight * 3 )
             return RayJson::Fail( "pixels must be width x height RGB bytes, in base64" );
     }

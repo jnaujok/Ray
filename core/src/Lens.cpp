@@ -1361,7 +1361,7 @@ BOOL CLens::FromJson( const IASLib::CJsonNode &oNode, BOOL bHasLens )
 
         if ( ! RayJson::OnlyFields( *pTables, astrTables ) || ! RayJson::GetString( *pTables, "key", strKey, TRUE ) )
             return FALSE;
-        if ( pData == NULL || ! pData->binaryValue( anData ) || ! BytesToTables( anData, pLoaded->aoRings, pLoaded->anPass ) )
+        if ( pData == NULL || ! RayJson::BinaryValue( *pData, anData ) || ! BytesToTables( anData, pLoaded->aoRings, pLoaded->anPass ) )
             return RayJson::Fail( "data must be the exit pupil tables, in base64" );
         m_pLoadedTables = pLoaded;
         m_strLoadedKey = strKey;

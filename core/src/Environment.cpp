@@ -579,7 +579,7 @@ BOOL CEnvironment::FromJson( const IASLib::CJsonNode &oNode )
             // The file's bytes, carried in a copy of the scene sent to a task.
         std::vector<unsigned char> anData;
 
-        if ( ! pData->binaryValue( anData ) )
+        if ( ! RayJson::BinaryValue( *pData, anData ) )
             return RayJson::Fail( "data must be the image file's bytes, in base64" );
         strData.assign( anData.begin(), anData.end() );
         m_strPath.clear();

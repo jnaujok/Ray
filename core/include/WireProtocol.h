@@ -13,7 +13,9 @@
 *                                                                        *
 *       MESSAGE_SCENE   master: the scene as an SJSON packet (IASLib's   *
 *                       compact binary JSON) of the scene file's JSON,   *
-*                       unrounded. The engine answers with a request.    *
+*                       unrounded, each one starting the stream afresh   *
+*                       (sequence 0), so the master encodes it once for  *
+*                       every engine. The engine answers with a request. *
 *       MESSAGE_REQUEST engine: ready for a tile (no payload)            *
 *       MESSAGE_TILE    master: a tile to trace: the trace number, then  *
 *                       left, top, width and height, 32-bit each         *
@@ -45,7 +47,7 @@
 #include <string>
 
 #define RAY_WIRE_MAGIC          ((uint32_t)0x52415931)     // "RAY1"
-#define RAY_WIRE_VERSION        ((uint32_t)4)     // 2: JSON scene; 3: SJSON scene, binary batches; 4: tiles
+#define RAY_WIRE_VERSION        ((uint32_t)5)     // 2: JSON scene; 3: SJSON scene, binary batches; 4: tiles; 5: a scene starts a fresh stream
 #define RAY_WIRE_DEFAULT_PORT   7997
 #define RAY_WIRE_MAX_PAYLOAD    ((uint32_t)( 256u * 1024u * 1024u ))
 

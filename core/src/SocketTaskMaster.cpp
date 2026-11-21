@@ -32,7 +32,6 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
         IASLib::CSocket            *m_pSocket;
         IASLib::CSocketStream       m_oOut;     // owns the socket
         IASLib::CSocketStream       m_oIn;      // shares it
-        RayWire::CEncoder           m_oEncoder;     // the master thread's
 
     public:
         CConnection( CSocketTaskMaster &oMaster, IASLib::CSocket *pSocket ) :
@@ -41,8 +40,7 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
             m_nTask( -1 ),
             m_pSocket( pSocket ),
             m_oOut( pSocket ),
-            m_oIn( pSocket ),
-            m_oEncoder( RAY_WIRE_MASTER_ID )
+            m_oIn( pSocket )
         {
             m_oIn.SetNoDelete();
             SetNoDelete( true );
@@ -63,9 +61,9 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
             return ( nTag == MESSAGE_HELLO ) && RayWire::DecodeHello( strPayload );
         }
 
-        void SendScene( CScene &oScene )
+        void SendScene( const std::string &strPacket )
         {
-            RayWire::SendFrame( m_oOut, MESSAGE_SCENE, m_oEncoder.Scene( oScene ) );
+            RayWire::SendFrame( m_oOut, MESSAGE_SCENE, strPacket );
         }
 
         void SendTile( uint32_t nTrace, const STile &oTile )
@@ -333,9 +331,19 @@ BOOL CSocketTaskMaster::SceneToTask( int nTask, CScene &oScene )
         return FALSE;
     try
     {
-            // Each connection has its own SJSON stream, so the scene is
-            // encoded for each.
-        pConnection->SendScene( oScene );
+            // Each connection is its own SJSON stream, but a scene starts its
+            // stream afresh (a new encoder's first packet, sequence 0), so the
+            // packet depends only on the scene: encoded once a trace, it goes
+            // to every engine. Tiles and pixels aren't SJSON, so nothing
+            // else on the stream depends on it.
+        if ( m_nScenePacketTrace != m_nTrace || m_strScenePacket.empty() )
+        {
+            RayWire::CEncoder oEncoder( RAY_WIRE_MASTER_ID );
+
+            m_strScenePacket = oEncoder.Scene( oScene );
+            m_nScenePacketTrace = m_nTrace;
+        }
+        pConnection->SendScene( m_strScenePacket );
     }
     catch ( IASLib::CException &oException )
     {

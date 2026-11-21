@@ -15,6 +15,10 @@
 #include <stdio.h>
 
 #include <filesystem>
+#include <memory>
+#include <mutex>
+#include <deque>
+#include <cstring>
 #include <vector>
 
 namespace
@@ -639,5 +643,96 @@ namespace RayJson
             return NULL;
         }
         return pRoot;
+    }
+}
+
+namespace RayJson
+{
+    namespace
+    {
+        struct SDecoded
+        {
+            size_t                                              nSize = 0;     // of the base64 text
+            uint64_t                                            anHash[ 2 ] = { 0, 0 };
+            std::shared_ptr<const std::vector<unsigned char>>   pData;
+        };
+
+        std::mutex          s_oDecodedLock;
+        std::deque<SDecoded> s_aoDecoded;     // the most recent first
+        size_t              s_nDecodedBytes = 0;
+    }
+
+    void HashBytes( const char *p, size_t nSize, uint64_t anHash[ 2 ] )
+    {
+            // Two 64-bit hashes, eight bytes at a time.
+        uint64_t a = 0x9E3779B97F4A7C15ULL ^ nSize, b = 0xC2B2AE3D27D4EB4FULL + nSize;
+        size_t   n = 0;
+
+        for ( ; n + 8 <= nSize; n += 8 )
+        {
+            uint64_t w;
+
+            std::memcpy( &w, p + n, 8 );
+            a = ( a ^ w ) * 0xFF51AFD7ED558CCDULL;
+            a ^= a >> 29;
+            b = ( b + w ) * 0xC4CEB9FE1A85EC53ULL;
+            b ^= b >> 31;
+        }
+        for ( ; n < nSize; n++ )
+        {
+            a = ( a ^ (unsigned char)p[ n ] ) * 0xFF51AFD7ED558CCDULL;
+            b = ( b + (unsigned char)p[ n ] ) * 0xC4CEB9FE1A85EC53ULL;
+        }
+        anHash[ 0 ] = a ^ ( a >> 33 );
+        anHash[ 1 ] = b ^ ( b >> 29 );
+    }
+
+    bool BinaryValue( const IASLib::CJsonNode &oNode, std::vector<unsigned char> &anData )
+    {
+        if ( ! oNode.isTextual() )
+            return oNode.binaryValue( anData );
+
+        const std::string &strText = oNode.textString();
+
+            // Small ones aren't worth keeping.
+        if ( strText.size() < 4096 )
+            return oNode.binaryValue( anData );
+
+        uint64_t anHash[ 2 ];
+
+        HashBytes( strText.data(), strText.size(), anHash );
+        {
+            std::lock_guard<std::mutex> oLock( s_oDecodedLock );
+
+            for ( const SDecoded &oDecoded : s_aoDecoded )
+            {
+                if ( oDecoded.nSize == strText.size() && oDecoded.anHash[ 0 ] == anHash[ 0 ] && oDecoded.anHash[ 1 ] == anHash[ 1 ] )
+                {
+                    anData = *oDecoded.pData;
+                    return true;
+                }
+            }
+        }
+        if ( ! oNode.binaryValue( anData ) )
+            return false;
+
+        SDecoded oNew;
+
+        oNew.nSize = strText.size();
+        oNew.anHash[ 0 ] = anHash[ 0 ];
+        oNew.anHash[ 1 ] = anHash[ 1 ];
+        oNew.pData = std::make_shared<const std::vector<unsigned char>>( anData );
+
+        std::lock_guard<std::mutex> oLock( s_oDecodedLock );
+
+        s_aoDecoded.push_front( oNew );
+        s_nDecodedBytes += anData.size();
+            // Keep a few, and no more than 512 MB.
+        while ( s_aoDecoded.size() > 16 || ( s_nDecodedBytes > ( 512u << 20 ) && s_aoDecoded.size() > 1 ) )
+        {
+            s_nDecodedBytes -= s_aoDecoded.back().pData->size();
+            s_aoDecoded.pop_back();
+        }
+        return true;
     }
 }

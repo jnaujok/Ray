@@ -71,8 +71,11 @@ namespace
         SModelKey oKey;
         uint64_t  nHash = 1469598103934665603ULL;
 
-        for ( size_t nIndex = 0; nIndex < strData.size(); nIndex++ )
-            nHash = ( nHash ^ (unsigned char)strData[ nIndex ] ) * 1099511628211ULL;
+        uint64_t  anData[ 2 ];
+
+        RayJson::HashBytes( strData.data(), strData.size(), anData );
+        nHash = ( nHash ^ anData[ 0 ] ) * 1099511628211ULL;
+        nHash = ( nHash ^ anData[ 1 ] ) * 1099511628211ULL;
             // The name picks the format, so it is part of the key, as are a
             // glTF model's node and other files.
         for ( size_t nIndex = 0; nIndex < strName.size(); nIndex++ )
@@ -87,8 +90,14 @@ namespace
         {
             for ( char chNext : oFile.first )
                 nHash = ( nHash ^ (unsigned char)chNext ) * 1099511628211ULL;
-            for ( size_t nIndex = 0; oFile.second && nIndex < oFile.second->size(); nIndex++ )
-                nHash = ( nHash ^ (unsigned char)( *oFile.second )[ nIndex ] ) * 1099511628211ULL;
+            if ( oFile.second )
+            {
+                uint64_t anFile[ 2 ];
+
+                RayJson::HashBytes( oFile.second->data(), oFile.second->size(), anFile );
+                nHash = ( nHash ^ anFile[ 0 ] ) * 1099511628211ULL;
+                nHash = ( nHash ^ anFile[ 1 ] ) * 1099511628211ULL;
+            }
         }
         oKey.nSize = strData.size();
         oKey.nHash = nHash;
@@ -131,8 +140,11 @@ namespace
         SModelKey oKey;
         uint64_t  nHash = 1469598103934665603ULL;
 
-        for ( size_t nIndex = 0; nIndex < strData.size(); nIndex++ )
-            nHash = ( nHash ^ (unsigned char)strData[ nIndex ] ) * 1099511628211ULL;
+        uint64_t  anData[ 2 ];
+
+        RayJson::HashBytes( strData.data(), strData.size(), anData );
+        nHash = ( nHash ^ anData[ 0 ] ) * 1099511628211ULL;
+        nHash = ( nHash ^ anData[ 1 ] ) * 1099511628211ULL;
         oKey.nSize = strData.size();
         oKey.nHash = nHash;
 
@@ -1627,7 +1639,7 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
             // The file's bytes, carried in a copy of the scene sent to a task.
         std::vector<unsigned char> anData;
 
-        if ( ! pData->binaryValue( anData ) )
+        if ( ! RayJson::BinaryValue( *pData, anData ) )
             return RayJson::Fail( "data must be the model file's bytes, in base64" );
         strData.assign( anData.begin(), anData.end() );
         m_strFilePath.clear();
@@ -1657,7 +1669,7 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
             {
                 std::vector<unsigned char> anData;
 
-                if ( ! pFile->binaryValue( anData ) )
+                if ( ! RayJson::BinaryValue( *pFile, anData ) )
                     return RayJson::Fail( "files: \"" + strUri + "\" must be the file's bytes, in base64" );
                 strFile.assign( anData.begin(), anData.end() );
             }
