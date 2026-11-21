@@ -384,21 +384,30 @@ raythrower scenes/teapot.ray --aa corners --ppm teapot.ppm
 ```
 
 **Render the torture test**, every kind of object (the teapot too, in marble, and a layer-lined
-3DBenchy, a colored-STL puzzle cube and an OBJ ring), mirrors, glass
+3DBenchy, a colored-STL puzzle cube, an OBJ ring, a gold torus, and "RAY" in beveled letters set in
+Lato Bold on top of the mirror frame), mirrors, glass
 (the cube with green swirls inside, the ball frosted, the mirror frosted in patches, a flint prism fanning colors into a spectrum), a die with drilled
 pips (constructive solid geometry), textures and presets (a walnut mirror frame, a malachite cone), a brushed
 gold tube, soft shadows from a sphere light, a rectangle light, a spot light with a Fresnel beam
 that projects dappled caustics onto the teapot, and a low sun under drifting cloud shadows (its intensity a noise texture), and an
 HDR sky in the mirrors and glass that lights the scene too, light bounced between surfaces, and a
-light haze, through the double Gauss lens at 25 rays a pixel, each traced at four wavelengths
-(spectral dispersion) and clamped at 1.5, at its full 1024×768 (about four and a half minutes on an idle
-16-core machine, with a Release build):
+light haze, through the double Gauss lens, each ray traced at four wavelengths (spectral
+dispersion) and clamped at 1.5. With the scene's own 5×5 stratified sampler (25 rays a pixel), its
+full 1024×768 takes about four and a half minutes on an idle 16-core machine with a Release build:
 
 ```sh
 raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 ```
 
-<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, textured shapes and a wood-framed mirror wall under an HDR sky in a light haze, through a real lens" width="720">
+The image below is rendered with the adaptive sampler instead (at least 25 rays a pixel, up to 256
+where they disagree), which is much cleaner and takes about seven and a half times as long (about 37 minutes on an idle
+16-core machine):
+
+```sh
+raythrower scenes/torture_test.ray --aa adaptive:min=25,max=256,threshold=0.004 --png torture.png
+```
+
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
 
 **Bring in a model**: name an STL or OBJ file in a mesh, and place it (here a printable model,
 which stands on z, turned to stand on y, 2 units across, on the floor):

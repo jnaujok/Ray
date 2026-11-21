@@ -97,12 +97,17 @@ render byte for byte as before.
 - **The README's full-size torture image is rendered with the adaptive sampler** (at least 25 rays
   a pixel, up to 256 where they disagree, until the standard error is under 0.004):
   `raythrower scenes/torture_test.ray --aa adaptive:min=25,max=256,threshold=0.004 --png torture.png`.
-  TORTURE_TIME_PLACEHOLDER The `render_torture` test still uses the scene's own 5×5 stratified
+  The full-size render took 35,724 CPU-seconds (44.5 minutes on this 16-core machine while it was
+  busy with other work; about 37 minutes idle), about seven and a half times what the 5×5 stratified
+  sampler costs on the same scene (measured at 256×192: 2,398 CPU-seconds against 314). The
+  `render_torture` test still uses the scene's own 5×5 stratified
   sampler at 160×120, so the test costs what it did. `CLAUDE.md`'s torture rule gives the command.
 
   ![Before and after: the torture test at 0.15 (5×5 stratified) and at 0.16 (adaptive), with the gold torus and the RAY letters](docs/images/changelog/torture-shapes-text.png)
 
-  TORTURE_CAPTION_PLACEHOLDER
+  Above, the whole frame: the gold torus in front and the red "RAY" on the frame are new. Below, a
+  full-size crop: the frosted ball, the marble teapot, the glass cube and the floor are far smoother,
+  because the adaptive sampler spends up to 256 rays on pixels whose rays disagree.
 
 ## [2026-alpha-0.15] - 2026-11-21
 
