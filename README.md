@@ -402,10 +402,10 @@ SHA256SUMS.txt`. Try one with `raythrower scenes/scan_test.ray --png scan_test.p
   programs at first: clear the quarantine flag on the unpacked folder with
   `xattr -dr com.apple.quarantine ray-<tag>-macos-arm64` (or `xattr -d com.apple.quarantine` on
   each program), or right-click a program and choose Open.
-- **Windows:** x86-64, built with the static Visual C++ runtime, so `raythrower`, `rayengine` and
-  `ray-editor` need nothing installed. `Ray.exe` uses MFC in a DLL and needs the
+- **Windows:** x86-64. `raythrower` and `rayengine` are built with the static Visual C++ runtime
+  and need nothing installed; `ray-editor.exe` and `Ray.exe` (MFC in a DLL) need the
   [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)
-  (x64). The programs aren't signed, so SmartScreen may warn: choose "More info", then "Run anyway".
+  (x64), which most Windows machines already have. The programs aren't signed, so SmartScreen may warn: choose "More info", then "Run anyway".
 
 The archives are made by `.github/workflows/release.yml` when a `2026-alpha-*` tag is pushed; an
 older tag can be built by hand from the Actions page (Release, Run workflow) or with
