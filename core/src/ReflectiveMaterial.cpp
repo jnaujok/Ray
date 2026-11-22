@@ -96,7 +96,7 @@ CColor CReflectiveMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVect
     oReflect.SetT( 1e100 );
     oReflect.SetDepth( oViewIncident.GetDepth() );
 
-    oScene.TraceRay( oReflect, oReflective, pIntersect );
+    oScene.TraceRay( oReflect, oReflective, pIntersect, CRayCounts::REFLECTION );
 
     if ( m_bFilterReflection )
     {

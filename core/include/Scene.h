@@ -12,6 +12,7 @@
 #ifndef __SCENE_H__
 #define __SCENE_H__
 
+#include "RayCounts.h"
 #include "Light.h"
 #include "Camera.h"
 #include "RaySettings.h"
@@ -67,6 +68,7 @@ class CScene
         std::vector<FLT>        m_anObjectBounds;   // min x, y, z, max x, y, z for each object
         BOOL                    m_bTreeBuilt;
         CObjects               *m_pLastOccluder;    // what last blocked a shadow ray
+        CRayCounts              m_oRayCounts;       // the rays this copy of the scene has cast
 
         void                ForgetTree( void );
         void                BuildTree( void );
@@ -95,7 +97,15 @@ class CScene
 #endif
 
             // TO DO: Replace TraceScene calls with multiple calls to TraceRay
-        virtual BOOL        TraceRay( CRay &oRay, CColor &oColor, CObjects *pDeny = NULL );
+            /// nKind is what the ray is, for the ray counts (CRayCounts):
+            /// counted if the ray is traced, not if the depth limit or
+            /// threshold stops it first.
+        virtual BOOL        TraceRay( CRay &oRay, CColor &oColor, CObjects *pDeny = NULL, int nKind = CRayCounts::OTHER );
+            /// Counts a ray of kind nKind (a shadow or bounce ray the
+            /// caller casts with Intersect or ClosestHit).
+        void                CountRay( int nKind ) { m_oRayCounts.Count( nKind ); }
+        const CRayCounts   &GetRayCounts( void ) const { return m_oRayCounts; }
+        void                ClearRayCounts( void ) { m_oRayCounts.Clear(); }
         virtual BOOL        Intersect( CRay &oRay, CObjects *pIgnore = NULL );
             /// The object the ray hits first (and sets the ray's t and the
             /// point), or NULL, using the tree; pDeny is skipped as in

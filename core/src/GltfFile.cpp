@@ -16,7 +16,10 @@
 
 #include "DracoDecoder.h"
 #include "ModelFile.h"
+#include "ImageTexture.h"
+#include "JpegImage.h"
 #include "PngImage.h"
+#include "WebpImage.h"
 #include "SceneJson.h"
 #include "JSON/JsonNode.h"
 
@@ -119,7 +122,7 @@ namespace
             std::vector<CColor>             m_aoFaceColors;
             std::vector<double>             m_adDracoColorCoords;    // a Draco primitive's base color coordinates
                 // Decoded base color images, by image index (width 0: none).
-            struct SImage { int nWidth = 0; int nHeight = 0; std::vector<BYTE> anPixels; BOOL bTried = FALSE; };
+            struct SImage { std::shared_ptr<const CImageTexture::SImage> pImage; BOOL bTried = FALSE; };
             std::vector<SImage>             m_aoImages;
 
             BOOL Fail( const std::string &strWhy ) { m_strError = strWhy; return FALSE; }
@@ -135,7 +138,7 @@ namespace
             BOOL Node( int nIndex, const SMatrix &oMatrix, int nDepth );
             BOOL Primitive( const IASLib::CJsonNode &oPrimitive, const SMatrix &oMatrix );
             BOOL BaseColor( int nMaterial, CColor &oFactor, int &nImage, int &nTexCoord );
-            const SImage *Image( int nImage );
+            const CImageTexture::SImage *Image( int nImage );
     };
 
     const IASLib::CJsonNode *CGltfReader::Array( const char *strName ) const
@@ -549,9 +552,14 @@ namespace
             const IASLib::CJsonNode *pEntry = pTextures ? pTextures->get( (int)dTexture ) : NULL;
             double                   dSource = 0.0;
 
-                // The plain source; extensions' sources (WebP, KTX) are
-                // left out, since they need decoders Ray doesn't have.
-            if ( Number( pEntry, "source", dSource ) )
+                // The plain source (PNG or JPEG) where there is one, since
+                // it is usually the lossless original; else EXT_texture_webp's
+                // source, for files that ship only WebP. KTX2
+                // (KHR_texture_basisu) isn't read.
+            const IASLib::CJsonNode *pExtensions = pEntry ? pEntry->get( "extensions" ) : NULL;
+            const IASLib::CJsonNode *pWebp = pExtensions ? pExtensions->get( "EXT_texture_webp" ) : NULL;
+
+            if ( Number( pEntry, "source", dSource ) || Number( pWebp, "source", dSource ) )
                 nImage = (int)dSource;
             if ( Number( pTexture, "texCoord", dCoord ) )
                 nTexCoord = (int)dCoord;
@@ -559,7 +567,7 @@ namespace
         return TRUE;
     }
 
-    const CGltfReader::SImage *CGltfReader::Image( int nImage )
+    const CImageTexture::SImage *CGltfReader::Image( int nImage )
     {
         const IASLib::CJsonNode *pImages = Array( "images" );
 
@@ -602,17 +610,16 @@ namespace
                     m_strError = strSaved;
                 }
             }
-                // PNG only: a JPEG (or anything else) leaves the base color
-                // factor alone, and the model says so.
-            if ( CPngImage::IsPng( strData ) )
-            {
-                if ( ! CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy ) )
-                    oImage.nWidth = oImage.nHeight = 0;
-            }
-            else if ( ! strData.empty() || ( pUri && pUri->isTextual() ) )
+                // PNG, JPEG or WebP (shared with every other reader of the
+                // same bytes); anything else (KTX2, or an image that won't
+                // decode) leaves the base color factor alone, and the model
+                // says so.
+            if ( CPngImage::IsPng( strData ) || CJpegImage::IsJpeg( strData ) || CWebpImage::IsWebp( strData ) )
+                oImage.pImage = CImageTexture::SharedImage( strData, "image", strWhy );
+            if ( ! oImage.pImage && ( ! strData.empty() || ( pUri && pUri->isTextual() ) ) )
                 m_oModel.nSkippedImages++;
         }
-        return ( oImage.nWidth > 0 ) ? &oImage : NULL;
+        return oImage.pImage ? oImage.pImage.get() : NULL;
     }
 
     BOOL CGltfReader::Primitive( const IASLib::CJsonNode &oPrimitive, const SMatrix &oMatrix )
@@ -756,8 +763,10 @@ namespace
             }
             else
                 m_aoNormals.push_back( CVector( 0.0, 1.0, 0.0 ) );
+                // glTF's v runs down from the image's top; Ray's runs up
+                // from its bottom (as OBJ's does), so it is turned over.
             m_anCoords.push_back( bHasCoords ? adCoords[ nPoint * 2 ] : 0.0 );
-            m_anCoords.push_back( bHasCoords ? adCoords[ nPoint * 2 + 1 ] : 0.0 );
+            m_anCoords.push_back( bHasCoords ? 1.0 - adCoords[ nPoint * 2 + 1 ] : 0.0 );
         }
         if ( ! bHasNormals )
             m_bNormals = FALSE;
@@ -796,7 +805,7 @@ namespace
             }
         }
 
-        const SImage *pImage = ( bColored && nImage >= 0 ) ? Image( nImage ) : NULL;
+        const CImageTexture::SImage *pImage = ( bColored && nImage >= 0 ) ? Image( nImage ) : NULL;
 
         for ( size_t nFace = 0; nFace + 2 < anFaces.size(); nFace += 3 )
         {

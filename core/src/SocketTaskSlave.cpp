@@ -150,7 +150,7 @@ BOOL CSocketTaskSlave::RequestWork( void )
     return Send( MESSAGE_REQUEST, std::string() );
 }
 
-BOOL CSocketTaskSlave::PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors )
+BOOL CSocketTaskSlave::PixelsToMaster( uint32_t nTrace, const STile &oTile, const CRayCounts &oCounts, const std::vector<double> &anColors )
 {
-    return Send( MESSAGE_PIXELS, RayWire::EncodePixels( nTrace, oTile, (uint64_t)nRays, anColors ) );
+    return Send( MESSAGE_PIXELS, RayWire::EncodePixels( nTrace, oTile, oCounts, anColors ) );
 }

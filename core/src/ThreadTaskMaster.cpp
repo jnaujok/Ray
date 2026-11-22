@@ -95,7 +95,7 @@ class CThreadTaskMaster::CWorker : public IASLib::CThread, public CTaskSlave
             return TRUE;
         }
 
-        virtual BOOL PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors )
+        virtual BOOL PixelsToMaster( uint32_t nTrace, const STile &oTile, const CRayCounts &oCounts, const std::vector<double> &anColors )
         {
             CTaskMaster::SEvent oEvent;
 
@@ -103,7 +103,7 @@ class CThreadTaskMaster::CWorker : public IASLib::CThread, public CTaskSlave
             oEvent.nTask = m_nIndex;
             oEvent.nTrace = nTrace;
             oEvent.oTile = oTile;
-            oEvent.nRays = nRays;
+            oEvent.oCounts = oCounts;
             oEvent.anColors = anColors;
             m_oMaster.PostEvent( std::move( oEvent ) );
             return TRUE;

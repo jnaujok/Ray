@@ -34,6 +34,7 @@ class CRectangleLight : public CLight
         FLT             m_nFalloff;         // degrees, inside the edge, over which the beam fades
 
     public:
+        virtual int     ShadowRayKind( void ) const { return CRayCounts::SHADOW_AREA; }
                         DYNAMIC_OBJECTS( CRectangleLight );
 
                         CRectangleLight( void );

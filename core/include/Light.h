@@ -38,6 +38,7 @@
 #ifndef __LIGHT_H__
 #define __LIGHT_H__
 
+#include "RayCounts.h"
 #include "Objects.h"
 #include "Texture.h"
 #include "Maps.h"
@@ -122,6 +123,8 @@ class CLight : public CObjects
         virtual BOOL    SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoint )
                         { (void)oFrom; (void)nU; (void)nV; oPoint = m_oPosition; return TRUE; }
         virtual BOOL    IsALight( void ) { return TRUE; }
+            /// The kind of shadow ray (CRayCounts) cast toward the light.
+        virtual int     ShadowRayKind( void ) const { return CRayCounts::SHADOW_POINT; }
 #ifdef RAY_GUI
         virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder ) = 0;
 #endif

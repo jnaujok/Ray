@@ -52,8 +52,9 @@ when the binary format was dropped; they are in the repository's history.
 | `film_test.ray` | | Kodak Ektachrome MS (`film` color model) on a 20 mm piece of film: gray steps a stop apart from 0.02 to 1.28, red, green and blue balls, and a far overexposed lamp whose light spreads into a red-orange halo (halation), with grain |
 | `reseau_test.ray` | | The Hasselblad Data Camera's Réseau crosses (drawn wider than the plate's own, and with more spread, so they show at this size): a bright white ball blooms over the cross on it, while the cross on a gray ball stays sharp |
 | `tranquility_test.ray` | | Tranquility Base: a lunar module built from boxes, a rounded box and cylinders (gold foil on four legs) beside a flag, on `regolith` in low sunlight (a 0.53° sun) under a black sky, shot with the Data Camera, its 60 mm Biogon, Réseau plate and Ektachrome MS; an imitation of the Apollo 11 views of the LM, not a recovered camera station |
-| `chess_dof_test.ray` | | Depth of field: a full chessboard in the Najdorf Sicilian, English Attack, after 1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 6.Be3 e5 7.Nb3 Be6 8.f3 Be7 9.Qd2 O-O 10.O-O-O Nbd7 11.g4 b5 (FEN `r2q1rk1/3nbppp/p2pbn2/1p2p3/4P1P1/1NN1BP2/PPPQ3P/2KR1B1R w - - 0 12`), played out by python-chess, the pieces Poly Haven's Chess Set (CC0) read from its glTF (`node` picks each piece), polished boxwood and ebony on an inlaid board, through the double Gauss wide open (f/2.02) focused on Black's pawn on e5, with twelve small lights behind the board that blur into bokeh discs; 160×120, a 3×3 stratified sampler. Written by `tools/make_showcase_scenes.py` |
+| `chess_dof_test.ray` | | Depth of field: a full chessboard in the Najdorf Sicilian, English Attack, after 1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6 6.Be3 e5 7.Nb3 Be6 8.f3 Be7 9.Qd2 O-O 10.O-O-O Nbd7 11.g4 b5 (FEN `r2q1rk1/3nbppp/p2pbn2/1p2p3/4P1P1/1NN1BP2/PPPQ3P/2KR1B1R w - - 0 12`), played out by python-chess, the pieces and board Poly Haven's Chess Set (CC0) read from its glTF (`node` picks each piece, and the board), lacquered and polished in the set's own JPEG textures (`image` textures through the models' UVs) on its marble board, through the double Gauss wide open (f/2.02) focused on Black's pawn on e5, with twelve small lights behind the board that blur into bokeh discs; 160×120, a 3×3 stratified sampler. Written by `tools/make_showcase_scenes.py` |
 | `as11_40_5903_test.ray` | | A recreation of NASA photograph AS11-40-5903: Buzz Aldrin (NASA's public-domain astronaut model, its arms lowered by `tools/pose_astronaut.py`) in a white suit with a gold `metal` visor that reflects Neil Armstrong (a second copy, behind the camera) and the lunar module (NASA's model, its glTF base colors through `faceColors`), the Solar Wind Composition foil and the flag (from ALSJ dimensions), on regolith under a 15° sun and a black sky, with Earth small and high; shot on the Data Camera with its 60 mm Biogon, Réseau plate and Ektachrome MS, one bounce of indirect light; 128×128. Written by `tools/make_showcase_scenes.py`. The camera was placed by eye against the photograph, not from a recovered camera station |
+| `images_test.ray` | | JPEG and WebP textures: the bricks of `textures/bricks.png` on three boxes, from the PNG, from a JPEG (`textures/formats/bricks.jpg`, quality 85, 4:2:0) and from a lossy WebP (`textures/formats/bricks.webp`, quality 80) |
 | `blend_test.ray` | | Models read straight from Blender `.blend` files: the red and blue cube of `models/blend_legacy_zst.blend` (Blender 2.93's mesh layout, Zstandard-compressed, its one object named by `node`) and the gold pentagon with its tetrahedron child from `models/blend_modern_gz.blend` (Blender 4.2's attribute layout, gzip-compressed), colored by their materials through `faceColors` |
 | `prism_test.ray` | | Dispersion: a flint glass prism (an intersection of three turned boxes) and a flint glass ball (index 1.62, Abbe number 20) before white bars on a black wall, which they fan out into a spectrum (spectral dispersion), with a 2×2 stratified sampler |
 | `teapot_textured.ray` | | The teapot with `textures/uv_grid.ppm`, spherically UV-mapped about its vertical axis |
@@ -548,9 +549,12 @@ scene each networked engine gets) the same way:
   every component type, with `byteStride`, normalized integers and sparse substitution; `POSITION`,
   `NORMAL` (kept if every primitive has them, and then the mesh is smooth) and `TEXCOORD_0` (likewise).
   Each primitive's material's `pbrMetallicRoughness` `baseColorFactor` becomes its faces' color,
-  times its `baseColorTexture` at the middle of each face when that image is a PNG (in the file,
-  beside it, or in a `data:` URI); a JPEG or WebP image is skipped and the factor alone used (a
-  texture's plain `source`, often a PNG fallback beside a WebP, is used when there is one). The
+  times its `baseColorTexture` at the middle of each face when that image is a PNG, JPEG or WebP
+  (in the file, beside it, or in a `data:` URI; a texture's plain `source`, often a lossless PNG
+  beside a WebP, is used when there is one, and `EXT_texture_webp`'s source otherwise; KTX2 images
+  are skipped and the factor alone used). `TEXCOORD_0` becomes the mesh's surface coordinates, so an
+  `image` texture can also lay a model's own picture over it through its UVs (glTF's v runs down
+  from the image's top, so it is turned over for Ray's, which runs up). The
   colors show through the `faceColors` texture, as a colored STL's do. Metallic and roughness,
   normal maps, cameras, lights, skins, morph targets and animation are ignored. glTF is right-handed
   and Ray's scenes are left-handed, so z is negated and each face turned back round: the model isn't
@@ -559,7 +563,7 @@ scene each networked engine gets) the same way:
   (standard or valence traversal), and every prediction scheme Draco writes (difference,
   parallelogram, multi-parallelogram, portable texture coordinates, geometric normals); each corner
   of the decoded mesh becomes a vertex, joined where all its values match. meshopt-compressed files
-  are refused with the extension's name. A `.gltf`'s buffers and PNG images
+  are refused with the extension's name. A `.gltf`'s buffers and PNG, JPEG and WebP images
   go into a saved scene's archive beside it, under the names it gives them, and into a networked
   engine's copy of the scene (as `files`, an object of base64 data by URI); a URI that leaves the
   model's folder is refused.
@@ -712,7 +716,7 @@ without dispersive glass or a chromatic lens render exactly the same either way.
 | `cells` | Worley's cellular noise: space split into cells around points scattered one a unit cube (one each `scale`). `mode`: `"flecks"` (the default: one value all over each cell, so each cell is a chip of a ramp color: granite, terrazzo), `"distance"` (the distance to the nearest point, about 0 to 1: spots) or `"edges"` (the gap to the second nearest, 0 on the cells' boundaries: cracks, scales). `turbulence` (default `0`) moves the point by noise first, so the cells' sides wander. Default colors black to white |
 | `caustics` | The web of bright lines light makes under water: the edges of Worley cells, bent by `turbulence` (default `0.6`), 1 on a line and falling to 0 a `width` (default `0.12`, a fraction of a cell) away, in `layers` (1 to 3, default 2) turned and scaled against each other. Meant for a light's `filter` (below), where it adds light along the lines: the default ramp runs from a dim blue-gray to a white brighter than 1 |
 | `faceColors` | The colors a colored model file gives its faces; `default` (default `[0.8, 0.8, 0.8]`) where a face has none or the surface isn't from such a file |
-| `image` | `file` (required: a PNG, a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
+| `image` | `file` (required: a PNG, a JPEG, a WebP, a PPM, P6 or P3, or a Ray raw image, relative to the scene file), `scale` (`[u, v]` repeats, default `[1, 1]`), `offset` (`[u, v]`, default `[0, 0]`), `repeat` (default `true`; `false` stretches the edge pixels), `srgb` (default `false`: a byte is the color /255, matching the default color model; `true` decodes the sRGB curve) |
 
 `marble`, `wood`, `noise`, `layers`, `cells` and `caustics` are solid: they fill space, so an object looks carved from a block and
 needs no surface coordinates. They share these fields: `colors` (a ramp of two or more colors,
@@ -753,6 +757,21 @@ RGBA, at 1, 2, 4, 8 or 16 bits a channel, interlaced or not. Low bit depths are 
 full range, 16-bit channels are rounded to 8 bits, and alpha is ignored (the color is used as it
 is). Ray reads them with its own decoder, so nothing else is needed; a damaged file is reported
 when the scene loads. `tools/make_textures.py` makes the brick images and the sky in `textures/`.
+
+JPEG and WebP images (since 2026-alpha-0.21.1) are read the same way, by Ray's own decoders, and
+told by their contents, not their names:
+
+| Format | Read | Not read (reported, with the reason) |
+|--------|------|--------------------------------------|
+| JPEG | baseline and progressive Huffman coding, 8-bit samples, grayscale or color (YCbCr, or RGB when the file says so with an Adobe marker or R, G, B component ids), every chroma subsampling, restart markers, Exif orientation (the picture comes out upright) | arithmetic coding, lossless and hierarchical JPEG, 12-bit samples, four-component (CMYK and YCCK) files, a height given after the data (DNL), and a file without its end marker |
+| WebP | the simple and extended (`VP8X`) containers; lossless (`VP8L`: every transform, the color cache and meta prefix codes); lossy (`VP8` key frames: segments, every intra prediction mode, the normal and simple loop filters, several token partitions) with or without an alpha (`ALPH`) chunk, raw or losslessly compressed and filtered | animated WebPs |
+
+They are integer arithmetic throughout, so every platform and every networked engine decodes the
+same pixels. A JPEG decodes as libjpeg-turbo decodes it by default (the IJG's accurate integer
+inverse DCT, the "fancy" triangle upsampling for 2:1 chroma, libjpeg's fixed-point color
+conversion), and a lossy WebP as libwebp does (its fancy upsampling and conversion); a lossless
+WebP is exact. On the test images in `textures/formats/`, made by `tools/make_image_fixtures.py`
+with Pillow and libwebp, every pixel matches. Alpha is dropped, as for PNG.
 
 **Bump and normal maps.** An object's `bump` tilts the normal it is shaded with, so light and
 highlights fall as if the surface were dented, grooved or rough, while rays still hit the smooth
@@ -867,7 +886,7 @@ scene, in mirrors and through glass. Up is +y.
 | `type` | required | `"sky"` or `"image"` |
 | `zenith`, `horizon`, `ground` | `[0.25, 0.45, 0.85]`, `[0.85, 0.9, 1]`, `[0.3, 0.28, 0.25]` | Sky only: the colors overhead, at the horizon and below it |
 | `exponent` | `0.5` | Sky only: the colors blend by the height of the direction (its y, from −1 to 1) to this power; smaller keeps the horizon's color in a thinner band |
-| `file` | required | Image only: an equirectangular (latitude-longitude) picture of the whole surroundings, twice as wide as it is tall: a Radiance HDR (`.hdr`, RGBE, flat or run-length encoded, stored `-Y height +X width`), PNG, PPM or Ray raw image. Its top row is straight up, its bottom straight down, its middle lies along +z, and +x is a quarter of the way to its right |
+| `file` | required | Image only: an equirectangular (latitude-longitude) picture of the whole surroundings, twice as wide as it is tall: a Radiance HDR (`.hdr`, RGBE, flat or run-length encoded, stored `-Y height +X width`), PNG, JPEG, WebP, PPM or Ray raw image. Its top row is straight up, its bottom straight down, its middle lies along +z, and +x is a quarter of the way to its right |
 | `rotation` | `0` | Image only: degrees to turn it about +y (toward +x) |
 | `srgb` | `false` | Image only: decode an 8-bit image's bytes from the sRGB curve (HDR colors are always linear, and may be brighter than 1) |
 | `intensity` | `1` | Scales its colors |

@@ -137,7 +137,7 @@ CColor CMetalMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &o
     oReflect.InheritSample( oViewIncident, RaySampling::PURPOSE_REFLECT );
     oReflect.SetT( 1e100 );
     oReflect.SetDepth( oViewIncident.GetDepth() );
-    oScene.TraceRay( oReflect, oReflected, pIntersect );
+    oScene.TraceRay( oReflect, oReflected, pIntersect, CRayCounts::REFLECTION );
 
     FLT     nCos = -oMicro.Dot( oView );
     CColor  oTint = ColorAt( m_oTint.At( oAt ), oIntersect, pIntersect );

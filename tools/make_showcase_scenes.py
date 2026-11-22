@@ -36,6 +36,8 @@ MOVES = "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3 e5 Nb3 Be6 f3 Be7 Qd2 O-O O-O-
 # Poly Haven's pieces stand on their own origins, in meters; a square of its
 # board is 0.0579 m, and a square here is one unit.
 PIECE_SCALE = 1.0 / 0.05788
+BOARD_TOP = 0.017392585054039955     # the board mesh's top, in the set's meters
+BOARD_TURN = 0.0
 PIECE_NODES = {"p": "piece_pawn_white_01", "r": "piece_rook_white_01", "n": "piece_knight_white_01",
                "b": "piece_bishop_white_01", "q": "piece_queen_white", "k": "piece_king_white"}
 
@@ -90,19 +92,23 @@ def scene(width, height, camera, objects, lights, background=(0.0, 0.0, 0.0), ex
 
 def chess_scene():
     fen, pieces = najdorf_position()
-    white = [ambient([0.06, 0.055, 0.045]), diffuse([0.88, 0.80, 0.66], 0.75), specular(0.55, 0.07), reflective(0.07)]
-    black = [ambient([0.012, 0.01, 0.008]), diffuse([0.07, 0.05, 0.035], 0.8), specular(0.6, 0.06), reflective(0.12)]
+    # The set's own textures (Poly Haven's JPEGs), through the models' UVs.
+    def texture(name):
+        return {"type": "image", "file": "models/chess/textures/chess_set_%s_diff_1k.jpg" % name, "srgb": True}
+
+    white = [ambient([0.06, 0.055, 0.045]), diffuse([1.0, 1.0, 1.0], 0.8, texture("pieces_white")), specular(0.55, 0.07),
+             reflective(0.07)]
+    black = [ambient([0.012, 0.01, 0.008]), diffuse([1.0, 1.0, 1.0], 0.85, texture("pieces_black")), specular(0.6, 0.06),
+             reflective(0.12)]
     objects = [
-        # The table, and the board: an inlaid checkerboard 8 squares across with a border.
+        # The table, and the set's own board (its top at y = 0, a square 1 unit across).
         {"type": "plane", "position": [0.0, -0.35, 0.0], "normal": [0.0, 1.0, 0.0], "color": [0.5, 0.5, 0.5],
          "materials": [ambient([0.02, 0.012, 0.008]), diffuse([1, 1, 1], 0.8, {"preset": "walnut", "scale": 0.08})]},
-        {"type": "box", "center": [0.0, -0.2, 0.0], "size": [9.2, 0.3, 9.2], "rotation": [0.0, 0.0, 0.0], "color": [0.5, 0.5, 0.5],
-         "materials": [ambient([0.02, 0.012, 0.008]), diffuse([0.30, 0.17, 0.08], 0.8), specular(0.3, 0.1), reflective(0.05)]},
-        {"type": "box", "center": [0.0, -0.025, 0.0], "size": [8.0, 0.05, 8.0], "rotation": [0.0, 0.0, 0.0], "color": [0.5, 0.5, 0.5],
-         "materials": [ambient([0.03, 0.025, 0.02]),
-                       diffuse([1, 1, 1], 0.78, {"type": "checker", "colors": [[0.22, 0.12, 0.06], [0.80, 0.64, 0.42]],
-                                                 "size": 1.0, "solid": True}),
-                       specular(0.35, 0.08), reflective(0.1)]},
+        {"type": "mesh", "file": "models/chess/chess_set_1k.gltf", "node": "board", "scale": PIECE_SCALE,
+         "rotation": [0.0, BOARD_TURN, 0.0], "align": "none", "translation": [0.0, -BOARD_TOP * PIECE_SCALE, 0.0],
+         "smooth": True, "doubleSided": False, "color": [0.5, 0.5, 0.5],
+         "materials": [ambient([0.03, 0.025, 0.02]), diffuse([1.0, 1.0, 1.0], 0.8, texture("board")), specular(0.35, 0.08),
+                       reflective(0.1)]},
     ]
     for file_index, rank, symbol in pieces:
         x = file_index - 3.5

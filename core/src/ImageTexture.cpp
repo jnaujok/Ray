@@ -6,9 +6,13 @@
 
 #include "ImageTexture.h"
 #include "SceneJson.h"
+#include "JpegImage.h"
 #include "PngImage.h"
+#include "WebpImage.h"
 
+#include <map>
 #include <math.h>
+#include <mutex>
 #include <stdio.h>
 
 #include <string>
@@ -64,6 +68,99 @@ namespace
     }
 }
 
+namespace
+{
+        // Decoded images and file contents, shared by every texture that
+        // reads the same bytes, in every copy of every scene (each piece of
+        // a chess set using one picture, each thread's copy of the scene):
+        // keyed by a hash of the bytes and kept only while something uses
+        // them.
+    struct SImageKey
+    {
+        uint64_t    anHash[ 2 ];
+        size_t      nSize;
+        int         nWidth;         // for carried pixels; -1 for a file
+
+        bool operator<( const SImageKey &oOther ) const
+        {
+            if ( anHash[ 0 ] != oOther.anHash[ 0 ] )
+                return anHash[ 0 ] < oOther.anHash[ 0 ];
+            if ( anHash[ 1 ] != oOther.anHash[ 1 ] )
+                return anHash[ 1 ] < oOther.anHash[ 1 ];
+            if ( nSize != oOther.nSize )
+                return nSize < oOther.nSize;
+            return nWidth < oOther.nWidth;
+        }
+    };
+
+    std::mutex                                                          s_oCacheLock;
+    std::map<SImageKey, std::weak_ptr<const CImageTexture::SImage> >    s_oImages;
+    std::map<SImageKey, std::weak_ptr<const std::string> >              s_oFiles;
+
+    SImageKey KeyOf( const char *pBytes, size_t nSize, int nWidth )
+    {
+        SImageKey oKey;
+
+        RayJson::HashBytes( pBytes, nSize, oKey.anHash );
+        oKey.nSize = nSize;
+        oKey.nWidth = nWidth;
+        return oKey;
+    }
+
+    template <class T>
+    std::shared_ptr<const T> Find( std::map<SImageKey, std::weak_ptr<const T> > &oCache, const SImageKey &oKey )
+    {
+        typename std::map<SImageKey, std::weak_ptr<const T> >::iterator itFound = oCache.find( oKey );
+
+        return ( itFound != oCache.end() ) ? itFound->second.lock() : std::shared_ptr<const T>();
+    }
+
+    template <class T>
+    void Remember( std::map<SImageKey, std::weak_ptr<const T> > &oCache, const SImageKey &oKey, const std::shared_ptr<const T> &pValue )
+    {
+            // Forget what nothing uses any more.
+        for ( typename std::map<SImageKey, std::weak_ptr<const T> >::iterator it = oCache.begin(); it != oCache.end(); )
+        {
+            if ( it->second.expired() )
+                it = oCache.erase( it );
+            else
+                ++it;
+        }
+        oCache[ oKey ] = pValue;
+    }
+}
+
+std::shared_ptr<const CImageTexture::SImage> CImageTexture::SharedImage( const std::string &strData, const std::string &strName,
+                                                                         std::string &strError )
+{
+    SImageKey                     oKey = KeyOf( strData.data(), strData.size(), -1 );
+    std::shared_ptr<const SImage> pShared;
+
+    {
+        std::lock_guard<std::mutex> oLock( s_oCacheLock );
+
+        pShared = Find( s_oImages, oKey );
+    }
+    if ( pShared )
+        return pShared;
+
+    std::shared_ptr<SImage> pImage( new SImage );
+
+    if ( ! ParseImage( strData, strName, *pImage, strError ) )
+        return std::shared_ptr<const SImage>();
+
+    std::lock_guard<std::mutex> oLock( s_oCacheLock );
+
+        // Another thread may have decoded it meanwhile: use the one kept.
+    pShared = Find( s_oImages, oKey );
+    if ( ! pShared )
+    {
+        pShared = pImage;
+        Remember( s_oImages, oKey, pShared );
+    }
+    return pShared;
+}
+
 CImageTexture::CImageTexture( void ) :
     m_bRepeat( TRUE ),
     m_bSrgb( FALSE )
@@ -74,11 +171,18 @@ CImageTexture::CImageTexture( void ) :
 
 BOOL CImageTexture::ParseImage( const std::string &strData, const std::string &strPath, SImage &oImage, std::string &strError )
 {
-    if ( CPngImage::IsPng( strData ) )
+    if ( CPngImage::IsPng( strData ) || CJpegImage::IsJpeg( strData ) || CWebpImage::IsWebp( strData ) )
     {
         std::string strWhy;
+        BOOL        bRead;
 
-        if ( ! CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy ) )
+        if ( CPngImage::IsPng( strData ) )
+            bRead = CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+        else if ( CJpegImage::IsJpeg( strData ) )
+            bRead = CJpegImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+        else
+            bRead = CWebpImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+        if ( ! bRead )
         {
             strError = "\"" + strPath + "\" " + strWhy;
             return FALSE;
@@ -229,9 +333,21 @@ void CImageTexture::ToJson( IASLib::CObjectNode &oNode ) const
     }
     if ( m_pImage && RayJson::EmbeddingData() )
     {
-        oNode.put( "width", m_pImage->nWidth );
-        oNode.put( "height", m_pImage->nHeight );
-        oNode.putBinary( "pixels", m_pImage->anPixels );
+            // A copy for a task carries the image: the file itself where it
+            // is smaller than its pixels (a PNG, JPEG or WebP), which the
+            // task decodes to the same pixels; else the pixels.
+        if ( m_pFileData && m_pFileData->size() < m_pImage->anPixels.size() )
+        {
+            std::vector<unsigned char> anData( m_pFileData->begin(), m_pFileData->end() );
+
+            oNode.putBinary( "data", anData );
+        }
+        else
+        {
+            oNode.put( "width", m_pImage->nWidth );
+            oNode.put( "height", m_pImage->nHeight );
+            oNode.putBinary( "pixels", m_pImage->anPixels );
+        }
     }
     oNode.putArray( "scale" )->add( (double)m_anScale[ 0 ] )->add( (double)m_anScale[ 1 ] );
     oNode.putArray( "offset" )->add( (double)m_anOffset[ 0 ] )->add( (double)m_anOffset[ 1 ] );
@@ -241,8 +357,9 @@ void CImageTexture::ToJson( IASLib::CObjectNode &oNode ) const
 
 BOOL CImageTexture::FromJson( const IASLib::CJsonNode &oNode )
 {
-    static const char *const astrFields[] = { "file", "width", "height", "pixels", "scale", "offset", "repeat", "srgb", NULL };
+    static const char *const astrFields[] = { "file", "width", "height", "pixels", "data", "scale", "offset", "repeat", "srgb", NULL };
     std::shared_ptr<SImage> pImage( new SImage );
+    std::shared_ptr<const SImage> pShared;
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
          ! RayJson::GetString( oNode, "file", m_strFile, FALSE ) ||
@@ -253,8 +370,36 @@ BOOL CImageTexture::FromJson( const IASLib::CJsonNode &oNode )
         return FALSE;
 
     const IASLib::CJsonNode *pPixels = oNode.get( "pixels" );
+    const IASLib::CJsonNode *pData = oNode.get( "data" );
 
-    if ( pPixels )
+    if ( pData && ! pPixels )
+    {
+            // The file itself, carried in the scene (a copy sent to a task).
+        std::vector<unsigned char> anData;
+        std::string                strError;
+
+        if ( ! RayJson::BinaryValue( *pData, anData ) )
+            return RayJson::Fail( "data must be the image file, in base64" );
+
+        std::string strData( anData.begin(), anData.end() );
+
+        pShared = SharedImage( strData, m_strFile, strError );
+        if ( ! pShared )
+            return RayJson::Fail( strError );
+
+        SImageKey                          oKey = KeyOf( strData.data(), strData.size(), -1 );
+        std::shared_ptr<const std::string> pFile;
+        std::lock_guard<std::mutex>        oLock( s_oCacheLock );
+
+        pFile = Find( s_oFiles, oKey );
+        if ( ! pFile )
+        {
+            pFile.reset( new std::string( strData ) );
+            Remember( s_oFiles, oKey, pFile );
+        }
+        m_pFileData = pFile;
+    }
+    else if ( pPixels )
     {
             // Pixels carried in the scene (a copy sent to a task).
         if ( ! RayJson::GetInt( oNode, "width", pImage->nWidth, 1, 65535, TRUE ) ||
@@ -263,6 +408,16 @@ BOOL CImageTexture::FromJson( const IASLib::CJsonNode &oNode )
         if ( ! RayJson::BinaryValue( *pPixels, pImage->anPixels ) ||
              pImage->anPixels.size() != (size_t)pImage->nWidth * (size_t)pImage->nHeight * 3 )
             return RayJson::Fail( "pixels must be width x height RGB bytes, in base64" );
+
+        SImageKey                    oKey = KeyOf( (const char *)pImage->anPixels.data(), pImage->anPixels.size(), pImage->nWidth );
+        std::lock_guard<std::mutex>  oLock( s_oCacheLock );
+
+        pShared = Find( s_oImages, oKey );
+        if ( ! pShared )
+        {
+            pShared = pImage;
+            Remember( s_oImages, oKey, pShared );
+        }
     }
     else
     {
@@ -274,10 +429,24 @@ BOOL CImageTexture::FromJson( const IASLib::CJsonNode &oNode )
 
         if ( ! RayJson::ReadSceneFile( m_strFile, strData, m_strPath, strError ) )
             return RayJson::Fail( "can't open the image \"" + m_strFile + "\"" );
-        if ( ! ParseImage( strData, m_strFile, *pImage, strError ) )
+
+        SImageKey                       oKey = KeyOf( strData.data(), strData.size(), -1 );
+        std::shared_ptr<const std::string> pFile;
+
+        pShared = SharedImage( strData, m_strFile, strError );
+        if ( ! pShared )
             return RayJson::Fail( strError );
-        m_pFileData.reset( new std::string( strData ) );
+
+        std::lock_guard<std::mutex> oLock( s_oCacheLock );
+
+        pFile = Find( s_oFiles, oKey );
+        if ( ! pFile )
+        {
+            pFile.reset( new std::string( strData ) );
+            Remember( s_oFiles, oKey, pFile );
+        }
+        m_pFileData = pFile;
     }
-    m_pImage = pImage;
+    m_pImage = pShared;
     return TRUE;
 }

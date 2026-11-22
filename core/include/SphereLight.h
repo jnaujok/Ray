@@ -26,6 +26,7 @@ class CSphereLight : public CLight
         int             m_nSamples;
 
     public:
+        virtual int     ShadowRayKind( void ) const { return CRayCounts::SHADOW_AREA; }
                         DYNAMIC_OBJECTS( CSphereLight );
 
                         CSphereLight( void );

@@ -37,7 +37,7 @@ class CSocketTaskSlave : public CTaskSlave
 
         virtual EMessage    FromMaster( std::unique_ptr<CScene> &pScene, STile &oTile, uint32_t &nTrace );
         virtual BOOL        RequestWork( void );
-        virtual BOOL        PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors );
+        virtual BOOL        PixelsToMaster( uint32_t nTrace, const STile &oTile, const CRayCounts &oCounts, const std::vector<double> &anColors );
 
         const char         *GetLastError( void ) const { return (const char *)m_strLastError; }
 

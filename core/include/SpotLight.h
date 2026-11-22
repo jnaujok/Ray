@@ -34,6 +34,7 @@ class CSpotLight : public CLight
         int             m_nSamples;
 
     public:
+        virtual int     ShadowRayKind( void ) const { return CRayCounts::SHADOW_SPOT; }
                         DYNAMIC_OBJECTS( CSpotLight );
 
                         CSpotLight( void );

@@ -93,6 +93,7 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
     BOOL                            bRetVal = TRUE;
 
     m_nRaysTraced = 0;
+    m_oRayCounts.Clear();
     m_strLastError.clear();
         // A color model that works on the whole image (film) needs every
         // pixel's linear color.
@@ -265,7 +266,8 @@ BOOL CTaskMaster::TraceScene( CScene &oScene, CImageFile &oImageFile )
                                                   (FLT)oEvent.anColors[ nAt + 2 ] ) );
                 }
                 nPixelsLeft -= (long long)oTile.nWidth * (long long)oTile.nHeight;
-                m_nRaysTraced += oEvent.nRays;
+                m_nRaysTraced += (long long)oEvent.oCounts.anCounts[ CRayCounts::CAMERA ];
+                m_oRayCounts.Add( oEvent.oCounts );
                 m_nStatus = (int)( ( ( nPixels - nPixelsLeft ) * 10000 ) / nPixels );
                 break;
             }
