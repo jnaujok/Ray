@@ -5,6 +5,7 @@
 
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 
 namespace RayEditor
 {
@@ -199,6 +200,29 @@ namespace RayEditor
         return true;
     }
 
+    bool CEditorDocument::ExportObject( const std::string &strPart, const std::string &strPath, std::string &strError )
+    {
+        const std::string strPrefix = "objects/";
+        int               nIndex = -1;
+
+        if ( strPart.compare( 0, strPrefix.size(), strPrefix ) == 0 && strPart.size() > strPrefix.size() &&
+             strPart.find_first_not_of( "0123456789", strPrefix.size() ) == std::string::npos )
+            nIndex = atoi( strPart.c_str() + strPrefix.size() );
+        if ( nIndex < 0 || nIndex >= m_pScene->GetObjectCount() )
+        {
+            strError = "choose an object to export";
+            return false;
+        }
+        if ( m_pScene->SaveObject( nIndex, strPath.c_str(), EndsWith( strPath, ".json" ) ? TRUE : FALSE ) != NO_SER_ERROR )
+        {
+            strError = m_pScene->GetLoadError();
+            if ( strError.empty() )
+                strError = "the file can't be written";
+            return false;
+        }
+        return true;
+    }
+
     std::string CEditorDocument::Directory( void ) const
     {
         size_t nSlash = m_strPath.find_last_of( "/\\" );
@@ -266,12 +290,13 @@ namespace RayEditor
             strError = "only objects and lights can be added";
             return false;
         }
-        if ( ! SetPart( strList + "/+", strText, strError ) )
-            return false;
-
+            // The new part is the first added (an include adds what it
+            // brings in after itself).
         int nCount = ( strList == "objects" ) ? m_pScene->GetObjectCount() : m_pScene->GetLightCount();
 
-        strPart = strList + "/" + std::to_string( nCount - 1 );
+        if ( ! SetPart( strList + "/+", strText, strError ) )
+            return false;
+        strPart = strList + "/" + std::to_string( nCount );
         return true;
     }
 

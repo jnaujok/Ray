@@ -181,6 +181,38 @@ static void TestFiles( const std::string &strScenes, const std::string &strScrat
         CHECK( oBack.SetPart( "objects/2", strText, strError ) );
     }
 
+        // One object exports as a scene of its own, which an include brings
+        // back in; the document itself is left alone.
+    std::string strObject = strScratch + "/editor_test_object.ray";
+    std::string strPrefab = "objects/" + std::to_string( oDoc.Scene().GetObjectCount() - 1 );
+
+    CHECK( oDoc.ExportObject( strPrefab, strObject, strError ) );
+    CHECK( oDoc.Path() == strJson );
+    CHECK( ! oDoc.ExportObject( "camera", strObject, strError ) && ! strError.empty() );
+    CHECK( ! oDoc.ExportObject( "objects/99", strObject, strError ) );
+    {
+        CEditorDocument oExported;
+
+        CHECK( oExported.Load( strObject, strError ) && oExported.Scene().GetObjectCount() == 1 );
+
+        std::string strInclude = "{\"type\": \"include\", \"file\": \"editor_test_object.ray\", \"position\": [2, 0, 0]}";
+        int         nBefore = oDoc.Scene().GetObjectCount();
+
+        CHECK( oDoc.Add( "objects", strInclude, strPart, strError ) );
+        CHECK( oDoc.Scene().GetObjectCount() == nBefore + 2 && strPart == "objects/" + std::to_string( nBefore ) );
+        CHECK( dynamic_cast<CMesh *>( oDoc.Scene().GetObjectAt( nBefore + 1 ) ) != NULL );
+
+            // What it brought in shows, but is edited through the include,
+            // and goes with it.
+        std::string strIncluded = "objects/" + std::to_string( nBefore + 1 );
+
+        CHECK( oDoc.PartJson( strIncluded ).find( "\"mesh\"" ) != std::string::npos );
+        CHECK( ! oDoc.SetPart( strIncluded, oDoc.PartJson( strIncluded ), strError ) );
+        CHECK( oDoc.SetPart( strPart, strInclude, strError ) && oDoc.Scene().GetObjectCount() == nBefore + 2 );
+        CHECK( oDoc.Undo() && oDoc.Scene().GetObjectCount() == nBefore + 2 );
+        CHECK( oDoc.Delete( strPart, strError ) && oDoc.Scene().GetObjectCount() == nBefore );
+    }
+
     CEditorDocument oMissing;
 
     CHECK( ! oMissing.Load( strScratch + "/no_such_scene.ray", strError ) && ! strError.empty() );

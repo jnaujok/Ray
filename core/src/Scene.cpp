@@ -759,6 +759,18 @@ std::string CScene::ToJson( BOOL bCompact )
     return bCompact ? pRoot->toJson( -1 ) : RayJson::Write( *pRoot );
 }
 
+    // An object or light as its JSON node: its type, its name (if any) and
+    // its fields.
+static void ObjectToJson( CObjects *pObject, IASLib::CObjectNode &oNode )
+{
+    LPCSTR strType = g_pDynamicList->JsonTypeOf( pObject->ClassType() );
+
+    oNode.put( "type", strType ? strType : pObject->ClassType() );
+    if ( ! pObject->GetName().empty() )
+        oNode.put( "name", pObject->GetName().c_str() );
+    pObject->ToJson( oNode );
+}
+
 IASLib::CObjectNode *CScene::ToJsonTree( void )
 {
     IASLib::CObjectNode    *pRoot = new IASLib::CObjectNode;
@@ -789,13 +801,7 @@ IASLib::CObjectNode *CScene::ToJsonTree( void )
             if ( nList == 0 && ( pObject->IncludedBy() || ( m_nOnlyObject >= 0 && nIndex != m_nOnlyObject ) ) )
                 continue;
 
-            IASLib::CObjectNode    *pNode = apArrays[ nList ]->addObject();
-            LPCSTR                  strType = g_pDynamicList->JsonTypeOf( pObject->ClassType() );
-
-            pNode->put( "type", strType ? strType : pObject->ClassType() );
-            if ( ! pObject->GetName().empty() )
-                pNode->put( "name", pObject->GetName().c_str() );
-            pObject->ToJson( *pNode );
+            ObjectToJson( pObject, *apArrays[ nList ]->addObject() );
         }
     }
 
@@ -857,6 +863,25 @@ static BOOL SplitPart( const std::string &strPart, std::string &strList, int &nI
     return TRUE;
 }
 
+int CScene::RemoveIncluded( CObjects *pInclude, int nBefore )
+{
+    int nRemovedBefore = 0;
+
+    for ( int nIndex = m_oObjects.GetSize() - 1; nIndex >= 0; nIndex-- )
+    {
+        CObjects *pObject = m_oObjects[ nIndex ];
+
+        if ( pObject->IncludedBy() == pInclude )
+        {
+            m_oObjects.Delete( nIndex );
+            delete pObject;
+            if ( nIndex < nBefore )
+                nRemovedBefore++;
+        }
+    }
+    return nRemovedBefore;
+}
+
 std::string CScene::PartToJson( const std::string &strPart )
 {
     std::unique_ptr<IASLib::CObjectNode>    pRoot( ToJsonTree() );
@@ -868,10 +893,17 @@ std::string CScene::PartToJson( const std::string &strPart )
         pNode = pRoot->get( strPart.c_str() );
     else if ( SplitPart( strPart, strList, nIndex ) && nIndex >= 0 )
     {
-        const IASLib::CJsonNode *pArray = pRoot->get( strList.c_str() );
+            // By the scene's own lists, which hold what includes brought in
+            // (the saved tree leaves those out).
+        BOOL bLights = ( strList == "lights" );
 
-        if ( pArray && nIndex < pArray->size() )
-            pNode = pArray->get( nIndex );
+        if ( nIndex < ( bLights ? m_oLights.GetSize() : m_oObjects.GetSize() ) )
+        {
+            IASLib::CObjectNode oNode;
+
+            ObjectToJson( bLights ? (CObjects *)m_oLights[ nIndex ] : m_oObjects[ nIndex ], oNode );
+            return RayJson::Write( oNode );
+        }
     }
     return pNode ? RayJson::Write( *pNode ) : std::string();
 }
@@ -918,6 +950,11 @@ DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, 
         m_strLoadError = "there is no " + strPart;
         return BAD_FILE;
     }
+    if ( bList && ! bLights && nIndex >= 0 && m_oObjects[ nIndex ]->IncludedBy() )
+    {
+        m_strLoadError = "that object came in with an include; edit the include, or its file";
+        return BAD_FILE;
+    }
 
         // Empty text removes the part, where it can be removed.
     if ( bEmpty )
@@ -945,6 +982,7 @@ DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, 
             {
                 CObjects *pOld = m_oObjects[ nIndex ];
 
+                RemoveIncluded( pOld );
                 m_oObjects.Delete( nIndex );
                 delete pOld;
                 ForgetTree();
@@ -1024,7 +1062,9 @@ DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, 
         std::vector<CObjects *> apRead;
 
         oRoot.putArray( strList.c_str() )->add( pNode.release() );
-        if ( ReadObjects( oRoot, strList.c_str(), bLights, apRead ) && apRead.size() == 1 )
+            // An include reads as itself and then what it brings in.
+        if ( ReadObjects( oRoot, strList.c_str(), bLights, apRead ) &&
+             ( apRead.size() == 1 || ( ! bLights && dynamic_cast<CInclude *>( apRead[ 0 ] ) ) ) )
         {
             if ( bLights )
             {
@@ -1042,13 +1082,18 @@ DWORD CScene::EditPart( const std::string &strPart, const std::string &strText, 
             else
             {
                 if ( nIndex < 0 )
-                    m_oObjects.Add( apRead[ 0 ] );
+                {
+                    for ( CObjects *pRead : apRead )
+                        m_oObjects.Add( pRead );
+                }
                 else
                 {
                     CObjects *pOld = m_oObjects[ nIndex ];
 
+                    nIndex -= RemoveIncluded( pOld, nIndex );
                     m_oObjects.Delete( nIndex );
-                    m_oObjects.Insert( apRead[ 0 ], nIndex );
+                    for ( size_t nRead = 0; nRead < apRead.size(); nRead++ )
+                        m_oObjects.Insert( apRead[ nRead ], nIndex + (int)nRead );
                     delete pOld;
                 }
                 ForgetTree();

@@ -149,6 +149,9 @@ class CScene
             /// "environment" (empty if there is none), "objects/N" or
             /// "lights/N" (from 0). Empty if there is no such part.
         std::string         PartToJson( const std::string &strPart );
+            /// Deletes what an include brought in; how many of those were
+            /// before nBefore in the list.
+        int                 RemoveIncluded( CObjects *pInclude, int nBefore = 0 );
             /// Replaces a part of the scene with one read from strText: a part
             /// named as above, or "objects/+" or "lights/+" to add one at the
             /// end. Empty text removes an object, a light or the environment.

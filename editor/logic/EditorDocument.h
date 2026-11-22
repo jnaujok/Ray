@@ -66,6 +66,10 @@ namespace RayEditor
                 /// Saves as a scene archive, or as plain JSON with its files
                 /// beside it if the name ends in ".json".
             bool                        Save( const std::string &strPath, std::string &strError );
+                /// Saves one object ("objects/N") as a scene of its own, the
+                /// same way, for an include to bring into other scenes. The
+                /// document itself is unchanged.
+            bool                        ExportObject( const std::string &strPart, const std::string &strPath, std::string &strError );
 
             CScene                     &Scene( void ) { return *m_pScene; }
             const std::string          &Path( void ) const { return m_strPath; }
