@@ -71,6 +71,32 @@ class CMesh : public CObjects
         std::shared_ptr<const ModelFile::SModel> m_pModel;
         CVector                 m_oScale;
         FLT                     m_nFitSize;         // 0: use m_oScale
+        FLT                     m_nCreaseAngle;     // >0: the file's normals are ignored, and worked out up to this angle (degrees)
+        BOOL                    m_bNodeWorld;       // a picked glTF node sits where its parents put it ("nodeFrame": "world")
+            // A placement on top of the mesh's own, given by an include.
+        BOOL                    m_bOuter;
+        FLT                     m_nOuterScale;
+        CVector                 m_oOuterRotation;
+        CVector                 m_oOuterTranslation;
+            // The materialMap: materials (and a bump) for a model's parts by
+            // name; faces of a part not in it use the mesh's own.
+        struct SPart
+        {
+            std::string                     strName;
+            CMaterialList                   oMaterials;
+            std::shared_ptr<const CBumpMap> pBump;
+            BOOL                            bBump = FALSE;     // the entry gave a bump (else the mesh's)
+                                            ~SPart( void );
+        };
+        std::vector< std::unique_ptr<SPart> > m_apParts;
+        std::vector<int>        m_anPartEntry;      // the geometry's parts, each an index into m_apParts or -1
+        BOOL                    MaterialMapFromJson( const IASLib::CJsonNode &oNode );
+        void                    MaterialMapToJson( IASLib::CObjectNode &oNode ) const;
+            // Matches the materialMap with the model's parts; FALSE, with a
+            // reason, for a name the model doesn't have.
+        BOOL                    ResolveParts( std::string &strError );
+            // The materials and bump a face shades with.
+        CMaterialList          *FaceMaterials( int nFace, std::shared_ptr<const CBumpMap> &pBump );
         CVector                 m_oRotation;
         int                     m_nAlign;           // EAlign
         CVector                 m_oTranslation;
@@ -116,6 +142,15 @@ class CMesh : public CObjects
             std::vector<FLT>            anUVs;              // u and v for each vertex, or empty
             std::vector<CColor>         aoGivenColors;      // one a face as given, or empty
             std::vector<unsigned char>  abGivenHasColor;
+                // From a model file: each given face's part (or empty), the
+                // parts' names, and base color images with each face's image,
+                // color factor and image coordinates (six a face).
+            std::vector<int>            anGivenParts;
+            std::vector<std::string>    astrParts;
+            std::vector< std::shared_ptr<const CImageTexture::SImage> > apImages;
+            std::vector<int>            anGivenFaceImage;
+            std::vector<CColor>         aoGivenFactor;
+            std::vector<FLT>            anGivenImageUVs;
             BOOL                        bSmooth;
             BOOL                        bDoubleSided;
             SUVMap                      oUVMap;
@@ -127,6 +162,10 @@ class CMesh : public CObjects
             std::vector<FLT>            anCornerUVs;        // six a face (u, v at each corner), or empty
             std::vector<CColor>         aoFaceColors;       // one a face, or empty
             std::vector<unsigned char>  abFaceHasColor;
+            std::vector<int>            anFacePart;         // one a kept face, or empty
+            std::vector<int>            anFaceImage;        // one a kept face, or empty
+            std::vector<CColor>         aoFaceFactor;
+            std::vector<FLT>            anFaceImageUVs;     // six a kept face
             CVector                     oMinimum;           // the bounding box
             CVector                     oMaximum;
             std::vector<SNode>          aoNodes;            // the root first
@@ -182,12 +221,23 @@ class CMesh : public CObjects
                                              const std::vector<CVector> &aoNormals = std::vector<CVector>(),
                                              const std::vector<FLT> &anUVs = std::vector<FLT>(),
                                              const std::vector<CColor> &aoFaceColors = std::vector<CColor>(),
-                                             const std::vector<unsigned char> &abHasColor = std::vector<unsigned char>() );
+                                             const std::vector<unsigned char> &abHasColor = std::vector<unsigned char>(),
+                                             const ModelFile::SModel *pModel = NULL );
+            /// Places the mesh again on top of its own placement: scaled by
+            /// nScale, turned (degrees about x, then y, then z) and moved, as
+            /// an include places what it brings in. Applies at the next load.
+        void                    SetOuterPlacement( FLT nScale, const CVector &oRotation, const CVector &oTranslation );
+            /// The model's part names (glTF or Blender materials), for a
+            /// materialMap.
+        std::vector<std::string> GetPartNames( void ) const;
             /// Loads the geometry from a model file's contents (STL or OBJ;
             /// strName picks the format) and places it with the model
             /// settings below. FALSE, with a reason in strError, if the file
             /// can't be read.
         BOOL                    LoadModel( const std::string &strData, const std::string &strName, std::string &strError );
+            /// Re-places a mesh that holds its geometry inline (vertices and
+            /// faces), for an include's placement.
+        void                    ApplyOuterToInline( void );
             /// Whether the mesh came from a model file.
         BOOL                    IsFromFile( void ) const { return ! m_strFile.empty(); }
         int                     GetFaceCount( void ) const { return m_pGeometry ? m_pGeometry->FaceCount() : 0; }

@@ -19,6 +19,7 @@ class CFaceColorTexture : public CTexture
 {
     protected:
         CColor                  m_oDefault;
+        BOOL                    m_bUV;          // "sample": "uv": the model's base color image through the face's coordinates
 
     public:
                                 CFaceColorTexture( void );

@@ -61,6 +61,8 @@ void CObjects::TextureAt( CVector &oPoint, STexturePoint &oAt )
     oAt.nU = oAt.nV = 0.0;
     oAt.bHasUV = SurfaceCoords( oPoint, oAt.nU, oAt.nV ) ? TRUE : FALSE;
     oAt.bHasColor = SurfaceColor( oPoint, oAt.oColor ) ? TRUE : FALSE;
+    oAt.pSurface = this;
+    oAt.oHit = oPoint;
 }
 
 void CObjects::BumpToJson( IASLib::CObjectNode &oNode ) const

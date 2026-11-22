@@ -86,6 +86,10 @@ class CObjects
             // face's color from a colored model file), for the faceColors
             // texture. FALSE if it gives none.
         virtual BOOL        SurfaceColor( CVector &oPoint, CColor &oColor ) { (void)oPoint; (void)oColor; return FALSE; }
+            // The surface's base color image (a model's own texture) at a
+            // point on it, sampled through the surface's image coordinates;
+            // FALSE if it has none.
+        virtual BOOL        SurfaceImageColor( CVector &oPoint, CColor &oColor ) { (void)oPoint; (void)oColor; return FALSE; }
             // A scene point in the space the object's textures are looked up
             // in: the point itself, unless the object has a texture frame.
         virtual CVector     TextureSpace( const CVector &oPoint ) const
