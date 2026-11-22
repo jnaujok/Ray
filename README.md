@@ -177,8 +177,10 @@ The ray tracing itself is the 1997 code.
 
   <img src="docs/images/soft.png" alt="Clear, lightly frosted and heavily frosted glass panes before a striped poster, a mirror ball and a brushed gold ball, and soft shadows from a rectangle light and a sphere light" width="320">
 - **Textures:** any material's color can come from a texture instead: a checkerboard, on the
-  surface or solid (carved from a checkered block), an image file (PNG of any kind, PPM, or Ray
-  raw) laid over the surface, or a solid noise texture: marble, wood, or plain noise and turbulence (granite, stone,
+  surface or solid (carved from a checkered block), an image file (PNG of any kind, JPEG baseline
+  or progressive, WebP lossless or lossy, PPM, or Ray raw, told apart by their contents and read by
+  Ray's own integer-only decoders, which match libjpeg-turbo and libwebp pixel for pixel on the test
+  images) laid over the surface, or a solid noise texture: marble, wood, or plain noise and turbulence (granite, stone,
   clouds), made from Perlin gradient noise and a ramp of colors. Spheres, planes, cylinders, cones, and boxes have surface coordinates of their own; triangles and meshes take
   `uvs`, and a mesh without them can use a UV map (planar, cylindrical, spherical, or box
   projection) to work them out. Networked engines get the images inside the scene, so they need no
@@ -217,7 +219,9 @@ The ray tracing itself is the 1997 code.
   `layers` texture draws the rounded 0.1 mm layer lines of a 3D print, as a color and as a bump map;
   a model's textures are looked up in its file's own coordinates (millimeters for a printable
   model), so the layers follow its print axis however it is turned. glTF models bring their node
-  transforms and their materials' base colors (through `faceColors`), and a mesh can pick one `node`
+  transforms, their UVs (so an `image` texture can lay the model's own picture over it, as the chess
+  set's JPEGs are) and their materials' base colors, times a PNG, JPEG or WebP base color image
+  (through `faceColors`), and a mesh can pick one `node`
   (a chess piece from a whole set) or one material's primitives (`gltfMaterial`: a visor apart from
   its suit). Draco-compressed glTF (`KHR_draco_mesh_compression`, as most of NASA's 3D Resources
   are) is decoded by Ray's own decoder. Blender `.blend` files from 2.8 to 4.x are read directly,
@@ -483,6 +487,27 @@ CPU-seconds in 2026-alpha-0.21, which spends more rays on bounce light around la
 raythrower scenes/torture_test.ray --aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb --png torture.png
 ```
 
+raythrower prints how many rays a render cast, by kind, at the end (`--stats` prints it even with
+`--quiet`, and `--stats-json <file>` writes it as JSON). The torture test at 240×180 with the
+adaptive command above (2026-alpha-0.21.1; 1,389 CPU-seconds, 110 s on 16 threads):
+
+| Kind | Rays | Share | Per pixel |
+|------|-----:|------:|----------:|
+| camera | 12,363,096 | 5.3% | 286 |
+| shadow (point light) | 28,490,826 | 12.2% | 660 |
+| shadow (spot light) | 28,490,826 | 12.2% | 660 |
+| shadow (sphere and rectangle lights) | 56,981,652 | 24.4% | 1,319 |
+| shadow (sun) | 28,490,826 | 12.2% | 660 |
+| shadow (sky) | 28,490,826 | 12.2% | 660 |
+| indirect (bounce) | 33,402,215 | 14.3% | 773 |
+| reflection | 12,910,932 | 5.5% | 299 |
+| refraction | 4,229,247 | 1.8% | 98 |
+| total | 233,850,446 | | 5,413 |
+
+Seven rays in ten are shadow rays: every point shaded casts one at each of the six lights, sky
+included, whether or not the light reaches it (a point outside the spot's cone still asks), which
+is where the next optimizations should look.
+
 <img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, a lump of regolith, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
 
 **Bring in a model**: name an STL or OBJ file in a mesh, and place it (here a printable model,
@@ -581,7 +606,7 @@ The tests render every sample scene and compare it with a reference render (four
 corner anti-aliasing, one with each other sampler and color model, the teapot, two real lenses,
 textures, solid textures and absorbing glass, rough glass and mirrors with area lights, bump and normal maps with PNG textures, spot and
 directional lights, an HDR environment map, cylinders, cones, and boxes, constructive solid geometry, a dispersive prism, models from colored STL and OBJ files,
-3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, the Apollo cameras (a Hasselblad and its lens, Kodak film with grain and halation, the Réseau crosses blooming over, and Tranquility Base on regolith), a chessboard in depth of field from glTF pieces, the AS11-40-5903 recreation with a gold metal visor, models read from Blender .blend files, and a torture test of all of them through a real lens).
+3DBenchy with printed layer lines, light bounced between surfaces, haze and ground mist, every material preset, beam profiles, a projected slide and attenuation, underwater caustics, texture maps on every material setting and on a light, textures inside glass, every new shape, text set in a TrueType font and carved with a csg, lathes, extrusions and sweeps, implicit surfaces, metaballs and fractals, the Apollo cameras (a Hasselblad and its lens, Kodak film with grain and halation, the Réseau crosses blooming over, and Tranquility Base on regolith), a chessboard in depth of field from glTF pieces, the AS11-40-5903 recreation with a gold metal visor, models read from Blender .blend files, textures from JPEG and WebP files beside their PNG original, and a torture test of all of them through a real lens).
 They also check the scene editor's logic without a display (`editor_logic`): editing parts as
 JSON with undo and redo, the new-object templates, tessellation, that the view aims rays exactly as
 the tracer's camera does, picking, model import, saving, and the progressive render.
@@ -599,7 +624,13 @@ that rough surfaces draw their microfacets from the GGX distribution, that rough
 every time for the same ray, that a sphere light's points lie on the disc it shows, that a
 rectangle light shines only to its front, and that hiding half of one gives half its light. They
 check that PNG images of every color type and bit depth, interlaced or not, decode exactly, that
-damaged or truncated ones are refused, and that height and normal maps tilt the normal the way
+damaged or truncated ones are refused, that JPEGs (baseline, progressive, every common
+subsampling, grayscale, restart markers, Exif orientations) decode as libjpeg-turbo decodes them
+and lossy WebPs (alpha, the simple filter, several partitions, one segment) as libwebp does, that
+lossless WebPs (every transform, palettes of 2 to 100 colors, alpha) decode exactly, that what isn't
+read (CMYK, arithmetic coding, 12-bit, lossless JPEG, animated WebP) is reported, and that cut-off
+or damaged images fail cleanly, that the rays a render casts, by kind, are the same with 4
+threads, 2 threads and 3 networked engines (`ray_counts_*`), and that height and normal maps tilt the normal the way
 and by the amount they should. They check that a spot light's cone fades along a smoothstep, that
 sunlight is the same everywhere and casts shadows the size of what casts them (soft with an angle),
 that HDR images decode exactly, flat or run-length encoded, that an environment shows each pixel
@@ -649,6 +680,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/fractal_test.png" alt="render_fractal" width="260"><br><code>render_fractal</code></td><td align="center"><img src="docs/images/tests/apollo_lenses_test.png" alt="render_apollo_lenses" width="160"><br><code>render_apollo_lenses</code></td><td align="center"><img src="docs/images/tests/film_test.png" alt="render_film" width="240"><br><code>render_film</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/reseau_test.png" alt="render_reseau" width="260"><br><code>render_reseau</code></td><td align="center"><img src="docs/images/tests/tranquility_test.png" alt="render_tranquility" width="192"><br><code>render_tranquility</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/chess_dof_test.png" alt="render_chess_dof" width="260"><br><code>render_chess_dof</code></td><td align="center"><img src="docs/images/tests/as11_40_5903_test.png" alt="render_as11_40_5903" width="192"><br><code>render_as11_40_5903</code></td><td align="center"><img src="docs/images/tests/blend_test.png" alt="render_blend" width="260"><br><code>render_blend</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/images_test.png" alt="render_images" width="260"><br><code>render_images</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -748,7 +780,8 @@ seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and l
 and a recreation of AS11-40-5903. Models load from glTF (Draco-compressed too) and Blender
 `.blend` files as well as STL and OBJ. 2026-alpha-0.21 was a tuning release: frames split their last
 tiles, scene copies share the files they carry, and networked engines share one encoding of the
-scene (see [`docs/performance.md`](docs/performance.md)).
+scene (see [`docs/performance.md`](docs/performance.md)). 2026-alpha-0.21.1 reads JPEG and WebP images
+with Ray's own decoders and counts every ray a render casts, by kind.
 
 ## Changelog
 

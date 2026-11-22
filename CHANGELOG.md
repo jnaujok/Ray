@@ -10,6 +10,112 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.21.1] - 2026-11-21
+
+JPEG and WebP, read by Ray's own decoders wherever PNG is, and every ray a render casts counted by
+kind. The chessboard now wears its set's own lacquer and marble textures. Every other image is byte
+for byte what it was.
+
+### Added
+
+- **JPEG images**, read by a decoder of Ray's own (`core/src/JpegImage.cpp`), wherever PNG is read:
+  image textures, normal and bump maps, light filters, environment pictures and the base color
+  images of glTF models. Baseline and progressive Huffman coding (spectral selection and successive
+  approximation), 8-bit samples, grayscale or color (YCbCr, or RGB when an Adobe marker or the
+  component ids say so), every chroma subsampling, restart markers, and the Exif orientation, so a
+  photo comes out upright. It is integer arithmetic throughout (the IJG's accurate integer inverse
+  DCT, libjpeg's "fancy" triangle upsampling for 2:1 chroma, its fixed-point YCbCr to RGB), so
+  every platform and engine decodes the same pixels; against libjpeg-turbo (through Pillow) every
+  pixel of every test image matches, and so do the chess set's 1024×1024 textures. Refused, each
+  with its reason: arithmetic coding, lossless and hierarchical JPEG, 12-bit samples, CMYK and YCCK,
+  a height given after the data (DNL), and a file cut off before its end marker.
+- **WebP images**, likewise (`core/src/WebpImage.cpp`): the simple and extended (`VP8X`)
+  containers; lossless `VP8L` (RFC 9649: the predictor, color, subtract-green and color-indexing
+  transforms, the color cache and meta prefix codes), exact; lossy `VP8` key frames (RFC 6386: the
+  boolean decoder, segments, every 16×16, chroma and 4×4 intra prediction mode, the DCT and
+  Walsh-Hadamard transforms, the normal and simple loop filters with sharpness, several token
+  partitions), then YUV 4:2:0 to RGB as libwebp does by default; and the `ALPH` chunk of a lossy
+  image, raw or losslessly compressed, with its filtering undone (alpha is dropped, as for PNG, but
+  decoded and checked). Every pixel matches libwebp's on the test images, the simple-filter,
+  sharpness, four-partition and one-segment files included. Animated WebPs are refused. The VP8
+  tables are RFC 6386's (see `NOTICE`).
+- **glTF base color images in JPEG and WebP**, through `faceColors` as PNGs are: a texture's plain
+  `source` where there is one (usually a lossless PNG), else `EXT_texture_webp`'s, so files that
+  ship only WebP get their colors; only KTX2 is still skipped. The lunar module and astronaut keep
+  their PNG fallbacks, so the AS11-40-5903 recreation is unchanged.
+- **`images_test.ray`**: the bricks of `textures/bricks.png` on three boxes, from the PNG, from a
+  JPEG (quality 85, 4:2:0) and from a lossy WebP (quality 80), with render, round-trip and network
+  tests, a reference render and a place in the README's Expected output table.
+
+  ![The bricks from a PNG, a JPEG and a lossy WebP](docs/images/changelog/jpeg-webp.png)
+
+  The same bricks three ways: the JPEG and WebP differ from the PNG only by their compression.
+- **Ray counts by kind.** Every ray cast into the scene is counted: camera rays; shadow rays toward
+  point, spot, area (sphere and rectangle), sun and sky light; bounce rays for indirect light;
+  reflections and refractions (rough and dispersed ones included); and others. Each task counts
+  into its own copy of the scene with no locks or atomics, sends a tile's counts with its pixels
+  (the pixels message now carries one 64-bit count for each kind: `RAY_WIRE_VERSION` 6), and the
+  master adds them up, so threads and networked engines report the same totals. A ray the depth
+  limit or threshold stops before it is traced isn't counted, and a real lens's recasts happen
+  inside the lens, so they aren't scene rays. `raythrower` prints the counts at the end, with
+  each kind's share, rays per pixel and rays a second per task (always, or with `--stats` when
+  `--quiet`), and `--stats-json <file>` writes them as JSON. The torture test at 240×180 with the
+  full-size adaptive command (1,389 CPU-seconds, 110 s on 16 threads):
+
+  | Kind | Rays | Share | Per pixel |
+  |------|-----:|------:|----------:|
+  | camera | 12,363,096 | 5.3% | 286 |
+  | shadow (point light) | 28,490,826 | 12.2% | 660 |
+  | shadow (spot light) | 28,490,826 | 12.2% | 660 |
+  | shadow (sphere and rectangle lights) | 56,981,652 | 24.4% | 1,319 |
+  | shadow (sun) | 28,490,826 | 12.2% | 660 |
+  | shadow (sky) | 28,490,826 | 12.2% | 660 |
+  | indirect (bounce) | 33,402,215 | 14.3% | 773 |
+  | reflection | 12,910,932 | 5.5% | 299 |
+  | refraction | 4,229,247 | 1.8% | 98 |
+  | total | 233,850,446 | | 5,413 |
+
+  Seven rays in ten are shadow rays, one at each of the six lights for every point shaded, whether
+  or not the light can reach it (a point outside the spot's cone still asks): the place for the
+  next optimizations. The chess showcase at 1024×768 cast 883 million (1,123 a pixel: 184 camera
+  rays, its spectral lens tracing four wavelengths a sample, 789 shadow rays and 149 reflections).
+- **Tests:** `format_test --textures` decodes the fixtures `tools/make_image_fixtures.py` writes
+  into `scenes/textures/formats/` (with Pillow and the system's libwebp) and compares them with
+  Pillow's decodes: ten JPEGs and eight lossy WebPs within 1 (all match exactly), seven lossless
+  WebPs and three alpha planes exactly; refused files say why; every fixture cut to 1/8 through
+  7/8 of its length is reported, and 480 damaged copies decode to whole pixels or are reported
+  (run under the sanitizers too). The pixels message's counts round-trip. `ray_counts_soft`,
+  `_lights`, `_environment` and `_bounce` render a scene at 48×36 with 4 threads, 2 threads and 3
+  networked engines and require the same counts, by kind, from all three
+  (`tests/RayCountTest.cmake`).
+
+### Changed
+
+- **The chessboard wears its set's own textures.** `chess_dof_test.ray` (written by
+  `tools/make_showcase_scenes.py`) now lays Poly Haven's 1k diffuse JPEGs over the pieces through
+  their UVs (`image` textures: cream and black lacquer, with the green felt under each base) and
+  uses the set's own marble board from the glTF instead of boxes with a checker texture. The three
+  JPEGs are committed unmodified (CC0; see `scenes/models/README.md` and `NOTICE`). Its reference,
+  README preview and the full-size showcase image are regenerated (1024×768 with the adaptive
+  sampler: 3,677 CPU-seconds, 4 min 50 s on 16 threads, against 3,131 before).
+
+  ![The chessboard before and after its textures](docs/images/changelog/chess-textures.png)
+
+  Look at the board, now black and white marble with its frame, and the pieces' lacquer.
+- **Decoded images are shared.** Every image texture, and the glTF reader, decode through
+  `CImageTexture::SharedImage`, which keeps one decoded picture for every copy of every scene that
+  uses the same bytes, while any uses it. A task's copy of the scene now carries an image texture's
+  file itself (`data`, in base64) when it is smaller than the pixels (a PNG, JPEG or WebP), and the
+  task decodes it to the same pixels. Before this the textured chessboard took 5.2 GB at 16 threads,
+  each piece in each thread's copy holding its own decoded JPEG; now 1.9 GB (1.4 GB untextured).
+
+### Fixed
+
+- **glTF texture coordinates were upside down for image textures.** glTF's v runs down from an
+  image's top and Ray's runs up from its bottom, so a model's own picture laid over it through its
+  UVs came out flipped (the face colors, which read glTF's coordinates themselves, were right). The
+  glTF reader now turns v over as it reads; no existing scene laid an image over a glTF model.
+
 ## [2026-alpha-0.21] - 2026-11-21
 
 Faster where it showed: frames no longer wait on their last few tiles, copies of a scene share the
@@ -2287,7 +2393,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.1...HEAD
+[2026-alpha-0.21.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21...2026-alpha-0.21.1
 [2026-alpha-0.21]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.2...2026-alpha-0.21
 [2026-alpha-0.20.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.1...2026-alpha-0.20.2
 [2026-alpha-0.20.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20...2026-alpha-0.20.1

@@ -99,6 +99,19 @@ one in each of Blender's mesh layouts, and their gzip and Zstandard copies) for 
 `blend_test.ray`: a header, blocks and a structure catalog the way Blender writes them, the same
 every time. Zstandard needs `pip install zstandard`.
 
+## `make_image_fixtures.py`
+
+Writes the JPEG and WebP test images in `scenes/textures/formats/` for `format_test`, each with
+Pillow's decode beside it (`<name>_ref.png`, and `<name>_alpha.png` for images with alpha), which
+Ray's decoders are compared against: baseline and progressive JPEGs at 4:4:4, 4:2:2 and 4:2:0,
+grayscale, restart markers, Exif orientations 3, 6 and 8 and a CMYK file (which Ray refuses);
+lossless WebPs (every transform, palettes, alpha) and lossy ones (with and without alpha). The lossy
+WebPs that need encoder settings Pillow doesn't offer (the simple loop filter, sharpness, several
+token partitions, one segment) are written by a small C program it builds against the system's
+libwebp (`libwebp-dev`), when there is one. It also writes `bricks.jpg` and `bricks.webp` from
+`../bricks.png` for `images_test.ray`. Needs Pillow; the same files come out every time with the
+same library versions.
+
 ## `pose_astronaut.py`
 
 Lowers the arms of NASA's astronaut model (decompressed) from its T-pose, about the shoulders, for

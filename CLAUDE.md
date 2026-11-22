@@ -166,6 +166,13 @@ ctest --preset full             # every test
   Materials read their color through `CMaterial::ColorAt`, so a texture applies to any of them.
   Anything a texture reads from a file must also be written into the scene when
   `RayJson::EmbeddingData()` is set, since engines may not have the file.
+- **Decode images with `CImageTexture::SharedImage`** (PNG, JPEG, WebP, PPM and Ray raw, told by
+  their contents), not by calling a decoder directly: every copy of a scene, and every object using
+  one picture, then shares one decoded image. Ray's decoders are integer-only so engines match
+  threads; keep them so.
+- **Count every ray cast into the scene** (`CRayCounts`): pass its kind to `CScene::TraceRay`, or
+  call `CScene::CountRay` before an `Intersect` or `ClosestHit` of your own. A new kind of ray gets
+  its own entry in `RayCounts.h`, which changes the pixels message: bump `RAY_WIRE_VERSION`.
 - **Objects that can be bounded** override `CObjects::GetBounds` (a box a little larger than the
   shape, since some hit tests allow a hair outside it) so the scene's tree can skip them, and
   objects made of parts override `Occludes` to stop at the first part a shadow ray hits. The tree

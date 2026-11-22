@@ -78,3 +78,28 @@ seconds and 34 minutes 35 seconds of wall time on the shared machine, against 19
   most of the bounce-light change's cost. It changes images, so it's left for a release that may.
 - The master still encodes the scene with IASLib's SJSON bit writer, about 2.4 s for Benchy; large
   embedded files could travel outside SJSON.
+
+## Ray counts (2026-alpha-0.21.1)
+
+`raythrower` now counts every ray it casts, by kind (`--stats`, `--stats-json`). The torture test at
+240×180 with the full-size adaptive command (1,389 CPU-seconds, 110 s on 16 threads):
+
+| Kind | Rays | Share | Per pixel |
+|------|-----:|------:|----------:|
+| camera | 12,363,096 | 5.3% | 286 |
+| shadow (point light) | 28,490,826 | 12.2% | 660 |
+| shadow (spot light) | 28,490,826 | 12.2% | 660 |
+| shadow (sphere and rectangle lights) | 56,981,652 | 24.4% | 1,319 |
+| shadow (sun) | 28,490,826 | 12.2% | 660 |
+| shadow (sky) | 28,490,826 | 12.2% | 660 |
+| indirect (bounce) | 33,402,215 | 14.3% | 773 |
+| reflection | 12,910,932 | 5.5% | 299 |
+| refraction | 4,229,247 | 1.8% | 98 |
+| total | 233,850,446 | | 5,413 |
+
+Seven rays in ten are shadow rays: every shaded point asks each of the six lights, sky included,
+whether or not the light can reach it (a point outside the spot's cone, or facing away from a
+light, still casts its shadow ray). Skipping the shadow ray when the light's contribution is zero
+would leave every image the same and is the obvious next step; so is the camera's share, four
+wavelengths a sample through the spectral lens.
+
