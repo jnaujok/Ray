@@ -12,12 +12,15 @@ scenes/as11_40_5927_test.ray recreates NASA photograph AS11-40-5927 (Apollo 11, 
 110:53:38, 1969-07-21 04:25:38 UTC): Eagle from the east, its aft
 equipment bay to the right and its Scientific Equipment (SEQ) bay closed, under
 a sun 14.96 degrees up at azimuth 90.2 (just south of east). Buzz Aldrin, who
-stands at the bay in the photograph, is left out. The LM is turned so its
-front (+Z, the hatch) faces azimuth 244 and sits 4 cm down (its footpads in the
-regolith), and the camera stands 12.4 m from it looking at azimuth 295, 1.03 m up, matched to the
-photograph by the footpads' spacing, the horizon's height and the aft box seen square on (no recovered camera station): the Hasselblad Data
-Camera, its 60 mm Biogon and Reseau plate, Ektachrome MS. Scene axes: x east,
-y up, z north.
+stands at the bay in the photograph, is left out. The ground is the LROC NAC
+terrain of Tranquility Base (scenes/terrain/), with its baked surroundings as the
+environment. The LM's front (+Z, the hatch) faces azimuth 253.47, tilted onto the
+3.2 degree slope it stands on and 4 cm down (its footpads in the regolith); the
+camera stands 12.31 m out at azimuth 115, 1.03 m above its ground, as
+tools/solve_5927_view.py solves it from the footpads and the LM's shadow: the
+Hasselblad Data Camera, its 60 mm Biogon and Reseau plate, Ektachrome MS at f/11
+and 1/250 s. scenes/terrain/apollo11_bake.ray, the scene the surroundings are
+baked from, is written too. Scene axes: x east, y up, z north.
 """
 import json
 import math
@@ -76,13 +79,15 @@ def stainless():
 
 def kapton(hexcolor):
     """Aluminized Kapton: the copper of the film over its aluminum backing, and the film's own front
-    surface (n about 1.7), which reflects about 7% face on, untinted, more at grazing angles."""
+    surface (n about 1.7), which reflects about 7% face on (12% here, with the light the folds catch),
+    and scatters a little untinted from its matte areas, untinted, more at grazing angles."""
     c = lin(hexcolor)
     return [{"type": "metal", "influence": 0.4, "metal": "copper", "roughness": 0.15, "tint": c},
             {"type": "specular", "influence": 0.4, "color": c, "power": 0.15, "indexOfRefraction": 1.5,
              "materialHighlight": False},
-            {"type": "diffuse", "influence": 0.06, "color": c, "diffuseCast": False},
-            {"type": "reflective", "influence": 0.07, "color": [1, 1, 1], "diffuseReflectivity": 0.0, "roughness": 0.05},
+            {"type": "diffuse", "influence": 0.1, "color": c, "diffuseCast": False},
+            {"type": "diffuse", "influence": 0.015, "color": [1, 1, 1], "diffuseCast": False},
+            {"type": "reflective", "influence": 0.12, "color": [1, 1, 1], "diffuseReflectivity": 0.0, "roughness": 0.05},
             {"type": "specular", "influence": 0.15, "color": [1, 1, 1], "power": 0.05, "indexOfRefraction": 1.7,
              "materialHighlight": False}]
 
@@ -150,14 +155,14 @@ MATERIAL_MAP = {
     "al_olive": {"materials": panel('#7A7966'), "bump": RIVETS},
     "kapton_mesa": {"materials": metal('#E59B34', 0.65, 0.25), "bump": CRINKLE},
     "black_blanket": {"materials": paint('#1C1D1F', 0.6), "bump": BIG_CRINKLE},
-    "dps_bell": {"materials": metal('#B8C0C8', 0.6, 0.45, 'titanium')},
+    "dps_bell": {"materials": metal('#ECF2FF', 0.2, 0.5, 'titanium')},
     "porch_aluminum": {"materials": metal('#34373A', 0.65, 0.3)},
     "rcs_stainless": {"materials": stainless()},
     "plume_deflector": {"materials": DEFLECTOR, "bump": WRINKLE},
     "inconel_dark": {"materials": metal('#26282A', 0.65, 0.55, 'iron')},
     "white_paint": {"materials": paint('#E2E4E6', 0.45)},
-    "al2024_anodized": {"materials": panel('#C2D4FF', 1.1), "bump": RIVETS},
-    "al5056_anodized": {"materials": panel('#F1F4F2', 1.1), "bump": RIVETS},
+    "al2024_anodized": {"materials": panel('#C2D4FF', 2.3), "bump": RIVETS},
+    "al5056_anodized": {"materials": panel('#F1F4F2', 2.3), "bump": RIVETS},
     "pyromark_black": {"materials": paint('#18191B', 0.7)},
     "window_quartz": {"materials": QUARTZ},
 }
