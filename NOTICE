@@ -41,7 +41,9 @@ module is included unmodified; the astronaut was written back out without its
 Draco compression by tools/gltf_decompress.py and its arms lowered by
 tools/pose_astronaut.py. scenes/models/apollo/lm5_eagle.glb is the lunar
 module modified by tools/make_lm5_eagle.py (decoded, faces regrouped into
-named parts, normals worked out, scaled and written without compression).
+named parts, normals worked out, struts shortened, scaled, panels given
+texture coordinates, and written without compression), with the panel
+textures lm5_eagle_panels.png and lm5_eagle_rivets.png that tool draws.
 NASA does not endorse this project. The comparison images of NASA photographs
 AS11-40-5903 and AS11-40-5927 (Neil Armstrong) in docs/images/changelog/ and
 docs/images/ are NASA images, in the public domain.

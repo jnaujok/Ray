@@ -7126,7 +7126,7 @@ static void ModelPartChecks( const char *strScenes, const char *strDir )
         std::string       strData = ReadFile( strModels + "apollo/lm5_eagle.glb" );
         const char       *astrNames[] = { "kapton_blanket", "kapton_gold", "silver_foil", "kapton_mesa", "black_blanket", "dps_bell",
                                           "porch_aluminum", "inconel_dark", "white_paint", "al2024_anodized", "al5056_anodized",
-                                          "al_olive", "pyromark_black", "window_quartz" };
+                                          "al_olive", "pyromark_black", "window_quartz", "rcs_stainless", "plume_deflector" };
         BOOL              bAll = TRUE;
 
         Check( ModelFile::ReadGltf( strData, NULL, "", "", oModel, strError ) == TRUE, "lm5_eagle.glb reads" );
@@ -7137,6 +7137,7 @@ static void ModelPartChecks( const char *strScenes, const char *strDir )
         }
         Check( bAll && oModel.astrParts.size() == sizeof( astrNames ) / sizeof( astrNames[ 0 ] ), "every Eagle part is there by name" );
         Check( oModel.aoNormals.size() == oModel.aoVertices.size(), "the Eagle carries its worked-out normals" );
+        Check( oModel.anUVs.size() == oModel.aoVertices.size() * 2, "and its panels' places in the atlas" );
     }
 }
 

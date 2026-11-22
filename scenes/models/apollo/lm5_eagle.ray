@@ -137,34 +137,34 @@
           "materials": [
             {
               "type": "metal",
-              "influence": 0.65,
+              "influence": 0.8,
               "metal": "aluminum",
-              "roughness": 0.3,
+              "roughness": 0.2,
               "tint": [
-                0.2623,
-                0.0437,
-                0.0137
+                0.2086,
+                0.0319,
+                0.0091
               ]
             },
             {
               "type": "specular",
-              "influence": 0.65,
+              "influence": 0.8,
               "color": [
-                0.2623,
-                0.0437,
-                0.0137
+                0.2086,
+                0.0319,
+                0.0091
               ],
-              "power": 0.3,
+              "power": 0.2,
               "indexOfRefraction": 1.5,
               "materialHighlight": false
             },
             {
               "type": "diffuse",
-              "influence": 0.35,
+              "influence": 0.2,
               "color": [
-                0.2623,
-                0.0437,
-                0.0137
+                0.2086,
+                0.0319,
+                0.0091
               ],
               "diffuseCast": false
             }
@@ -174,12 +174,12 @@
             "texture": {
               "type": "cells",
               "mode": "edges",
-              "scale": 0.045,
-              "turbulence": 1.0,
+              "scale": 0.27,
+              "turbulence": 0.3,
               "seed": 9
             },
-            "depth": 0.006,
-            "step": 0.0015
+            "depth": 0.05,
+            "step": 0.006
           }
         },
         "kapton_gold": {
@@ -283,39 +283,62 @@
         "al_olive": {
           "materials": [
             {
-              "type": "metal",
-              "influence": 0.35,
-              "metal": "aluminum",
-              "roughness": 0.4,
-              "tint": [
-                0.2016,
-                0.1946,
-                0.1384
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.0039,
+                0.0038,
+                0.0027
               ]
             },
             {
-              "type": "specular",
-              "influence": 0.35,
+              "type": "diffuse",
+              "influence": 0.38,
               "color": [
-                0.2016,
-                0.1946,
-                0.1384
+                1,
+                1,
+                1
               ],
-              "power": 0.4,
-              "indexOfRefraction": 1.5,
-              "materialHighlight": false
+              "diffuseCast": false,
+              "texture": {
+                "type": "image",
+                "file": "lm5_eagle_panels.png",
+                "srgb": true
+              }
             },
             {
-              "type": "diffuse",
-              "influence": 0.65,
+              "type": "metal",
+              "influence": 0.35,
+              "metal": "aluminum",
+              "roughness": 0.3,
+              "tint": {
+                "type": "image",
+                "file": "lm5_eagle_panels.png",
+                "srgb": true
+              }
+            },
+            {
+              "type": "specular",
+              "influence": 0.3,
               "color": [
-                0.2016,
                 0.1946,
-                0.1384
+                0.1912,
+                0.1329
               ],
-              "diffuseCast": false
+              "power": 0.15,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
             }
-          ]
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "image",
+              "file": "lm5_eagle_rivets.png"
+            },
+            "depth": 0.0015,
+            "step": 0.002
+          }
         },
         "kapton_mesa": {
           "materials": [
@@ -405,12 +428,12 @@
             "texture": {
               "type": "cells",
               "mode": "edges",
-              "scale": 0.045,
-              "turbulence": 1.0,
+              "scale": 0.27,
+              "turbulence": 0.3,
               "seed": 9
             },
-            "depth": 0.006,
-            "step": 0.0015
+            "depth": 0.05,
+            "step": 0.006
           }
         },
         "dps_bell": {
@@ -454,38 +477,148 @@
           "materials": [
             {
               "type": "metal",
-              "influence": 0.8,
+              "influence": 0.25,
               "metal": "aluminum",
-              "roughness": 0.5,
+              "roughness": 0.55,
               "tint": [
-                0.3916,
-                0.4179,
-                0.4452
+                0.0762,
+                0.0844,
+                0.0908
               ]
             },
             {
               "type": "specular",
-              "influence": 0.8,
+              "influence": 0.25,
               "color": [
-                0.3916,
-                0.4179,
-                0.4452
+                0.0762,
+                0.0844,
+                0.0908
               ],
-              "power": 0.5,
+              "power": 0.55,
               "indexOfRefraction": 1.5,
               "materialHighlight": false
             },
             {
               "type": "diffuse",
-              "influence": 0.2,
+              "influence": 0.75,
               "color": [
-                0.3916,
-                0.4179,
-                0.4452
+                0.0762,
+                0.0844,
+                0.0908
               ],
               "diffuseCast": false
             }
           ]
+        },
+        "rcs_stainless": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.9,
+              "n": [
+                2.76,
+                2.55,
+                2.3
+              ],
+              "k": [
+                3.79,
+                3.55,
+                3.18
+              ],
+              "roughness": 0.12
+            },
+            {
+              "type": "specular",
+              "influence": 0.6,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "power": 0.12,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.06,
+              "color": [
+                0.2542,
+                0.2623,
+                0.2705
+              ],
+              "diffuseCast": false
+            }
+          ]
+        },
+        "plume_deflector": {
+          "materials": [
+            {
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.003,
+                0.003,
+                0.003
+              ]
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.9,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "diffuseCast": false,
+              "texture": {
+                "type": "noise",
+                "scale": 0.03,
+                "octaves": 3,
+                "seed": 21,
+                "stretch": [
+                  1,
+                  40,
+                  1
+                ],
+                "colors": [
+                  [
+                    0.0685,
+                    0.0704,
+                    0.0723
+                  ],
+                  [
+                    0.2623,
+                    0.2664,
+                    0.2705
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "specular",
+              "influence": 0.05,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "power": 0.5,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "noise",
+              "scale": 0.12,
+              "octaves": 3,
+              "seed": 4
+            },
+            "depth": 0.006,
+            "step": 0.008
+          }
         },
         "inconel_dark": {
           "materials": [
@@ -565,14 +698,14 @@
               "type": "ambient",
               "influence": 1.0,
               "color": [
-                0.0054,
-                0.0055,
-                0.0048
+                0.0073,
+                0.0076,
+                0.0076
               ]
             },
             {
               "type": "diffuse",
-              "influence": 0.97,
+              "influence": 0.38,
               "color": [
                 1,
                 1,
@@ -580,49 +713,31 @@
               ],
               "diffuseCast": false,
               "texture": {
-                "type": "noise",
-                "scale": 0.004,
-                "octaves": 3,
-                "seed": 5,
-                "stretch": [
-                  60,
-                  1,
-                  1
-                ],
-                "colors": [
-                  [
-                    0.238,
-                    0.2417,
-                    0.2098
-                  ],
-                  [
-                    0.2705,
-                    0.2747,
-                    0.2384
-                  ]
-                ]
+                "type": "image",
+                "file": "lm5_eagle_panels.png",
+                "srgb": true
               }
             },
             {
               "type": "metal",
-              "influence": 0.04,
+              "influence": 0.35,
               "metal": "aluminum",
-              "roughness": 0.4,
-              "tint": [
-                0.2705,
-                0.2747,
-                0.2384
-              ]
+              "roughness": 0.3,
+              "tint": {
+                "type": "image",
+                "file": "lm5_eagle_panels.png",
+                "srgb": true
+              }
             },
             {
               "type": "specular",
-              "influence": 0.08,
+              "influence": 0.3,
               "color": [
-                1,
-                1,
-                1
+                0.3663,
+                0.3813,
+                0.3813
               ],
-              "power": 0.35,
+              "power": 0.15,
               "indexOfRefraction": 1.5,
               "materialHighlight": false
             }
@@ -630,13 +745,11 @@
           "bump": {
             "mode": "height",
             "texture": {
-              "type": "noise",
-              "scale": 0.6,
-              "octaves": 2,
-              "seed": 3
+              "type": "image",
+              "file": "lm5_eagle_rivets.png"
             },
-            "depth": 0.004,
-            "step": 0.01
+            "depth": 0.0015,
+            "step": 0.002
           }
         },
         "al5056_anodized": {
@@ -645,14 +758,14 @@
               "type": "ambient",
               "influence": 1.0,
               "color": [
-                0.0129,
-                0.0114,
-                0.0078
+                0.0119,
+                0.0104,
+                0.0067
               ]
             },
             {
               "type": "diffuse",
-              "influence": 0.97,
+              "influence": 0.38,
               "color": [
                 1,
                 1,
@@ -660,49 +773,31 @@
               ],
               "diffuseCast": false,
               "texture": {
-                "type": "noise",
-                "scale": 0.004,
-                "octaves": 3,
-                "seed": 5,
-                "stretch": [
-                  60,
-                  1,
-                  1
-                ],
-                "colors": [
-                  [
-                    0.5672,
-                    0.5026,
-                    0.3446
-                  ],
-                  [
-                    0.6445,
-                    0.5711,
-                    0.3916
-                  ]
-                ]
+                "type": "image",
+                "file": "lm5_eagle_panels.png",
+                "srgb": true
               }
             },
             {
               "type": "metal",
-              "influence": 0.04,
+              "influence": 0.35,
               "metal": "aluminum",
-              "roughness": 0.4,
-              "tint": [
-                0.6445,
-                0.5711,
-                0.3916
-              ]
+              "roughness": 0.3,
+              "tint": {
+                "type": "image",
+                "file": "lm5_eagle_panels.png",
+                "srgb": true
+              }
             },
             {
               "type": "specular",
-              "influence": 0.08,
+              "influence": 0.3,
               "color": [
-                1,
-                1,
-                1
+                0.5972,
+                0.521,
+                0.3325
               ],
-              "power": 0.35,
+              "power": 0.15,
               "indexOfRefraction": 1.5,
               "materialHighlight": false
             }
@@ -710,13 +805,11 @@
           "bump": {
             "mode": "height",
             "texture": {
-              "type": "noise",
-              "scale": 0.6,
-              "octaves": 2,
-              "seed": 3
+              "type": "image",
+              "file": "lm5_eagle_rivets.png"
             },
-            "depth": 0.004,
-            "step": 0.01
+            "depth": 0.0015,
+            "step": 0.002
           }
         },
         "pyromark_black": {

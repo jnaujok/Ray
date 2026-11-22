@@ -68,21 +68,31 @@ Python tool, and Ray saves a model as a Ray scene with `--save-object`).
   Look at the descent stage's panel: a sawtooth of face colors before, the flag and lettering after.
 - **The LM-5 Eagle, Ray's own model.** `tools/make_lm5_eagle.py` turns NASA's lunar module into
   `scenes/models/apollo/lm5_eagle.glb`: faces NASA wound against their own normals turned round,
-  every face sorted into one of 14 named parts by its NASA material, node, height and facing
+  every face sorted into one of 16 named parts by its NASA material, node, height and facing
   (`kapton_blanket`, `kapton_gold`, `silver_foil`, `kapton_mesa`, `black_blanket`, `dps_bell`,
   `porch_aluminum`, `inconel_dark`, `white_paint`, `al2024_anodized`, `al5056_anodized`, `al_olive`,
-  `pyromark_black`, `window_quartz`), normals worked out with a 45° crease, scaled to the real LM and
-  standing on the ground. `scenes/models/apollo/lm5_eagle.ray`, written by the new
-  `tools/make_eagle_scenes.py`, is the prefab: one mesh whose `materialMap` dresses each part, the
-  anodized aluminum almost all diffuse (0.97 of its color, 4% metal, a soft highlight and an
-  oil-canning bump), the Kapton blankets and foils tinted metals with crinkle bumps.
+  `pyromark_black`, `window_quartz`, `rcs_stainless`, `plume_deflector`), normals worked out with a
+  45° crease, scaled to the real LM and standing on the ground, its primary struts' lower sections
+  shortened smoothly so everything above the footpads sits 15 cm lower (the honeycomb the landing
+  crushed). The ascent stage's anodized skin is split into flat panels (8,922), each bellied out
+  (the normals at its edges tilted 5° away from its middle, as the thin micrometeoroid-shield panels
+  oil-can) and given its own place in a texture atlas: `lm5_eagle_panels.png` holds each panel's
+  color, a little different from its neighbors' and some clearly bluer, with its seam and a row of
+  rivets around its edge, and `lm5_eagle_rivets.png` the rivets' heights for a bump map. `scenes/models/apollo/lm5_eagle.ray`, written by the new
+  `tools/make_eagle_scenes.py`, is the prefab: one mesh whose `materialMap` dresses each part: the
+  anodized panels satin metal (0.38 diffuse from the atlas through their UVs, 0.35 metal tinted by
+  it, a soft highlight, the rivets as a bump); the copper Kapton blankets a tinted metal with large
+  faceted folds (cells about 27 cm across, 5 cm deep, sharp-edged, as big as Aldrin's head beside
+  them in the photograph); the bare aluminum struts and porch a dark, mostly diffuse metal; the RCS
+  quads polished 304 stainless steel (its own n and k, roughness 0.12, the sun's highlight); the
+  plume deflectors below them gray, gently wrinkled and streaked from top to bottom.
 
   ![The Eagle prefab from the front, far and near](docs/images/changelog/lm5-eagle.png)
 - **AS11-40-5927 recreated** (`scenes/as11_40_5927_test.ray`, also written by
   `make_eagle_scenes.py`): Eagle from the east at GET 110:53:38 (1969-07-21 04:25:38 UTC), brought in
-  by an `include`, its Scientific Equipment bay open on anodized racks (uprights, shelves, brackets
-  and a stowed package on its strap), a rock of about 40 cm in the foreground, a white bag and a
-  pole, on `regolith` under the sun as it stood then: 14.96° up (ALSJ's 14.0° at 109:00, rising
+  by an `include` (its aft equipment bay to the right, as in the photograph, and 4 cm down, the
+  footpads sunk into the regolith), its Scientific Equipment bay closed, a low rock about 70 cm
+  across half sunk in the foreground, a white bag and a pole, on `regolith` under the sun as it stood then: 14.96° up (ALSJ's 14.0° at 109:00, rising
   0.508° an hour) at azimuth 90.2°, just south of east, a 0.53° disc. The Data Camera, its 60 mm
   Biogon, Réseau plate and Ektachrome MS; one bounce of `"hemisphere"` indirect light at 16 rays a
   point; 128×128 in the test suite (`render_as11_40_5927`, `roundtrip_as11_40_5927_test`,
@@ -91,16 +101,17 @@ Python tool, and Ray saves a model as a Ray scene with `--save-object`).
   ![NASA photograph AS11-40-5927 beside Ray's recreation at 512×512](docs/images/changelog/as11-40-5927.png)
 
   Left, NASA's frame (Neil Armstrong; public domain); right, Ray at 512×512. Buzz Aldrin, who
-  stands at the bay in the photograph, the PSEP and the flag are left out. Look at the copper
-  blankets with their crinkles, the silver and gold struts and gold footpads, the open bay, the
-  LM's shadow to the left and the Réseau crosses; the ascent stage reads paler than the frame's,
-  and NASA's model is taller for its leg span than the real LM.
+  stands at the bay in the photograph, the PSEP and the flag are left out, and the bay is shown
+  closed. Look at the aft equipment box on the right, the copper blankets' large folds, the
+  stainless RCS quads and gray plume deflectors, the darker struts, the LM's shadow to the left and
+  the Réseau crosses; the ascent stage still reads paler than the frame's, and NASA's model is
+  taller for its leg span than the real LM.
 - `format_test` checks a model's parts and images (`ModelPartChecks`): NASA's LM's 12 parts and its
   images' coordinates, a `materialMap` giving one part a bump and refusing a part the model lacks,
   `creaseAngle` keeping a cube's corners sharp below 90° and rounding them above, `nodeFrame`
   moving the chess rook by its node's translation, `"sample": "uv"` at a face with an image,
   names, `SaveObject`, an include's placement, save and task copy, an include in a folder through
-  an archive and back out, the Eagle's 14 parts, and `fanOpacity`'s limits. `editor_test` checks
+  an archive and back out, the Eagle's 16 parts and its UVs, and `fanOpacity`'s limits. `editor_test` checks
   Export Object and editing an include.
 
 ### Changed

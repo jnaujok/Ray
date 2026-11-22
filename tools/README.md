@@ -96,21 +96,25 @@ lens's length and its paraxial back focal distance. Only the Python standard lib
 ## `make_lm5_eagle.py`
 
 Writes `scenes/models/apollo/lm5_eagle.glb`, the LM-5 Eagle, from NASA's
-`apollo_lunar_module.glb` (`pip install DracoPy numpy`): decodes it, turns round the faces NASA
-wound against their own normals, and sorts every face into one of 14 named parts (the glTF
+`apollo_lunar_module.glb` (`pip install DracoPy numpy Pillow`): decodes it, turns round the faces NASA
+wound against their own normals, and sorts every face into one of 16 named parts (the glTF
 materials of the output, which a mesh's `materialMap` dresses) by its NASA material, its node, its
 height and which way it faces. The ascent stage's skin is split by facing: low faces facing forward or aft
 are black Pyromark paint, sideways and aft faces the champagne 5056 anodized panels, the rest the
 gray 2024 skin, and forward, high faces of the window frames quartz. It works normals out with a
-45° crease, scales the model by 1.4 to the real LM's size, stands it on y = 0 and writes an
-indexed, uncompressed glb. The same file comes out every time.
+45° crease, scales the model by 1.4 to the real LM's size, shortens the primary struts' lower
+sections so everything above the footpads comes down 15 cm, stands it on y = 0, splits the
+anodized skin into flat panels (each bellied out by tilting its edge normals 5° away from its
+middle), packs them into a texture atlas (`lm5_eagle_panels.png`: each panel's color, varied a
+little, with its seam and rivets; `lm5_eagle_rivets.png`: the rivets' heights) and writes an
+indexed, uncompressed glb with their texture coordinates. The same files come out every time.
 
 ## `make_eagle_scenes.py`
 
 Writes `scenes/models/apollo/lm5_eagle.ray`, the Eagle prefab (one mesh with a `materialMap`, and a
 camera and sun of its own), and `scenes/as11_40_5927_test.ray`, the AS11-40-5927 recreation that
 brings it in with an `include`: the sun as it stood at GET 110:53:38 (14.96° up at azimuth 90.2°),
-the open equipment bay's racks, a rock, a bag and a pole, the camera placed by eye. Only the Python
+a rock half sunk in the ground, a bag and a pole, the LM 4 cm down (its footpads in the regolith), the camera placed by eye. Only the Python
 standard library is needed.
 
 ## `make_icon.py`

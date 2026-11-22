@@ -240,8 +240,9 @@ The ray tracing itself is the 1997 code.
   own `scale`, `rotation` and `position`; a saved scene keeps the include, and an archive carries
   the included scene with its files. Objects can have a `name`. The LM-5 Eagle is one:
   `scenes/models/apollo/lm5_eagle.ray`, NASA's lunar module cleaned up and split into named parts
-  (blankets, foils, anodized skins, paint, the engine bell) by `tools/make_lm5_eagle.py`, each part
-  dressed by a `materialMap`.
+  (blankets, foils, anodized skins, paint, the engine bell, the stainless RCS quads and their plume
+  deflectors) by `tools/make_lm5_eagle.py`, its anodized panels bellied out, riveted and each a
+  slightly different color through a texture atlas, each part dressed by a `materialMap`.
 
   <img src="docs/images/changelog/lm5-eagle.png" alt="The LM-5 Eagle prefab from the front, far and near: anodized ascent stage, copper and gold Kapton blankets on the descent stage, silver and gold struts, the ladder" width="640">
 
@@ -308,11 +309,11 @@ The ray tracing itself is the 1997 code.
   `tranquility_test.ray` shoots a lunar module on it with the Data Camera. `as11_40_5903_test.ray`
   recreates NASA photograph AS11-40-5903, Aldrin with Armstrong and the lunar module in his gold
   visor, from NASA's own astronaut and lunar module models, and `as11_40_5927_test.ray` recreates
-  AS11-40-5927, Eagle with its equipment bay open under the sun as it stood at 110:53:38 (14.96°
+  AS11-40-5927, Eagle under the sun as it stood at 110:53:38 (14.96°
   up, azimuth 90.2°), from the Eagle prefab (left: NASA's frame, public domain; right: Ray at
   512×512; Aldrin, the PSEP and the flag are left out, and the camera was placed by eye):
 
-  <img src="docs/images/changelog/as11-40-5927.png" alt="NASA photograph AS11-40-5927 beside Ray's recreation: the lunar module Eagle from the east with its equipment bay open, its shadow to the left, Réseau crosses" width="720">
+  <img src="docs/images/changelog/as11-40-5927.png" alt="NASA photograph AS11-40-5927 beside Ray's recreation: the lunar module Eagle from the east, its aft equipment box to the right, its shadow to the left, Réseau crosses" width="720">
 - **Metals:** the `metal` material reflects by a conductor's exact Fresnel equations from its complex
   index n + ik in red, green and blue, so gold, copper, silver, aluminum, iron, chromium, titanium
   and platinum (presets, or your own n and k) shift color toward grazing as real metals do.
