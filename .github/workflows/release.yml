@@ -56,20 +56,32 @@ jobs:
             build/_deps/wxwidgets-src
             build/_deps/wxwidgets-build
             build/_deps/wxwidgets-subbuild
+            build-editor/_deps/wxwidgets-src
+            build-editor/_deps/wxwidgets-build
+            build-editor/_deps/wxwidgets-subbuild
           key: release-wxwidgets-3.2.9-${{ runner.os }}-${{ hashFiles('cmake/RayEditor.cmake') }}
 
       - name: Configure
         shell: bash
         run: |
-          ARGS=(-DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON -DRAY_BUILD_TESTS=OFF -DRAY_USE_SYSTEM_WXWIDGETS=OFF)
+          ARGS=(-DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_TESTS=OFF -DRAY_USE_SYSTEM_WXWIDGETS=OFF)
           if [ "$RUNNER_OS" = "Windows" ]; then
-            # The static C++ runtime, so the programs need no Visual C++ Redistributable.
-            ARGS+=(-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DwxBUILD_USE_STATIC_RUNTIME=ON)
+            # raythrower and rayengine with the static C++ runtime, so they need no Visual C++
+            # Redistributable; ray-editor is built apart (below), since the editor's build keeps
+            # wxWidgets on the shared runtime.
+            cmake -S . -B build "${ARGS[@]}" -DRAY_BUILD_EDITOR=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          else
+            cmake -S . -B build "${ARGS[@]}" -DRAY_BUILD_EDITOR=ON
           fi
-          cmake -S . -B build "${ARGS[@]}"
 
       - name: Build
         run: cmake --build build --config Release --parallel 4
+
+      - name: Build the wxWidgets editor
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S . -B build-editor -DRAY_BUILD_TESTS=OFF -DRAY_USE_SYSTEM_WXWIDGETS=OFF -DRAY_BUILD_EDITOR=ON
+          cmake --build build-editor --config Release --target ray-editor --parallel 4
 
       # The MFC scene editor uses MFC in a shared DLL, as CI builds it.
       - name: Build the MFC scene editor
@@ -84,9 +96,10 @@ jobs:
           NAME="ray-${TAG}-${{ matrix.platform }}"
           mkdir -p "dist/$NAME"
           if [ "$RUNNER_OS" = "Windows" ]; then
-            for program in raythrower rayengine ray-editor; do
+            for program in raythrower rayengine; do
               cp "$(find build -type f -name "$program.exe" | head -1)" "dist/$NAME/"
             done
+            cp "$(find build-editor -type f -name 'ray-editor.exe' | head -1)" "dist/$NAME/"
             cp "$(find build-gui -type f -name 'Ray.exe' | head -1)" "dist/$NAME/"
           else
             for program in raythrower rayengine; do

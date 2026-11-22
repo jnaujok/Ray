@@ -20,8 +20,9 @@ Every change that alters rendered output shows its before and after images here.
   `ray-<tag>-macos-arm64.tar.gz`, `ray-<tag>-windows-x86_64.zip`) holds `raythrower`, `rayengine`
   and `ray-editor` (an app bundle on macOS; on Windows also the MFC `Ray.exe`), the sample scenes
   with their models, fonts and textures, the README, this changelog, `LICENSE` and `NOTICE`, with a
-  SHA-256 checksum for each and `SHA256SUMS.txt` for all. The Windows programs use the static C++
-  runtime (`Ray.exe` still needs the Visual C++ Redistributable, for MFC). Each build renders a
+  SHA-256 checksum for each and `SHA256SUMS.txt` for all. On Windows `raythrower` and `rayengine`
+  use the static C++ runtime; `ray-editor` (whose build keeps wxWidgets on the shared runtime) and
+  `Ray.exe` (MFC in a DLL) need the Visual C++ Redistributable. Each build renders a
   small scene before it is packaged. The first release built this way is 2026-alpha-0.21.1, built
   by hand after its tag, which was pushed before the workflow existed. The README's new Downloads
   section has the platform notes (macOS quarantine, GTK 3 for the Linux editor, SmartScreen).
