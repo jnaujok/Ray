@@ -16,6 +16,7 @@
 
 #include "DracoDecoder.h"
 #include "ModelFile.h"
+#include "ImageTexture.h"
 #include "JpegImage.h"
 #include "PngImage.h"
 #include "WebpImage.h"
@@ -121,7 +122,7 @@ namespace
             std::vector<CColor>             m_aoFaceColors;
             std::vector<double>             m_adDracoColorCoords;    // a Draco primitive's base color coordinates
                 // Decoded base color images, by image index (width 0: none).
-            struct SImage { int nWidth = 0; int nHeight = 0; std::vector<BYTE> anPixels; BOOL bTried = FALSE; };
+            struct SImage { std::shared_ptr<const CImageTexture::SImage> pImage; BOOL bTried = FALSE; };
             std::vector<SImage>             m_aoImages;
 
             BOOL Fail( const std::string &strWhy ) { m_strError = strWhy; return FALSE; }
@@ -137,7 +138,7 @@ namespace
             BOOL Node( int nIndex, const SMatrix &oMatrix, int nDepth );
             BOOL Primitive( const IASLib::CJsonNode &oPrimitive, const SMatrix &oMatrix );
             BOOL BaseColor( int nMaterial, CColor &oFactor, int &nImage, int &nTexCoord );
-            const SImage *Image( int nImage );
+            const CImageTexture::SImage *Image( int nImage );
     };
 
     const IASLib::CJsonNode *CGltfReader::Array( const char *strName ) const
@@ -566,7 +567,7 @@ namespace
         return TRUE;
     }
 
-    const CGltfReader::SImage *CGltfReader::Image( int nImage )
+    const CImageTexture::SImage *CGltfReader::Image( int nImage )
     {
         const IASLib::CJsonNode *pImages = Array( "images" );
 
@@ -609,25 +610,16 @@ namespace
                     m_strError = strSaved;
                 }
             }
-                // PNG, JPEG or WebP; anything else (KTX2, or an image that
-                // won't decode) leaves the base color factor alone, and the
-                // model says so.
-            BOOL bRead = FALSE;
-
-            if ( CPngImage::IsPng( strData ) )
-                bRead = CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
-            else if ( CJpegImage::IsJpeg( strData ) )
-                bRead = CJpegImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
-            else if ( CWebpImage::IsWebp( strData ) )
-                bRead = CWebpImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
-            if ( ! bRead )
-            {
-                oImage.nWidth = oImage.nHeight = 0;
-                if ( ! strData.empty() || ( pUri && pUri->isTextual() ) )
-                    m_oModel.nSkippedImages++;
-            }
+                // PNG, JPEG or WebP (shared with every other reader of the
+                // same bytes); anything else (KTX2, or an image that won't
+                // decode) leaves the base color factor alone, and the model
+                // says so.
+            if ( CPngImage::IsPng( strData ) || CJpegImage::IsJpeg( strData ) || CWebpImage::IsWebp( strData ) )
+                oImage.pImage = CImageTexture::SharedImage( strData, "image", strWhy );
+            if ( ! oImage.pImage && ( ! strData.empty() || ( pUri && pUri->isTextual() ) ) )
+                m_oModel.nSkippedImages++;
         }
-        return ( oImage.nWidth > 0 ) ? &oImage : NULL;
+        return oImage.pImage ? oImage.pImage.get() : NULL;
     }
 
     BOOL CGltfReader::Primitive( const IASLib::CJsonNode &oPrimitive, const SMatrix &oMatrix )
@@ -813,7 +805,7 @@ namespace
             }
         }
 
-        const SImage *pImage = ( bColored && nImage >= 0 ) ? Image( nImage ) : NULL;
+        const CImageTexture::SImage *pImage = ( bColored && nImage >= 0 ) ? Image( nImage ) : NULL;
 
         for ( size_t nFace = 0; nFace + 2 < anFaces.size(); nFace += 3 )
         {

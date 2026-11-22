@@ -60,10 +60,15 @@ class CImageTexture : public CTexture
         virtual CTexture       *Clone( void ) const { return new CImageTexture( *this ); }
         virtual const char     *GetName( void ) const { return "image"; }
 
-            /// Decodes a PNG, PPM or Ray raw image from a file's contents (strName
-            /// names it in messages); FALSE, with why in strError, if it
-            /// can't be read.
+            /// Decodes a PNG, JPEG, WebP, PPM or Ray raw image from a file's
+            /// contents (strName names it in messages); FALSE, with why in
+            /// strError, if it can't be read.
         static BOOL             ParseImage( const std::string &strData, const std::string &strName, SImage &oImage, std::string &strError );
+            /// The same, shared: every caller decoding the same bytes (each
+            /// copy of a scene, each object using one picture, the images in
+            /// glTF models) gets one decoded image, kept while any uses it.
+            /// Empty, with why in strError, if it can't be read.
+        static std::shared_ptr<const SImage> SharedImage( const std::string &strData, const std::string &strName, std::string &strError );
 
         virtual CColor          ColorAt( const STexturePoint &oAt ) const;
         virtual void            ToJson( IASLib::CObjectNode &oNode ) const;
