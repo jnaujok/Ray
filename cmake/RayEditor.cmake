@@ -42,12 +42,11 @@ else()
     set(wxBUILD_PRECOMP OFF CACHE STRING "Set-by-the-Ray-editor-build" FORCE)
     set(wxUSE_OPENGL ON CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
     set(wxUSE_PROPGRID ON CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
-    # wxWidgets' own copies of the image and compression libraries, built in, so the editor
-    # depends only on GTK and OpenGL: a system libjpeg8 picked up on the build machine would tie
-    # the .deb to Ubuntu (Debian has libjpeg62-turbo).
-    foreach(wxLibrary wxUSE_LIBJPEG wxUSE_LIBPNG wxUSE_ZLIB wxUSE_REGEX)
-        set(${wxLibrary} builtin CACHE STRING "Set-by-the-Ray-editor-build" FORCE)
-    endforeach()
+    # No JPEG in wxWidgets: the editor only saves PNG (Ray's core reads JPEG textures itself),
+    # and a system libjpeg8 picked up on the build machine tied the .deb to Ubuntu (Debian has
+    # libjpeg62-turbo). wxWidgets 3.2.9's bundled zlib doesn't build with GCC 14, so PNG, zlib
+    # and regex stay the system's, which every distribution has.
+    set(wxUSE_LIBJPEG OFF CACHE STRING "Set-by-the-Ray-editor-build" FORCE)
     if(MSVC)
         # Match the rest of the build's runtime library.
         set(wxBUILD_USE_STATIC_RUNTIME OFF CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)

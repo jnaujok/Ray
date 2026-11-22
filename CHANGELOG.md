@@ -107,6 +107,15 @@ byte for byte the same.
   folders are gone), and found three unparenthesized `std::max` calls in `tests/editor_test.cpp`,
   now fixed. The rule stays: IASLib's headers and the wxWidgets editor still bring Windows' `min`
   and `max` macros into the Windows builds.
+- **The editor's wxWidgets is built without JPEG** (`wxUSE_LIBJPEG` off in `cmake/RayEditor.cmake`;
+  the editor only saves PNG, and Ray's core reads JPEG textures with its own decoder). Built on
+  Ubuntu, it had picked up the system's `libjpeg8`, which tied the `.deb` to Ubuntu (Debian has
+  `libjpeg62-turbo`).
+
+### Fixed
+
+- `core/include/RayCountMap.h` includes `<cstddef>`: GCC 11 (Rocky Linux 9, building the `.rpm`)
+  doesn't bring in `size_t` through `<vector>` as newer compilers do.
 
 ## [2026-alpha-0.21.1] - 2026-11-21
 
