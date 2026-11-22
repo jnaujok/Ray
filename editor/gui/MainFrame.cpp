@@ -30,6 +30,7 @@ namespace
     enum
     {
         ID_IMPORT = wxID_HIGHEST + 1,
+        ID_EXPORT_OBJECT,
         ID_ADD_ENVIRONMENT,
         ID_ADD_HAZE,
         ID_DUPLICATE,
@@ -93,6 +94,7 @@ CMainFrame::CMainFrame( void )
     pFile->Append( wxID_SAVEAS, "Save &As...\tCtrl+Shift+S" );
     pFile->AppendSeparator();
     pFile->Append( ID_IMPORT, "&Import Model (STL, OBJ)...\tCtrl+I" );
+    pFile->Append( ID_EXPORT_OBJECT, "&Export Object...", "Save the selected object as a scene of its own, for an include" );
     pFile->AppendSeparator();
     pFile->Append( wxID_EXIT, "E&xit\tCtrl+Q" );
 
@@ -167,6 +169,7 @@ CMainFrame::CMainFrame( void )
     Bind( wxEVT_MENU, &CMainFrame::OnSave, this, wxID_SAVE );
     Bind( wxEVT_MENU, &CMainFrame::OnSaveAs, this, wxID_SAVEAS );
     Bind( wxEVT_MENU, &CMainFrame::OnImport, this, ID_IMPORT );
+    Bind( wxEVT_MENU, &CMainFrame::OnExportObject, this, ID_EXPORT_OBJECT );
     Bind( wxEVT_MENU, &CMainFrame::OnQuit, this, wxID_EXIT );
     Bind( wxEVT_MENU, &CMainFrame::OnUndo, this, wxID_UNDO );
     Bind( wxEVT_MENU, &CMainFrame::OnRedo, this, wxID_REDO );
@@ -429,6 +432,25 @@ void CMainFrame::OnImport( wxCommandEvent & )
     }
     Rebuild( false );
     SelectPart( strPart );
+}
+
+void CMainFrame::OnExportObject( wxCommandEvent & )
+{
+    std::string strPart = SelectedPart(), strError;
+
+    if ( strPart.compare( 0, 8, "objects/" ) != 0 )
+    {
+        ReportError( "Can't export it", "choose an object in the tree first" );
+        return;
+    }
+
+    wxFileDialog oDialog( this, "Export the object (.ray: an archive with its files; .json: plain JSON)", wxEmptyString,
+                          "object.ray", SCENE_FILES, wxFD_SAVE | wxFD_OVERWRITE_PROMPT );
+
+    if ( oDialog.ShowModal() != wxID_OK )
+        return;
+    if ( ! m_oDocument.ExportObject( strPart, std::string( oDialog.GetPath().ToUTF8() ), strError ) )
+        ReportError( "Can't export to " + oDialog.GetPath(), strError );
 }
 
 void CMainFrame::OnQuit( wxCommandEvent & )

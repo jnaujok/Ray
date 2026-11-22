@@ -19,7 +19,9 @@
 #include "Globals.h"
 #include "MaterialList.h"
 
+#include <functional>
 #include <memory>
+#include <string>
 
 
 class CBumpMap;
@@ -65,6 +67,10 @@ class CObjects
             // Where textures are looked up, if not the scene's own space (a
             // mesh from a file, and its faces).
         std::shared_ptr<const STextureFrame> m_pTextureFrame;
+            // The object's optional "name" in the scene, and the include that
+            // brought it in (NULL if the scene names it itself).
+        std::string         m_strName;
+        const CObjects     *m_pIncludedBy;
 
     public:
                             CObjects( void );
@@ -75,6 +81,15 @@ class CObjects
             // returns FALSE, with RayJson::Fail, if one is missing or bad.
         virtual void        ToJson( IASLib::CObjectNode &oNode ) = 0;
         virtual BOOL        FromJson( const IASLib::CJsonNode &oNode ) = 0;
+            // Makes an object (bLights FALSE) or a light from its JSON, by
+            // its "type", with its optional "name"; NULL, with RayJson::Fail,
+            // if it can't be read.
+        static CObjects    *ReadJson( const IASLib::CJsonNode &oNode, BOOL bLights,
+                                       const std::function<BOOL ( CObjects * )> &fnBeforeRead = std::function<BOOL ( CObjects * )>() );
+        const std::string  &GetName( void ) const { return m_strName; }
+        void                SetName( const std::string &strName ) { m_strName = strName; }
+        const CObjects     *IncludedBy( void ) const { return m_pIncludedBy; }
+        void                SetIncludedBy( const CObjects *pInclude ) { m_pIncludedBy = pInclude; }
         virtual LPCSTR      ClassType( void ) { return "CObjects"; }
         virtual BOOL        IsALight( void ) { return FALSE; }
         virtual BOOL        IsCamera( void ) { return FALSE; }
@@ -86,6 +101,10 @@ class CObjects
             // face's color from a colored model file), for the faceColors
             // texture. FALSE if it gives none.
         virtual BOOL        SurfaceColor( CVector &oPoint, CColor &oColor ) { (void)oPoint; (void)oColor; return FALSE; }
+            // The surface's base color image (a model's own texture) at a
+            // point on it, sampled through the surface's image coordinates;
+            // FALSE if it has none.
+        virtual BOOL        SurfaceImageColor( CVector &oPoint, CColor &oColor ) { (void)oPoint; (void)oColor; return FALSE; }
             // A scene point in the space the object's textures are looked up
             // in: the point itself, unless the object has a texture frame.
         virtual CVector     TextureSpace( const CVector &oPoint ) const

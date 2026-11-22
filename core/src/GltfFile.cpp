@@ -103,6 +103,7 @@ namespace
 
             BOOL Read( const std::string &strData, const std::string &strNode );
             std::string                     m_strMaterial;   // only primitives with this material, if set
+            BOOL                            m_bWorld = FALSE;   // a picked node placed by its parents' transforms too
 
         private:
             const ModelFile::SGltfFiles    *m_pFiles;
@@ -658,6 +659,30 @@ namespace
 
         if ( Number( &oPrimitive, "material", dMaterial ) )
             bColored = BaseColor( (int)dMaterial, oFactor, nImage, nTexCoord );
+
+            // The part this primitive's faces belong to: its material's name
+            // (or "material N" for one without a name).
+        int nPart = -1;
+
+        if ( dMaterial >= 0.0 )
+        {
+            const IASLib::CJsonNode *pAllMaterials = Array( "materials" );
+            const IASLib::CJsonNode *pThis = pAllMaterials ? pAllMaterials->get( (int)dMaterial ) : NULL;
+            const IASLib::CJsonNode *pPartName = pThis ? pThis->get( "name" ) : NULL;
+            std::string              strPart = ( pPartName && pPartName->isTextual() ) ? std::string( pPartName->textString() )
+                                                                                         : "material " + std::to_string( (int)dMaterial );
+
+            for ( size_t nAt = 0; nAt < m_oModel.astrParts.size() && nPart < 0; nAt++ )
+            {
+                if ( m_oModel.astrParts[ nAt ] == strPart )
+                    nPart = (int)nAt;
+            }
+            if ( nPart < 0 )
+            {
+                nPart = (int)m_oModel.astrParts.size();
+                m_oModel.astrParts.push_back( strPart );
+            }
+        }
         if ( ! m_strMaterial.empty() )
         {
             const IASLib::CJsonNode *pMaterials = Array( "materials" );
@@ -802,6 +827,23 @@ namespace
         }
 
         const CImageTexture::SImage *pImage = ( bColored && nImage >= 0 ) ? Image( nImage ) : NULL;
+        int                          nModelImage = -1;
+
+        if ( pImage && adColorCoords.size() == nPoints * 2 )
+        {
+            std::shared_ptr<const CImageTexture::SImage> pShared = m_aoImages[ (size_t)nImage ].pImage;
+
+            for ( size_t nAt = 0; nAt < m_oModel.apImages.size() && nModelImage < 0; nAt++ )
+            {
+                if ( m_oModel.apImages[ nAt ] == pShared )
+                    nModelImage = (int)nAt;
+            }
+            if ( nModelImage < 0 )
+            {
+                nModelImage = (int)m_oModel.apImages.size();
+                m_oModel.apImages.push_back( pShared );
+            }
+        }
 
         for ( size_t nFace = 0; nFace + 2 < anFaces.size(); nFace += 3 )
         {
@@ -843,6 +885,19 @@ namespace
                 m_bAnyColor = TRUE;
             m_aoFaceColors.push_back( oColor );
             m_oModel.abHasColor.push_back( bColored ? 1 : 0 );
+            m_oModel.anFacePart.push_back( nPart );
+            m_oModel.anFaceImage.push_back( nModelImage );
+            m_oModel.aoFaceFactor.push_back( oFactor );
+                // The corners in the order they were kept (a, c, b).
+            size_t anCorner[ 3 ] = { a, c, b };
+
+            for ( int nCorner = 0; nCorner < 3; nCorner++ )
+            {
+                BOOL bHave = ( nModelImage >= 0 ) ? TRUE : FALSE;
+
+                m_oModel.anFaceImageUVs.push_back( bHave ? adColorCoords[ anCorner[ nCorner ] * 2 ] : 0.0 );
+                m_oModel.anFaceImageUVs.push_back( bHave ? adColorCoords[ anCorner[ nCorner ] * 2 + 1 ] : 0.0 );
+            }
         }
         return TRUE;
     }
@@ -927,7 +982,40 @@ namespace
             }
             if ( nFound < 0 )
                 return Fail( "has no node named \"" + strNode + "\"" );
-            if ( ! Node( nFound, SMatrix::Identity(), 0 ) )
+
+            SMatrix oFrame = SMatrix::Identity();
+
+            if ( m_bWorld )
+            {
+                    // The node's parents, root first: their matrices are
+                    // applied in turn before the node's own (Node adds that).
+                std::vector<int> anChain;
+                int              nChild = nFound;
+
+                for ( int nGuard = 0; nGuard < pNodes->size(); nGuard++ )
+                {
+                    int nParent = -1;
+
+                    for ( int nIndex = 0; nIndex < pNodes->size() && nParent < 0; nIndex++ )
+                    {
+                        const IASLib::CJsonNode *pChildren = pNodes->get( nIndex )->get( "children" );
+
+                        for ( int nAt = 0; pChildren && pChildren->isArray() && nAt < pChildren->size(); nAt++ )
+                        {
+                            if ( pChildren->get( nAt )->intValue() == nChild )
+                                nParent = nIndex;
+                        }
+                    }
+                    if ( nParent < 0 )
+                        break;
+                    anChain.insert( anChain.begin(), nParent );
+                    nChild = nParent;
+                }
+                for ( int nParent : anChain )
+                    oFrame = oFrame * NodeMatrix( *pNodes->get( nParent ) );
+                oFrame = oFrame * NodeMatrix( *pNodes->get( nFound ) );
+            }
+            if ( ! Node( nFound, oFrame, 0 ) )
                 return FALSE;
         }
         else
@@ -988,6 +1076,14 @@ namespace
             m_oModel.aoFaceColors = m_aoFaceColors;
         else
             m_oModel.abHasColor.clear();
+        if ( m_oModel.apImages.empty() )
+        {
+            m_oModel.anFaceImage.clear();
+            m_oModel.aoFaceFactor.clear();
+            m_oModel.anFaceImageUVs.clear();
+        }
+        if ( m_oModel.astrParts.empty() )
+            m_oModel.anFacePart.clear();
         return TRUE;
     }
 }
@@ -1008,11 +1104,12 @@ BOOL IsGltf( const std::string &strData, const std::string &strName )
 }
 
 BOOL ReadGltf( const std::string &strData, const SGltfFiles *pFiles, const std::string &strNode,
-               const std::string &strMaterial, SModel &oModel, std::string &strError )
+               const std::string &strMaterial, SModel &oModel, std::string &strError, BOOL bWorld )
 {
     CGltfReader oReader( pFiles, oModel, strError );
 
     oReader.m_strMaterial = strMaterial;
+    oReader.m_bWorld = bWorld;
     oModel = SModel();
     return oReader.Read( strData, strNode );
 }

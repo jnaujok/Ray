@@ -69,7 +69,7 @@ def scene(name, surfaces, size, sampler, fields):
         "objects": [
             {"type": "lensElements", "prescription": name, "scale": scale, "position": [0.0, 0.0, 0.0],
              "rotation": [180.0, -90.0, 0.0], "cutaway": True, "barrel": False, "fans": True, "rays": 7,
-             "fields": fields, "tubeRadius": round(0.035 / scale, 6)},
+             "fields": fields, "tubeRadius": round(0.028 / scale, 6), "fanOpacity": 0.5},
             {"type": "plane", "position": [0.0, 0.0, widest * scale + 8.0], "normal": [0.0, 0.0, -1.0],
              "color": [0.5, 0.5, 0.5],
              # Lit by nothing (ambient only), so the lens casts no shadow on it.

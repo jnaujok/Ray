@@ -44,6 +44,10 @@ struct STexturePoint
     BOOL                bHasUV;
     CColor              oColor;         // the surface's own color (a colored model's face), if bHasColor
     BOOL                bHasColor;
+        // The surface that was hit and where (in the scene), for a texture
+        // that asks it for more (faceColors' "sample": "uv"); NULL if none.
+    class CObjects     *pSurface = NULL;
+    CVector             oHit;
 };
 
 class CTexture

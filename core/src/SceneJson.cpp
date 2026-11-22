@@ -27,6 +27,7 @@ namespace
     thread_local std::string                t_strSaveDirectory;
     thread_local IASLib::CResourceFile     *t_pArchive = NULL;
     thread_local RayJson::CFileCollector   *t_pCollector = NULL;
+    thread_local std::string                t_strArchiveFolder;     // "" or a relative folder ending in '/' 
 
     std::string Where( void )
     {
@@ -241,6 +242,37 @@ namespace RayJson
         t_strBaseDirectory = m_strPrevious;
     }
 
+    CArchiveFolder::CArchiveFolder( const std::string &strFolder, BOOL bReset ) :
+        m_strPrevious( t_strArchiveFolder )
+    {
+        t_strArchiveFolder = ( bReset ? std::string() : t_strArchiveFolder ) + strFolder;
+    }
+
+    CArchiveFolder::~CArchiveFolder( void )
+    {
+        t_strArchiveFolder = m_strPrevious;
+    }
+
+    std::string CArchiveFolder::Name( const std::string &strName )
+    {
+        std::filesystem::path oName( strName );
+
+        if ( t_strArchiveFolder.empty() || oName.is_absolute() || oName.has_root_name() )
+            return strName;
+        return ( std::filesystem::path( t_strArchiveFolder ) / oName ).lexically_normal().generic_string();
+    }
+
+    std::string CArchiveFolder::FolderOf( const std::string &strName )
+    {
+        std::filesystem::path oName = std::filesystem::path( strName ).lexically_normal();
+        std::string           strFolder = oName.parent_path().generic_string();
+
+        if ( strFolder.empty() || strFolder == "." || oName.is_absolute() || oName.has_root_name() ||
+             strFolder.compare( 0, 2, ".." ) == 0 )
+            return std::string();
+        return strFolder + "/";
+    }
+
     std::string ResolvePath( const std::string &strPath )
     {
         std::filesystem::path oPath( strPath );
@@ -304,7 +336,7 @@ namespace RayJson
     {
         short nFolder, nResource;
 
-        if ( t_pArchive && t_pArchive->FindByName( strName.c_str(), nFolder, nResource ) )
+        if ( t_pArchive && t_pArchive->FindByName( CArchiveFolder::Name( strName ).c_str(), nFolder, nResource ) )
         {
             std::shared_ptr<const IASLib::CResource> pResource = t_pArchive->Get( nFolder, nResource );
 
@@ -395,7 +427,13 @@ namespace RayJson
                                const std::shared_ptr<const std::string> &pData )
     {
         if ( t_pCollector && pData )
-            return t_pCollector->Add( strName, pData );
+        {
+                // Kept under the included scene's folder, if any, but named
+                // in the scene as it was (relative to its own file).
+            std::string strKept = t_pCollector->Add( CArchiveFolder::Name( strName ), pData );
+
+            return ( strKept == CArchiveFolder::Name( strName ) ) ? strName : strKept;
+        }
         return PathForSave( strAbsolute, strName );
     }
 

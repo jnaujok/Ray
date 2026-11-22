@@ -47,6 +47,7 @@ class CMainFrame : public wxFrame
         void            OnSave( wxCommandEvent &oEvent );
         void            OnSaveAs( wxCommandEvent &oEvent );
         void            OnImport( wxCommandEvent &oEvent );
+        void            OnExportObject( wxCommandEvent &oEvent );
         void            OnQuit( wxCommandEvent &oEvent );
         void            OnClose( wxCloseEvent &oEvent );
         void            OnUndo( wxCommandEvent &oEvent );

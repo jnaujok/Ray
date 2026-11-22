@@ -5671,6 +5671,12 @@ static void LensElementsChecks( void )
     ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
                           "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"scale\": 0 }" ), BAD_FILE, "scale must be more than 0" );
     ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                          "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"fanOpacity\": 0 }" ), BAD_FILE,
+                 "fanOpacity must be more than 0 and at most 1" );
+    ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                          "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"fanOpacity\": 1.5 }" ), BAD_FILE,
+                 "fanOpacity must be more than 0 and at most 1" );
+    ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
                           "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"fields\": [1.5] }" ), BAD_FILE, "must be from 0 to 1" );
     ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
                           "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"rays\": 0 }" ), BAD_FILE, "rays" );
@@ -6855,6 +6861,286 @@ static void ImageFormatChecks( const char *strScenes )
     }
 }
 
+    // 2026-alpha-0.21.3: model parts and materialMap, creaseAngle, nodeFrame,
+    // faceColors' "sample": "uv", object names, --save-object and include,
+    // and the LM-5 Eagle model's parts.
+static void ModelPartChecks( const char *strScenes, const char *strDir )
+{
+    std::string             strModels = std::string( strScenes ) + "/models/";
+    RayJson::CBaseDirectory oBase( strScenes );
+    std::string             strError;
+
+    auto Mesh = [ & ]( const std::string &strJson, BOOL &bRead ) -> std::unique_ptr<CMesh>
+    {
+        std::unique_ptr<IASLib::CJsonNode> pNode( RayJson::Parse( strJson ) );
+        std::unique_ptr<CMesh>             pMesh( new CMesh );
+
+        bRead = ( pNode && pMesh->FromJson( *pNode ) ) ? TRUE : FALSE;
+        if ( ! bRead )
+        {
+            strError = RayJson::GetError();
+            RayJson::ClearError();
+        }
+        return pMesh;
+    };
+    BOOL bRead = FALSE;
+
+        // Parts: each face's glTF material, by name.
+    {
+        ModelFile::SModel oModel;
+        std::string       strData = ReadFile( strModels + "apollo/apollo_lunar_module.glb" );
+
+        Check( ModelFile::ReadGltf( strData, NULL, "", "", oModel, strError ) == TRUE, "NASA's LM reads" );
+        Check( oModel.anFacePart.size() == oModel.anFaces.size() / 3 && oModel.astrParts.size() == 12,
+               "each face of the LM has its part, one of its 12 materials" );
+        Check( std::find( oModel.astrParts.begin(), oModel.astrParts.end(), "blinn5SG.002" ) != oModel.astrParts.end(),
+               "the parts are named by the glTF materials" );
+        Check( ! oModel.apImages.empty() && oModel.anFaceImage.size() == oModel.anFaces.size() / 3 &&
+               oModel.anFaceImageUVs.size() == oModel.anFaces.size() * 2, "the base color images and each face's image coordinates are kept" );
+    }
+
+        // A materialMap gives a part its own materials and bump; a name the
+        // model doesn't have is refused, listing the parts.
+    {
+        std::unique_ptr<CMesh> pMesh = Mesh( "{\"file\": \"models/apollo/apollo_lunar_module.glb\", \"materialMap\": {"
+                                             "\"blinn5SG.002\": {\"materials\": [{\"type\": \"diffuse\", \"influence\": 1, \"color\": [1, 0, 0]}],"
+                                             " \"bump\": {\"texture\": {\"type\": \"noise\"}}}}}", bRead );
+        const CMesh::SGeometry *pGeometry = pMesh->GetGeometry();
+        int                     nBell = -1, nOther = -1, nPart = -1;
+        std::vector<std::string> astrParts = pMesh->GetPartNames();
+
+        Check( bRead == TRUE, "a mesh with a materialMap reads" );
+        for ( size_t i = 0; i < astrParts.size(); i++ )
+        {
+            if ( astrParts[ i ] == "blinn5SG.002" )
+                nPart = (int)i;
+        }
+        for ( size_t i = 0; pGeometry && i < pGeometry->anFacePart.size(); i++ )
+        {
+            if ( pGeometry->anFacePart[ i ] == nPart && nBell < 0 )
+                nBell = (int)i;
+            if ( pGeometry->anFacePart[ i ] != nPart && nOther < 0 )
+                nOther = (int)i;
+        }
+        Check( nBell >= 0 && nOther >= 0 && pMesh->FaceHasBump( nBell ) && ! pMesh->FaceHasBump( nOther ),
+               "a part's faces take its entry's bump, the others the mesh's (none)" );
+
+        std::unique_ptr<IASLib::CObjectNode> pOut( new IASLib::CObjectNode );
+
+        pMesh->ToJson( *pOut );
+        Check( pOut->get( "materialMap" ) && pOut->get( "materialMap" )->get( "blinn5SG.002" ), "the materialMap is saved" );
+
+        Mesh( "{\"file\": \"models/apollo/apollo_lunar_module.glb\", \"materialMap\": {\"hull\": {\"materials\": []}}}", bRead );
+        Check( bRead == FALSE && strError.find( "has no part named \"hull\"" ) != std::string::npos &&
+               strError.find( "blinn5SG.002" ) != std::string::npos, "a part the model doesn't have is refused, naming its parts" );
+        Mesh( "{\"vertices\": [[0,0,0],[1,0,0],[0,1,0]], \"faces\": [[0,1,2]], \"materialMap\": {}}", bRead );
+        Check( bRead == FALSE, "a materialMap is for a model file" );
+        Mesh( "{\"file\": \"models/apollo/apollo_lunar_module.glb\", \"materialMap\": {\"blinn5SG.002\": {\"bump\": {}}}}", bRead );
+        Check( bRead == FALSE && strError.find( "needs \"materials\"" ) != std::string::npos, "an entry needs materials" );
+    }
+
+        // creaseAngle: normals worked out from the faces. A cube's corners
+        // stay sharp under 90 degrees and round past it.
+    {
+        std::unique_ptr<CMesh> pSharp = Mesh( "{\"file\": \"models/color_cube.stl\", \"smooth\": true, \"creaseAngle\": 30}", bRead );
+        BOOL                   bSharp = bRead;
+        std::unique_ptr<CMesh> pRound = Mesh( "{\"file\": \"models/color_cube.stl\", \"smooth\": true, \"creaseAngle\": 100}", bRead );
+        BOOL                   bAllFace = TRUE, bAnyBent = FALSE;
+
+        Check( bSharp && bRead, "creaseAngle reads" );
+        const CMesh::SGeometry &oSharp = *pSharp->GetGeometry();
+        const CMesh::SGeometry &oRound = *pRound->GetGeometry();
+
+        for ( int f = 0; f < oSharp.FaceCount(); f++ )
+        {
+            CVector oFace = oSharp.aoFaceNormals[ (size_t)f ];
+
+            for ( int c = 0; c < 3; c++ )
+            {
+                CVector oN = oSharp.aoVertexNormals[ (size_t)oSharp.anKept[ (size_t)f * 3 + c ] ];
+
+                if ( fabs( oN.Dot( oFace ) - 1.0 ) > 1e-9 )
+                    bAllFace = FALSE;
+                oN = oRound.aoVertexNormals[ (size_t)oRound.anKept[ (size_t)f * 3 + c ] ];
+                oFace = oRound.aoFaceNormals[ (size_t)f ];
+                if ( oN.Dot( oFace ) < 0.9 )
+                    bAnyBent = TRUE;
+                oFace = oSharp.aoFaceNormals[ (size_t)f ];
+            }
+        }
+        Check( bAllFace, "under the crease angle a cube's corners keep their faces' normals" );
+        Check( bAnyBent, "past it they are blended with the faces around them" );
+        Mesh( "{\"file\": \"models/color_cube.stl\", \"creaseAngle\": 200}", bRead );
+        Check( bRead == FALSE, "a creaseAngle past 180 is refused" );
+    }
+
+        // nodeFrame: a picked node in its own frame, or where its parents put it.
+    {
+        std::unique_ptr<CMesh> pLocal = Mesh( "{\"file\": \"models/chess/chess_set_1k.gltf\", \"node\": \"piece_rook_white_01\"}", bRead );
+        BOOL                   bLocal = bRead;
+        std::unique_ptr<CMesh> pWorld = Mesh( "{\"file\": \"models/chess/chess_set_1k.gltf\", \"node\": \"piece_rook_white_01\", "
+                                              "\"nodeFrame\": \"world\"}", bRead );
+
+        Check( bLocal && bRead, "nodeFrame reads" );
+        CVector oLocal = pLocal->GetGeometry()->oMinimum, oWorld = pWorld->GetGeometry()->oMinimum;
+
+            // The rook's node moves it by (0.2026, 0.0174, -0.2026); glTF's z
+            // is turned round in Ray.
+        Check( fabs( ( oWorld.GetX() - oLocal.GetX() ) - 0.20260828733444214 ) < 1e-6 &&
+               fabs( ( oWorld.GetY() - oLocal.GetY() ) - 0.017392655834555626 ) < 1e-6 &&
+               fabs( ( oWorld.GetZ() - oLocal.GetZ() ) - 0.20260828733444214 ) < 1e-6,
+               "\"nodeFrame\": \"world\" places a node by its own transform" );
+        Mesh( "{\"file\": \"models/chess/chess_set_1k.gltf\", \"nodeFrame\": \"world\"}", bRead );
+        Check( bRead == FALSE, "nodeFrame needs a node" );
+    }
+
+        // faceColors' "sample": "uv": a face of NASA's LM that has a base
+        // color image samples it through the face's coordinates.
+    {
+        std::unique_ptr<CMesh>  pMesh = Mesh( "{\"file\": \"models/apollo/apollo_lunar_module.glb\"}", bRead );
+        const CMesh::SGeometry &oGeometry = *pMesh->GetGeometry();
+        CRay                    oRay;
+        CVector                 oHit;
+        BOOL                    bFlip = FALSE;
+        int                     nFace = -1;
+
+        for ( size_t i = 0; i < oGeometry.anFaceImage.size() && nFace < 0; i++ )
+        {
+            if ( oGeometry.anFaceImage[ i ] >= 0 )
+                nFace = (int)i;
+        }
+        Check( nFace >= 0, "some of the LM's faces have an image" );
+        if ( nFace < 0 )
+            return;
+
+        CVector oA = oGeometry.aoVertices[ (size_t)oGeometry.anKept[ (size_t)nFace * 3 ] ];
+        CVector oB = oGeometry.aoVertices[ (size_t)oGeometry.anKept[ (size_t)nFace * 3 + 1 ] ];
+        CVector oC = oGeometry.aoVertices[ (size_t)oGeometry.anKept[ (size_t)nFace * 3 + 2 ] ];
+        CVector oN = oGeometry.aoFaceNormals[ (size_t)nFace ];
+        FLT     nX = ( oA.GetX() + oB.GetX() + oC.GetX() ) / 3.0, nY = ( oA.GetY() + oB.GetY() + oC.GetY() ) / 3.0;
+        FLT     nZ = ( oA.GetZ() + oB.GetZ() + oC.GetZ() ) / 3.0;
+
+            // From just off the face's middle, straight at it.
+        oRay.Set( nX + oN.GetX() * 1e-4, nY + oN.GetY() * 1e-4, nZ + oN.GetZ() * 1e-4, -oN.GetX(), -oN.GetY(), -oN.GetZ(), 1e100, 1.0, 0, 0 );
+        Check( pMesh->Intersect( oRay, oHit ) == TRUE, "a ray at that face hits it" );
+
+        CObjects *pFace = pMesh->HitPart( bFlip );
+        CColor    oColor;
+
+        Check( pFace && pFace->SurfaceImageColor( oHit, oColor ) && oColor.GetR() >= 0.0 && oColor.GetR() <= 1.0,
+               "a face with an image samples it at the hit" );
+
+        std::unique_ptr<IASLib::CJsonNode> pNode( RayJson::Parse( "{\"type\": \"faceColors\", \"sample\": \"uv\"}" ) );
+        std::unique_ptr<CTexture>          pTexture( CTexture::Read( *pNode ) );
+        STexturePoint                      oAt;
+
+        pFace->TextureAt( oHit, oAt );
+        Check( pTexture && pTexture->ColorAt( oAt ).GetR() == oColor.GetR(), "faceColors with \"sample\": \"uv\" uses it" );
+        pNode.reset( RayJson::Parse( "{\"type\": \"faceColors\", \"sample\": \"both\"}" ) );
+        pTexture.reset( CTexture::Read( *pNode ) );
+        RayJson::ClearError();
+        Check( ! pTexture, "an unknown sample is refused" );
+    }
+
+        // Object names, --save-object and include.
+    {
+        CScene      oScene;
+        std::string strPrefab = std::string( strDir ) + "/prefab_cube.ray";
+        std::string strUse = std::string( strDir ) + "/use_prefab.ray";
+
+        Check( oScene.Load( ( std::string( strScenes ) + "/models_test.ray" ).c_str() ) == 0, "models_test loads" );
+        Check( oScene.FindObject( "2" ) == 1 && oScene.FindObject( "9" ) == -1, "an object is found by its number" );
+        Check( oScene.SaveObject( 1, strPrefab.c_str(), TRUE ) == 0, "one object saves as a scene of its own" );
+
+        CScene oPrefab;
+
+        Check( oPrefab.Load( strPrefab.c_str() ) == 0 && oPrefab.GetObjectCount() == 1, "the prefab holds just that object" );
+
+        FILE *pFile = fopen( strUse.c_str(), "wb" );
+
+        fputs( "{\"format\": \"Ray scene\", \"version\": 3, \"camera\": {\"position\": [0, 2, -10], \"lookAt\": [0, 0, 0]},"
+               " \"objects\": [{\"type\": \"include\", \"name\": \"cubes\", \"file\": \"prefab_cube.ray\", \"position\": [3, 0, 0]}],"
+               " \"lights\": []}", pFile );
+        fclose( pFile );
+
+        CScene oUse;
+
+        Check( oUse.Load( strUse.c_str() ) == 0 && oUse.GetObjectCount() == 2, "an include brings its object in after it" );
+        if ( oUse.GetObjectCount() == 2 )
+        {
+            CMesh  *pOriginal = dynamic_cast<CMesh *>( oPrefab.GetObjectAt( 0 ) );
+            CMesh  *pPlaced = dynamic_cast<CMesh *>( oUse.GetObjectAt( 1 ) );
+
+            Check( pOriginal && pPlaced && fabs( CVector( pPlaced->GetGeometry()->oMinimum ).GetX() - CVector( pOriginal->GetGeometry()->oMinimum ).GetX() - 3.0 ) < 1e-9,
+                   "the include's position moves what it brings in" );
+            Check( oUse.GetObjectAt( 0 )->GetName() == "cubes" && oUse.FindObject( "cubes" ) == 0, "an object keeps its name" );
+            Check( oUse.SaveObject( 1, strPrefab.c_str(), TRUE ) != 0, "an included object can't be saved alone" );
+        }
+
+        std::string strSaved = oUse.ToJson();
+
+        Check( strSaved.find( "\"include\"" ) != std::string::npos && strSaved.find( "color_cube" ) == std::string::npos &&
+               strSaved.find( "\"name\": \"cubes\"" ) != std::string::npos, "the scene saves the include, not what it brought in" );
+
+        std::string strTask;
+        {
+            RayJson::CEmbedData oEmbed;
+
+            strTask = oUse.ToJson( TRUE );
+        }
+        CScene oTask;
+
+        Check( oTask.FromJson( strTask ) == 0 && oTask.GetObjectCount() == 2, "a task's copy carries the included objects inline" );
+        Check( strTask.find( "\"objects\":[{\"type\":\"mesh\"" ) != std::string::npos, "a task's copy holds the mesh itself" );
+
+            // An included scene in a folder of its own: its files go in an
+            // archive under that folder, so extracting the archive puts them
+            // beside it, where it looks for them.
+        std::filesystem::create_directories( std::string( strDir ) + "/parts" );
+        Check( oScene.SaveObject( 1, ( std::string( strDir ) + "/parts/cube.ray" ).c_str(), TRUE ) == 0, "a prefab saves in a folder" );
+
+        std::string strNested = std::string( strDir ) + "/use_nested.ray";
+
+        pFile = fopen( strNested.c_str(), "wb" );
+        fputs( "{\"format\": \"Ray scene\", \"version\": 3, \"camera\": {\"position\": [0, 2, -10], \"lookAt\": [0, 0, 0]},"
+               " \"objects\": [{\"type\": \"include\", \"file\": \"parts/cube.ray\"}], \"lights\": []}", pFile );
+        fclose( pFile );
+
+        CScene      oNested, oArchived, oExtracted;
+        std::string strArchive = std::string( strDir ) + "/use_nested_archive.ray";
+        std::string strOut = std::string( strDir ) + "/extracted/use.ray";
+
+        std::filesystem::create_directories( std::string( strDir ) + "/extracted" );
+        Check( oNested.Load( strNested.c_str() ) == 0 && oNested.Save( strArchive.c_str() ) == 0, "a scene with an include in a folder saves as an archive" );
+        Check( oArchived.Load( strArchive.c_str() ) == 0 && oArchived.GetObjectCount() == 2, "the archive reads back" );
+        Check( oArchived.SaveJson( strOut.c_str() ) == 0, "and extracts" );
+        Check( std::filesystem::exists( std::string( strDir ) + "/extracted/parts/cube.ray" ) &&
+               std::filesystem::exists( std::string( strDir ) + "/extracted/parts/models/color_cube.stl" ),
+               "an included scene's files are extracted beside it" );
+        Check( oExtracted.Load( strOut.c_str() ) == 0 && oExtracted.GetObjectCount() == 2, "the extracted scene reads" );
+    }
+
+        // The LM-5 Eagle: NASA's model, its parts named.
+    {
+        ModelFile::SModel oModel;
+        std::string       strData = ReadFile( strModels + "apollo/lm5_eagle.glb" );
+        const char       *astrNames[] = { "kapton_blanket", "kapton_gold", "silver_foil", "kapton_mesa", "black_blanket", "dps_bell",
+                                          "porch_aluminum", "inconel_dark", "white_paint", "al2024_anodized", "al5056_anodized",
+                                          "al_olive", "pyromark_black", "window_quartz", "rcs_stainless", "plume_deflector" };
+        BOOL              bAll = TRUE;
+
+        Check( ModelFile::ReadGltf( strData, NULL, "", "", oModel, strError ) == TRUE, "lm5_eagle.glb reads" );
+        for ( const char *strName : astrNames )
+        {
+            if ( std::find( oModel.astrParts.begin(), oModel.astrParts.end(), strName ) == oModel.astrParts.end() )
+                bAll = FALSE;
+        }
+        Check( bAll && oModel.astrParts.size() == sizeof( astrNames ) / sizeof( astrNames[ 0 ] ), "every Eagle part is there by name" );
+        Check( oModel.aoNormals.size() == oModel.aoVertices.size(), "the Eagle carries its worked-out normals" );
+        Check( oModel.anUVs.size() == oModel.aoVertices.size() * 2, "and its panels' places in the atlas" );
+    }
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -6869,6 +7155,7 @@ int main( int argc, char **argv )
         SceneTreeChecks( argv[ 2 ] );
         LensTableChecks( argv[ 2 ] );
         ModelFileChecks( argv[ 2 ], argv[ 3 ] );
+        ModelPartChecks( argv[ 2 ], argv[ 3 ] );
         DracoChecks( argv[ 2 ] );
         BlendChecks( argv[ 2 ] );
         TextChecks( argv[ 2 ] );

@@ -9,6 +9,9 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <tuple>
+#include <cmath>
+#include "BumpMap.h"
 #include <mutex>
 
 
@@ -56,7 +59,7 @@ namespace
 
     std::shared_ptr<const ModelFile::SModel> ReadModelOnce( const std::string &strData, const std::string &strName,
                                                             const ModelFile::SGltfFiles &oFiles, const std::string &strNode,
-                                                            const std::string &strMaterial, std::string &strError )
+                                                            const std::string &strMaterial, std::string &strError, BOOL bWorld = FALSE )
     {
         SModelKey oKey;
         uint64_t  nHash = 1469598103934665603ULL;
@@ -76,6 +79,7 @@ namespace
         nHash = ( nHash ^ 0x24 ) * 1099511628211ULL;
         for ( size_t nIndex = 0; nIndex < strMaterial.size(); nIndex++ )
             nHash = ( nHash ^ (unsigned char)strMaterial[ nIndex ] ) * 1099511628211ULL;
+        nHash = ( nHash ^ ( bWorld ? 0x57 : 0x4C ) ) * 1099511628211ULL;
         for ( const auto &oFile : oFiles.aoFiles )
         {
             for ( char chNext : oFile.first )
@@ -105,7 +109,7 @@ namespace
         BOOL bRead;
 
         if ( ModelFile::IsGltf( strData, strName ) )
-            bRead = ModelFile::ReadGltf( strData, &oFiles, strNode, strMaterial, *pModel, strError );
+            bRead = ModelFile::ReadGltf( strData, &oFiles, strNode, strMaterial, *pModel, strError, bWorld );
         else if ( ModelFile::IsBlend( strData, strName ) )
             bRead = ModelFile::ReadBlend( strData, strNode, *pModel, strError );
         else
@@ -151,9 +155,126 @@ namespace
     }
 }
 
+namespace
+{
+        // Smooth normals worked out from the faces, not a file's: corners at
+        // the same place share a normal summed (weighted by area) from the
+        // faces there whose normals are within nAngle degrees of this face's,
+        // either way round (double-sided models often flip faces). Every face
+        // gets its own three corners, so a crease splits them.
+    void CreaseNormals( std::vector<CVector> &aoVertices, std::vector<int> &anFaces, std::vector<FLT> &anUVs,
+                        std::vector<CVector> &aoNormals, FLT nAngle )
+    {
+        FLT     nMinCos = cos( nAngle * PI / 180.0 );
+        FLT     anMin[ 3 ] = { 1e300, 1e300, 1e300 };
+        FLT     anMax[ 3 ] = { -1e300, -1e300, -1e300 };
+
+        for ( size_t nIndex = 0; nIndex < aoVertices.size(); nIndex++ )
+        {
+            CVector &oV = aoVertices[ nIndex ];
+            FLT      anValue[ 3 ] = { oV.GetX(), oV.GetY(), oV.GetZ() };
+
+            for ( int nAxis = 0; nAxis < 3; nAxis++ )
+            {
+                anMin[ nAxis ] = (std::min)( anMin[ nAxis ], anValue[ nAxis ] );
+                anMax[ nAxis ] = (std::max)( anMax[ nAxis ], anValue[ nAxis ] );
+            }
+        }
+
+        FLT     nSpan = (std::max)( anMax[ 0 ] - anMin[ 0 ], (std::max)( anMax[ 1 ] - anMin[ 1 ], anMax[ 2 ] - anMin[ 2 ] ) );
+        FLT     nCell = ( nSpan > 0.0 ) ? nSpan * 1e-6 : 1e-9;
+        size_t  nFaces = anFaces.size() / 3;
+        std::vector<CVector> aoFaceNormals( nFaces, CVector( 0.0, 0.0, 0.0 ) );
+        std::vector<FLT>     anAreas( nFaces, 0.0 );
+        std::map< std::tuple<long long, long long, long long>, std::vector<size_t> > oAt;
+
+        for ( size_t nFace = 0; nFace < nFaces; nFace++ )
+        {
+            CVector oA = aoVertices[ (size_t)anFaces[ nFace * 3 ] ];
+            CVector oB = aoVertices[ (size_t)anFaces[ nFace * 3 + 1 ] ];
+            CVector oC = aoVertices[ (size_t)anFaces[ nFace * 3 + 2 ] ];
+            FLT anE1[ 3 ] = { oB.GetX() - oA.GetX(), oB.GetY() - oA.GetY(), oB.GetZ() - oA.GetZ() };
+            FLT anE2[ 3 ] = { oC.GetX() - oA.GetX(), oC.GetY() - oA.GetY(), oC.GetZ() - oA.GetZ() };
+            FLT anN[ 3 ] = { anE1[ 1 ] * anE2[ 2 ] - anE1[ 2 ] * anE2[ 1 ], anE1[ 2 ] * anE2[ 0 ] - anE1[ 0 ] * anE2[ 2 ],
+                             anE1[ 0 ] * anE2[ 1 ] - anE1[ 1 ] * anE2[ 0 ] };
+            FLT nLength = sqrt( anN[ 0 ] * anN[ 0 ] + anN[ 1 ] * anN[ 1 ] + anN[ 2 ] * anN[ 2 ] );
+
+            anAreas[ nFace ] = nLength;
+            if ( nLength > 0.0 )
+                aoFaceNormals[ nFace ].Set( anN[ 0 ] / nLength, anN[ 1 ] / nLength, anN[ 2 ] / nLength );
+            for ( int nCorner = 0; nCorner < 3; nCorner++ )
+            {
+                CVector oV = aoVertices[ (size_t)anFaces[ nFace * 3 + (size_t)nCorner ] ];
+
+                oAt[ std::make_tuple( (long long)llround( oV.GetX() / nCell ), (long long)llround( oV.GetY() / nCell ),
+                                      (long long)llround( oV.GetZ() / nCell ) ) ].push_back( nFace * 3 + (size_t)nCorner );
+            }
+        }
+
+        std::vector<CVector> aoCornerVertices( anFaces.size() );
+        std::vector<CVector> aoCornerNormals( anFaces.size() );
+        std::vector<int>     anCornerFaces( anFaces.size() );
+        std::vector<FLT>     anCornerUVs;
+
+        for ( auto &oEntry : oAt )
+        {
+            const std::vector<size_t> &anCorners = oEntry.second;
+
+            for ( size_t nI = 0; nI < anCorners.size(); nI++ )
+            {
+                CVector oN = aoFaceNormals[ anCorners[ nI ] / 3 ];
+                FLT     anSum[ 3 ] = { 0.0, 0.0, 0.0 };
+
+                for ( size_t nJ = 0; nJ < anCorners.size(); nJ++ )
+                {
+                    size_t  nOther = anCorners[ nJ ] / 3;
+                    CVector oM = aoFaceNormals[ nOther ];
+                    FLT     nDot = oN.GetX() * oM.GetX() + oN.GetY() * oM.GetY() + oN.GetZ() * oM.GetZ();
+
+                    if ( fabs( nDot ) >= nMinCos )
+                    {
+                        FLT nSign = ( nDot < 0.0 ) ? -1.0 : 1.0;
+
+                        anSum[ 0 ] += nSign * oM.GetX() * anAreas[ nOther ];
+                        anSum[ 1 ] += nSign * oM.GetY() * anAreas[ nOther ];
+                        anSum[ 2 ] += nSign * oM.GetZ() * anAreas[ nOther ];
+                    }
+                }
+
+                FLT nLength = sqrt( anSum[ 0 ] * anSum[ 0 ] + anSum[ 1 ] * anSum[ 1 ] + anSum[ 2 ] * anSum[ 2 ] );
+
+                if ( nLength > 0.0 )
+                    aoCornerNormals[ anCorners[ nI ] ].Set( anSum[ 0 ] / nLength, anSum[ 1 ] / nLength, anSum[ 2 ] / nLength );
+                else if ( oN.Magnitude() > 0.0 )
+                    aoCornerNormals[ anCorners[ nI ] ] = oN;
+                else
+                    aoCornerNormals[ anCorners[ nI ] ].Set( 0.0, 1.0, 0.0 );
+            }
+        }
+        if ( ! anUVs.empty() )
+            anCornerUVs.resize( anFaces.size() * 2 );
+        for ( size_t nCorner = 0; nCorner < anFaces.size(); nCorner++ )
+        {
+            size_t nVertex = (size_t)anFaces[ nCorner ];
+
+            aoCornerVertices[ nCorner ] = aoVertices[ nVertex ];
+            anCornerFaces[ nCorner ] = (int)nCorner;
+            if ( ! anUVs.empty() )
+            {
+                anCornerUVs[ nCorner * 2 ] = anUVs[ nVertex * 2 ];
+                anCornerUVs[ nCorner * 2 + 1 ] = anUVs[ nVertex * 2 + 1 ];
+            }
+        }
+        aoVertices.swap( aoCornerVertices );
+        anFaces.swap( anCornerFaces );
+        aoNormals.swap( aoCornerNormals );
+        anUVs.swap( anCornerUVs );
+    }
+}
+
 BOOL CMesh::LoadModel( const std::string &strData, const std::string &strName, std::string &strError )
 {
-    std::shared_ptr<const ModelFile::SModel> pModel = ReadModelOnce( strData, strName, m_oGltfFiles, m_strNode, m_strGltfMaterial, strError );
+    std::shared_ptr<const ModelFile::SModel> pModel = ReadModelOnce( strData, strName, m_oGltfFiles, m_strNode, m_strGltfMaterial, strError, m_bNodeWorld );
 
     if ( ! pModel )
         return FALSE;
@@ -231,15 +352,35 @@ BOOL CMesh::LoadModel( const std::string &strData, const std::string &strName, s
         oVertex.Set( oVertex.GetX() + anShift[ 0 ], oVertex.GetY() + anShift[ 1 ], oVertex.GetZ() + anShift[ 2 ] );
     }
 
-        // Normals turn with the model and scale by the inverse of its scale.
-    std::vector<CVector> aoNormals( oModel.aoNormals.size() );
+        // An include's placement, on top of the mesh's own.
+    FLT nORX = m_oOuterRotation.GetX() * nToRadians;
+    FLT nORY = m_oOuterRotation.GetY() * nToRadians;
+    FLT nORZ = m_oOuterRotation.GetZ() * nToRadians;
 
-    for ( size_t nIndex = 0; nIndex < oModel.aoNormals.size(); nIndex++ )
+    if ( m_bOuter )
+    {
+        for ( size_t nIndex = 0; nIndex < aoVertices.size(); nIndex++ )
+        {
+            CVector &oVertex = aoVertices[ nIndex ];
+            FLT      anValue[ 3 ] = { oVertex.GetX() * m_nOuterScale, oVertex.GetY() * m_nOuterScale, oVertex.GetZ() * m_nOuterScale };
+
+            RotateXYZ( anValue, nORX, nORY, nORZ );
+            oVertex.Set( anValue[ 0 ] + m_oOuterTranslation.GetX(), anValue[ 1 ] + m_oOuterTranslation.GetY(),
+                         anValue[ 2 ] + m_oOuterTranslation.GetZ() );
+        }
+    }
+
+        // Normals turn with the model and scale by the inverse of its scale.
+    std::vector<CVector> aoNormals( ( m_nCreaseAngle > 0.0 ) ? 0 : oModel.aoNormals.size() );
+
+    for ( size_t nIndex = 0; nIndex < aoNormals.size(); nIndex++ )
     {
         CVector oNormal( oModel.aoNormals[ nIndex ] );
         FLT     anValue[ 3 ] = { oNormal.GetX() / anScale[ 0 ], oNormal.GetY() / anScale[ 1 ], oNormal.GetZ() / anScale[ 2 ] };
 
         RotateXYZ( anValue, nRX, nRY, nRZ );
+        if ( m_bOuter )
+            RotateXYZ( anValue, nORX, nORY, nORZ );
         aoNormals[ nIndex ].Set( anValue[ 0 ], anValue[ 1 ], anValue[ 2 ] );
         aoNormals[ nIndex ].Normalize();
     }
@@ -282,15 +423,77 @@ BOOL CMesh::LoadModel( const std::string &strData, const std::string &strName, s
         }
         pFrame->anMatrix[ ( nRow * 4 ) + 3 ] = nOffset;
     }
+    if ( m_bOuter )
+    {
+            // Undo the include's placement first: F'(p) = F( R^T ( p - t ) / s ).
+        FLT anTurn[ 3 ][ 3 ];       // anTurn[ column ][ row ]: the outer turn's columns
+
+        for ( int nAxis = 0; nAxis < 3; nAxis++ )
+        {
+            FLT anBasis[ 3 ] = { 0.0, 0.0, 0.0 };
+
+            anBasis[ nAxis ] = 1.0;
+            RotateXYZ( anBasis, nORX, nORY, nORZ );
+            for ( int nRow = 0; nRow < 3; nRow++ )
+                anTurn[ nAxis ][ nRow ] = anBasis[ nRow ];
+        }
+
+        FLT anNew[ 12 ];
+        FLT anT[ 3 ] = { m_oOuterTranslation.GetX(), m_oOuterTranslation.GetY(), m_oOuterTranslation.GetZ() };
+
+        for ( int nRow = 0; nRow < 3; nRow++ )
+        {
+            FLT nOffset = pFrame->anMatrix[ ( nRow * 4 ) + 3 ];
+
+            for ( int nColumn = 0; nColumn < 3; nColumn++ )
+            {
+                    // (A R^T / s)[ row ][ column ] = sum_k A[ row ][ k ] R[ column ][ k ] / s
+                FLT nValue = 0.0;
+
+                for ( int nK = 0; nK < 3; nK++ )
+                    nValue += pFrame->anMatrix[ ( nRow * 4 ) + nK ] * anTurn[ nK ][ nColumn ];
+                nValue /= m_nOuterScale;
+                anNew[ ( nRow * 4 ) + nColumn ] = nValue;
+                nOffset -= nValue * anT[ nColumn ];
+            }
+            anNew[ ( nRow * 4 ) + 3 ] = nOffset;
+        }
+        for ( int nIndex = 0; nIndex < 12; nIndex++ )
+            pFrame->anMatrix[ nIndex ] = anNew[ nIndex ];
+    }
     SetTextureFrame( pFrame );
 
-    if ( ! SetGeometry( aoVertices, anFaces, m_bSmooth || ! aoNormals.empty(), m_bDoubleSided, aoNormals, oModel.anUVs,
-                        oModel.aoFaceColors, oModel.abHasColor ) )
+        // The parts and images, with their corners turned round as the
+        // faces' were, for a mirroring scale.
+    ModelFile::SModel oExtras;
+
+    oExtras.astrParts = oModel.astrParts;
+    oExtras.anFacePart = oModel.anFacePart;
+    oExtras.apImages = oModel.apImages;
+    oExtras.anFaceImage = oModel.anFaceImage;
+    oExtras.aoFaceFactor = oModel.aoFaceFactor;
+    oExtras.anFaceImageUVs = oModel.anFaceImageUVs;
+    if ( anScale[ 0 ] * anScale[ 1 ] * anScale[ 2 ] < 0.0 )
+    {
+        for ( size_t nAt = 0; nAt + 5 < oExtras.anFaceImageUVs.size(); nAt += 6 )
+        {
+            std::swap( oExtras.anFaceImageUVs[ nAt + 2 ], oExtras.anFaceImageUVs[ nAt + 4 ] );
+            std::swap( oExtras.anFaceImageUVs[ nAt + 3 ], oExtras.anFaceImageUVs[ nAt + 5 ] );
+        }
+    }
+
+    std::vector<FLT> anUVs( oModel.anUVs );
+
+    if ( m_nCreaseAngle > 0.0 )
+        CreaseNormals( aoVertices, anFaces, anUVs, aoNormals, m_nCreaseAngle );
+
+    if ( ! SetGeometry( aoVertices, anFaces, m_bSmooth || ! aoNormals.empty(), m_bDoubleSided, aoNormals, anUVs,
+                        oModel.aoFaceColors, oModel.abHasColor, &oExtras ) )
     {
         strError = "has a face with a corner out of range";
         return FALSE;
     }
-    return TRUE;
+    return ResolveParts( strError );
 }
 
 namespace
@@ -304,6 +507,7 @@ namespace
         protected:
             const CObjects *m_pMesh;
             int             m_nFace;
+            const CMesh::SGeometry *m_pGeometry;
 
         public:
                             CMeshFace( const CObjects *pMesh, int nFace, const CMesh::SGeometry &oGeometry, CMaterialList *pMaterials ) :
@@ -312,7 +516,8 @@ namespace
                                            oGeometry.aoVertices[ (size_t)oGeometry.anKept[ ( (size_t)nFace * 3 ) + 2 ] ],
                                            oGeometry.bDoubleSided, oGeometry.bSmooth, pMaterials ),
                                 m_pMesh( pMesh ),
-                                m_nFace( nFace )
+                                m_nFace( nFace ),
+                                m_pGeometry( &oGeometry )
                             {
                                 size_t nAt = (size_t)nFace * 3;
 
@@ -327,6 +532,74 @@ namespace
                             }
 
             virtual int     MeshFaceOf( const CObjects *pMesh ) const { return ( pMesh == m_pMesh ) ? m_nFace : -1; }
+                // The face's base color image at a point on it, sampled
+                // (bilinear, wrapping) through its corners' image coordinates.
+            virtual BOOL    SurfaceImageColor( CVector &oPoint, CColor &oColor )
+                            {
+                                const CMesh::SGeometry &oGeometry = *m_pGeometry;
+
+                                if ( oGeometry.anFaceImage.empty() )
+                                    return FALSE;
+
+                                int nImage = oGeometry.anFaceImage[ (size_t)m_nFace ];
+
+                                if ( nImage < 0 || (size_t)nImage >= oGeometry.apImages.size() || ! oGeometry.apImages[ (size_t)nImage ] )
+                                    return FALSE;
+
+                                CVector oA = GetCorner( 0 ), oB = GetCorner( 1 ), oC = GetCorner( 2 );
+                                FLT     anAB[ 3 ] = { oB.GetX() - oA.GetX(), oB.GetY() - oA.GetY(), oB.GetZ() - oA.GetZ() };
+                                FLT     anAC[ 3 ] = { oC.GetX() - oA.GetX(), oC.GetY() - oA.GetY(), oC.GetZ() - oA.GetZ() };
+                                FLT     anAP[ 3 ] = { oPoint.GetX() - oA.GetX(), oPoint.GetY() - oA.GetY(), oPoint.GetZ() - oA.GetZ() };
+                                FLT     d00 = anAB[ 0 ] * anAB[ 0 ] + anAB[ 1 ] * anAB[ 1 ] + anAB[ 2 ] * anAB[ 2 ];
+                                FLT     d01 = anAB[ 0 ] * anAC[ 0 ] + anAB[ 1 ] * anAC[ 1 ] + anAB[ 2 ] * anAC[ 2 ];
+                                FLT     d11 = anAC[ 0 ] * anAC[ 0 ] + anAC[ 1 ] * anAC[ 1 ] + anAC[ 2 ] * anAC[ 2 ];
+                                FLT     d20 = anAP[ 0 ] * anAB[ 0 ] + anAP[ 1 ] * anAB[ 1 ] + anAP[ 2 ] * anAB[ 2 ];
+                                FLT     d21 = anAP[ 0 ] * anAC[ 0 ] + anAP[ 1 ] * anAC[ 1 ] + anAP[ 2 ] * anAC[ 2 ];
+                                FLT     nDenominator = d00 * d11 - d01 * d01;
+
+                                if ( nDenominator == 0.0 )
+                                    return FALSE;
+
+                                FLT        nB = ( d11 * d20 - d01 * d21 ) / nDenominator;
+                                FLT        nC = ( d00 * d21 - d01 * d20 ) / nDenominator;
+                                FLT        nA = 1.0 - nB - nC;
+                                const FLT *pUV = &oGeometry.anFaceImageUVs[ (size_t)m_nFace * 6 ];
+                                FLT        nU = nA * pUV[ 0 ] + nB * pUV[ 2 ] + nC * pUV[ 4 ];
+                                FLT        nV = nA * pUV[ 1 ] + nB * pUV[ 3 ] + nC * pUV[ 5 ];
+                                const CImageTexture::SImage &oImage = *oGeometry.apImages[ (size_t)nImage ];
+
+                                if ( oImage.nWidth <= 0 || oImage.nHeight <= 0 )
+                                    return FALSE;
+
+                                    // Texel centers at half steps, wrapping as glTF's default sampler does.
+                                FLT    nX = ( nU - floor( nU ) ) * oImage.nWidth - 0.5;
+                                FLT    nY = ( nV - floor( nV ) ) * oImage.nHeight - 0.5;
+                                FLT    nX0 = floor( nX ), nY0 = floor( nY );
+                                FLT    nFX = nX - nX0, nFY = nY - nY0;
+                                int    anX[ 2 ] = { (int)nX0, (int)nX0 + 1 };
+                                int    anY[ 2 ] = { (int)nY0, (int)nY0 + 1 };
+                                double adSum[ 3 ] = { 0.0, 0.0, 0.0 };
+
+                                for ( int nCorner = 0; nCorner < 4; nCorner++ )
+                                {
+                                    int    nPX = ( ( anX[ nCorner & 1 ] % oImage.nWidth ) + oImage.nWidth ) % oImage.nWidth;
+                                    int    nPY = ( ( anY[ nCorner >> 1 ] % oImage.nHeight ) + oImage.nHeight ) % oImage.nHeight;
+                                    double dWeight = ( ( nCorner & 1 ) ? nFX : 1.0 - nFX ) * ( ( nCorner >> 1 ) ? nFY : 1.0 - nFY );
+                                    const unsigned char *pPixel = &oImage.anPixels[ ( (size_t)nPY * (size_t)oImage.nWidth + (size_t)nPX ) * 3 ];
+
+                                    for ( int nChannel = 0; nChannel < 3; nChannel++ )
+                                    {
+                                        double dValue = pPixel[ nChannel ] / 255.0;
+
+                                        adSum[ nChannel ] += dWeight * ( ( dValue <= 0.04045 ) ? dValue / 12.92 : pow( ( dValue + 0.055 ) / 1.055, 2.4 ) );
+                                    }
+                                }
+
+                                CColor oFactor = oGeometry.aoFaceFactor[ (size_t)m_nFace ];
+
+                                oColor = CColor( oFactor.GetR() * adSum[ 0 ], oFactor.GetG() * adSum[ 1 ], oFactor.GetB() * adSum[ 2 ] );
+                                return TRUE;
+                            }
             virtual BOOL    SameSurface( const CObjects *pOther ) const
                             { return ( pOther == this || ( pOther && pOther->MeshFaceOf( m_pMesh ) == m_nFace ) ) ? TRUE : FALSE; }
     };
@@ -396,6 +669,20 @@ namespace
         MixVector( nHash, oGeometry.oUVMap.oCenter );
         Mix( nHash, Bits( oGeometry.oUVMap.anScale[ 0 ] ) );
         Mix( nHash, Bits( oGeometry.oUVMap.anScale[ 1 ] ) );
+        Mix( nHash, oGeometry.anGivenParts.size() );
+        for ( size_t nIndex = 0; nIndex < oGeometry.anGivenParts.size(); nIndex++ )
+            Mix( nHash, (uint64_t)(int64_t)oGeometry.anGivenParts[ nIndex ] );
+        Mix( nHash, oGeometry.astrParts.size() );
+        Mix( nHash, oGeometry.apImages.size() );
+        for ( size_t nIndex = 0; nIndex < oGeometry.apImages.size(); nIndex++ )
+            Mix( nHash, (uint64_t)(uintptr_t)oGeometry.apImages[ nIndex ].get() );
+        Mix( nHash, oGeometry.anGivenFaceImage.size() );
+        for ( size_t nIndex = 0; nIndex < oGeometry.anGivenFaceImage.size(); nIndex++ )
+            Mix( nHash, (uint64_t)(int64_t)oGeometry.anGivenFaceImage[ nIndex ] );
+        for ( size_t nIndex = 0; nIndex < oGeometry.anGivenImageUVs.size(); nIndex++ )
+            Mix( nHash, Bits( oGeometry.anGivenImageUVs[ nIndex ] ) );
+        for ( size_t nIndex = 0; nIndex < oGeometry.aoGivenFactor.size(); nIndex++ )
+            MixColor( nHash, oGeometry.aoGivenFactor[ nIndex ] );
         return nHash;
     }
 
@@ -429,8 +716,25 @@ namespace
              oA.oUVMap.bCenterGiven != oB.oUVMap.bCenterGiven || ! SameVector( oA.oUVMap.oCenter, oB.oUVMap.oCenter ) ||
              Bits( oA.oUVMap.anScale[ 0 ] ) != Bits( oB.oUVMap.anScale[ 0 ] ) ||
              Bits( oA.oUVMap.anScale[ 1 ] ) != Bits( oB.oUVMap.anScale[ 1 ] ) ||
-             ! SameVectors( oA.aoVertices, oB.aoVertices ) || ! SameVectors( oA.aoGivenNormals, oB.aoGivenNormals ) )
+             ! SameVectors( oA.aoVertices, oB.aoVertices ) || ! SameVectors( oA.aoGivenNormals, oB.aoGivenNormals ) ||
+             oA.anGivenParts != oB.anGivenParts || oA.astrParts != oB.astrParts || oA.apImages != oB.apImages ||
+             oA.anGivenFaceImage != oB.anGivenFaceImage || oA.anGivenImageUVs.size() != oB.anGivenImageUVs.size() ||
+             oA.aoGivenFactor.size() != oB.aoGivenFactor.size() )
             return FALSE;
+        for ( size_t nIndex = 0; nIndex < oA.anGivenImageUVs.size(); nIndex++ )
+        {
+            if ( Bits( oA.anGivenImageUVs[ nIndex ] ) != Bits( oB.anGivenImageUVs[ nIndex ] ) )
+                return FALSE;
+        }
+        for ( size_t nIndex = 0; nIndex < oA.aoGivenFactor.size(); nIndex++ )
+        {
+            CColor &oFirst = const_cast<CColor &>( oA.aoGivenFactor[ nIndex ] );
+            CColor &oSecond = const_cast<CColor &>( oB.aoGivenFactor[ nIndex ] );
+
+            if ( Bits( oFirst.GetR() ) != Bits( oSecond.GetR() ) || Bits( oFirst.GetG() ) != Bits( oSecond.GetG() ) ||
+                 Bits( oFirst.GetB() ) != Bits( oSecond.GetB() ) )
+                return FALSE;
+        }
         for ( size_t nIndex = 0; nIndex < oA.anUVs.size(); nIndex++ )
         {
             if ( Bits( oA.anUVs[ nIndex ] ) != Bits( oB.anUVs[ nIndex ] ) )
@@ -461,6 +765,12 @@ namespace
 CMesh::CMesh( void ) :
     m_oScale( 1.0, 1.0, 1.0 ),
     m_nFitSize( 0.0 ),
+    m_nCreaseAngle( 0.0 ),
+    m_bNodeWorld( FALSE ),
+    m_bOuter( FALSE ),
+    m_nOuterScale( 1.0 ),
+    m_oOuterRotation( 0.0, 0.0, 0.0 ),
+    m_oOuterTranslation( 0.0, 0.0, 0.0 ),
     m_oRotation( 0.0, 0.0, 0.0 ),
     m_nAlign( ALIGN_NONE ),
     m_oTranslation( 0.0, 0.0, 0.0 ),
@@ -500,9 +810,11 @@ const std::vector<CVector> &CMesh::GetVertices( void ) const
 
 CTriangle *CMesh::MakeFace( int nFace )
 {
-    CMeshFace  *pFace = new CMeshFace( this, nFace, *m_pGeometry, &m_oMaterials );
+    std::shared_ptr<const CBumpMap> pBump;
+    CMaterialList                  *pMaterials = FaceMaterials( nFace, pBump );
+    CMeshFace                      *pFace = new CMeshFace( this, nFace, *m_pGeometry, pMaterials );
 
-    pFace->SetBump( m_pBump );
+    pFace->SetBump( pBump );
     if ( m_pTextureFrame )
         pFace->SetTextureFrame( m_pTextureFrame );
     return pFace;
@@ -557,7 +869,8 @@ CObjects *CMesh::HitPart( BOOL &bFlip )
 
 BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vector<int> &anFaces, BOOL bSmooth, BOOL bDoubleSided,
                          const std::vector<CVector> &aoNormals, const std::vector<FLT> &anUVs,
-                         const std::vector<CColor> &aoFaceColors, const std::vector<unsigned char> &abHasColor )
+                         const std::vector<CColor> &aoFaceColors, const std::vector<unsigned char> &abHasColor,
+                         const ModelFile::SModel *pModel )
 {
     if ( ! aoNormals.empty() && aoNormals.size() != aoVertices.size() )
         return FALSE;
@@ -583,6 +896,24 @@ BOOL CMesh::SetGeometry( const std::vector<CVector> &aoVertices, const std::vect
     pGeometry->bSmooth = bSmooth;
     pGeometry->bDoubleSided = bDoubleSided;
     pGeometry->oUVMap = m_oUVMap;
+    if ( pModel )
+    {
+        size_t nFaces = anFaces.size() / 3;
+
+        if ( pModel->anFacePart.size() == nFaces && ! pModel->astrParts.empty() )
+        {
+            pGeometry->anGivenParts = pModel->anFacePart;
+            pGeometry->astrParts = pModel->astrParts;
+        }
+        if ( pModel->anFaceImage.size() == nFaces && pModel->aoFaceFactor.size() == nFaces &&
+             pModel->anFaceImageUVs.size() == nFaces * 6 && ! pModel->apImages.empty() )
+        {
+            pGeometry->apImages = pModel->apImages;
+            pGeometry->anGivenFaceImage = pModel->anFaceImage;
+            pGeometry->aoGivenFactor = pModel->aoFaceFactor;
+            pGeometry->anGivenImageUVs = pModel->anFaceImageUVs;
+        }
+    }
 
     m_bSmooth = bSmooth;
     m_bDoubleSided = bDoubleSided;
@@ -640,6 +971,15 @@ void CMesh::Build( SGeometry &oGeometry )
             oGeometry.abFaceHasColor.push_back( oGeometry.abGivenHasColor[ nFace / 3 ] );
         }
         oGeometry.aoFaceNormals.push_back( oNormal );
+        if ( ! oGeometry.anGivenParts.empty() )
+            oGeometry.anFacePart.push_back( oGeometry.anGivenParts[ nFace / 3 ] );
+        if ( ! oGeometry.anGivenFaceImage.empty() )
+        {
+            oGeometry.anFaceImage.push_back( oGeometry.anGivenFaceImage[ nFace / 3 ] );
+            oGeometry.aoFaceFactor.push_back( oGeometry.aoGivenFactor[ nFace / 3 ] );
+            for ( int nAt = 0; nAt < 6; nAt++ )
+                oGeometry.anFaceImageUVs.push_back( oGeometry.anGivenImageUVs[ ( nFace / 3 ) * 6 + (size_t)nAt ] );
+        }
         for ( int nCorner = 0; nCorner < 3; nCorner++ )
             oGeometry.anKept.push_back( oGeometry.anFaces[ nFace + (size_t)nCorner ] );
         anKeptFrom.push_back( nFace );
@@ -1374,9 +1714,11 @@ CColor CMesh::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
     if ( m_nHitFace < 0 || ! m_pGeometry )
         return CColor( 0, 0, 0 );
 
-    CMeshFace oFace( this, m_nHitFace, *m_pGeometry, &m_oMaterials );
+    std::shared_ptr<const CBumpMap> pBump;
+    CMaterialList                  *pMaterials = FaceMaterials( m_nHitFace, pBump );
+    CMeshFace                       oFace( this, m_nHitFace, *m_pGeometry, pMaterials );
 
-    oFace.SetBump( m_pBump );
+    oFace.SetBump( pBump );
     if ( m_pTextureFrame )
         oFace.SetTextureFrame( m_pTextureFrame );
     return oFace.Shade( oScene, oRay, oIntersect );
@@ -1413,6 +1755,175 @@ void CMesh::UVMapToJson( IASLib::CObjectNode &oNode ) const
     }
 }
 
+CMesh::SPart::~SPart( void )
+{
+    for ( int nIndex = 0; nIndex < oMaterials.GetSize(); nIndex++ )
+        delete oMaterials[ nIndex ];
+    oMaterials.RemoveAll();
+}
+
+CMaterialList *CMesh::FaceMaterials( int nFace, std::shared_ptr<const CBumpMap> &pBump )
+{
+    pBump = m_pBump;
+    if ( m_anPartEntry.empty() || ! m_pGeometry || m_pGeometry->anFacePart.empty() || nFace < 0 ||
+         (size_t)nFace >= m_pGeometry->anFacePart.size() )
+        return &m_oMaterials;
+
+    int nPart = m_pGeometry->anFacePart[ (size_t)nFace ];
+
+    if ( nPart < 0 || (size_t)nPart >= m_anPartEntry.size() || m_anPartEntry[ (size_t)nPart ] < 0 )
+        return &m_oMaterials;
+
+    SPart &oPart = *m_apParts[ (size_t)m_anPartEntry[ (size_t)nPart ] ];
+
+    if ( oPart.bBump )
+        pBump = oPart.pBump;
+    return &oPart.oMaterials;
+}
+
+std::vector<std::string> CMesh::GetPartNames( void ) const
+{
+    return m_pGeometry ? m_pGeometry->astrParts : std::vector<std::string>();
+}
+
+BOOL CMesh::ResolveParts( std::string &strError )
+{
+    std::vector<std::string> astrParts = GetPartNames();
+
+    m_anPartEntry.assign( astrParts.size(), -1 );
+    for ( size_t nEntry = 0; nEntry < m_apParts.size(); nEntry++ )
+    {
+        BOOL bFound = FALSE;
+
+        for ( size_t nPart = 0; nPart < astrParts.size(); nPart++ )
+        {
+            if ( astrParts[ nPart ] == m_apParts[ nEntry ]->strName )
+            {
+                m_anPartEntry[ nPart ] = (int)nEntry;
+                bFound = TRUE;
+            }
+        }
+        if ( ! bFound )
+        {
+            std::string strList;
+
+            for ( size_t nPart = 0; nPart < astrParts.size(); nPart++ )
+                strList += ( nPart ? ", \"" : "\"" ) + astrParts[ nPart ] + "\"";
+            strError = "has no part named \"" + m_apParts[ nEntry ]->strName + "\" for the materialMap (" +
+                       ( astrParts.empty() ? std::string( "it has no named parts" ) : "its parts are " + strList ) + ")";
+            return FALSE;
+        }
+    }
+    m_apLeafFaces.clear();
+    m_anLeafFace.clear();
+    return TRUE;
+}
+
+BOOL CMesh::MaterialMapFromJson( const IASLib::CJsonNode &oNode )
+{
+    const IASLib::CJsonNode *pMap = oNode.get( "materialMap" );
+
+    m_apParts.clear();
+    m_anPartEntry.clear();
+    if ( pMap == NULL )
+        return TRUE;
+
+    RayJson::CWhere oWhere( "materialMap" );
+
+    if ( ! pMap->isObject() )
+        return RayJson::Fail( "must be an object of part names, each { \"materials\": [...], \"bump\": {...} }" );
+
+    const IASLib::CObjectNode &oMap = static_cast<const IASLib::CObjectNode &>( *pMap );
+
+    for ( int nIndex = 0; nIndex < oMap.size(); nIndex++ )
+    {
+        static const char *const astrEntryFields[] = { "materials", "bump", NULL };
+        const std::string       &strName = oMap.fieldNameString( nIndex );
+        const IASLib::CJsonNode *pEntry = oMap.get( strName.c_str() );
+        RayJson::CWhere          oEntryWhere( strName.c_str() );
+        std::unique_ptr<SPart>   pPart( new SPart );
+
+        if ( pEntry == NULL || ! RayJson::OnlyFields( *pEntry, astrEntryFields ) )
+            return FALSE;
+        if ( pEntry->get( "materials" ) == NULL )
+            return RayJson::Fail( "needs \"materials\"" );
+        pPart->strName = strName;
+        if ( ! pPart->oMaterials.FromJson( *pEntry, "materials" ) )
+            return FALSE;
+
+        const IASLib::CJsonNode *pBump = pEntry->get( "bump" );
+
+        if ( pBump )
+        {
+            RayJson::CWhere           oBumpWhere( "bump" );
+            std::shared_ptr<CBumpMap> pNew( new CBumpMap );
+
+            if ( ! pNew->FromJson( *pBump ) )
+                return FALSE;
+            pPart->pBump = pNew;
+            pPart->bBump = TRUE;
+        }
+        m_apParts.push_back( std::move( pPart ) );
+    }
+    return TRUE;
+}
+
+void CMesh::MaterialMapToJson( IASLib::CObjectNode &oNode ) const
+{
+    if ( m_apParts.empty() )
+        return;
+
+    IASLib::CObjectNode *pMap = oNode.putObject( "materialMap" );
+
+    for ( const auto &pPart : m_apParts )
+    {
+        IASLib::CObjectNode *pEntry = pMap->putObject( pPart->strName.c_str() );
+
+        const_cast<CMaterialList &>( pPart->oMaterials ).ToJson( *pEntry->putArray( "materials" ) );
+        if ( pPart->bBump && pPart->pBump )
+            pPart->pBump->ToJson( *pEntry->putObject( "bump" ) );
+    }
+}
+
+void CMesh::SetOuterPlacement( FLT nScale, const CVector &oRotation, const CVector &oTranslation )
+{
+    m_bOuter = TRUE;
+    m_nOuterScale = nScale;
+    m_oOuterRotation = oRotation;
+    m_oOuterTranslation = oTranslation;
+}
+
+void CMesh::ApplyOuterToInline( void )
+{
+    if ( ! m_bOuter || IsFromFile() || ! m_pGeometry )
+        return;
+
+    const SGeometry      oOld = *m_pGeometry;
+    const FLT            nToRadians = PI / 180.0;
+    FLT                  nRX = m_oOuterRotation.GetX() * nToRadians;
+    FLT                  nRY = m_oOuterRotation.GetY() * nToRadians;
+    FLT                  nRZ = m_oOuterRotation.GetZ() * nToRadians;
+    std::vector<CVector> aoVertices( oOld.aoVertices );
+    std::vector<CVector> aoNormals( oOld.aoGivenNormals );
+
+    for ( CVector &oVertex : aoVertices )
+    {
+        FLT anValue[ 3 ] = { oVertex.GetX() * m_nOuterScale, oVertex.GetY() * m_nOuterScale, oVertex.GetZ() * m_nOuterScale };
+
+        RotateXYZ( anValue, nRX, nRY, nRZ );
+        oVertex.Set( anValue[ 0 ] + m_oOuterTranslation.GetX(), anValue[ 1 ] + m_oOuterTranslation.GetY(),
+                     anValue[ 2 ] + m_oOuterTranslation.GetZ() );
+    }
+    for ( CVector &oNormal : aoNormals )
+    {
+        FLT anValue[ 3 ] = { oNormal.GetX(), oNormal.GetY(), oNormal.GetZ() };
+
+        RotateXYZ( anValue, nRX, nRY, nRZ );
+        oNormal.Set( anValue[ 0 ], anValue[ 1 ], anValue[ 2 ] );
+    }
+    SetGeometry( aoVertices, oOld.anFaces, oOld.bSmooth, oOld.bDoubleSided, aoNormals, oOld.anUVs, oOld.aoGivenColors, oOld.abGivenHasColor );
+}
+
 void CMesh::ToJson( IASLib::CObjectNode &oNode )
 {
     if ( IsFromFile() )
@@ -1430,6 +1941,8 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
             oNode.put( "node", m_strNode.c_str() );
         if ( ! m_strGltfMaterial.empty() )
             oNode.put( "gltfMaterial", m_strGltfMaterial.c_str() );
+        if ( m_bNodeWorld )
+            oNode.put( "nodeFrame", "world" );
         if ( ! m_oGltfFiles.aoFiles.empty() )
         {
                 // A .gltf's buffers and images go into an archive beside it,
@@ -1459,11 +1972,14 @@ void CMesh::ToJson( IASLib::CObjectNode &oNode )
         oNode.put( "align", astrAligns[ m_nAlign ] );
         RayJson::PutVector( oNode, "translation", m_oTranslation );
         RayJson::PutBool( oNode, "smooth", m_bSmooth );
+        if ( m_nCreaseAngle > 0.0 )
+            RayJson::PutNumber( oNode, "creaseAngle", m_nCreaseAngle );
         RayJson::PutBool( oNode, "doubleSided", m_bDoubleSided );
         UVMapToJson( oNode );
         RayJson::PutColor( oNode, "color", m_oColor );
         m_oMaterials.ToJson( *oNode.putArray( "materials" ) );
         BumpToJson( oNode );
+        MaterialMapToJson( oNode );
         return;
     }
 
@@ -1615,6 +2131,21 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
          ! RayJson::GetString( oNode, "gltfMaterial", m_strGltfMaterial, FALSE ) )
         return FALSE;
 
+    std::string strFrame = m_bNodeWorld ? "world" : "local";
+
+    if ( ! RayJson::GetString( oNode, "nodeFrame", strFrame, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "creaseAngle", m_nCreaseAngle, FALSE ) )
+        return FALSE;
+    if ( strFrame != "local" && strFrame != "world" )
+        return RayJson::Fail( "nodeFrame must be \"local\" (the node in its own frame) or \"world\" (where its parents put it)" );
+    m_bNodeWorld = ( strFrame == "world" ) ? TRUE : FALSE;
+    if ( oNode.get( "nodeFrame" ) && m_strNode.empty() )
+        return RayJson::Fail( "nodeFrame is for a picked \"node\"" );
+    if ( m_nCreaseAngle < 0.0 || m_nCreaseAngle > 180.0 )
+        return RayJson::Fail( "creaseAngle must be from 0 (off) to 180 degrees" );
+    if ( ! MaterialMapFromJson( oNode ) )
+        return FALSE;
+
     if ( pData )
     {
             // The file's bytes, carried in a copy of the scene sent to a task.
@@ -1688,8 +2219,10 @@ BOOL CMesh::ModelFromJson( const IASLib::CJsonNode &oNode, BOOL bSmooth, BOOL bD
 BOOL CMesh::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "vertices", "faces", "normals", "uvs", "uvMap", "smooth", "doubleSided", "color", "materials", "bump",
-                                              "file", "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files", NULL };
-    static const char *const astrModelOnly[] = { "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files", NULL };
+                                              "file", "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files",
+                                              "creaseAngle", "nodeFrame", "materialMap", NULL };
+    static const char *const astrModelOnly[] = { "data", "scale", "fitSize", "rotation", "align", "translation", "node", "gltfMaterial", "files",
+                                                 "creaseAngle", "nodeFrame", "materialMap", NULL };
     static const char *const astrInlineOnly[] = { "vertices", "faces", "normals", "uvs", NULL };
     std::vector<CVector>    aoVertices;
     std::vector<int>        anFaces;

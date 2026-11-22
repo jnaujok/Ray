@@ -179,7 +179,8 @@ namespace
                            std::vector<int> &anCorners, std::vector<float> &afUVs, std::vector<int> &anMaterial,
                            std::string &strError ) const;
             void Matrix( const SBlock &oObject, double adOut[ 16 ], int nDepth ) const;
-            void Colors( const SBlock &oObject, const SBlock &oMesh, std::vector<CColor> &aoColors, std::vector<char> &abHave ) const;
+            void Colors( const SBlock &oObject, const SBlock &oMesh, std::vector<CColor> &aoColors, std::vector<char> &abHave,
+                         std::vector<std::string> &astrNames ) const;
     };
 
     BOOL CBlend::Parse( std::string &strError )
@@ -808,7 +809,8 @@ namespace
 
         // The viewport color of each material slot: the object's own
         // material where its slot says so, else the mesh's.
-    void CBlend::Colors( const SBlock &oObject, const SBlock &oMesh, std::vector<CColor> &aoColors, std::vector<char> &abHave ) const
+    void CBlend::Colors( const SBlock &oObject, const SBlock &oMesh, std::vector<CColor> &aoColors, std::vector<char> &abHave,
+                         std::vector<std::string> &astrNames ) const
     {
         int nMeshCount = 0, nObjectCount = 0;
 
@@ -822,6 +824,7 @@ namespace
 
         aoColors.assign( (size_t)( nCount > 0 ? nCount : 0 ), CColor( 1.0, 1.0, 1.0 ) );
         abHave.assign( aoColors.size(), 0 );
+        astrNames.assign( aoColors.size(), std::string() );
         for ( int i = 0; i < nCount && i < 1024; i++ )
         {
             bool          bObject = pBits && (size_t)i < pBits->nLength && m_pData[ pBits->nData + (size_t)i ] != 0;
@@ -832,6 +835,9 @@ namespace
 
             const SBlock *pMaterial = Block( Pointer( pList->nData + (size_t)i * m_nPointer ) );
             float         af[ 3 ];
+
+            if ( pMaterial )
+                astrNames[ (size_t)i ] = Name( pMaterial->nData );
 
             if ( pMaterial && GetFloats( pMaterial->nData, "Material", "r", af, 1 ) && GetFloats( pMaterial->nData, "Material", "g", af + 1, 1 ) &&
                  GetFloats( pMaterial->nData, "Material", "b", af + 2, 1 ) )
@@ -886,8 +892,9 @@ namespace
 
             std::vector<CColor> aoColors;
             std::vector<char>   abHave;
+            std::vector<std::string> astrNames;
 
-            Colors( oObject, *pMesh, aoColors, abHave );
+            Colors( oObject, *pMesh, aoColors, abHave, astrNames );
 
                 // Each different (vertex, UV) pair becomes a vertex.
             std::map<std::pair<int, std::pair<uint32_t, uint32_t> >, int> oJoined;
@@ -948,6 +955,23 @@ namespace
 
                 if ( bHave )
                     bAnyColor = true;
+
+                    // The face's part: its material's name.
+                int nPart = -1;
+
+                if ( nMaterial >= 0 && (size_t)nMaterial < astrNames.size() && ! astrNames[ (size_t)nMaterial ].empty() )
+                {
+                    for ( size_t nAt = 0; nAt < oModel.astrParts.size() && nPart < 0; nAt++ )
+                    {
+                        if ( oModel.astrParts[ nAt ] == astrNames[ (size_t)nMaterial ] )
+                            nPart = (int)nAt;
+                    }
+                    if ( nPart < 0 )
+                    {
+                        nPart = (int)oModel.astrParts.size();
+                        oModel.astrParts.push_back( astrNames[ (size_t)nMaterial ] );
+                    }
+                }
                 for ( size_t k = 1; k + 1 < anFaceVertices.size(); k++ )
                 {
                     int a = anFaceVertices[ 0 ], b = anFaceVertices[ k ], c = anFaceVertices[ k + 1 ];
@@ -959,6 +983,7 @@ namespace
                     oModel.anFaces.push_back( b );
                     oModel.aoFaceColors.push_back( oColor );
                     oModel.abHasColor.push_back( bHave ? 1 : 0 );
+                    oModel.anFacePart.push_back( nPart );
                 }
             }
             bAny = true;
@@ -988,6 +1013,8 @@ namespace
             oModel.aoFaceColors.clear();
             oModel.abHasColor.clear();
         }
+        if ( oModel.astrParts.empty() )
+            oModel.anFacePart.clear();
         return TRUE;
     }
 }

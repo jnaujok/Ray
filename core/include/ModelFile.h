@@ -65,6 +65,8 @@
 #include <utility>
 #include <vector>
 
+#include "ImageTexture.h"
+
 namespace ModelFile
 {
     struct SModel
@@ -76,6 +78,19 @@ namespace ModelFile
         std::vector<CColor>         aoFaceColors;   // one a face, or empty if the file has no colors
         std::vector<unsigned char>  abHasColor;     // whether each face has its color (with aoFaceColors)
         int                         nSkippedImages = 0;     // glTF base color images Ray couldn't read
+            // Parts: the material each face came from, by name (a glTF
+            // material's or a Blender material's), for a mesh's materialMap.
+        std::vector<std::string>    astrParts;      // the names, in the order first met
+        std::vector<int>            anFacePart;     // one a face (an index into astrParts, or -1), or empty
+            // Base color images, for sampling through the faces' own
+            // coordinates (faceColors with "sample": "uv"): each face's image
+            // (an index into apImages, or -1), its color factor, and the
+            // image coordinates at its three corners (u, v with v down the
+            // image, as glTF gives them).
+        std::vector< std::shared_ptr<const CImageTexture::SImage> > apImages;
+        std::vector<int>            anFaceImage;    // one a face, or empty if no face has an image
+        std::vector<CColor>         aoFaceFactor;   // one a face, with anFaceImage
+        std::vector<FLT>            anFaceImageUVs; // six a face, with anFaceImage
     };
 
         /// The other files a .gltf names (buffers and PNG images), by the
@@ -97,8 +112,10 @@ namespace ModelFile
         /// Reads glTF. pFiles holds the files a .gltf names (NULL: none);
         /// strNode, if not empty, picks one node, and strMaterial, if not
         /// empty, only the primitives whose material has that name.
+        /// bWorld places a picked node by its own and its parents'
+        /// transforms (as it sits in the scene) instead of in its own frame.
     BOOL        ReadGltf( const std::string &strData, const SGltfFiles *pFiles, const std::string &strNode,
-                          const std::string &strMaterial, SModel &oModel, std::string &strError );
+                          const std::string &strMaterial, SModel &oModel, std::string &strError, BOOL bWorld = FALSE );
         /// The files a glTF model names besides itself: its buffers' and its
         /// PNG images' URIs (data: URIs left out). FALSE for a URI that leaves
         /// its folder, or JSON that isn't glTF.

@@ -88,6 +88,26 @@ namespace RayJson
                         CBaseDirectory( const CBaseDirectory & );
             CBaseDirectory &operator =( const CBaseDirectory & );
     };
+        /// While one exists, the files a scene names are kept in (and read
+        /// from) an archive under this folder: an included scene's files sit
+        /// beside it, as they do on disk, so extracting the archive puts
+        /// them where the included scene looks. Folders nest; bReset starts
+        /// again from the top (reading a scene inside its own archive).
+    class CArchiveFolder
+    {
+        public:
+                        CArchiveFolder( const std::string &strFolder, BOOL bReset = FALSE );
+                       ~CArchiveFolder( void );
+                /// A file's name in the archive.
+            static std::string Name( const std::string &strName );
+                /// The folder an included scene's files go in, from its name
+                /// (empty for one in the same folder, or one outside it).
+            static std::string FolderOf( const std::string &strName );
+        private:
+            std::string m_strPrevious;
+                        CArchiveFolder( const CArchiveFolder & );
+            CArchiveFolder &operator =( const CArchiveFolder & );
+    };
         /// A file name from a scene, relative to the scene file's
         /// directory, as an absolute path.
     std::string     ResolvePath( const std::string &strPath );

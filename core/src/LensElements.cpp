@@ -73,6 +73,7 @@ CLensElements::CLensElements( void ) :
     m_bFans( TRUE ),
     m_nRays( 7 ),
     m_nTubeRadius( 0.25 ),
+    m_nFanOpacity( 0.5 ),
     m_nLead( 0.0 ),
     m_nSensorWidth( 0.0 ),
     m_nElements( 0 ),
@@ -342,11 +343,17 @@ BOOL CLensElements::Build( std::string &strError )
                     CVector        oColor( aoColors[ nColor ] );
                     std::string    strColor = Rgb( oColor.GetX(), oColor.GetY(), oColor.GetZ() );
 
+                    std::string strMaterials = "[{\"type\": \"ambient\", \"influence\": " + Number( m_nFanOpacity ) +
+                                               ", \"color\": " + strColor + "}";
+
+                    if ( m_nFanOpacity < 1.0 )
+                        strMaterials += ", {\"type\": \"transparent\", \"influence\": " + Number( 1.0 - m_nFanOpacity ) +
+                                        ", \"color\": [1, 1, 1], \"indexOfRefraction\": 1}";
+                    strMaterials += "]";
                     astrParts.push_back( "{\"type\": \"sweep\", \"path\": [" + strPath + "], \"radius\": " +
                                          Number( m_nTubeRadius * m_nScale ) +
                                          ", \"segments\": 8, \"smooth\": false, \"capped\": true, \"color\": " + strColor +
-                                         ", \"materials\": [{\"type\": \"ambient\", \"influence\": 1, \"color\": " + strColor +
-                                         "}]}" );
+                                         ", \"materials\": " + strMaterials + "}" );
                     m_aaoRayPaths.push_back( aoPath );
                     m_nRayCount++;
                 }
@@ -526,6 +533,7 @@ void CLensElements::ToJson( IASLib::CObjectNode &oNode )
     for ( size_t nIndex = 0; nIndex < m_anFields.size(); nIndex++ )
         pFields->add( (double)m_anFields[ nIndex ] );
     RayJson::PutNumber( oNode, "tubeRadius", m_nTubeRadius );
+    RayJson::PutNumber( oNode, "fanOpacity", m_nFanOpacity );
     if ( m_nLead > 0.0 )
         RayJson::PutNumber( oNode, "lead", m_nLead );
     if ( m_nSensorWidth > 0.0 )
@@ -535,7 +543,7 @@ void CLensElements::ToJson( IASLib::CObjectNode &oNode )
 BOOL CLensElements::FromJson( const IASLib::CJsonNode &oNode )
 {
     static const char *const astrFields[] = { "prescription", "fNumber", "scale", "position", "rotation", "cutaway", "barrel",
-                                              "fans", "rays", "fields", "tubeRadius", "lead", "sensorWidth", NULL };
+                                              "fans", "rays", "fields", "tubeRadius", "fanOpacity", "lead", "sensorWidth", NULL };
 
     Clear();
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
@@ -549,6 +557,7 @@ BOOL CLensElements::FromJson( const IASLib::CJsonNode &oNode )
          ! RayJson::GetBool( oNode, "fans", m_bFans, FALSE ) ||
          ! RayJson::GetInt( oNode, "rays", m_nRays, 1, 64, FALSE ) ||
          ! RayJson::GetNumber( oNode, "tubeRadius", m_nTubeRadius, FALSE ) ||
+         ! RayJson::GetNumber( oNode, "fanOpacity", m_nFanOpacity, FALSE ) ||
          ! RayJson::GetNumber( oNode, "lead", m_nLead, FALSE ) ||
          ! RayJson::GetNumber( oNode, "sensorWidth", m_nSensorWidth, FALSE ) )
         return FALSE;
@@ -558,6 +567,8 @@ BOOL CLensElements::FromJson( const IASLib::CJsonNode &oNode )
         return RayJson::Fail( "scale must be more than 0" );
     if ( ! ( m_nTubeRadius > 0.0 ) )
         return RayJson::Fail( "tubeRadius must be more than 0" );
+    if ( ! ( m_nFanOpacity > 0.0 ) || m_nFanOpacity > 1.0 )
+        return RayJson::Fail( "fanOpacity must be more than 0 and at most 1" );
     if ( m_nLead < 0.0 || m_nSensorWidth < 0.0 )
         return RayJson::Fail( "lead and sensorWidth can't be less than 0" );
 
