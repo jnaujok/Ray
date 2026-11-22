@@ -1,8 +1,11 @@
 name: Release
 
-# Builds the programs for Linux, macOS and Windows and publishes them as a GitHub Release
-# (a prerelease: these are alphas). Pushing a 2026-alpha-* tag starts it; an older tag can be
-# built by hand: Actions > Release > Run workflow, or `gh workflow run release.yml -f tag=<tag>`.
+# Builds the programs for Linux, macOS and Windows, a .deb, an .rpm and a Flatpak bundle, tests the
+# packages in clean containers, and publishes it all as a GitHub Release (a prerelease: these are
+# alphas). Pushing a 2026-alpha-* tag starts it; an older tag can be built by hand: Actions >
+# Release > Run workflow, or `gh workflow run release.yml -f tag=<tag>`. To try the workflow on a
+# branch without publishing: `gh workflow run release.yml --ref <branch> -f tag=<a name> -f ref=<branch>
+# -f publish=false`.
 
 on:
   push:
@@ -10,20 +13,49 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'The tag to build and release (it must already exist)'
+        description: 'The tag to build and release (it must already exist, unless publish is off)'
         required: true
+      ref:
+        description: 'Build this branch or commit instead of the tag (for trying the workflow)'
+        required: false
+        default: ''
+      publish:
+        description: 'Publish the GitHub Release'
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: write
 
 env:
   TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  SOURCE: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref != '' && inputs.ref || inputs.tag) || github.ref_name }}
 
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      stage: ${{ steps.version.outputs.stage }}
+    steps:
+      # 2026-alpha-0.21.2 is version 0.21.2, stage alpha: the packages carry 0.21.2~alpha (deb)
+      # and 0.21.2-0.alpha (rpm), which sort before a final 0.21.2.
+      - id: version
+        run: |
+          if [[ "$TAG" =~ ^[0-9]{4}-([a-z]+)-([0-9]+(\.[0-9]+)*)$ ]]; then
+            echo "stage=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "version=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=test" >> "$GITHUB_OUTPUT"
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
@@ -41,7 +73,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ env.SOURCE }}
 
       - name: Install GTK and OpenGL
         if: runner.os == 'Linux'
@@ -83,13 +115,6 @@ jobs:
           cmake -S . -B build-editor -DRAY_BUILD_TESTS=OFF -DRAY_USE_SYSTEM_WXWIDGETS=OFF -DRAY_BUILD_EDITOR=ON
           cmake --build build-editor --config Release --target ray-editor --parallel 4
 
-      # The MFC scene editor uses MFC in a shared DLL, as CI builds it.
-      - name: Build the MFC scene editor
-        if: runner.os == 'Windows'
-        run: |
-          cmake -S . -B build-gui -DRAY_BUILD_GUI=ON -DRAY_BUILD_TESTS=OFF
-          cmake --build build-gui --config Release --target Ray --parallel 4
-
       - name: Package
         shell: bash
         run: |
@@ -100,7 +125,6 @@ jobs:
               cp "$(find build -type f -name "$program.exe" | head -1)" "dist/$NAME/"
             done
             cp "$(find build-editor -type f -name 'ray-editor.exe' | head -1)" "dist/$NAME/"
-            cp "$(find build-gui -type f -name 'Ray.exe' | head -1)" "dist/$NAME/"
           else
             for program in raythrower rayengine; do
               cp "$(find build -type f -name "$program" -perm -u+x | head -1)" "dist/$NAME/"
@@ -108,7 +132,11 @@ jobs:
             if [ "$RUNNER_OS" = "macOS" ]; then
               cp -R "$(find build -name 'ray-editor.app' -type d | head -1)" "dist/$NAME/"
             else
-              cp "$(find build -type f -name 'ray-editor' -perm -u+x | head -1)" "dist/$NAME/"
+              # The editor behind a launcher that checks for GTK, OpenGL and a display first.
+              mkdir -p "dist/$NAME/bin"
+              cp "$(find build -type f -name 'ray-editor' -perm -u+x | head -1)" "dist/$NAME/bin/ray-editor-bin"
+              cp packaging/linux/ray-editor.sh "dist/$NAME/ray-editor"
+              chmod +x "dist/$NAME/ray-editor"
             fi
           fi
           cp LICENSE NOTICE README.md CHANGELOG.md "dist/$NAME/"
@@ -138,9 +166,159 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  # A .deb built on the oldest Ubuntu runner, so its C library suits Ubuntu 22.04 and Debian 12
+  # and later.
+  deb:
+    name: .deb
+    needs: version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE }}
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libgl1-mesa-dev libglu1-mesa-dev lintian
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON -DRAY_BUILD_TESTS=OFF \
+                -DRAY_USE_SYSTEM_WXWIDGETS=OFF -DCMAKE_INSTALL_PREFIX=/usr \
+                -DRAY_PACKAGE_VERSION=${{ needs.version.outputs.version }} -DRAY_PACKAGE_STAGE=${{ needs.version.outputs.stage }}
+          cmake --build build --parallel 4
+      - name: Package
+        run: |
+          cd build
+          cpack -G DEB
+          mkdir -p ../dist
+          cp ray_*.deb "../dist/ray-${TAG}-amd64.deb"
+          cd ../dist
+          dpkg-deb --info "ray-${TAG}-amd64.deb"
+          sha256sum "ray-${TAG}-amd64.deb" > "ray-${TAG}-amd64.deb.sha256"
+      - name: Lintian
+        run: lintian --fail-on error --tag-display-limit 0 dist/*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-deb
+          path: dist/
+          if-no-files-found: error
+
+  # An .rpm built on Rocky Linux 9, for RHEL, Rocky and Alma 9 and later, and Fedora.
+  rpm:
+    name: .rpm
+    needs: version
+    runs-on: ubuntu-latest
+    container: rockylinux:9
+    steps:
+      - name: Install tools
+        run: dnf install -y gcc-c++ cmake make git gtk3-devel mesa-libGL-devel mesa-libGLU-devel rpm-build gzip
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE }}
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON -DRAY_BUILD_TESTS=OFF \
+                -DRAY_USE_SYSTEM_WXWIDGETS=OFF -DRAY_USE_CCACHE=OFF -DCMAKE_INSTALL_PREFIX=/usr \
+                -DRAY_PACKAGE_VERSION=${{ needs.version.outputs.version }} -DRAY_PACKAGE_STAGE=${{ needs.version.outputs.stage }}
+          cmake --build build --parallel 4
+      - name: Package
+        run: |
+          cd build
+          cpack -G RPM
+          mkdir -p ../dist
+          cp ray-*.rpm "../dist/ray-${TAG}.x86_64.rpm"
+          cd ../dist
+          rpm -qip "ray-${TAG}.x86_64.rpm"
+          rpm -qpR "ray-${TAG}.x86_64.rpm"
+          sha256sum "ray-${TAG}.x86_64.rpm" > "ray-${TAG}.x86_64.rpm.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-rpm
+          path: dist/
+          if-no-files-found: error
+
+  # Each package installed in clean containers, its dependencies pulled in by the package manager,
+  # then a small render.
+  packages-test:
+    name: Install on ${{ matrix.image }}
+    needs: [deb, rpm]
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ubuntu:22.04
+            kind: deb
+          - image: debian:12
+            kind: deb
+          - image: rockylinux:9
+            kind: rpm
+          - image: fedora:latest
+            kind: rpm
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-${{ matrix.kind }}
+          path: dist
+      - name: Install
+        run: |
+          if [ "${{ matrix.kind }}" = "deb" ]; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y ./dist/*.deb
+          else
+            dnf install -y ./dist/*.rpm
+            if [ "${{ matrix.image }}" = "fedora:latest" ]; then
+              dnf install -y rpmlint && (rpmlint dist/*.rpm || true)
+            fi
+          fi
+      - name: Run
+        run: |
+          raythrower --help | head -3
+          raythrower /usr/share/ray/scenes/scan_test.ray -q --size 64x48 -o /tmp/smoke.raw
+          test -s /tmp/smoke.raw
+          missing=$(ldd /usr/bin/ray-editor | grep "not found" || true)
+          if [ -n "$missing" ]; then echo "ray-editor is missing libraries:"; echo "$missing"; exit 1; fi
+          test -f /usr/share/applications/io.github.jnaujok.Ray.desktop
+          echo "installed and rendered on ${{ matrix.image }}"
+
+  flatpak:
+    name: Flatpak
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE }}
+      - name: Install flatpak-builder and the GNOME runtime
+        run: |
+          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+          # Ubuntu 24.04 keeps unprivileged user namespaces from bubblewrap, which flatpak-builder needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Build
+        run: |
+          flatpak-builder --user --install-deps-from=flathub --force-clean --repo=repo build-dir \
+                          packaging/flatpak/io.github.jnaujok.Ray.yml
+          mkdir -p dist
+          flatpak build-bundle repo "dist/ray-${TAG}.flatpak" io.github.jnaujok.Ray \
+                               --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          cd dist
+          sha256sum "ray-${TAG}.flatpak" > "ray-${TAG}.flatpak.sha256"
+          ls -la
+      - name: Try it
+        run: |
+          flatpak install --user -y --noninteractive "dist/ray-${TAG}.flatpak"
+          flatpak run --command=raythrower io.github.jnaujok.Ray /app/share/ray/scenes/scan_test.ray -q --size 64x48 -o /tmp/smoke.raw
+          test -s /tmp/smoke.raw
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-flatpak
+          path: dist/
+          if-no-files-found: error
+
   release:
     name: GitHub Release
-    needs: build
+    needs: [build, deb, rpm, packages-test, flatpak]
+    if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
     steps:
       # The workflow's own commit, for its scripts; the notes come from the tag's CHANGELOG.
@@ -151,7 +329,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: release-*
+          pattern: '{release,package}-*'
           merge-multiple: true
 
       - name: Release notes and checksums
@@ -162,7 +340,7 @@ jobs:
           ls -la dist
           head -20 notes.md
 
-      - name: Create the release and upload the archives
+      - name: Create the release and upload the files
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -172,5 +350,6 @@ jobs:
           else
             gh release edit "$TAG" --prerelease --title "Ray $TAG" --notes-file notes.md
           fi
-          gh release upload "$TAG" --clobber dist/*.tar.gz dist/*.zip dist/*.sha256 dist/SHA256SUMS.txt
+          gh release upload "$TAG" --clobber dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/*.flatpak \
+                                             dist/*.sha256 dist/SHA256SUMS.txt
           gh release view "$TAG"

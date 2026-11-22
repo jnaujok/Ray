@@ -1,0 +1,17 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Ray
+Upstream-Contact: https://github.com/jnaujok/Ray
+Source: https://github.com/jnaujok/Ray
+Comment: The programs link IASLib (LGPL-3.0) and, in ray-editor, wxWidgets (wxWindows Library
+ Licence 3.1) statically. The sample scenes include third-party models, fonts and textures under
+ their own licenses (CC0, SIL Open Font License, public domain). See NOTICE beside this file.
+
+Files: *
+Copyright: 1996-2026 Jeffrey R. Naujok
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+ this file except in compliance with the License. You may obtain a copy of the
+ License at https://www.apache.org/licenses/LICENSE-2.0 .
+ .
+ On Debian systems, the complete text of the Apache License, Version 2.0 can be
+ found in /usr/share/common-licenses/Apache-2.0.

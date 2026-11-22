@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ray's icon: a lens bending three rays to a focus. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect x="8" y="8" width="240" height="240" rx="44" fill="#141a26"/>
+  <g stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M28 82 L114 82 L222 128" stroke="#ff4f3f"/>
+    <path d="M28 128 L222 128" stroke="#ffd23f"/>
+    <path d="M28 174 L114 174 L222 128" stroke="#4f8cff"/>
+  </g>
+  <path d="M104 40 Q150 128 104 216 Q78 128 104 40 Z" fill="#8ec5ff" fill-opacity="0.55" stroke="#cfe6ff" stroke-width="5"/>
+  <circle cx="222" cy="128" r="9" fill="#ffffff"/>
+</svg>

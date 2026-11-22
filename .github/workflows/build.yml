@@ -36,6 +36,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Linux archive's ray-editor launcher (tests/launcher_test.sh runs it in ctest too).
+      - name: Shellcheck the launcher
+        if: runner.os == 'Linux' && matrix.cc == 'gcc'
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck packaging/linux/ray-editor.sh tests/launcher_test.sh
+
       - name: Configure
         shell: bash
         run: |

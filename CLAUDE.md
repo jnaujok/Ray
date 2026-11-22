@@ -208,6 +208,13 @@ ctest --preset full             # every test
   and `bump`. Add the type to `editor/logic` (`Tessellator.cpp`, `EditorDocument.cpp`) too.
 - **Adding a source file:** add it to `RAY_CORE_SOURCES` in `CMakeLists.txt` (core), or to
   `cmake/RayEditor.cmake` / `editor/CMakeLists.txt` (editor).
+- **Packaging:** `cmake/RayPackaging.cmake` installs everything in the `ray` component (so the
+  packages leave out IASLib's and wxWidgets' own install rules) and configures CPack for `.deb`
+  and `.rpm`; `packaging/` holds the desktop entry, icon and AppStream metadata (shared by the
+  packages and the Flatpak, all named `io.github.jnaujok.Ray`), the Linux archive's `ray-editor`
+  launcher and the Flatpak manifest. A new install rule needs `COMPONENT ray`. The release
+  workflow tests the packages in clean containers; locally, `docker run` an `ubuntu:22.04` or
+  `rockylinux:9` and install the package to check it.
 - **Don't modify** `legacy/` (historical project files).
 
 ## Repository policy

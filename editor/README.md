@@ -26,6 +26,19 @@ build/editor/ray-editor scenes/torture_test.ray     # macOS: build/editor/ray-ed
 - Without `RAY_BUILD_EDITOR`, the editor's toolkit-free logic still builds, and the
   `editor_logic` test checks it.
 
+## Ready-built
+
+The releases have it for Linux, macOS and Windows (see the README's Downloads section). On Linux:
+
+- **The archive:** `ray-editor` is a small launcher script ([`packaging/linux/ray-editor.sh`](../packaging/linux/ray-editor.sh))
+  for `bin/ray-editor-bin`. Before starting the editor it checks with `ldd` that GTK 3 and OpenGL
+  are installed, and if not it names the missing libraries and prints the commands to install them
+  (`apt` for Debian and Ubuntu, `dnf` for Fedora and RHEL 8 and later, `yum` for RHEL 7). Without
+  that check a missing library stops the program before it can say anything. It also says so when
+  there is no display (no `DISPLAY` or `WAYLAND_DISPLAY`). The `editor_launcher` test checks it.
+- **The `.deb`, `.rpm` and Flatpak** bring GTK and OpenGL with them, and add *Ray Editor* to the
+  desktop's menu (`io.github.jnaujok.Ray.desktop`).
+
 ## Using it
 
 The window has the scene tree on the left, the view in the middle and the selected part's

@@ -192,13 +192,17 @@ target_link_libraries(raythrower PRIVATE ray_core)
 add_executable(rayengine rayengine/main.cpp)
 target_link_libraries(rayengine PRIVATE ray_core)
 
-install(TARGETS raythrower rayengine RUNTIME DESTINATION bin)
 
 # ---------------------------------------------------------------------------
 # Cross-platform scene editor (wxWidgets): its logic always, the program with
 # RAY_BUILD_EDITOR
 # ---------------------------------------------------------------------------
 add_subdirectory(editor)
+
+# ---------------------------------------------------------------------------
+# Installing and packaging (.deb and .rpm with CPack)
+# ---------------------------------------------------------------------------
+include(cmake/RayPackaging.cmake)
 
 # ---------------------------------------------------------------------------
 # Tests

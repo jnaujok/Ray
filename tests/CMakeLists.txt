@@ -628,5 +628,15 @@ endif()
 add_test(NAME editor_logic COMMAND editor_test ${PROJECT_SOURCE_DIR}/scenes ${RENDER_DIR})
 set_tests_properties(editor_logic PROPERTIES TIMEOUT 300)
 
+# The Linux release archive's ray-editor launcher: it names missing GTK and
+# OpenGL libraries with the commands to install them, and says when there
+# is no display.
+if(UNIX AND NOT APPLE)
+    add_test(NAME editor_launcher
+             COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher_test.sh ${PROJECT_SOURCE_DIR}/packaging/linux/ray-editor.sh
+                        ${RENDER_DIR}/launcher)
+    set_tests_properties(editor_launcher PROPERTIES TIMEOUT 120)
+endif()
+
 # raythrower --spawn starts the rayengine next to it.
 add_dependencies(raythrower rayengine)

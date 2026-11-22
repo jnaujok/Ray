@@ -86,4 +86,4 @@ if(APPLE)
     # The view's OpenGL 1.x calls are deprecated on macOS, but still there.
     target_compile_definitions(ray-editor PRIVATE GL_SILENCE_DEPRECATION)
 endif()
-install(TARGETS ray-editor RUNTIME DESTINATION bin BUNDLE DESTINATION .)
+install(TARGETS ray-editor RUNTIME DESTINATION bin COMPONENT ray BUNDLE DESTINATION . COMPONENT ray)
