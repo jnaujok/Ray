@@ -6,22 +6,13 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Box.h"
 #include "SceneJson.h"
 
 #include <math.h>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
     // Turns anVector about x, then y, then z, by the angles (radians).
 static void RotateXYZ( FLT anVector[ 3 ], FLT nX, FLT nY, FLT nZ )
@@ -58,15 +49,6 @@ CBox::~CBox( void )
 {
 }
 
-#ifdef RAY_GUI
-void CBox::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hBox;
-
-    hBox = pTree->AddObject( this, 10, "Box", hUnder );
-    CObjects::MatToTree( pTree, hBox );
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CBox, "box" );
 

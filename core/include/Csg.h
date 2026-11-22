@@ -89,9 +89,6 @@ class CCsg : public CObjects
         virtual CObjects       *HitPart( BOOL &bFlip ) { bFlip = m_bHitFlip; return m_pHitLeaf ? m_pHitLeaf : (CObjects *)this; }
         virtual BOOL            IsClosed( void ) { return TRUE; }
         virtual CColor          Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
-#ifdef RAY_GUI
-        virtual void            ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __CSG_H__

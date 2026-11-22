@@ -1,9 +1,4 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-    #include "resource.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Mesh.h"
 #include "ModelFile.h"
@@ -16,11 +11,6 @@
 #include <map>
 #include <mutex>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 DYNAMIC_IMPLEMENTS( CMesh, "mesh" );
 
@@ -1406,15 +1396,6 @@ void CMesh::SetTextureFrame( const std::shared_ptr<const STextureFrame> &pFrame 
     m_anLeafFace.clear();
 }
 
-#ifdef RAY_GUI
-void CMesh::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hMesh;
-
-    hMesh = pTree->AddObject( this, 24, "Mesh", hUnder );
-    CObjects::MatToTree( pTree, hMesh );
-}
-#endif
 
 void CMesh::UVMapToJson( IASLib::CObjectNode &oNode ) const
 {

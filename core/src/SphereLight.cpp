@@ -7,21 +7,12 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "SphereLight.h"
 #include "Sampling.h"
 #include "SceneJson.h"
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 #define MAXIMUM_LIGHT_SAMPLES   256
 
@@ -66,12 +57,6 @@ BOOL CSphereLight::SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoint )
     return TRUE;
 }
 
-#ifdef RAY_GUI
-void CSphereLight::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddObject( this, 6, "Sphere Light", hUnder );
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CSphereLight, "sphereLight" );
 

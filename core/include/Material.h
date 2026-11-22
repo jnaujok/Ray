@@ -1,9 +1,6 @@
 #ifndef __MATERIAL_H__
 #define __MATERIAL_H__
 
-#ifdef RAY_GUI
-    #include "SceneTreeView.h"
-#endif
 
 #include "Color.h"
 #include "Rays.h"
@@ -63,11 +60,6 @@ class CMaterial
         virtual void        ToJson( IASLib::CObjectNode &oNode ) = 0;
         virtual BOOL        FromJson( const IASLib::CJsonNode &oNode ) = 0;
         virtual void        SetColor( CColor &oColor ) = 0;
-#ifdef RAY_GUI
-        virtual void        Properties( void ) = 0;
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder ) = 0;
-        virtual void        ToList( CListCtrl &oList, int nIndex, FLT nInfluence ) = 0;
-#endif
 };
 
 
@@ -116,9 +108,6 @@ class CDynMaterialList
         CMaterial          *Create( LPCSTR strJsonType );
             // The JSON "type" of a material class (its ClassType()), or NULL.
         LPCSTR              JsonTypeOf( LPCSTR strClassType );
-#ifdef RAY_GUI
-        void                LoadAddList( CListCtrl &oList );
-#endif
 };
 
 extern CDynMaterialList         *g_pMaterialList;   

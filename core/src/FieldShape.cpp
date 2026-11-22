@@ -7,22 +7,13 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "FieldShape.h"
 #include "SceneJson.h"
 
 #include <math.h>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 CFieldShape::CFieldShape( void ) :
     m_nScale( 1.0 )

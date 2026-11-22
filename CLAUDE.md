@@ -18,7 +18,7 @@ Guidance for Claude Code when working in this repository.
 ## Project overview
 
 Ray is a distributed ray tracer from 1997, rebuilt on [IASLib](https://github.com/jnaujok/IASLib)
-v3.0. It is made of four programs and a shared core:
+v3.0. It is made of three programs and a shared core:
 
 | Part | Location | Platform |
 |------|----------|----------|
@@ -26,16 +26,14 @@ v3.0. It is made of four programs and a shared core:
 | `raythrower`: command-line master (threads, or engines over TCP) | `raythrower/` | Windows, Linux, macOS |
 | `rayengine`: networked tracing task | `rayengine/` | Windows, Linux, macOS |
 | `ray-editor`: cross-platform scene editor (wxWidgets) | `editor/` (`logic/` toolkit-free, `gui/` wxWidgets) | Windows, Linux, macOS |
-| `Ray.exe`: MFC scene editor | `src/`, `include/`, `res/` | Windows only (MFC, MBCS) |
 
-The core is compiled twice: once as the `ray_core` OBJECT library for the command-line programs
-and `ray-editor`, and again inside the MFC target with `RAY_GUI` defined, which turns on the
-tree-view and dialog code in the scene classes. Keep `ray_core` an OBJECT library: object and
-material classes register themselves from static constructors, which a static library would let
-the linker drop.
+The core is the `ray_core` OBJECT library, used by the command-line programs and `ray-editor`.
+Keep it an OBJECT library: object and material classes register themselves from static
+constructors, which a static library would let the linker drop. The core includes no toolkit
+headers. The 1997 MFC scene editor (`Ray.exe`) was retired in 2026-alpha-0.21.2; its last version
+is the `mfc-editor-final` tag, and the core no longer has its `RAY_GUI` tree-view and dialog code.
 
-`ray-editor` uses `ray_core` without `RAY_GUI`: it must never include MFC headers or use the
-`RAY_GUI` code. Its logic (`editor/logic/`, the `ray_editor_logic` OBJECT library: document,
+`ray-editor`'s logic (`editor/logic/`, the `ray_editor_logic` OBJECT library: document,
 undo, tessellation, the view's camera, picking, the progressive render) includes no wxWidgets
 headers, is always built, and is tested by `editor_test` without a display; only `editor/gui/`
 uses wxWidgets. Its view's camera must aim rays exactly as `CCamera::RayDirection` does (the
@@ -54,7 +52,6 @@ ctest --preset full             # every test
 - IASLib is fetched by CMake (`FetchContent`, pinned to commit `de038c0`, the one that added
   SJSON, until IASLib tags a release with it). To use a local checkout, pass
   `-DFETCHCONTENT_SOURCE_DIR_IASLIB=/path/to/IASLib`. SJSON's LZ4 and zstd support is kept off.
-- The GUI needs MSVC with MFC: `-DRAY_BUILD_GUI=ON`, then build the `Ray` target.
 - The cross-platform editor: `-DRAY_BUILD_EDITOR=ON`, then build the `ray-editor` target. CMake
   uses an installed wxWidgets (`find_package`) or fetches 3.2.9 (pinned by SHA-256 in
   `cmake/RayEditor.cmake`) and builds only `base`, `core`, `gl` and `propgrid`, static. Linux needs
@@ -135,26 +132,25 @@ ctest --preset full             # every test
 - **If JSON output changes**, re-save the sample scenes with
   `raythrower scenes/<scene>.ray --save scenes/<scene>.ray` and check the renders still match.
 - Use IASLib for strings, streams, files, threads, sockets, and JSON rather than adding new
-  hand-written versions. In core headers write `IASLib::CString` in full: the GUI also sees MFC's
-  `CString`.
+  hand-written versions. In core headers write `IASLib::CString` in full.
 - Avoid names that are Win32 macros (`SendMessage`, `GetMessage`, `CreateWindow`, ...).
 - **Never call `min` or `max` unparenthesized.** Windows headers define `min` and `max` as macros,
-  and the MFC build sees them, so `std::min(a, b)`, `std::max(...)` and
-  `std::numeric_limits<T>::max()` break the Windows GUI build. Write `(std::min)(a, b)`,
-  `(std::max)(a, b)` and `(std::numeric_limits<T>::max)()` in every file under `core/`, `src/`,
-  `include/` and `editor/`. The `lint_minmax` test checks this on every platform.
+  and IASLib's headers and the wxWidgets editor bring them into the Windows builds, so
+  `std::min(a, b)`, `std::max(...)` and `std::numeric_limits<T>::max()` break there. Write
+  `(std::min)(a, b)`, `(std::max)(a, b)` and `(std::numeric_limits<T>::max)()` in every file under
+  `core/`, `editor/`, `raythrower/`, `rayengine/` and `tests/`. The `lint_minmax` test checks this
+  on every platform.
 
 ## Conventions
 
 - **File names:** source and header files are PascalCase after the class they define, without
-  the MFC `C` prefix (`CSpherePropertiesDlg` → `SpherePropertiesDlg.h`). Exceptions follow
-  Windows convention: `StdAfx.cpp`/`StdAfx.h`, `resource.h`, `MainFrm`, `ChildFrm`, and `main.cpp`.
-  Data and scene files are snake_case.
+  the class's `C` prefix (`CSphereLight` → `SphereLight.h`); `main.cpp` is the exception. Data and
+  scene files are snake_case.
 - **Extensions:** `.cpp` and `.h`.
 - **Includes:** `#include` names must match the file name's case exactly, because Linux is
   case-sensitive. Use include paths rather than `..\` or `../` relative includes.
-- **Line endings:** LF everywhere except `*.dsp`, `*.dsw`, `*.clw`, and `*.bat`, which must stay
-  CRLF because Visual C++ 6 and `cmd.exe` need it. `.gitattributes` enforces this.
+- **Line endings:** LF everywhere except `*.dsp`, `*.dsw`, `*.clw`, and `*.bat` (in `legacy/`),
+  which must stay CRLF because Visual C++ 6 and `cmd.exe` need it. `.gitattributes` enforces this.
 - **New ways of sampling pixels** (anti-aliasing and the like) are `CPixelSampler` subclasses
   attached to the camera, listed in the table in `core/src/PixelSampler.cpp`. They sample one
   tile at a time (`Begin( left, top, width, height )`) in image coordinates; keep sampling inside
@@ -210,8 +206,8 @@ ctest --preset full             # every test
   `LocalTriangles` (for `ray-editor`'s preview) in that frame, and list their own JSON fields; the
   base class turns rays and points, and reads and writes `center`, `rotation`, `color`, `materials`
   and `bump`. Add the type to `editor/logic` (`Tessellator.cpp`, `EditorDocument.cpp`) too.
-- **Adding a source file:** add it to `RAY_CORE_SOURCES` in `CMakeLists.txt` (core) or to
-  `cmake/RayGui.cmake` (GUI).
+- **Adding a source file:** add it to `RAY_CORE_SOURCES` in `CMakeLists.txt` (core), or to
+  `cmake/RayEditor.cmake` / `editor/CMakeLists.txt` (editor).
 - **Don't modify** `legacy/` (historical project files).
 
 ## Repository policy
@@ -222,5 +218,5 @@ ctest --preset full             # every test
 
 ## Known issues
 
-- The MFC application can only be built on Windows; on Linux and macOS the core, the command-line
-  programs and `ray-editor` build.
+- Nothing platform-specific: the core, the command-line programs and `ray-editor` build on
+  Windows, Linux and macOS.

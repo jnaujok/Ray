@@ -1,8 +1,4 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Light.h"
 #include "Sampling.h"
@@ -12,11 +8,6 @@
 #include <string.h>
 #include <algorithm>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 
 CLight::CLight( void ) :

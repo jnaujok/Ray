@@ -178,10 +178,6 @@ class CCamera : public CObjects
         FLT         GetXRotate( void ) { return m_nXRotate; }
         FLT         GetYRotate( void ) { return m_nYRotate; }
 
-#ifdef RAY_GUI
-        virtual void    SetProperties( void );
-        virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif

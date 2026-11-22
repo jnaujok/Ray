@@ -9,12 +9,7 @@
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-#include "StdAfx.h"
-#include "resource.h"
-#else
 #include "Globals.h"
-#endif
 
 #include "RaySettings.h"
 #include "Scene.h"
@@ -38,11 +33,6 @@
 #include <string>
 #include <vector>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 
     // The binary scene files of 1996-1999 began with this.
@@ -70,12 +60,6 @@ CScene::CScene( void ) :
     m_oObjects.RemoveAll();
     m_oLights.RemoveAll();
     m_oBackgroundColor.Set( 1, 1, 1 );
-#ifdef RAY_GUI
-    m_hObjects = NULL;
-    m_hLights = NULL;
-    m_hCamera = NULL;
-    m_poSceneTree = NULL;
-#endif
 }
 
 CScene::~CScene( void )
@@ -84,185 +68,18 @@ CScene::~CScene( void )
     m_oLights.RemoveAll();
 }
 
-#ifdef RAY_GUI
-void CScene::ToTree( CSceneTreeView *poSceneTree )
-{
-	CLight     *pLight;
-    CObjects   *pObject;
-    int         nCount;
-
-    m_poSceneTree = poSceneTree;
-
-    if ( m_hCamera == NULL )
-    {
-        m_hCamera = poSceneTree->AddObject( &m_oCamera, 12, "Camera" );
-        m_oCamera.ToTree( poSceneTree, m_hCamera );
-    }
-    
-        // Add Base Light Tree
-    if ( m_hLights == NULL )
-    {
-        m_hLights = poSceneTree->AddObject( NULL, 2, "Lights" );
-        nCount = 0;
-
-        while ( nCount < m_oLights.GetSize() )
-        {
-            pLight = m_oLights[nCount ];
-            pLight->ToTree( poSceneTree, m_hLights );
-            nCount++;
-        }
-    }
-
-        // Add Base Object Tree
-    if ( m_hObjects == NULL )
-    {
-        m_hObjects = poSceneTree->AddObject( NULL, 4, "Objects" );
-
-        nCount = 0;
-
-        while ( nCount < m_oObjects.GetSize() )
-        {
-            pObject = m_oObjects[nCount ];
-            pObject->ToTree( poSceneTree, m_hObjects );
-            nCount++;
-        }
-    }
-}
-#endif
 
 void CScene::AddLight( CLight *pLight )
 {
     m_oLights.Add( pLight );
-#ifdef RAY_GUI
-    if ( m_hLights )
-        pLight->ToTree( m_poSceneTree, m_hLights );
-#endif
 }
 
 void CScene::AddObject( CObjects *pObject )
 {
     m_oObjects.Add( pObject );
     ForgetTree();
-#ifdef RAY_GUI
-    if ( m_hObjects )
-        pObject->ToTree( m_poSceneTree, m_hObjects );
-#endif
 }
 
-#ifdef RAY_GUI
-BOOL CScene::TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter )
-{
-        // Current Pixel Color
-    CColor  oPixel;
-
-        // Pixel Iterators
-    int     nX;
-    int     nY;
-
-        // Object Iterator
-    int     nCount;
-
-        // Object pointer
-    CObjects    *pObject;
-
-        // The closest intersecting object
-    CObjects    *pIntersection;
-
-        // The Ray we're casting
-    CRay    oRay;
-
-        // The intersection point of the ray with the object
-    CVector oIntersect;
-
-        // Light's for shading/shadow ray
-//    int         nLight;
-//    CLight     *pLight;
-
-        // Objects for Shadow testing
-//    int         nShadowObject;
-//    CObjects   *pShadowObject;
-
-        // Vector and rays for shadow casting
-    CRay        oShadowRay;
-    CVector     oLightVector;
-    CVector     oShadowIntersect;
-
-        // Camera information
-    CVector oCamPos = m_oCamera.GetPosition();
-    CVector oCamPoint = m_oCamera.PointAt() - oCamPos;
-
-    int         nYStop = oRect.bottom + 1;
-    int         nXStart = oRect.left;
-    int         nXStop = oRect.right + 1;
-    int         nYStart = oRect.top;
-
-    switch( nQuarter )
-    {
-        case 1:
-            break;
-
-        case 2:
-            return TRUE;
-
-        case 3:
-            return TRUE;
-
-        case 4:
-            return TRUE;
-
-        default:
-            return TRUE;
-    }
-
-    nY = nYStart;
-    while ( nY < nYStop )
-    {
-        nX = nXStart;
-        while ( nX < nXStop )
-        {
-                // Check if the trace has been interrupted
-            if ( *pbStop )
-                return FALSE;
-
-            oRay.CreateRay( *this, nX, nY );
-
-            nCount = 0;
-            oPixel = RGB( 0, 0, 0 );
-            pIntersection = NULL;
-
-            while ( nCount < m_oObjects.GetSize() )
-            {
-                pObject = m_oObjects[ nCount ];
-                if ( pObject->Intersect( oRay, oIntersect ) )
-                    pIntersection = pObject;
-                nCount++;
-            }
-
-            if ( pIntersection )
-            {
-                oPixel = pIntersection->Shade( *this, oRay, oIntersect );
-            }
-            else
-            {
-                CVector oDirection( oRay.GetI(), oRay.GetJ(), oRay.GetK() );
-
-                oPixel = Escaped( oDirection );
-#ifdef _DEBUG
-                    // This should set the scene to a funky gradient
-                oPixel.Set( oPixel.GetR() * ABS(oRay.GetI()), oPixel.GetG() * ABS(oRay.GetJ()), oPixel.GetB() * ABS(oRay.GetK()) );
-#endif
-            }
-
-            oPixel.Clip();
-            pDC->SetPixel( nX, nY, (COLORREF)oPixel );
-
-            nX++;
-        }
-        nY++;
-    }
-    return TRUE;
-}
-#endif
 
 BOOL CScene::Intersect( CRay &oRay, CObjects *pIgnore )
 {

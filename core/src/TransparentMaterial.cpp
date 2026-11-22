@@ -1,8 +1,4 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "TransparentMaterial.h"
 #include "Scene.h"
@@ -14,11 +10,6 @@
 #include <math.h>
 #include <algorithm>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 #define TRANSPARENT_MATERIAL_VERSION    ((DWORD)1)
 
@@ -331,53 +322,6 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
 }
 
 
-#ifdef RAY_GUI
-#include "resource.h"
-#include "TransparentMatDlg.h"
-
-void CTransparentMaterial::Properties( void )
-{
-    CTransparentMatDlg       oDlg;
-
-    oDlg.m_oColor = m_oColor;
-    oDlg.m_nIndexOfRefraction = m_nIndexOfRefraction;
-
-    if ( oDlg.DoModal() == IDOK )
-    {
-        m_oColor = oDlg.m_oColor;
-        m_nIndexOfRefraction = oDlg.m_nIndexOfRefraction;
-    }
-}
-
-void  CTransparentMaterial::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddMaterial( this, 20, "Transparent Material", hUnder );
-}
-
-void CTransparentMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
-{
-    LVITEM      oItem;
-    CString     strTemp;
-
-    oItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-    oItem.iItem = nIndex;
-    oItem.iSubItem = 0;
-    oItem.state = 0;
-    oItem.stateMask = 0;
-    oItem.pszText = "Transparent";
-    oItem.cchTextMax = 0;
-    oItem.iImage = 3;
-    oItem.lParam = (LPARAM)this;
-    oList.InsertItem( &oItem );
-
-    oItem.iSubItem = 1;
-    oItem.mask = LVIF_TEXT;
-    strTemp.Format( "%f", nInfluence );
-    oItem.pszText = (LPSTR)(LPCSTR)strTemp;
-    oList.SetItem( &oItem );
-}
-
-#endif
 
 void CTransparentMaterial::ToJson( IASLib::CObjectNode &oNode )
 {

@@ -56,9 +56,6 @@ class CSpotLight : public CLight
             // place, the cone's edge "size" from its middle.
         virtual void    FilterAt( const CVector &oPoint, const CVector &oToLight, STexturePoint &oAt ) const;
 
-#ifdef RAY_GUI
-        virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __SPOTLIGHT_H__

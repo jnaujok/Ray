@@ -1,8 +1,4 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "MetalMaterial.h"
 #include "Scene.h"
@@ -147,39 +143,6 @@ CColor CMetalMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVector &o
                    oReflected.GetB() * Reflectance( nCos, m_anN[ 2 ], m_anK[ 2 ] ) * oTint.GetB() );
 }
 
-#ifdef RAY_GUI
-void CMetalMaterial::Properties( void )
-{
-}
-
-void CMetalMaterial::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddMaterial( this, 18, "Metal Material", hUnder );
-}
-
-void CMetalMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
-{
-    LVITEM      oItem;
-    CString     strTemp;
-
-    oItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-    oItem.iItem = nIndex;
-    oItem.iSubItem = 0;
-    oItem.state = 0;
-    oItem.stateMask = 0;
-    oItem.pszText = "Metal";
-    oItem.cchTextMax = 0;
-    oItem.iImage = 2;
-    oItem.lParam = (LPARAM)this;
-    oList.InsertItem( &oItem );
-
-    oItem.iSubItem = 1;
-    oItem.mask = LVIF_TEXT;
-    strTemp.Format( "%f", nInfluence );
-    oItem.pszText = (LPSTR)(LPCSTR)strTemp;
-    oList.SetItem( &oItem );
-}
-#endif
 
 void CMetalMaterial::ToJson( IASLib::CObjectNode &oNode )
 {

@@ -6,11 +6,7 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Extrusion.h"
 #include "Extruder.h"
@@ -18,11 +14,6 @@
 
 #include <cmath>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 DYNAMIC_IMPLEMENTS( CExtrusion, "extrusion" );
 
@@ -43,15 +34,6 @@ CExtrusion::~CExtrusion( void )
 {
 }
 
-#ifdef RAY_GUI
-void CExtrusion::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hItem;
-
-    hItem = pTree->AddObject( this, 24, "Extrusion", hUnder );
-    CObjects::MatToTree( pTree, hItem );
-}
-#endif
 
 BOOL CExtrusion::Build( std::string &strError )
 {

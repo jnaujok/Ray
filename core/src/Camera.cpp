@@ -1,10 +1,4 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-    #include "resource.h"
-    #include "CameraPropertiesDlg.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Camera.h"
 #include "FilmColorModel.h"
@@ -14,11 +8,6 @@
 
 #include <math.h>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 
 #define CAMERA_VERSION      ((DWORD)1)
@@ -251,32 +240,6 @@ const CCamera::SBody *CCamera::GetBodies( int &nCount )
 
 DYNAMIC_IMPLEMENTS( CCamera, "camera" );
 
-#ifdef RAY_GUI
-
-void CCamera::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddObject( this, 12, "Camera", hUnder );
-}
-
-void CCamera::SetProperties( void )
-{
-    CCameraPropertiesDlg     oProp( &m_oPosition, &m_oPointAt );
-
-    oProp.m_nCameraAngle = ( m_nHorizontalAngle < m_nVerticalAngle ) ? m_nHorizontalAngle : m_nVerticalAngle;
-
-    oProp.m_nCameraAngle /= RADIANS;
-
-    if ( oProp.DoModal() == IDOK )
-    {
-        oProp.m_nCameraAngle *= RADIANS;
-        m_nVerticalAngle = oProp.m_nCameraAngle;
-        m_nHorizontalAngle = oProp.m_nCameraAngle * m_nAspectRatio;
-    }
-    
-    CalcRotate();
-}
-
-#endif    
 
 void CCamera::CalcRotate( void )
 {

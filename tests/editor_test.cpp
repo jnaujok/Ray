@@ -246,8 +246,8 @@ static void TestTessellation( void )
 
     for ( size_t i = 0; i + 2 < aoMeshes[ 0 ].anPositions.size(); i += 3 )
     {
-        nMaxX = std::max( nMaxX, (double)aoMeshes[ 0 ].anPositions[ i ] );
-        nMaxZ = std::max( nMaxZ, (double)aoMeshes[ 0 ].anPositions[ i + 2 ] );
+        nMaxX = (std::max)( nMaxX, (double)aoMeshes[ 0 ].anPositions[ i ] );
+        nMaxZ = (std::max)( nMaxZ, (double)aoMeshes[ 0 ].anPositions[ i + 2 ] );
     }
         // Turned 90 degrees about y, the box's 6 deep side lies along x.
     CHECK( std::fabs( nMaxX - 3.0 ) < 1e-6 && std::fabs( nMaxZ - 1.0 ) < 1e-6 );
@@ -302,7 +302,7 @@ static void TestCamera( void )
             CVector oTracer = oCamera.RayDirection( x, y, 1.5 );
             SVec3   oMine = oView.RayDirection( x, y, 1.5 );
 
-            nWorst = std::max( nWorst, ( SVec3( oTracer.GetX(), oTracer.GetY(), oTracer.GetZ() ) - oMine ).Length() );
+            nWorst = (std::max)( nWorst, ( SVec3( oTracer.GetX(), oTracer.GetY(), oTracer.GetZ() ) - oMine ).Length() );
         }
     }
     CHECK( nWorst < 1e-9 );

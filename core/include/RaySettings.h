@@ -318,9 +318,6 @@ class CSettings
         FLT             GetFractalSeed( void ) { return m_nFractalSeed; }
 
 
-#ifdef RAY_GUI
-        void            Properties( void );
-#endif
 };
 
 #endif

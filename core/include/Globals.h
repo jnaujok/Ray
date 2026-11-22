@@ -2,9 +2,9 @@
 *   Globals                                                              *
 *                                                                        *
 *   Basic types and math macros shared by every part of the ray tracer.  *
-*   In the MFC GUI build (RAY_GUI) the Win32 headers already supply the  *
-*   Windows types; everywhere else they are defined here with the same   *
-*   sizes as on Win32, so scene files and network messages agree.        *
+*   On Windows the Win32 headers already supply the Windows types;       *
+*   everywhere else they are defined here with the same sizes as on      *
+*   Win32, so scene files and network messages agree.                    *
 *                                                                        *
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
@@ -15,21 +15,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#ifdef RAY_GUI
-        // IASLib defines its own ASSERT; the GUI keeps MFC's.
-    #pragma push_macro( "ASSERT" )
-    #undef ASSERT
-    #include "BaseTypes/IASLib_String.h"
-    #undef ASSERT
-    #pragma pop_macro( "ASSERT" )
-#else
-    #include "BaseTypes/IASLib_String.h"
-    #undef ASSERT
-#endif
+#include "BaseTypes/IASLib_String.h"
+#undef ASSERT
 
-#if defined( RAY_GUI ) || defined( _WIN32 )
+#if defined( _WIN32 )
 
-    // On Windows, <windows.h> (included by MFC, or by IASLib's headers)
+    // On Windows, <windows.h> (included by IASLib's headers)
     // already defines BYTE, WORD, DWORD, BOOL, LPCSTR, TRUE and FALSE.
 #ifndef ASSERT
 #include <assert.h>
@@ -57,7 +48,7 @@ typedef char           *LPSTR;
 #define ASSERT( x )     assert( x )
 #endif
 
-#endif // RAY_GUI || _WIN32
+#endif // _WIN32
 
 #ifndef CFUNC
 #if defined( _WIN32 )

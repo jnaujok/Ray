@@ -2,8 +2,8 @@
 #
 #   cmake -DROOT=<source dir> -P LintMinMax.cmake
 #
-# Windows headers define min and max as macros, and the MFC build sees
-# them, so std::min( a, b ), std::max( ... ) and
+# Windows headers define min and max as macros, and the Windows builds
+# (IASLib's headers, the wxWidgets editor) see them, so std::min( a, b ), std::max( ... ) and
 # std::numeric_limits<T>::max() fail to compile there. Write
 # (std::min)( a, b ), (std::max)( a, b ) and
 # (std::numeric_limits<T>::max)() instead. This runs on every platform, so
@@ -14,7 +14,7 @@ if(NOT ROOT)
 endif()
 
 set(FOUND "")
-foreach(DIR core src include editor)
+foreach(DIR core editor raythrower rayengine tests)
     file(GLOB_RECURSE FILES "${ROOT}/${DIR}/*.cpp" "${ROOT}/${DIR}/*.h")
     foreach(FILE ${FILES})
         file(STRINGS "${FILE}" LINES)

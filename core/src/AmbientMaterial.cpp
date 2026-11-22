@@ -1,19 +1,10 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Vector.h"
 
 #include "AmbientMaterial.h"
 #include "SceneJson.h"
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 
 #define AMBIENT_MATERIAL_VERSION    ((DWORD)1)
@@ -46,47 +37,6 @@ CColor CAmbientMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor &
 }
 
 
-#ifdef RAY_GUI
-#include "resource.h"
-#include "SetColorDlg.h"
-
-void CAmbientMaterial::Properties( void )
-{
-    CColor          oColor( m_oColor.Get() );
-    CSetColorDlg    oDlg( &oColor );
-
-    if ( oDlg.DoModal() == IDOK )
-        m_oColor = oColor;
-}
-
-void CAmbientMaterial::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddMaterial( this, 22, "Ambient Material", hUnder );
-}
-
-void CAmbientMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
-{
-    LVITEM      oItem;
-    CString     strTemp;
-
-    oItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-    oItem.iItem = nIndex;
-    oItem.iSubItem = 0;
-    oItem.state = 0;
-    oItem.stateMask = 0;
-    oItem.pszText = "Ambient";
-    oItem.cchTextMax = 0;
-    oItem.iImage = 4;
-    oItem.lParam = (LPARAM)this;
-    oList.InsertItem( &oItem );
-
-    oItem.iSubItem = 1;
-    oItem.mask = LVIF_TEXT;
-    strTemp.Format( "%f", nInfluence );
-    oItem.pszText = (LPSTR)(LPCSTR)strTemp;
-    oList.SetItem( &oItem );
-}
-#endif
 
 void CAmbientMaterial::ToJson( IASLib::CObjectNode &oNode )
 {

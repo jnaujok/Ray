@@ -37,9 +37,6 @@ class CSphereLight : public CLight
         virtual BOOL    SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoint );
         FLT             GetRadius( void ) const { return m_nRadius; }
 
-#ifdef RAY_GUI
-        virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __SPHERELIGHT_H__

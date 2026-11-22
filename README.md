@@ -2,7 +2,7 @@
 
 # Ray
 
-**A distributed ray tracer from 1997: an MFC scene editor on the front end and a farm of tracing engines on the back end.**
+**A distributed ray tracer from 1997: a scene editor on the front end and a farm of tracing engines on the back end.**
 
 [![Build and test](https://github.com/jnaujok/Ray/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jnaujok/Ray/actions/workflows/build.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -45,9 +45,10 @@
 ## About
 
 Ray is a ray tracer written in 1996–1997 that splits rendering across a network of machines.
-You build and edit scenes in a scene editor (the cross-platform `ray-editor`, or the original
-Windows MFC application), and the image is traced in parallel by engine processes on any number of
-machines, or by worker threads on one.
+You build and edit scenes in the cross-platform scene editor, `ray-editor` (the original Windows
+MFC editor was retired in 2026-alpha-0.21.2; its last version is the `mfc-editor-final` tag),
+and the image is traced in parallel by engine processes on any number of machines, or by worker
+threads on one.
 
 It was originally written for [PVM](https://www.netlib.org/pvm3/) (Parallel Virtual Machine) on
 a cluster of Unix workstations. The cross-platform library written for it grew into
@@ -303,11 +304,6 @@ The ray tracing itself is the 1997 code.
   scene's own reader, a shaded OpenGL view with a wireframe overlay that you orbit, pan, zoom and
   click to select in, a *Render* button that ray-traces the view progressively over it, undo and
   redo, and STL and OBJ import. See [`editor/README.md`](editor/README.md).
-- **Windows scene editor:** MFC MDI application with a scene tree, property dialogs for spheres, planes,
-  point lights, the camera and the materials, and a material editor. Anything else, from any shape
-  or light to the camera's sampler, color model and lens and the environment, can be edited, added
-  or deleted as JSON from the tree's right-click menu, and *Import Model* brings in an STL or OBJ
-  file.
 - **Distributed rendering:** `rayengine` processes connect to the master over TCP and pull tiles of
   the image from its queue, trace them (camera rays, lens and sampling included) and send back the
   pixels; faster machines simply take more tiles. Engines can run anywhere that can reach the
@@ -324,7 +320,7 @@ The ray tracing itself is the 1997 code.
 ```mermaid
 flowchart LR
     subgraph Front["Front end"]
-        UI["ray-editor or Ray.exe<br/>scene editors"]
+        UI["ray-editor<br/>scene editor"]
         CLI["raythrower<br/>command line"]
     end
     subgraph Master["Task master"]
@@ -374,7 +370,6 @@ opens the connection with a hello carrying the protocol version (4).
 |------|:-----:|:-----:|:-------:|
 | `raythrower`, `rayengine`, core | ✅ GCC, Clang | ✅ Apple Clang | ✅ MSVC |
 | `ray-editor` scene editor (wxWidgets) | ✅ GTK 3 | ✅ Cocoa | ✅ MSVC |
-| `Ray.exe` scene editor (MFC) | | | ✅ MSVC with MFC |
 
 All of them are built by CI on every push.
 
@@ -434,19 +429,10 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON
 cmake --build build --target ray-editor --parallel
 ```
 
-To build the Windows MFC scene editor, use Visual Studio with the *C++ MFC* component, which
-includes the MBCS libraries the code needs:
-
-```sh
-cmake -S . -B build -DRAY_BUILD_GUI=ON
-cmake --build build --config Release --target Ray
-```
-
 | Option | Default | What it does |
 |--------|:-------:|--------------|
 | `RAY_BUILD_EDITOR` | `OFF` | Build `ray-editor`, the cross-platform scene editor (wxWidgets) |
 | `RAY_USE_SYSTEM_WXWIDGETS` | `ON` | Use an installed wxWidgets if CMake finds one, instead of downloading it |
-| `RAY_BUILD_GUI` | `OFF` | Build the MFC scene editor (MSVC only) |
 | `RAY_BUILD_TESTS` | `ON` | Build the regression tests |
 | `FETCHCONTENT_SOURCE_DIR_IASLIB` | | Use a local IASLib checkout instead of downloading it |
 
@@ -608,11 +594,6 @@ ray-traces the view over it, a quick pass first. *Edit* adds objects, lights and
 
 <img src="docs/images/editor.png" alt="ray-editor on Linux: the scene tree on the left, the textured teapot ray-traced in the view after Render, and the settings in the property grid on the right" width="720">
 
-**Windows scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
-menu, and choose *Render*. Right-click the scene's name in the tree to edit its settings, camera or
-environment as JSON, add any object or light as JSON, or import a model; right-click an object or
-light to edit it as JSON or delete it.
-
 ## Testing
 
 ```sh
@@ -746,14 +727,11 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`raythrower/`](raythrower) | Command-line master |
 | [`rayengine/`](rayengine) | Networked tracing task |
 | [`editor/`](editor) | `ray-editor`, the cross-platform scene editor: `logic/` (no toolkit: the document, tessellation, the view's camera, the progressive render) and `gui/` (wxWidgets) |
-| [`src/`](src), [`include/`](include) | MFC scene editor |
-| [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
-| [`help/`](help) | WinHelp project for the scene editor |
 | [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images, `scenes/models/` model files, among them 3DBenchy (CC0), and `scenes/fonts/` fonts, Lato Bold (SIL Open Font License; see [NOTICE](NOTICE)) |
 | [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files |
 | [`tests/`](tests) | Regression tests and reference renders |
-| [`cmake/`](cmake) | The scene editors' builds: `RayEditor.cmake` (wxWidgets) and `RayGui.cmake` (MFC) |
-| [`docs/`](docs) | MFC AppWizard notes, README images, the changelog's before and after images, and the performance notes (`performance.md`) |
+| [`cmake/`](cmake) | The scene editor's build, `RayEditor.cmake` (wxWidgets) |
+| [`docs/`](docs) | README images, the changelog's before and after images, and the performance notes (`performance.md`) |
 | [`legacy/`](legacy) | Visual C++ 4, 5, and 6 project files, kept for history |
 
 ## Scene files
@@ -809,8 +787,8 @@ beam profiles, attenuation and projected light filters, texture maps for every m
 light setting, textures inside glass, tori, discs, quadrics, superquadrics and rounded boxes, 3D text
 from TrueType fonts, Bézier patches and B-spline and NURBS surfaces traced exactly, solids turned on a lathe, extrusions
 and sweeps along a path, implicit surfaces from formulas, metaballs and fractals, and JSON scenes
-so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both
-editors reach every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
+so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering, which
+reaches every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
 seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and lunar regolith,
 and a recreation of AS11-40-5903. Models load from glTF (Draco-compressed too) and Blender
 `.blend` files as well as STL and OBJ. 2026-alpha-0.21 was a tuning release: frames split their last

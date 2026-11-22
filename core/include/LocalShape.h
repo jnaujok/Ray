@@ -98,9 +98,6 @@ class CLocalShape : public CObjects
             /// only touches zero without crossing is missed.
         static int          PolynomialRoots( const double *anCoeffs, int nDegree, double nLow, double nHigh, double *anRoots );
 
-#ifdef RAY_GUI
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
     // Helpers the shapes share for the editor's triangles.

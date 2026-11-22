@@ -6,11 +6,7 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Text.h"
 #include "FontFile.h"
@@ -21,11 +17,6 @@
 
 #include <cmath>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 DYNAMIC_IMPLEMENTS( CText, "text" );
 
@@ -74,15 +65,6 @@ CText::~CText( void )
 {
 }
 
-#ifdef RAY_GUI
-void CText::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hText;
-
-    hText = pTree->AddObject( this, 24, "Text", hUnder );
-    CObjects::MatToTree( pTree, hText );
-}
-#endif
 
 BOOL CText::SetText( const std::string &strString, const std::string &strFontData, FLT nSize, FLT nDepth, FLT nBevel, std::string &strError )
 {

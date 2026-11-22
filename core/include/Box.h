@@ -56,9 +56,6 @@ class CBox : public CObjects
         CVector             NormalAt( CVector &oPoint );
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 
-#ifdef RAY_GUI
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __BOX_H__

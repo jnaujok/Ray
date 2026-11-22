@@ -8,7 +8,6 @@
 
 # Original, untouched historical files
 /legacy/** -text
-/help/** -text
 
 # Scene files are JSON text.
 *.ray text eol=lf

@@ -143,22 +143,3 @@ jobs:
           name: ray-editor-${{ runner.os }}
           path: dist/
           if-no-files-found: error
-
-  gui:
-    name: Windows scene editor (MFC)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure
-        run: cmake -S . -B build -DRAY_BUILD_GUI=ON -DRAY_BUILD_TESTS=OFF
-
-      - name: Build
-        run: cmake --build build --config Release --target Ray --parallel
-
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: ray-scene-editor-windows
-          path: build/Release/Ray.exe
-          if-no-files-found: error

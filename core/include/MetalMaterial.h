@@ -56,11 +56,6 @@ class CMetalMaterial : public CMaterial
         static FLT          Reflectance( FLT nCos, FLT nN, FLT nK );
             /// A preset's n and k; FALSE if there is none by that name.
         static BOOL         Preset( const std::string &strName, FLT anN[ 3 ], FLT anK[ 3 ] );
-#ifdef RAY_GUI
-        virtual void        Properties( void );
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-        virtual void        ToList( CListCtrl &oList, int nIndex, FLT nInfluence );
-#endif
 };
 
 #endif

@@ -1,6 +1,3 @@
-#ifdef RAY_GUI
-#include "StdAfx.h"
-#endif
 
 #include "WireProtocol.h"
 #include "Scene.h"

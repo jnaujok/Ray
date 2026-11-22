@@ -9,22 +9,11 @@
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-    #include "resource.h"
-    #include "PointLightPropertiesDlg.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "PtLight.h"
 #include "SceneJson.h"
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 
 #define PTLIGHT_VERSION     ((DWORD)1)
@@ -58,19 +47,6 @@ CColor CPointLight::GetShade( CVector oVector )
     return oReturn;
 }
 
-#ifdef RAY_GUI
-void CPointLight::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddObject( this, 6, "Point Light", hUnder );
-}
-
-void CPointLight::SetProperties( void )
-{
-    CPointLightPropertiesDlg     oProp( &m_oPosition, &m_oColor );
-
-    oProp.DoModal();
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CPointLight, "point" );
 

@@ -6,20 +6,11 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Cylinder.h"
 #include "SceneJson.h"
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 CCylinder::CCylinder( void )
 {
@@ -31,15 +22,6 @@ CCylinder::~CCylinder( void )
 {
 }
 
-#ifdef RAY_GUI
-void CCylinder::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hCylinder;
-
-    hCylinder = pTree->AddObject( this, 8, "Cylinder", hUnder );
-    CObjects::MatToTree( pTree, hCylinder );
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CCylinder, "cylinder" );
 

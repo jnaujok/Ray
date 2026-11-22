@@ -1,19 +1,10 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Vector.h"
 
 #include "DiffuseMaterial.h"
 #include "SceneJson.h"
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 #define DIFFUSE_MATERIAL_VERSION    ((DWORD)1)
 
@@ -71,52 +62,6 @@ CColor CDiffuseMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor &
 }
 
 
-#ifdef RAY_GUI
-#include "resource.h"
-#include "DiffuseMaterialPropDlg.h"
-
-void CDiffuseMaterial::Properties( void )
-{
-    CDiffuseMaterialPropDlg     oDlg;
-
-    oDlg.m_oColor = m_oColor;
-    oDlg.m_bCastDiffuse = m_bDiffuseCast;
-
-    if ( oDlg.DoModal() == IDOK )
-    {
-        m_oColor = oDlg.m_oColor;
-        m_bDiffuseCast = oDlg.m_bCastDiffuse;
-    }
-}
-
-void CDiffuseMaterial::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddMaterial( this, 14, "Diffuse Material", hUnder );
-}
-
-void CDiffuseMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
-{
-    LVITEM      oItem;
-    CString     strTemp;
-
-    oItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-    oItem.iItem = nIndex;
-    oItem.iSubItem = 0;
-    oItem.state = 0;
-    oItem.stateMask = 0;
-    oItem.pszText = "Diffuse";
-    oItem.cchTextMax = 0;
-    oItem.iImage = 0;
-    oItem.lParam = (LPARAM)this;
-    oList.InsertItem( &oItem );
-
-    oItem.iSubItem = 1;
-    oItem.mask = LVIF_TEXT;
-    strTemp.Format( "%f", nInfluence );
-    oItem.pszText = (LPSTR)(LPCSTR)strTemp;
-    oList.SetItem( &oItem );
-}
-#endif
 
 void CDiffuseMaterial::ToJson( IASLib::CObjectNode &oNode )
 {

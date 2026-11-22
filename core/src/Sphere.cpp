@@ -7,13 +7,7 @@
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-    #include "resource.h"
-    #include "SpherePropertiesDlg.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Sphere.h"
 #include "Light.h"
@@ -21,13 +15,6 @@
 
 #include <math.h>
 
-#ifdef RAY_GUI
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
-#endif
 
 #define SPHERE_VERSION  ((DWORD)3)
 #define VERSION_2       ((DWORD)2)
@@ -63,35 +50,6 @@ CSphere::~CSphere( void )
 }
 
 
-#ifdef RAY_GUI
-void CSphere::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hSphere;
-
-    hSphere = pTree->AddObject( this, 8, "Sphere", hUnder );
-    CObjects::MatToTree( pTree, hSphere );
-}
-
-void CSphere::SetProperties( void )
-{
-    CSpherePropertiesDlg    oProp( &m_oCenter, &m_nRadius );
-    int                     nCount;
-    CMaterial              *pMaterial;
-
-    oProp.m_oColor = m_oColor;
-    if ( ( oProp.DoModal() == IDOK ) && ( oProp.m_bColorChanged ) )
-    {
-        m_oColor = oProp.m_oColor;
-        nCount = 0;
-        while ( nCount < m_oMaterials.GetSize() )
-        {
-            pMaterial = m_oMaterials[ nCount ];
-            pMaterial->SetColor( m_oColor );
-            nCount++;
-        }
-    }
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CSphere, "sphere" );
 

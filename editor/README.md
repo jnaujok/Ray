@@ -2,7 +2,8 @@
 
 `ray-editor` edits Ray scenes on Windows, Linux and macOS. It's built on
 [wxWidgets](https://www.wxwidgets.org/) 3.2 (native controls on each system: Win32, GTK 3,
-Cocoa) and sits beside the Windows-only MFC editor, `Ray.exe`, which is unchanged.
+Cocoa). It replaced the Windows-only MFC editor, `Ray.exe`, which was retired in 2026-alpha-0.21.2
+(its last version is the `mfc-editor-final` tag).
 
 <img src="../docs/images/editor.png" alt="ray-editor on Linux: the scene tree on the left, the textured teapot ray-traced in the view after Render, and the settings in the property grid on the right" width="720">
 
@@ -88,5 +89,4 @@ Mesa. The scene's coordinates are left-handed, as the tracer's camera takes them
 matrices match the tracer's camera exactly, so a render lines up with the view; `editor_logic`
 checks this against `CCamera::RayDirection`.
 
-The editor compiles the core without `RAY_GUI` (the MFC build's switch), so it needs none of the
-MFC code, and its logic files include no wxWidgets headers.
+The editor's logic files include no wxWidgets headers; only `gui/` does.
