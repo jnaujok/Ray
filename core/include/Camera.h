@@ -56,6 +56,7 @@ class CCamera : public CObjects
             // chromatic lens: into red, green and blue, or into single
             // wavelengths (see Spectrum.h).
         BOOL                            m_bSpectral = FALSE;
+        BOOL                            m_bPanorama = FALSE;    // equirectangular 360 x 180 projection
         std::string                     m_strLensError;     // why the lens couldn't be prepared
     public:
             // A Reseau plate: a glass plate pressed against the film,
@@ -172,6 +173,13 @@ class CCamera : public CObjects
             // ("dispersion": "spectral") rather than in red, green and blue.
         BOOL        IsSpectral( void ) const { return m_bSpectral; }
         void        SetSpectral( BOOL bSpectral ) { m_bSpectral = bSpectral; }
+            /// An equirectangular panorama: the image's width is all the way
+            /// round (longitude, the look-at direction in the middle) and its
+            /// height from straight up to straight down, in the layout an
+            /// `environment` image uses, so a rendered panorama can be read
+            /// back as one.
+        BOOL        IsPanorama( void ) const { return m_bPanorama; }
+        void        SetPanorama( BOOL bPanorama ) { m_bPanorama = bPanorama; }
             // A sample's color with each channel clamped (unchanged if the
             // camera doesn't clamp).
         CColor      ClampSample( const CColor &oColor ) const;

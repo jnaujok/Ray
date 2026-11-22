@@ -399,6 +399,19 @@ add_test(NAME render_environment
 set_tests_properties(render_environment PROPERTIES FIXTURES_SETUP render_environment TIMEOUT 300)
 add_test(NAME roundtrip_environment_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/environment_test.ray ${RENDER_DIR})
 
+# An equirectangular panorama: the whole surroundings in one image, laid out as
+# an environment map reads it (+z in the middle, +x a quarter to the right).
+add_test(NAME render_panorama
+         COMMAND ${CMAKE_COMMAND}
+                 -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                 -DCOMPARE=$<TARGET_FILE:compare_images>
+                 -DSCENE=${PROJECT_SOURCE_DIR}/scenes/panorama_test.ray
+                 -DOUTPUT=${RENDER_DIR}/panorama_test.raw
+                 -DREFERENCE=${REFERENCE_DIR}/panorama_test.raw
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/RenderTest.cmake)
+set_tests_properties(render_panorama PROPERTIES FIXTURES_SETUP render_panorama TIMEOUT 300)
+add_test(NAME roundtrip_panorama_test COMMAND format_test ${PROJECT_SOURCE_DIR}/scenes/panorama_test.ray ${RENDER_DIR})
+
 # Constructive solid geometry: a lens blank (two spheres' intersection), a
 # bowl (a shell cut by a turned box, shaded by its parts' materials), a die
 # (a rounded cube, itself a csg, with drilled pips painted black) and a
@@ -603,7 +616,7 @@ endforeach()
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
                        patches nurbs lathe extrusion implicit blob fractal apollo_lenses film reseau tranquility
-                       chess_dof as11_40_5903 as11_40_5927 blend images lens_cutaway)
+                       chess_dof as11_40_5903 as11_40_5927 blend images lens_cutaway panorama)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

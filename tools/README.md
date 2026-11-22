@@ -99,9 +99,11 @@ Writes `scenes/models/apollo/lm5_eagle.glb`, the LM-5 Eagle, from NASA's
 `apollo_lunar_module.glb` (`pip install DracoPy numpy Pillow`): decodes it, turns round the faces NASA
 wound against their own normals, and sorts every face into one of 16 named parts (the glTF
 materials of the output, which a mesh's `materialMap` dresses) by its NASA material, its node, its
-height and which way it faces. The ascent stage's skin is split by facing: low faces facing forward or aft
-are black Pyromark paint, sideways and aft faces the champagne 5056 anodized panels, the rest the
-gray 2024 skin, and forward, high faces of the window frames quartz. It works normals out with a
+height and which way it faces. The ascent stage's skin is split by facing: low faces facing forward
+are black Pyromark paint, low aft faces beside the RCS quads crinkled silver foil, sideways and aft
+faces the champagne 5056 anodized panels, the rest the gray 2024 skin, and forward, high faces of
+the window frames quartz; the secondary struts from the descent stage out to the legs are gold strut
+wrap (`kapton_gold`). It works normals out with a
 45° crease, scales the model by 1.4 to the real LM's size, shortens the primary struts' lower
 sections so everything above the footpads comes down 15 cm, stands it on y = 0, splits the
 anodized skin into flat panels (each bellied out by tilting its edge normals 5° away from its
@@ -112,11 +114,54 @@ indexed, uncompressed glb with their texture coordinates. The same files come ou
 ## `make_eagle_scenes.py`
 
 Writes `scenes/models/apollo/lm5_eagle.ray`, the Eagle prefab (one mesh with a `materialMap`, and a
-camera and sun of its own), and `scenes/as11_40_5927_test.ray`, the AS11-40-5927 recreation that
-brings it in with an `include`: the sun as it stood at GET 110:53:38 (14.96° up at azimuth 90.2°),
-a rock half sunk in the ground, a bag and a pole, the LM 4 cm down (its footpads in the regolith), the camera matched to the photograph by the
-footpads' spacing, the horizon's height and the aft box seen square on. Only the Python
-standard library is needed.
+camera and sun of its own), `scenes/as11_40_5927_test.ray`, the AS11-40-5927 recreation that
+brings it in with an `include`, and `scenes/terrain/apollo11_bake.ray`, the scene its surroundings
+are baked from (see [`../scenes/terrain/README.md`](../scenes/terrain/README.md)). The recreation
+stands on the LROC terrain (`terrain/apollo11_inner.glb`) under the sun as it stood at GET
+110:53:38 (14.96° up at azimuth 90.2°), with the baked surroundings as its `environment`, a rock
+half sunk in the ground, a bag and a pole, the LM turned and tilted onto the ground and 4 cm down
+(its footpads in the regolith), and the camera where `solve_5927_view.py` puts it, exposed as the
+Apollo crews did down-sun (f/11 at 1/250 s). Only the Python standard library is needed.
+
+## `solve_5927_view.py`
+
+Solves the AS11-40-5927 view from the photograph: the LM's heading, the camera's azimuth and
+distance from the LM, and its pan and tilt, by fitting the four footpads' places in NASA's
+1950 × 1950 scan (Nelder–Mead from a grid of starts), with the camera held 1.03 m above the ground
+under it and the LM tilted onto the plane it stands on, both read from
+`scenes/terrain/apollo11_inner_crop.tif`. Prints the LM's rotation as Ray's x, y, z angles, the
+camera's position and look-at, and each pad's place in the photograph and in the solved view,
+which `make_eagle_scenes.py` copies. Needs numpy.
+
+## `geotiff_terrain.py`
+
+Crops a digital terrain model around a point and tessellates it into a glTF mesh:
+`geotiff_terrain.py <model> --center LAT LON --radius METERS [--inner METERS] [--step N]
+[--curvature] [--fill-center METERS] --out mesh.glb [--crop crop.tif]`. It reads PDS3 `.IMG`
+products with an attached label (such as the LROC NAC DTMs: 32-bit floats on an equirectangular
+grid) and plain GeoTIFFs (uncompressed, strips or tiles, float32 or int16, equirectangular or
+geographic, with a nodata value). The mesh is in local meters (x east, y up, z north) about the
+center, two triangles to each grid cell inside the radius (and outside `--inner`, for a ring that
+goes round another mesh), every `--step`th post, with smooth normals and a regolith material; it
+stops where the model has no data. `--curvature` drops the ground by d²/2R for the Moon's
+curvature; `--fill-center` replaces the middle (where a lander shows as a bump) by the plane fitted
+to the ground from that radius to twice it, and puts y = 0 on that plane under the center.
+`--crop` writes the heights as a float32 GeoTIFF in the same local meters (which it reads back),
+and `--sample LAT LON` and `--sample-local EAST NORTH` print the ground's height at points. Needs
+numpy.
+
+## `hdr_rle.py`
+
+Rewrites a Radiance HDR file (`raythrower --hdr` writes flat pixels) with run-length encoded
+scanlines, pixel for pixel the same: `hdr_rle.py in.hdr [out.hdr]`. A baked lunar panorama, half
+black sky, comes out at under half the size. Only the Python standard library is needed.
+
+## `compare_5927.py`
+
+Puts NASA's AS11-40-5927 beside a render of `as11_40_5927_test.ray`, both at 512 × 512, labelled,
+and prints a table of regions measured in linear light in each (the sunlit ground, the aft box's
+face, the copper Kapton, the ground in the LM's shadow, the engine bell): `compare_5927.py
+photo.jpg render.png [side_by_side.png]`. Needs Pillow.
 
 ## `make_icon.py`
 

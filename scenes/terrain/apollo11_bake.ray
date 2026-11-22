@@ -1,0 +1,132 @@
+{
+  "format": "Ray scene",
+  "version": 3,
+  "settings": {
+    "imageWidth": 2048,
+    "imageHeight": 1024,
+    "imageFile": "apollo11_surroundings.out",
+    "colorDepth": 8,
+    "maximumDepth": 6,
+    "depthThreshold": 0.01
+  },
+  "background": [
+    0,
+    0,
+    0
+  ],
+  "camera": {
+    "position": [
+      11.153,
+      1.094,
+      -5.2007
+    ],
+    "lookAt": [
+      11.153,
+      1.094,
+      -4.2007
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "projection": "equirectangular",
+    "sampler": {
+      "type": "stratified",
+      "grid": 2,
+      "seed": 0
+    },
+    "colorModel": "clip"
+  },
+  "objects": [
+    {
+      "type": "mesh",
+      "name": "ground",
+      "file": "apollo11_inner.glb",
+      "smooth": true,
+      "doubleSided": true,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "regolith",
+          "influence": 1.0,
+          "color": [
+            0.12,
+            0.115,
+            0.11
+          ],
+          "surge": 1.0,
+          "width": 0.06
+        }
+      ],
+      "bump": {
+        "mode": "height",
+        "texture": {
+          "type": "noise",
+          "scale": 0.9,
+          "octaves": 6,
+          "seed": 11
+        },
+        "depth": 0.05,
+        "step": 0.005
+      }
+    },
+    {
+      "type": "mesh",
+      "name": "far ground",
+      "file": "apollo11_outer.glb",
+      "smooth": true,
+      "doubleSided": true,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "regolith",
+          "influence": 1.0,
+          "color": [
+            0.12,
+            0.115,
+            0.11
+          ],
+          "surge": 1.0,
+          "width": 0.06
+        }
+      ],
+      "bump": {
+        "mode": "height",
+        "texture": {
+          "type": "noise",
+          "scale": 0.9,
+          "octaves": 6,
+          "seed": 11
+        },
+        "depth": 0.05,
+        "step": 0.005
+      }
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [
+        -0.9661,
+        -0.258145,
+        0.003372
+      ],
+      "color": [
+        3.6,
+        3.6,
+        3.52
+      ],
+      "angle": 0.53,
+      "samples": 1
+    }
+  ]
+}
