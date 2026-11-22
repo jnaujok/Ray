@@ -727,8 +727,8 @@ namespace RayJson
 
         s_aoDecoded.push_front( oNew );
         s_nDecodedBytes += anData.size();
-            // Keep a few, and no more than 512 MB.
-        while ( s_aoDecoded.size() > 16 || ( s_nDecodedBytes > ( 512u << 20 ) && s_aoDecoded.size() > 1 ) )
+            // Keep a few, and no more than 128 MB.
+        while ( s_aoDecoded.size() > 8 || ( s_nDecodedBytes > ( 128u << 20 ) && s_aoDecoded.size() > 1 ) )
         {
             s_nDecodedBytes -= s_aoDecoded.back().pData->size();
             s_aoDecoded.pop_back();

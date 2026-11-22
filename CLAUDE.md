@@ -119,6 +119,10 @@ ctest --preset full             # every test
   `Scene.cpp` only for a change old readers would get wrong. Update `scenes/README.md` with it.
 - **The 1997 binary scene format is gone,** along with `CRayStream`. Don't bring back binary
   scene files.
+- **Performance work keeps images byte for byte the same** unless a change is meant to alter them:
+  check with `tools/bench.py` (it prints each image's MD5) and the reference renders, and record
+  what was measured in `docs/performance.md`. No fast-math or other flags that reorder
+  floating-point arithmetic.
 - **The wire** (`WireProtocol.h`): the scene goes as SJSON; tiles and their pixels as fixed-layout
   big-endian numbers, the pixels as IEEE-754 doubles. Numbers must cross exactly, so networked
   engines match threads byte for byte; the `network_*` tests, `engine_churn` and `format_test`'s

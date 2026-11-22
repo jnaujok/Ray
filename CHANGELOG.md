@@ -10,6 +10,82 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.21] - 2026-11-21
+
+Faster where it showed: frames no longer wait on their last few tiles, copies of a scene share the
+files they carry instead of each decoding them, networked engines get one encoding of the scene
+between them, and lathes answer shadow rays sooner. Every image is byte for byte what it was, but
+for one deliberate change to bounce light that takes the speckles out of objects-method scenes.
+The profiles and measurements are in [`docs/performance.md`](docs/performance.md).
+
+### Changed
+
+- **The last tiles of a frame are split.** Once fewer tiles are waiting than twice the tasks, each
+  tile handed out is first cut into quarters, down to 8 pixels, so the end of a frame no longer
+  waits on one or two threads finishing a big tile while the rest sit idle. A pixel comes out the
+  same in any tile. The torture test at 240×180 with its full-size settings went from 153 s to
+  108 s of wall time on 16 threads.
+- **Scene copies share the files they carry.** Each worker thread reads its own copy of the scene,
+  with the model files, images and fonts it uses in it as base64, and each decoded them again. Now
+  the last few decoded (up to 128 MB) are kept, by a hash of their text, and shared
+  (`RayJson::BinaryValue`), and the model and file caches hash their contents a word at a time
+  instead of a byte (`RayJson::HashBytes`). The chessboard renders with 21% less CPU.
+- **Networked engines share one encoding of the scene.** A scene packet now starts its SJSON
+  stream afresh (sequence 0), so it depends only on the scene, and the master encodes it once a
+  trace for every engine instead of once an engine; tiles and pixels aren't SJSON, so nothing else
+  on the stream depends on it. `RAY_WIRE_VERSION` is 5. Benchy over three engines takes a third
+  less wall time.
+- **Lathes answer shadow rays at their first hit** (`CLathe::Occludes`, as Bézier patches do),
+  except for a ray leaving the lathe itself, where the nearest hit decides whether it's past the
+  surface; and a lathe's nearest-point search remembers its last answer (shading asks twice for the
+  same point) and skips pieces whose box is farther than the best so far.
+- **The polynomial root finder does less work for the same roots.** It first checks, in the
+  Bernstein basis, whether a polynomial is certainly clear of zero over the range, with room for
+  rounding (then it has no root there, and none could be found by mistake). And once a bracket is
+  small, it certifies which way most of the remaining bisection steps go (the derivative keeps one
+  sign, and the polynomial is well clear of zero just either side of the root), so only the last
+  dozen steps evaluate it. The roots are exactly the ones plain bisection finds. Evaluations fell
+  from about 52 a root to 18, but the function only got 8% faster: bisection is bound by its chain
+  of dependent steps.
+- **Objects-method bounce light gathers four times the rays from an object around the point.** An
+  object whose bounds hold the shading point is gathered over the whole half above it, not a cone,
+  so its `samples` rays were spread far thinner, and with one sample a bright patch caught or missed
+  showed as a speckle (the AS11 suit's, before 0.20.2 moved that scene to the hemisphere method).
+  It now gets four times `samples`. The torture test and `bounce_test` change (their references and
+  previews are regenerated, and the full-size torture image), and the torture test costs about 22%
+  more CPU, since its long boxes' bounding spheres hold much of the scene.
+
+  ![The AS11 recreation with the objects method and one sample, before and after](docs/images/changelog/bounce-fallback.png)
+
+  The shadowed arm and legs lose most of their dark speckles.
+
+  ![A full-size crop of the torture test, before and after](docs/images/changelog/torture-fallback.png)
+
+  In the torture test the change is slight: shadowed floor and the tube's underside a little
+  smoother.
+
+### Added
+
+- **`tools/bench.py`** times six fixed cases (the torture test, Benchy, the chessboard, the fractals,
+  the AS11 recreation and three networked engines) and reports wall and CPU time, peak memory and an
+  MD5 of each image, so a change can be checked for speed and for exactly the same bytes.
+- **`docs/performance.md`**: where the time goes, what was changed and measured, and what's left.
+
+### Measured, not kept
+
+- Link-time optimization: 2–3% less CPU, within the noise of the shared machine, for longer builds.
+
+| Case (16 threads) | Wall 0.20.2 | Wall 0.21 | CPU 0.20.2 | CPU 0.21 |
+|---|---|---|---|---|
+| Torture test, 240×180, adaptive | 153.4 s | 108.0 s | 1,134 s | 1,387 s (1,113–1,125 s before the bounce change) |
+| Benchy, 320×240 | 2.16 s | 2.11 s | 19.0 s | 18.8 s |
+| Chessboard, 480×360 | 10.05 s | 8.04 s | 121.7 s | 95.7 s |
+| Fractals, 320×240 | 0.49 s | 0.51 s | 3.05 s | 3.08 s |
+| AS11-40-5903, 256×256 | 4.72 s | 4.38 s | 48.5 s | 47.9 s |
+| Benchy over 3 engines, 160×120 | 8.47 s | 5.64 s | 12.5 s | 8.0 s |
+
+The full-size torture image took 24,137 CPU seconds (34½ minutes on the shared machine).
+
 ## [2026-alpha-0.20.2] - 2026-11-21
 
 Model files from more places: Ray decodes Draco-compressed glTF itself, as most of NASA's 3D
@@ -2211,7 +2287,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.2...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21...HEAD
+[2026-alpha-0.21]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.2...2026-alpha-0.21
 [2026-alpha-0.20.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.1...2026-alpha-0.20.2
 [2026-alpha-0.20.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20...2026-alpha-0.20.1
 [2026-alpha-0.20]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.19...2026-alpha-0.20
