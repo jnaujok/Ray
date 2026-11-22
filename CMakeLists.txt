@@ -155,6 +155,7 @@ set(RAY_CORE_SOURCES
     core/src/Extruder.cpp
     core/src/Profile.cpp
     core/src/Lathe.cpp
+    core/src/LensElements.cpp
     core/src/Extrusion.cpp
     core/src/Sweep.cpp
     core/src/SrgbColorModel.cpp

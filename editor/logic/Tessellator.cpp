@@ -2,6 +2,7 @@
 #include "Tessellator.h"
 
 #include "Mesh.h"
+#include "LensElements.h"
 #include "LocalShape.h"
 #include "Objects.h"
 #include "Scene.h"
@@ -320,6 +321,34 @@ namespace RayEditor
             anColor[ i ] = (std::min)( 1.0f, (std::max)( 0.0f, anColor[ i ] ) );
     }
 
+        // A mesh's faces (its lean geometry), smooth where it has vertex normals.
+    bool MeshTriangles( SDrawMesh &oMesh, CMesh &oSource )
+    {
+        if ( ! oSource.GetGeometry() )
+            return false;
+
+        const CMesh::SGeometry     &oGeometry = *oSource.GetGeometry();
+        const std::vector<CVector> &aoVertices = oSource.GetVertices();
+        bool                        bSmooth = ( oGeometry.aoVertexNormals.size() == aoVertices.size() );
+
+        for ( size_t nFace = 0; nFace * 3 + 2 < oGeometry.anKept.size() && nFace < oGeometry.aoFaceNormals.size(); nFace++ )
+        {
+            SVec3 p[ 3 ], n[ 3 ];
+
+            for ( int k = 0; k < 3; k++ )
+            {
+                int      nVertex = oGeometry.anKept[ nFace * 3 + (size_t)k ];
+                CVector  oV( aoVertices[ (size_t)nVertex ] );
+                CVector  oN( bSmooth ? oGeometry.aoVertexNormals[ (size_t)nVertex ] : oGeometry.aoFaceNormals[ nFace ] );
+
+                p[ k ] = SVec3( oV.GetX(), oV.GetY(), oV.GetZ() );
+                n[ k ] = SVec3( oN.GetX(), oN.GetY(), oN.GetZ() );
+            }
+            Triangle( oMesh, p[ 0 ], p[ 1 ], p[ 2 ], n[ 0 ], n[ 1 ], n[ 2 ] );
+        }
+        return true;
+    }
+
     bool TessellateObject( const IASLib::CJsonNode &oObject, CObjects *pObject, int nObject, double nPlane,
                            std::vector<SDrawMesh> &aoOut, int nSegments )
     {
@@ -452,6 +481,45 @@ namespace RayEditor
                 }
                 Triangle( oMesh, p[ 0 ], p[ 1 ], p[ 2 ], n[ 0 ], n[ 1 ], n[ 2 ] );
             }
+        }
+        else if ( strType == "lensElements" )
+        {
+                // The ray tubes as they are; the glass, stop and barrel (csgs
+                // of spheres) faintly, as their boxes.
+            CLensElements *pLens = dynamic_cast<CLensElements *>( pObject );
+
+            if ( ! pLens )
+                return false;
+
+            const std::vector<CObjects *> &apParts = pLens->GetParts();
+            size_t                         nFirstRay = apParts.size() - (size_t)pLens->GetRayCount();
+            bool                           bAny = false;
+
+            for ( size_t nPart = 0; nPart < apParts.size(); nPart++ )
+            {
+                SDrawMesh oPart;
+
+                oPart.nObject = oMesh.nObject;
+                std::copy( oMesh.anColor, oMesh.anColor + 4, oPart.anColor );
+                if ( nPart >= nFirstRay )
+                {
+                    CMesh *pTube = dynamic_cast<CMesh *>( apParts[ nPart ] );
+
+                    if ( ! pTube || ! MeshTriangles( oPart, *pTube ) )
+                        continue;
+                }
+                else
+                {
+                    BoundsBox( oPart, *apParts[ nPart ] );
+                    oPart.bGhost = true;
+                }
+                if ( ! oPart.anPositions.empty() )
+                {
+                    aoOut.push_back( std::move( oPart ) );
+                    bAny = true;
+                }
+            }
+            return bAny;
         }
         else if ( strType == "csg" )
         {
