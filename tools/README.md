@@ -93,6 +93,26 @@ cut away with its ray fans, and `scenes/lens_cutaway_test.ray`, the double Gauss
 suite. It reads the prescription tables from `core/src/Lens.cpp` and frames each scene from the
 lens's length and its paraxial back focal distance. Only the Python standard library is needed.
 
+## `make_lm5_eagle.py`
+
+Writes `scenes/models/apollo/lm5_eagle.glb`, the LM-5 Eagle, from NASA's
+`apollo_lunar_module.glb` (`pip install DracoPy numpy`): decodes it, turns round the faces NASA
+wound against their own normals, and sorts every face into one of 14 named parts (the glTF
+materials of the output, which a mesh's `materialMap` dresses) by its NASA material, its node, its
+height and which way it faces. The ascent stage's skin is split by facing: low faces facing forward or aft
+are black Pyromark paint, sideways and aft faces the champagne 5056 anodized panels, the rest the
+gray 2024 skin, and forward, high faces of the window frames quartz. It works normals out with a
+45° crease, scales the model by 1.4 to the real LM's size, stands it on y = 0 and writes an
+indexed, uncompressed glb. The same file comes out every time.
+
+## `make_eagle_scenes.py`
+
+Writes `scenes/models/apollo/lm5_eagle.ray`, the Eagle prefab (one mesh with a `materialMap`, and a
+camera and sun of its own), and `scenes/as11_40_5927_test.ray`, the AS11-40-5927 recreation that
+brings it in with an `include`: the sun as it stood at GET 110:53:38 (14.96° up at azimuth 90.2°),
+the open equipment bay's racks, a rock, a bag and a pole, the camera placed by eye. Only the Python
+standard library is needed.
+
 ## `make_icon.py`
 
 Draws `packaging/io.github.jnaujok.Ray.png`, the 256×256 PNG of Ray's icon, the same picture as

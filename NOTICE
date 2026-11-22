@@ -39,8 +39,12 @@ scenes/models/apollo/apollo_lunar_module.glb and astronaut.glb are from NASA's
 and "Astronaut"), which NASA offers free and without copyright. The lunar
 module is included unmodified; the astronaut was written back out without its
 Draco compression by tools/gltf_decompress.py and its arms lowered by
-tools/pose_astronaut.py. NASA does not endorse this project. The comparison image of NASA photograph AS11-40-5903 in
-docs/images/changelog/ is a NASA image, in the public domain.
+tools/pose_astronaut.py. scenes/models/apollo/lm5_eagle.glb is the lunar
+module modified by tools/make_lm5_eagle.py (decoded, faces regrouped into
+named parts, normals worked out, scaled and written without compression).
+NASA does not endorse this project. The comparison images of NASA photographs
+AS11-40-5903 and AS11-40-5927 (Neil Armstrong) in docs/images/changelog/ and
+docs/images/ are NASA images, in the public domain.
 
 core/src/WebpImage.cpp contains the VP8 token, mode and quantizer tables of
 RFC 6386, "VP8 Data Format and Decoding Guide" (J. Bankoski et al., 2011).

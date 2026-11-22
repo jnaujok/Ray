@@ -10,6 +10,115 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.21.3] - 2026-11-22
+
+Prefabs and the Eagle: any object can be saved as a scene of its own and brought into others with
+an `include`; a model's parts can each wear their own materials and bumps; smooth normals can be
+worked out with a crease angle; a glTF model's own base color image is sampled smoothly through its
+UVs; the LM-5 Eagle is Ray's own model, a prefab dressed part by part; and NASA frame AS11-40-5927
+is recreated with it. The lens cutaways' ray fans are half as bright. Every other render is byte
+for byte the same.
+
+Not in this release: packed images in Blender `.blend` files aren't read, so `"sample": "uv"` works
+on glTF models only, and there is no glTF writer in C++ (the Eagle's cleaned glb is written by the
+Python tool, and Ray saves a model as a Ray scene with `--save-object`).
+
+### Added
+
+- **`include`: one scene's objects in another.** A new object type, `{ "type": "include", "file":
+  "models/apollo/lm5_eagle.ray" }`, reads a scene (JSON or archive) and brings its objects in after
+  itself, placed by the include's own `scale`, `rotation` and `position` about the file's origin
+  (meshes only; anything else is refused unless the placement is left alone). The included scene's
+  files are read beside it, and includes can nest. A saved scene keeps the include, not what it
+  brought in; an archive holds the included scene, and its files under the included scene's folder,
+  so `--save-json` extracts them where it looks (the new `RayJson::CArchiveFolder`). A task's copy
+  of the scene carries the included objects themselves, so networked engines need no files and
+  match threads byte for byte (`network_as11_40_5927`).
+- **Object names and `--save-object`.** Any object can have a `name` (kept when saved).
+  `raythrower --save-object <object> <file>` saves one object, found by its name or its number from
+  1, as a scene archive of its own, and `--save-object-json` as plain JSON with its files beside it,
+  ready for an `include`. `ray-editor` has **File > Export Object...** for the selected object
+  (`CEditorDocument::ExportObject`); what an include brought in shows in its tree and view, is
+  edited through the include, and goes with it when the include is deleted.
+
+  ![models_test.ray, and its puzzle cube saved with --save-object-json and included twice, once moved and turned](docs/images/changelog/include.png)
+
+  On the right, a scene of two includes of the cube saved from `models_test.ray`, one at its own
+  place and one moved 1.5 units and turned 30°.
+- **`materialMap`: materials for a model's parts.** A mesh loaded from a file can give each of its
+  parts (a glTF file's materials, by name; a Blender file's material slots) its own `materials`
+  and `bump`: `"materialMap": { "kapton_blanket": { "materials": [...], "bump": {...} } }`. Faces of
+  parts not named wear the mesh's own. A name the model doesn't have is refused, and the error lists
+  the parts it has.
+- **`creaseAngle`** (0 to 180 degrees) on a model mesh: the file's normals are left out and worked
+  out from the faces instead, each corner taking the area-weighted normals of the faces around it
+  within the angle of its own face, so curved surfaces are smooth and edges sharper than the angle
+  stay sharp.
+- **`"nodeFrame": "world"`** on a glTF mesh with a `node`: the node is placed by its own and its
+  parents' transforms, where the file's scene puts it, instead of in its own frame (still the
+  default, so the chessboard is unchanged).
+- **`faceColors` reads a model's own image (`"sample": "uv"`).** glTF base color images were taken
+  one color a face; with `"sample": "uv"` the `faceColors` texture samples the image itself at the
+  hit, through the face's texture coordinates (bilinear, wrapping, converted from sRGB, times the
+  material's color factor), so the LM's "UNITED STATES" can be read. Faces without an image keep
+  their one color.
+
+  ![NASA's lunar module through faceColors, one color a face before and sampled through each face's UVs after](docs/images/changelog/facecolors-uv.png)
+
+  Look at the descent stage's panel: a sawtooth of face colors before, the flag and lettering after.
+- **The LM-5 Eagle, Ray's own model.** `tools/make_lm5_eagle.py` turns NASA's lunar module into
+  `scenes/models/apollo/lm5_eagle.glb`: faces NASA wound against their own normals turned round,
+  every face sorted into one of 14 named parts by its NASA material, node, height and facing
+  (`kapton_blanket`, `kapton_gold`, `silver_foil`, `kapton_mesa`, `black_blanket`, `dps_bell`,
+  `porch_aluminum`, `inconel_dark`, `white_paint`, `al2024_anodized`, `al5056_anodized`, `al_olive`,
+  `pyromark_black`, `window_quartz`), normals worked out with a 45° crease, scaled to the real LM and
+  standing on the ground. `scenes/models/apollo/lm5_eagle.ray`, written by the new
+  `tools/make_eagle_scenes.py`, is the prefab: one mesh whose `materialMap` dresses each part, the
+  anodized aluminum almost all diffuse (0.97 of its color, 4% metal, a soft highlight and an
+  oil-canning bump), the Kapton blankets and foils tinted metals with crinkle bumps.
+
+  ![The Eagle prefab from the front, far and near](docs/images/changelog/lm5-eagle.png)
+- **AS11-40-5927 recreated** (`scenes/as11_40_5927_test.ray`, also written by
+  `make_eagle_scenes.py`): Eagle from the east at GET 110:53:38 (1969-07-21 04:25:38 UTC), brought in
+  by an `include`, its Scientific Equipment bay open on anodized racks (uprights, shelves, brackets
+  and a stowed package on its strap), a rock of about 40 cm in the foreground, a white bag and a
+  pole, on `regolith` under the sun as it stood then: 14.96° up (ALSJ's 14.0° at 109:00, rising
+  0.508° an hour) at azimuth 90.2°, just south of east, a 0.53° disc. The Data Camera, its 60 mm
+  Biogon, Réseau plate and Ektachrome MS; one bounce of `"hemisphere"` indirect light at 16 rays a
+  point; 128×128 in the test suite (`render_as11_40_5927`, `roundtrip_as11_40_5927_test`,
+  `network_as11_40_5927`). The camera was placed by eye, 13 m out on azimuth 295 and 1.2 m up.
+
+  ![NASA photograph AS11-40-5927 beside Ray's recreation at 512×512](docs/images/changelog/as11-40-5927.png)
+
+  Left, NASA's frame (Neil Armstrong; public domain); right, Ray at 512×512. Buzz Aldrin, who
+  stands at the bay in the photograph, the PSEP and the flag are left out. Look at the copper
+  blankets with their crinkles, the silver and gold struts and gold footpads, the open bay, the
+  LM's shadow to the left and the Réseau crosses; the ascent stage reads paler than the frame's,
+  and NASA's model is taller for its leg span than the real LM.
+- `format_test` checks a model's parts and images (`ModelPartChecks`): NASA's LM's 12 parts and its
+  images' coordinates, a `materialMap` giving one part a bump and refusing a part the model lacks,
+  `creaseAngle` keeping a cube's corners sharp below 90° and rounding them above, `nodeFrame`
+  moving the chess rook by its node's translation, `"sample": "uv"` at a face with an image,
+  names, `SaveObject`, an include's placement, save and task copy, an include in a folder through
+  an archive and back out, the Eagle's 14 parts, and `fanOpacity`'s limits. `editor_test` checks
+  Export Object and editing an include.
+
+### Changed
+
+- **The lens cutaways' ray fans are half as bright.** A ray tube now glows with half its color and
+  lets the rest of the light through (a transparent material of index 1, which doesn't bend it), so
+  the glass shows through the fans: the new `fanOpacity` field of `lensElements` (default 0.5;
+  `1` is the old look), and `tools/make_lens_cutaways.py` makes the tubes thinner too (0.028 of the
+  scale, from 0.035). The scenes in `scenes/cutaways/` and `scenes/lens_cutaway_test.ray` are
+  written again, and `tests/reference/renders.tar.gz`, the README's expected-output images
+  (`tools/render_previews.py`) and `docs/images/lens_cutaways.png` are regenerated.
+
+  ![The 60 mm Biogon's fans before and after](docs/images/changelog/lens-fans.png)
+
+  The fans let the elements and the checkerboard show through them.
+- `CScene::PartToJson` gives an object by the scene's own list (included objects too), so the
+  editor's tree and its JSON agree.
+
 ## [2026-alpha-0.21.2] - 2026-11-22
 
 Lenses as glass, and packages: every built-in lens can be built in a scene as glass, cut away to
@@ -2500,7 +2609,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.2...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.3...HEAD
+[2026-alpha-0.21.3]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.2...2026-alpha-0.21.3
 [2026-alpha-0.21.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.1...2026-alpha-0.21.2
 [2026-alpha-0.21.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21...2026-alpha-0.21.1
 [2026-alpha-0.21]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.2...2026-alpha-0.21

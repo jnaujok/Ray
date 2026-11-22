@@ -76,7 +76,10 @@ properties on the right.
   duplicate and delete.
 - **File:** new, open (scene archives and JSON), save (a `.ray` archive with every file the scene
   uses, or plain `.json` with the files beside it), and **Import Model** (STL or OBJ), which adds
-  a mesh fitted to two units and standing on the floor.
+  a mesh fitted to two units and standing on the floor, and **Export Object**, which saves the
+  selected object as a scene of its own (archive or JSON, as for save) for an `include` to bring
+  into other scenes. What an include brought in shows in the tree and the view, and is edited
+  through the include (or its file); deleting the include removes it.
 
 ## Not yet
 
