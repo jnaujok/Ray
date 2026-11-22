@@ -28,6 +28,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <cstdint>
 
 class CVector;
 
@@ -65,6 +66,15 @@ namespace RayJson
             CEmbedData &operator =( const CEmbedData & );
     };
     BOOL            EmbeddingData( void );
+
+        /// The bytes a text node holds in base64 (a file carried in a copy
+        /// of the scene), as CJsonNode::binaryValue gives them. Every thread
+        /// reading the same copy of a scene decodes the same files, so the
+        /// last few decoded are kept and shared: the rest only check that
+        /// the text is the same.
+    bool            BinaryValue( const IASLib::CJsonNode &oNode, std::vector<unsigned char> &anData );
+        /// Two 64-bit hashes of some bytes, for caches keyed by contents.
+    void            HashBytes( const char *pBytes, size_t nSize, uint64_t anHash[ 2 ] );
 
         /// While one exists, relative file names in a scene being read are
         /// taken from this directory (the scene file's).

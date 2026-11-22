@@ -52,6 +52,19 @@ tools/bounce_sweep.py build/raythrower --scene scenes/torture_test.ray --size 16
     --counts 1,4,9 --hemisphere 1,4,9 --reference 49 --out sweep-torture
 ```
 
+## `bench.py`
+
+Times `raythrower` on the scenes 2026-alpha-0.21 was tuned on (the torture test at 240×180 with the
+full-size adaptive settings, Benchy, the depth-of-field chessboard, the fractals, the AS11-40-5903
+recreation and a render by three networked engines) and prints each one's wall time, CPU time, peak
+memory and an MD5 of the image, so a change can be checked both for speed and for giving exactly
+the same bytes. It needs GNU time (`/usr/bin/time`). `--runs` keeps the fastest of several runs,
+`--only` picks cases, `--tasks` sets the threads (default 16) and `--json` saves the numbers.
+
+```sh
+python3 tools/bench.py --runs 2 --json before.json
+```
+
 ## `adaptive_sweep.py`
 
 Measures the adaptive sampler's noise against its cost, to choose its settings:

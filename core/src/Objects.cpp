@@ -670,7 +670,14 @@ void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, C
                 nCosLimit = 1.0 - ( oTarget.nSolidAngle / ( 2.0 * PI ) );
             }
 
-            for ( int nSample = 0; nSample < nSamples; nSample++ )
+                // An object whose bounds hold the point (a room, a large
+                // mesh around it) is gathered over the whole half above the
+                // point, not a small cone, so its few rays are spread far
+                // thinner and one bright patch caught or missed shows as a
+                // speckle. It gets four times the rays.
+            int nRays = ( oTarget.nAim == AIM_HALF ) ? nSamples * 4 : nSamples;
+
+            for ( int nSample = 0; nSample < nRays; nSample++ )
             {
                 FLT     nU;
                 FLT     nV;
@@ -684,7 +691,7 @@ void CObjects::IndirectShade( CScene &oScene, CRay &oRay, CVector &oIntersect, C
 
                     if ( GatherAlong( oScene, oRay, oIntersect, oUp, oDirection, nReach * 1.0001 + 1e-9, nStream + (uint64_t)nSample,
                                       oTarget.pObject, oBounced ) )
-                        oIncoming = oIncoming + ( oBounced * ( PI / (FLT)nSamples ) );
+                        oIncoming = oIncoming + ( oBounced * ( PI / (FLT)nRays ) );
                 }
                 else
                 {

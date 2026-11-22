@@ -44,6 +44,11 @@ class CSocketTaskMaster : public CTaskMaster
         std::vector<CConnection *>  m_apConnections;    // by task; only ever added to during a run
         CAcceptor                  *m_pAcceptor;
         std::atomic<bool>           m_bClosing;
+            // The scene as an SJSON packet, encoded once a trace from a
+            // fresh stream (sequence 0, so a receiver starts afresh too) and
+            // sent to every engine alike.
+        std::string                 m_strScenePacket;
+        uint32_t                    m_nScenePacketTrace = 0;
 
             /// Reads a new engine's hello and adds it. Returns its task
             /// number, or -1 if it isn't a rayengine of this version.

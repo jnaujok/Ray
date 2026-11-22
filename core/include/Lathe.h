@@ -43,7 +43,8 @@ class CLathe : public CLocalShape
             int     nDegree;            // 1 to 3
             double  anR[ 4 ];
             double  anY[ 4 ];
-            double  nRMax;              // the most r and the y range of its control points
+            double  nRMin;              // the r range and the y range of its control points,
+            double  nRMax;              // which hold the piece (as its Bezier hull)
             double  nYMin;
             double  nYMax;
             double  nV0;                // v at s = 0 and s = 1
@@ -66,6 +67,15 @@ class CLathe : public CLocalShape
         double              m_nYMax;
         double              m_anEndNormal[ 2 ][ 3 ];    // the end faces' outward normals (partial sweep)
         double              m_anEndAlong[ 2 ][ 3 ];     // the direction in each end face away from the axis
+        BOOL                m_bAnyHit;          // LocalHit may stop at the first hit (a shadow ray)
+            // The last Nearest asked and its answer: shading asks for the
+            // normal and the surface coordinates of the same point.
+        mutable double      m_nNearR;
+        mutable double      m_nNearY;
+        mutable int         m_nNearPiece;
+        mutable double      m_nNearS;
+        mutable double      m_nNearDistance;
+        mutable BOOL        m_bNearValid;
 
         BOOL                PieceHit( const SPiece &oPiece, const FLT anO[ 3 ], const FLT anD[ 3 ], double nLow, double nHigh, double &nBest );
         BOOL                InSweep( double x, double z ) const;
@@ -90,6 +100,7 @@ class CLathe : public CLocalShape
         virtual            ~CLathe( void );
 
         virtual BOOL        IsClosed( void ) { return m_bClosed; }
+        virtual BOOL        Occludes( CRay &oRay, CObjects *pIgnore );
 };
 
 #endif // __LATHE_H__

@@ -476,8 +476,8 @@ raythrower scenes/torture_test.ray --png torture.png --hdr torture.hdr
 
 The image below is rendered with the adaptive sampler instead (at least 16 rays a pixel, up to 100
 where Student's t says they don't yet agree, watching red, green and blue apart), which is much
-cleaner: 69 rays a pixel on average, about 20 minutes on an idle 16-core machine (19,329
-CPU-seconds):
+cleaner: 69 rays a pixel on average, about 25 minutes on an idle 16-core machine (24,137
+CPU-seconds in 2026-alpha-0.21, which spends more rays on bounce light around large objects):
 
 ```sh
 raythrower scenes/torture_test.ray --aa adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb --png torture.png
@@ -557,8 +557,8 @@ light to edit it as JSON or delete it.
 
 ```sh
 cmake --preset release && cmake --build --preset release
-ctest --preset fast        # every test but the three slow renders: about 35 s on 16 cores
-ctest --preset full        # every test: about 45 s
+ctest --preset fast        # every test but the three slow renders: about 35 to 55 s on 16 cores
+ctest --preset full        # every test: about 45 to 80 s (the range is a busy machine)
 ```
 
 The presets (`CMakePresets.json`) build optimized, as CI does, and run 8 tests at a time; `ctest
@@ -570,6 +570,8 @@ every test under the sanitizers, except the torture test (labelled `torture`), w
 for the runners: CI runs `ctest -LE torture`, and the `full` preset runs it locally before every
 merge.
 
+`tools/bench.py` times six fixed renders and checks their images' MD5s, for performance work; what
+it found is in [`docs/performance.md`](docs/performance.md) (2026-alpha-0.21).
 `tools/bounce_sweep.py` measures indirect light's noise and render time against its number of rays
 (see the 2026-alpha-0.14.1 changelog; the scenes in `scenes/studies/` compare the two methods), and
 `tools/adaptive_sweep.py` the adaptive sampler's noise against its cost (2026-alpha-0.20.1); they
@@ -684,7 +686,7 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editors' builds: `RayEditor.cmake` (wxWidgets) and `RayGui.cmake` (MFC) |
-| [`docs/`](docs) | MFC AppWizard notes, README images, and the changelog's before and after images |
+| [`docs/`](docs) | MFC AppWizard notes, README images, the changelog's before and after images, and the performance notes (`performance.md`) |
 | [`legacy/`](legacy) | Visual C++ 4, 5, and 6 project files, kept for history |
 
 ## Scene files
@@ -744,7 +746,9 @@ so far, and a cross-platform scene editor with a shaded OpenGL view and progress
 editors reach every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
 seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and lunar regolith,
 and a recreation of AS11-40-5903. Models load from glTF (Draco-compressed too) and Blender
-`.blend` files as well as STL and OBJ.
+`.blend` files as well as STL and OBJ. 2026-alpha-0.21 was a tuning release: frames split their last
+tiles, scene copies share the files they carry, and networked engines share one encoding of the
+scene (see [`docs/performance.md`](docs/performance.md)).
 
 ## Changelog
 

@@ -125,9 +125,11 @@ Gathered light respects the camera's `clamp`. Two methods:
   direction counts twice, and it counts by the cosine at the point and the solid angle it stands
   for, so the answer is right whatever the number of rays. An object the point is inside the bounds
   of (the room it stands in, a mesh it is part of) is gathered from over the whole half above the
-  point instead, and a closed object (a sphere, a box) lights itself when seen from inside. Cost:
-  at most `objects` × `samples` gathering rays at each diffuse hit, each shading what it meets with
-  direct light (more with `bounces` above 1), so it stays predictable however big the scene.
+  point instead, with four times `samples` rays (since 2026-alpha-0.21: spread that thin, one ray
+  showed as speckles), and a closed object (a sphere, a box) lights itself when seen from inside.
+  Cost: at most `objects` × `samples` gathering rays at each diffuse hit (four times that for an
+  object around the point), each shading what it meets with direct light (more with `bounces`
+  above 1), so it stays predictable however big the scene.
 - **`"hemisphere"`**: `samples` rays spread by the cosine over the whole half above the point, each
   reaching `distance`. Nothing nearby is missed, but most rays in an open scene hit nothing. Cost:
   `samples` gathering rays at each diffuse hit. A ray that hits nothing in reach brings nothing:

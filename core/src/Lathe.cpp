@@ -88,7 +88,14 @@ CLathe::CLathe( void ) :
     m_nOrient( 1.0 ),
     m_nRMax( 1.0 ),
     m_nYMin( 0.0 ),
-    m_nYMax( 1.0 )
+    m_nYMax( 1.0 ),
+    m_bAnyHit( FALSE ),
+    m_nNearR( 0.0 ),
+    m_nNearY( 0.0 ),
+    m_nNearPiece( 0 ),
+    m_nNearS( 0.0 ),
+    m_nNearDistance( 0.0 ),
+    m_bNearValid( FALSE )
 {
         // A plain cylinder until a scene says otherwise.
     Profile::SEntry aoEntries[ 4 ] = { { 1, { { 0.0, 0.0 } } }, { 1, { { 1.0, 0.0 } } }, { 1, { { 1.0, 1.0 } } }, { 1, { { 0.0, 1.0 } } } };
@@ -177,6 +184,7 @@ BOOL CLathe::PrepareShape( void )
     double              nTotal = 0.0;
 
     m_aoPieces.clear();
+    m_bNearValid = FALSE;
     m_nYMin = 1e300;
     m_nYMax = -1e300;
     for ( const Profile::SPiece &oIn : aoLoop )
@@ -186,11 +194,13 @@ BOOL CLathe::PrepareShape( void )
 
         oPiece.nDegree = oIn.nDegree;
         Profile::PowerBasis( oIn, oPiece.anR, oPiece.anY );
+        oPiece.nRMin = 1e300;
         oPiece.nRMax = 0.0;
         oPiece.nYMin = 1e300;
         oPiece.nYMax = -1e300;
         for ( int k = 0; k < 4; k++ )
         {
+            oPiece.nRMin = ( oIn.p[ k ][ 0 ] < oPiece.nRMin ) ? oIn.p[ k ][ 0 ] : oPiece.nRMin;
             oPiece.nRMax = ( oIn.p[ k ][ 0 ] > oPiece.nRMax ) ? oIn.p[ k ][ 0 ] : oPiece.nRMax;
             oPiece.nYMin = ( oIn.p[ k ][ 1 ] < oPiece.nYMin ) ? oIn.p[ k ][ 1 ] : oPiece.nYMin;
             oPiece.nYMax = ( oIn.p[ k ][ 1 ] > oPiece.nYMax ) ? oIn.p[ k ][ 1 ] : oPiece.nYMax;
@@ -408,9 +418,13 @@ BOOL CLathe::LocalHit( const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT 
     for ( const SPiece &oPiece : m_aoPieces )
     {
         if ( PieceHit( oPiece, anOrigin, anDirection, nLow, nHigh, nBest ) )
+        {
             bFound = TRUE;
+            if ( m_bAnyHit )
+                break;
+        }
     }
-    if ( m_bClosed && m_bPartial )
+    if ( m_bClosed && m_bPartial && ! ( bFound && m_bAnyHit ) )
     {
         for ( int k = 0; k < 2; k++ )
         {
@@ -443,6 +457,13 @@ BOOL CLathe::LocalHit( const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], FLT 
 
 double CLathe::Nearest( double r, double y, int &nPiece, double &s ) const
 {
+    if ( m_bNearValid && r == m_nNearR && y == m_nNearY )
+    {
+        nPiece = m_nNearPiece;
+        s = m_nNearS;
+        return m_nNearDistance;
+    }
+
     double nBest = 1e300;
 
     nPiece = 0;
@@ -451,6 +472,25 @@ double CLathe::Nearest( double r, double y, int &nPiece, double &s ) const
     {
         const SPiece &oPiece = m_aoPieces[ n ];
         int           d = oPiece.nDegree;
+
+            // A piece lies in its control points' box, so none of its points
+            // can be nearer than the box. Skip it if the box is farther than
+            // the best so far, allowing for rounding in how the candidates'
+            // distances are worked out (so the answer is exactly what
+            // looking at every piece gives).
+        if ( nBest < 1e300 )
+        {
+            double nSlack = 1e-13 * ( std::fabs( r ) + std::fabs( y ) + std::fabs( oPiece.anR[ 0 ] ) + std::fabs( oPiece.anR[ 1 ] ) +
+                                      std::fabs( oPiece.anR[ 2 ] ) + std::fabs( oPiece.anR[ 3 ] ) + std::fabs( oPiece.anY[ 0 ] ) +
+                                      std::fabs( oPiece.anY[ 1 ] ) + std::fabs( oPiece.anY[ 2 ] ) + std::fabs( oPiece.anY[ 3 ] ) + 1e-300 );
+            double nGapR = ( r < oPiece.nRMin ) ? oPiece.nRMin - r : ( r > oPiece.nRMax ) ? r - oPiece.nRMax : 0.0;
+            double nGapY = ( y < oPiece.nYMin ) ? oPiece.nYMin - y : ( y > oPiece.nYMax ) ? y - oPiece.nYMax : 0.0;
+
+            nGapR = ( nGapR > nSlack ) ? nGapR - nSlack : 0.0;
+            nGapY = ( nGapY > nSlack ) ? nGapY - nSlack : 0.0;
+            if ( ( ( nGapR * nGapR ) + ( nGapY * nGapY ) ) * ( 1.0 - 1e-12 ) > nBest )
+                continue;
+        }
         double        anR[ 4 ], anY[ 4 ], anR1[ 3 ], anY1[ 3 ], anA[ 6 ], anB[ 6 ], anG[ 6 ], anRoots[ 6 ];
         double        anCandidates[ 8 ] = { 0.0, 1.0 };
         int           nCandidates = 2;
@@ -492,7 +532,30 @@ double CLathe::Nearest( double r, double y, int &nPiece, double &s ) const
             }
         }
     }
-    return std::sqrt( nBest );
+    m_nNearR = r;
+    m_nNearY = y;
+    m_nNearPiece = nPiece;
+    m_nNearS = s;
+    m_nNearDistance = std::sqrt( nBest );
+    m_bNearValid = TRUE;
+    return m_nNearDistance;
+}
+
+BOOL CLathe::Occludes( CRay &oRay, CObjects *pIgnore )
+{
+        // A shadow ray needs a hit, not the nearest. Not when the ray leaves
+        // this lathe: then the nearest hit decides whether it's far enough
+        // past the surface it left.
+    if ( pIgnore == this )
+        return CLocalShape::Occludes( oRay, pIgnore );
+
+    CVector oHit;
+    BOOL    bHit;
+
+    m_bAnyHit = TRUE;
+    bHit = Intersect( oRay, oHit, pIgnore );
+    m_bAnyHit = FALSE;
+    return bHit;
 }
 
 void CLathe::LocalNormal( const FLT anPoint[ 3 ], FLT anNormal[ 3 ] )

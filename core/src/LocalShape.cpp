@@ -328,6 +328,169 @@ static double Evaluate( const double *anCoeffs, int nDegree, double x )
     return nValue;
 }
 
+    // Whether a polynomial certainly has no root in [nLow, nHigh], and more:
+    // whether it stays so far from zero there that working it out at any
+    // point of the stretch, with rounding, can't give zero or the other sign.
+    // Then the search below would find no root either, so skipping it gives
+    // exactly the same answer, much sooner. The test writes the polynomial
+    // in the Bernstein basis over the stretch: if every coefficient has the
+    // same sign, so has the polynomial, and it is at least the smallest of
+    // them. Each coefficient's rounding is bounded by doing the same sums on
+    // magnitudes, with a wide margin.
+    // C(k, i) / C(n, i) for each degree n up to 7, worked out once.
+static const double ( *BernsteinWeights( int nDegree ) )[ 8 ]
+{
+    struct STable
+    {
+        double anW[ 8 ][ 8 ][ 8 ];
+
+        STable( void )
+        {
+            double anC[ 8 ][ 8 ] = {};
+
+            for ( int n = 0; n < 8; n++ )
+            {
+                anC[ n ][ 0 ] = 1.0;
+                for ( int k = 1; k <= n; k++ )
+                    anC[ n ][ k ] = anC[ n - 1 ][ k - 1 ] + ( ( k <= n - 1 ) ? anC[ n - 1 ][ k ] : 0.0 );
+            }
+            for ( int n = 0; n < 8; n++ )
+                for ( int k = 0; k < 8; k++ )
+                    for ( int i = 0; i < 8; i++ )
+                        anW[ n ][ k ][ i ] = ( k <= n && i <= k ) ? anC[ k ][ i ] / anC[ n ][ i ] : 0.0;
+        }
+    };
+    static const STable s_oTable;
+
+    return s_oTable.anW[ nDegree ];
+}
+
+static bool ClearOfZero( const double *anCoeffs, int nDegree, double nLow, double nHigh )
+{
+    double anA[ 8 ], anM[ 8 ];
+    double h = nHigh - nLow, nAbsLow = ( nLow < 0.0 ) ? -nLow : nLow;
+
+    for ( int i = 0; i <= nDegree; i++ )
+    {
+        anA[ i ] = anCoeffs[ i ];
+        anM[ i ] = ( anCoeffs[ i ] < 0.0 ) ? -anCoeffs[ i ] : anCoeffs[ i ];
+    }
+        // p( nLow + h t ): shift to nLow (Horner's Taylor shift), then scale.
+    for ( int k = 0; k < nDegree; k++ )
+    {
+        for ( int i = nDegree - 1; i >= k; i-- )
+        {
+            anA[ i ] += nLow * anA[ i + 1 ];
+            anM[ i ] += nAbsLow * anM[ i + 1 ];
+        }
+    }
+
+    double nPower = 1.0;
+
+    for ( int i = 0; i <= nDegree; i++ )
+    {
+        anA[ i ] *= nPower;
+        anM[ i ] *= nPower;
+        nPower *= h;
+    }
+
+        // To the Bernstein basis: b_k = sum over i <= k of C(k,i)/C(n,i) a_i.
+    const double ( *anWeight )[ 8 ] = BernsteinWeights( nDegree );
+    double nSmallest = 1e300;
+    int    nSign = 0;
+
+    for ( int k = 0; k <= nDegree; k++ )
+    {
+        double b = 0.0, m = 0.0;
+
+        for ( int i = 0; i <= k; i++ )
+        {
+            double w = anWeight[ k ][ i ];
+
+            b += w * anA[ i ];
+            m += w * ( ( anA[ i ] < 0.0 ) ? -anA[ i ] : anA[ i ] ) + w * anM[ i ];
+        }
+
+        double nRoom = ( ( b < 0.0 ) ? -b : b ) - ( 1e-12 * m );
+        int    nThis = ( b > 0.0 ) ? 1 : -1;
+
+        if ( ! ( nRoom > 0.0 ) || ( nSign != 0 && nThis != nSign ) )
+            return false;
+        nSign = nThis;
+        nSmallest = ( nRoom < nSmallest ) ? nRoom : nSmallest;
+    }
+
+        // Working the polynomial out by Horner's rule at x is off by less
+        // than 2 n u times the sum of |c_i| |x|^i; demand far more room.
+    double nMost = ( nAbsLow > ( ( nHigh < 0.0 ) ? -nHigh : nHigh ) ) ? nAbsLow : ( ( nHigh < 0.0 ) ? -nHigh : nHigh );
+    double nBound = 0.0;
+
+    for ( int i = nDegree; i >= 0; i-- )
+        nBound = ( nBound * nMost ) + ( ( anCoeffs[ i ] < 0.0 ) ? -anCoeffs[ i ] : anCoeffs[ i ] );
+    return nSmallest > 1e-12 * nBound;
+}
+
+    // For the bisection below: on the bracket [a, b] (where the polynomial
+    // has sign nSign at a and the other at b), whether its derivative is
+    // certainly of one sign throughout (so it only rises or only falls), and
+    // points L and R, near the root, where it is certainly so far from zero
+    // that rounding can't hide its sign. Then every point of [a, L] has sign
+    // nSign and every point of [R, b] the other, when worked out.
+static bool Certify( const double *anCoeffs, const double *anDerivative, int nDegree, double a, double b, int nSign,
+                     double &L, double &R )
+{
+    if ( ! ClearOfZero( anDerivative, nDegree - 1, a, b ) )
+        return false;
+
+        // A few Newton steps from the middle find the root closely.
+    double x = ( a + b ) / 2.0;
+    double nSlope = 0.0;
+
+    for ( int k = 0; k < 4; k++ )
+    {
+        double f = Evaluate( anCoeffs, nDegree, x );
+
+        nSlope = Evaluate( anDerivative, nDegree - 1, x );
+        if ( nSlope == 0.0 )
+            return false;
+
+        double x1 = x - ( f / nSlope );
+
+        if ( ! ( x1 > a && x1 < b ) )
+            break;
+        x = x1;
+    }
+    if ( nSlope == 0.0 )
+        return false;
+
+        // Horner's rule is off by less than 2 n u (u = 2^-53) times the sum
+        // of |c_i| |x|^i; E is several times that, for every x in [a, b].
+    double nMost = ( ( a < 0.0 ) ? -a : a ) > ( ( b < 0.0 ) ? -b : b ) ? ( ( a < 0.0 ) ? -a : a ) : ( ( b < 0.0 ) ? -b : b );
+    double nBound = 0.0;
+
+    for ( int i = nDegree; i >= 0; i-- )
+        nBound = ( nBound * nMost ) + ( ( anCoeffs[ i ] < 0.0 ) ? -anCoeffs[ i ] : anCoeffs[ i ] );
+
+    double E = 1e-14 * nBound;
+    double nScale = ( ( x < 0.0 ) ? -x : x ) + ( b - a );
+    double d = ( 4.0 * E ) / ( ( nSlope < 0.0 ) ? -nSlope : nSlope ) + ( 1e-15 * nScale );
+
+    for ( int nTry = 0; nTry < 3; nTry++, d *= 16.0 )
+    {
+        L = x - d;
+        R = x + d;
+        if ( ! ( L > a && R < b ) )
+            return false;
+
+        double fL = Evaluate( anCoeffs, nDegree, L ), fR = Evaluate( anCoeffs, nDegree, R );
+
+        if ( ( ( fL < 0.0 ) ? -fL : fL ) > 2.0 * E && ( ( fR < 0.0 ) ? -fR : fR ) > 2.0 * E &&
+             ( ( fL < 0.0 ) ? -1 : 1 ) == nSign && ( ( fR < 0.0 ) ? -1 : 1 ) == -nSign )
+            return true;
+    }
+    return false;
+}
+
 int CLocalShape::PolynomialRoots( const double *anCoeffs, int nDegree, double nLow, double nHigh, double *anRoots )
 {
         // Leading coefficients that are zero (to rounding) lower the degree.
@@ -352,6 +515,9 @@ int CLocalShape::PolynomialRoots( const double *anCoeffs, int nDegree, double nL
         }
         return 0;
     }
+
+    if ( nDegree <= 7 && ClearOfZero( anCoeffs, nDegree, nLow, nHigh ) )
+        return 0;
 
         // The turning points split [nLow, nHigh] into stretches where the
         // polynomial only rises or only falls, so each holds one root at
@@ -388,27 +554,63 @@ int CLocalShape::PolynomialRoots( const double *anCoeffs, int nDegree, double nL
                 anRoots[ nRoots++ ] = b;
             continue;
         }
-        for ( int nStep = 0; nStep < 200; nStep++ )
+            // Bisection to neighboring doubles. Once the bracket is small,
+            // most of the remaining steps can be decided without working the
+            // polynomial out: if the polynomial certainly rises (or falls)
+            // all across the bracket, and it is certainly well clear of
+            // zero at points L and R on either side of the root, then at
+            // every point left of L it has fa's sign, and at every point
+            // right of R the other, even with rounding. Those steps take
+            // the branch the evaluation would have; only the steps between
+            // L and R work it out. The points, the tests and the answer are
+            // exactly the plain bisection's.
+        int    nSign = ( fa < 0.0 ) ? -1 : 1;
+        bool   bNegative = ( fa < 0.0 );
+        double L = 0.0, R = 0.0;
+        bool   bKnown = false, bTried = false;
+        double nWidth = b - a;
+        int    nStep = 0;
+
+            // The moves are written as selections rather than branches: which
+            // way each step goes can't be guessed, and a processor that
+            // guesses wrong half the time spends longer on that than on the
+            // arithmetic.
+        while ( nStep < 200 )
         {
             double m = ( a + b ) / 2.0;
 
             if ( m <= a || m >= b )
                 break;
+            if ( ! bTried && ( b - a ) < nWidth / 64.0 )
+            {
+                bTried = true;
+                bKnown = Certify( anCoeffs, anDerivative, nDegree, a, b, nSign, L, R );
+            }
+            if ( bKnown && ( m <= L || m >= R ) )
+            {
+                    // Known side: m at or left of L has the sign at a, so a
+                    // moves there; right of R the other, so b does.
+                bool bLeft = ( m <= L );
+
+                a = bLeft ? m : a;
+                b = bLeft ? b : m;
+                nStep++;
+                continue;
+            }
 
             double fm = Evaluate( anCoeffs, nDegree, m );
 
+            nStep++;
             if ( fm == 0.0 )
             {
                 a = b = m;
                 break;
             }
-            if ( ( fm < 0.0 ) == ( fa < 0.0 ) )
-            {
-                a = m;
-                fa = fm;
-            }
-            else
-                b = m;
+
+            bool bRight = ( ( fm < 0.0 ) == bNegative );
+
+            a = bRight ? m : a;
+            b = bRight ? b : m;
         }
         anRoots[ nRoots++ ] = ( a + b ) / 2.0;
     }
