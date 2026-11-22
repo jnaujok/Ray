@@ -1,8 +1,4 @@
-#ifdef RAY_GUI
-#include "StdAfx.h"
-#else
 #include "Globals.h"
-#endif
 
 #include "Lens.h"
 #include "SceneJson.h"
@@ -483,7 +479,8 @@ FLT CLens::FocalLengthIn( int nChannel ) const
     return -PARAXIAL_HEIGHT / ( anDirection[ 1 ] / anDirection[ 2 ] );
 }
 
-BOOL CLens::Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT nStopRadius, int nChannel ) const
+BOOL CLens::Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT nStopRadius, int nChannel,
+                   std::vector<FLT> *panPath ) const
 {
     int nCount = (int)m_aoSurfaces.size();
 
@@ -581,7 +578,52 @@ BOOL CLens::Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT n
             anOrigin[ nAxis ] = anHit[ nAxis ];
         }
         Normalize( anDirection );
+        if ( panPath )
+            panPath->insert( panPath->end(), anHit, anHit + 3 );
     }
+    return TRUE;
+}
+
+void CLens::GlassAfter( int nIndex, FLT &nIndexD, FLT &nAbbe ) const
+{
+    nIndexD = 1.0;
+    nAbbe = 0.0;
+    if ( nIndex < 0 || nIndex >= (int)m_aoSurfaces.size() )
+        return;
+
+    const SSurface &oSurface = m_aoSurfaces[ (size_t)nIndex ];
+
+    if ( oSurface.nGlass != GLASS_NONE )
+    {
+        FLT nD = SellmeierIndex( oSurface.nGlass, 0.5875618 );
+        FLT nF = SellmeierIndex( oSurface.nGlass, 0.4861327 );
+        FLT nC = SellmeierIndex( oSurface.nGlass, 0.6562725 );
+
+        nIndexD = nD;
+        nAbbe = ( nF > nC ) ? ( nD - 1.0 ) / ( nF - nC ) : 0.0;
+        return;
+    }
+    nIndexD = oSurface.nIor;
+    nAbbe = ( oSurface.nIor > 1.0 ) ? oSurface.nAbbe : 0.0;
+}
+
+BOOL CLens::TracePath( const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], int nChannel, std::vector<FLT> &anPoints ) const
+{
+    FLT anFrom[ 3 ] = { anOrigin[ 0 ], anOrigin[ 1 ], anOrigin[ 2 ] };
+    FLT anWay[ 3 ] = { anDirection[ 0 ], anDirection[ 1 ], anDirection[ 2 ] };
+
+    anPoints.clear();
+    if ( ! m_bPrepared )
+        return FALSE;
+    Normalize( anWay );
+    if ( ! Trace( anFrom, anWay, TRUE, m_nStopRadius, nChannel, &anPoints ) || ! ( anWay[ 2 ] > 0.0 ) )
+        return FALSE;
+
+        // On to the sensor plane.
+    FLT nT = ( m_nSensorZ - anFrom[ 2 ] ) / anWay[ 2 ];
+
+    for ( int nAxis = 0; nAxis < 3; nAxis++ )
+        anPoints.push_back( anFrom[ nAxis ] + ( nT * anWay[ nAxis ] ) );
     return TRUE;
 }
 

@@ -74,6 +74,7 @@
 #include "Fractal.h"
 #include "Extrusion.h"
 #include "Sweep.h"
+#include "LensElements.h"
 #include <map>
 
 
@@ -5577,6 +5578,106 @@ static std::string ToBase64( const std::string &strData )
 
     // glTF 2.0 models, CMetalMaterial, the adaptive sampler's confidence and
     // channels, and CRayCountMap (2026-alpha-0.20.1).
+    // The lens built as glass, with its ray fans (2026-alpha-0.21.2).
+static void LensElementsChecks( void )
+{
+    const char *strObject = "{ \"type\": \"lensElements\", \"prescription\": \"double-gauss-50mm\", \"scale\": 1, \"rays\": 5 }";
+    CScene      oScene;
+    std::string strScene = Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }", strObject );
+
+    Check( oScene.FromJson( strScene ) == 0, "a lensElements object loads" );
+
+    CLensElements *pElements = dynamic_cast<CLensElements *>( oScene.GetObjectAt( 0 ) );
+    CLens          oLens;
+    std::string    strError;
+
+    Check( pElements != NULL, "it is a CLensElements" );
+    if ( pElements == NULL )
+        return;
+    oLens.SetPrescription( "double-gauss-50mm" );
+    oLens.SetFocusDistance( 1e9 );
+    Check( oLens.Prepare( 1e9, strError ) == TRUE, "the double Gauss prepares" );
+
+        // Six runs of glass: two singlets, a doublet, a doublet and a singlet.
+    Check( pElements->GetElementCount() == 6, "the double Gauss is built as its six elements" );
+    Check( (int)pElements->GetParts().size() == 6 + 1 + pElements->GetRayCount(), "the parts are the glass, the stop and the rays" );
+        // Two fields: on axis in three colors, then 0.7 of the field.
+    Check( pElements->GetRayCount() == 4 * 5, "five rays in each of the four fans" );
+
+        // Each ray meets every surface and ends on the sensor plane; the
+        // on-axis green rays (the d line, the second fan) come to the axis there.
+    const std::vector< std::vector<CVector> > &aaoPaths = pElements->GetRayPaths();
+    bool                                       bEnds = true;
+    bool                                       bFocus = true;
+    bool                                       bCount = true;
+
+    for ( size_t nRay = 0; nRay < aaoPaths.size(); nRay++ )
+    {
+        std::vector<CVector> aoPath = aaoPaths[ nRay ];
+
+        if ( aoPath.size() != (size_t)oLens.GetSurfaceCount() + 2 )
+            bCount = false;
+        if ( aoPath.empty() )
+            continue;
+
+        CVector oEnd = aoPath.back();
+
+            // In the lens frame (scale 1, no turn) z is along the axis and the
+            // cutaway sets the rays just off the cut, at x = -2 x 0.25 mm.
+        if ( ABS( oEnd.GetZ() - oLens.GetSensorZ() ) > 1e-6 || ABS( oEnd.GetX() + 0.5 ) > 1e-9 )
+            bEnds = false;
+        if ( nRay >= 5 && nRay < 10 && ABS( oEnd.GetY() ) > 0.15 )
+            bFocus = false;
+    }
+    Check( bCount, "each ray has a point at every surface, its start and its end" );
+    Check( bEnds, "each ray ends on the sensor plane, just off the cut face" );
+    Check( bFocus, "the on-axis d-line rays meet the axis at the sensor, within 0.15 mm" );
+
+        // A ray straight down the axis goes straight through.
+    {
+        CLensElements oStraight;
+        std::unique_ptr<IASLib::CJsonNode> pNode( RayJson::Parse(
+            "{ \"prescription\": \"planar-80mm\", \"scale\": 1, \"rays\": 3, \"fields\": [0.5] }" ) );
+
+        Check( pNode && oStraight.FromJson( *pNode ) && oStraight.GetRayCount() == 3 && oStraight.GetElementCount() == 5,
+               "the Planar 80 has five elements, and one fan of three rays off axis" );
+    }
+
+        // It hits as glass: a ray through the middle meets the front element.
+    {
+        CRay    oRay;
+        CVector oHit;
+
+            // 1 mm into the half the cutaway keeps (x >= 0); the front
+            // surface (radius 29.475 mm) is there sag(1) behind its vertex.
+        double dSag = 29.475 - sqrt( 29.475 * 29.475 - 1.0 );
+
+        oRay.Set( 1.0, 0.0, -50.0, 0.0, 0.0, 1.0, 1e100, 1.0, -1, -1 );
+        Check( pElements->Intersect( oRay, oHit ) && ABS( oHit.GetZ() - dSag ) < 1e-6, "a ray along the axis meets the front surface" );
+        oRay.Set( -1.0, 0.0, -50.0, 0.0, 0.0, 1.0, 1e100, 1.0, -1, -1 );
+        Check( ! pElements->Intersect( oRay, oHit ) || oHit.GetZ() > 40.0, "the cut-away half lets a ray past the glass" );
+    }
+
+        // It saves its settings, not its parts, and reads them back the same.
+    std::string strSaved = oScene.ToJson();
+    CScene      oAgain;
+
+    Check( strSaved.find( "\"lensElements\"" ) != std::string::npos && strSaved.find( "\"csg\"" ) == std::string::npos,
+           "a lensElements object saves its settings, not its parts" );
+    Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "a lensElements object round-trips" );
+
+    ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                          "{ \"type\": \"lensElements\", \"prescription\": \"no-such-lens\" }" ), BAD_FILE, "has no built-in lens" );
+    ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                          "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"scale\": 0 }" ), BAD_FILE, "scale must be more than 0" );
+    ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                          "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"fields\": [1.5] }" ), BAD_FILE, "must be from 0 to 1" );
+    ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                          "{ \"type\": \"lensElements\", \"prescription\": \"biogon-38mm\", \"rays\": 0 }" ), BAD_FILE, "rays" );
+    ExpectError( Minimal( "{ \"type\": \"sphere\", \"center\": [0, 0, 0], \"radius\": 1 }",
+                          "{ \"type\": \"lensElements\" }" ), BAD_FILE, "prescription" );
+}
+
 static void ShowcaseChecks( void )
 {
     std::string strError;
@@ -6811,6 +6912,7 @@ int main( int argc, char **argv )
         MathShapeChecks();
         ApolloChecks();
         ShowcaseChecks();
+        LensElementsChecks();
     }
 
     if ( g_nFailures == 0 )

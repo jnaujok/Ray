@@ -581,8 +581,9 @@ ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCE
 
 # Models read straight from Blender .blend files, in both of Blender's mesh
 # layouts, Zstandard- and gzip-compressed; and textures from JPEG and WebP
-# files beside their PNG original.
-foreach(scene IN ITEMS blend images)
+# files beside their PNG original; and a lens built as glass with its ray
+# fans (lensElements).
+foreach(scene IN ITEMS blend images lens_cutaway)
     add_test(NAME render_${scene}
              COMMAND ${CMAKE_COMMAND}
                      -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -601,7 +602,7 @@ endforeach()
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
                        patches nurbs lathe extrusion implicit blob fractal apollo_lenses film reseau tranquility
-                       chess_dof as11_40_5903 blend images)
+                       chess_dof as11_40_5903 blend images lens_cutaway)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 
@@ -626,6 +627,16 @@ endif()
 # render (no display needed).
 add_test(NAME editor_logic COMMAND editor_test ${PROJECT_SOURCE_DIR}/scenes ${RENDER_DIR})
 set_tests_properties(editor_logic PROPERTIES TIMEOUT 300)
+
+# The Linux release archive's ray-editor launcher: it names missing GTK and
+# OpenGL libraries with the commands to install them, and says when there
+# is no display.
+if(UNIX AND NOT APPLE)
+    add_test(NAME editor_launcher
+             COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher_test.sh ${PROJECT_SOURCE_DIR}/packaging/linux/ray-editor.sh
+                        ${RENDER_DIR}/launcher)
+    set_tests_properties(editor_launcher PROPERTIES TIMEOUT 120)
+endif()
 
 # raythrower --spawn starts the rayengine next to it.
 add_dependencies(raythrower rayengine)

@@ -1,8 +1,4 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Color.h"
 #include "ImageFile.h"

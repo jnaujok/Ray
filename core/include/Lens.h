@@ -205,7 +205,7 @@ class CLens
             // sensor) or backward. The ray is changed in place; FALSE if it
             // is blocked or totally internally reflected.
         BOOL                    Trace( FLT anOrigin[ 3 ], FLT anDirection[ 3 ], BOOL bForward, FLT nStopRadius,
-                                       int nChannel = CHANNEL_ALL ) const;
+                                       int nChannel = CHANNEL_ALL, std::vector<FLT> *panPath = NULL ) const;
             // The index of what follows surface nIndex (or air, for -1) in a channel.
         FLT                     IorAt( int nIndex, int nChannel ) const;
         FLT                     WorkOutIor( int nIndex, int nChannel ) const;
@@ -280,6 +280,27 @@ class CLens
 
             /// The built-in lenses.
         static const SPrescription *GetPrescriptions( int &nCount );
+
+            /// The surfaces, as given or from the prescription.
+        const std::vector<SSurface> &GetSurfaces( void ) const { return m_aoSurfaces; }
+            /// Where surface nIndex's vertex is on the axis, in mm from the
+            /// front vertex (after Prepare).
+        FLT                     GetVertexZ( int nIndex ) const { return m_anVertexZ[ (size_t)nIndex ]; }
+            /// Where the sensor is on the axis, in mm (after Prepare).
+        FLT                     GetSensorZ( void ) const { return m_nSensorZ; }
+            /// The stop's opening at the f-number, in mm (after Prepare).
+        FLT                     GetStopRadius( void ) const { return m_nStopRadius; }
+            /// The index of what follows surface nIndex (-1: the air in
+            /// front) at the d line, and its Abbe number (0 for air), for
+            /// building the lens's glass (after Prepare).
+        void                    GlassAfter( int nIndex, FLT &nIndexD, FLT &nAbbe ) const;
+            /// Traces a ray from in front of the lens to the sensor plane
+            /// (after Prepare), in the lens frame and in mm, at the f-number,
+            /// in a channel (CHANNEL_ALL, a color, or a spectral one). The
+            /// point where it meets each surface, then the sensor plane, go
+            /// into anPoints as x, y, z. FALSE if the lens blocks it.
+        BOOL                    TracePath( const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ], int nChannel,
+                                           std::vector<FLT> &anPoints ) const;
 };
 
 #endif // __LENS_H__

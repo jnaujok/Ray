@@ -100,10 +100,6 @@ class CTriangle : public CObjects
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 
 
-#ifdef RAY_GUI
-        virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-        virtual void    SetProperties( void );
-#endif
 };
 
 #endif // __TRIANGLE_H__

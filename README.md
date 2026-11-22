@@ -2,7 +2,7 @@
 
 # Ray
 
-**A distributed ray tracer from 1997: an MFC scene editor on the front end and a farm of tracing engines on the back end.**
+**A distributed ray tracer from 1997: a scene editor on the front end and a farm of tracing engines on the back end.**
 
 [![Build and test](https://github.com/jnaujok/Ray/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jnaujok/Ray/actions/workflows/build.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -45,9 +45,10 @@
 ## About
 
 Ray is a ray tracer written in 1996–1997 that splits rendering across a network of machines.
-You build and edit scenes in a scene editor (the cross-platform `ray-editor`, or the original
-Windows MFC application), and the image is traced in parallel by engine processes on any number of
-machines, or by worker threads on one.
+You build and edit scenes in the cross-platform scene editor, `ray-editor` (the original Windows
+MFC editor was retired in 2026-alpha-0.21.2; its last version is the `mfc-editor-final` tag),
+and the image is traced in parallel by engine processes on any number of machines, or by worker
+threads on one.
 
 It was originally written for [PVM](https://www.netlib.org/pvm3/) (Parallel Virtual Machine) on
 a cluster of Unix workstations. The cross-platform library written for it grew into
@@ -270,6 +271,13 @@ The ray tracing itself is the 1997 code.
   adaptive:min=16,max=100,threshold=0.004,confidence=0.95,channels=rgb`):
 
   <img src="docs/images/chess_dof.png" alt="A chessboard in the Najdorf Sicilian through a wide-open lens: the near white pieces blurred, the pieces in the middle of the board sharp, the far ones softening, and warm lights behind the board blurred into discs" width="720">
+
+  Every built-in lens can also be built as glass in a scene (`lensElements`): its elements cut away
+  to show their cross-sections, with fans of rays traced through the actual prescription to the
+  film (on axis in red, green and blue, off axis in orange). One scene for each lens is in
+  `scenes/cutaways/` (`tools/make_lens_cutaways.py`):
+
+  <img src="docs/images/lens_cutaways.png" alt="The nine built-in lenses cut away in glass with their ray fans: the double Gauss, the Biogons 38 and 60 mm (and the 60 with its Réseau plate), the Planars 80 and 100 mm, the UV-Sonnar 105, the Sonnar 250 and the Tele-Tessar 500" width="720">
 - **Color models:** the last step from pixel color to bytes is pluggable too: `clip` (the 1997
   look, and the default), `gamma`, `srgb`, `reinhard` tone mapping, `hdr`, and `film`.
 - **The Apollo cameras:** the Hasselblads flown to the Moon, as camera `body` presets: the Electric
@@ -303,11 +311,6 @@ The ray tracing itself is the 1997 code.
   scene's own reader, a shaded OpenGL view with a wireframe overlay that you orbit, pan, zoom and
   click to select in, a *Render* button that ray-traces the view progressively over it, undo and
   redo, and STL and OBJ import. See [`editor/README.md`](editor/README.md).
-- **Windows scene editor:** MFC MDI application with a scene tree, property dialogs for spheres, planes,
-  point lights, the camera and the materials, and a material editor. Anything else, from any shape
-  or light to the camera's sampler, color model and lens and the environment, can be edited, added
-  or deleted as JSON from the tree's right-click menu, and *Import Model* brings in an STL or OBJ
-  file.
 - **Distributed rendering:** `rayengine` processes connect to the master over TCP and pull tiles of
   the image from its queue, trace them (camera rays, lens and sampling included) and send back the
   pixels; faster machines simply take more tiles. Engines can run anywhere that can reach the
@@ -324,7 +327,7 @@ The ray tracing itself is the 1997 code.
 ```mermaid
 flowchart LR
     subgraph Front["Front end"]
-        UI["ray-editor or Ray.exe<br/>scene editors"]
+        UI["ray-editor<br/>scene editor"]
         CLI["raythrower<br/>command line"]
     end
     subgraph Master["Task master"]
@@ -374,7 +377,6 @@ opens the connection with a hello carrying the protocol version (4).
 |------|:-----:|:-----:|:-------:|
 | `raythrower`, `rayengine`, core | ✅ GCC, Clang | ✅ Apple Clang | ✅ MSVC |
 | `ray-editor` scene editor (wxWidgets) | ✅ GTK 3 | ✅ Cocoa | ✅ MSVC |
-| `Ray.exe` scene editor (MFC) | | | ✅ MSVC with MFC |
 
 All of them are built by CI on every push.
 
@@ -382,35 +384,53 @@ All of them are built by CI on every push.
 
 Ready-built programs for each release are on the
 [Releases page](https://github.com/jnaujok/Ray/releases), as prereleases (these are alphas), from
-2026-alpha-0.21.1 on. Each archive holds the programs, the sample scenes (`scenes/`, with their
-models, fonts and textures, so they render as they are), `README.md`, `CHANGELOG.md`, `LICENSE`
-and `NOTICE`:
+2026-alpha-0.21.1 on: an archive for each system, and for Linux also a `.deb`, an `.rpm` and a
+Flatpak bundle (from 2026-alpha-0.21.2). Each archive holds the programs, the sample scenes
+(`scenes/`, with their models, fonts and textures, so they render as they are), `README.md`,
+`CHANGELOG.md`, `LICENSE` and `NOTICE`; the packages put the scenes in `/usr/share/ray/scenes`:
 
-| Archive | Programs |
-|---------|----------|
-| `ray-<tag>-linux-x86_64.tar.gz` | `raythrower`, `rayengine`, `ray-editor` |
+| File | What it is |
+|------|------------|
+| `ray-<tag>-linux-x86_64.tar.gz` | `raythrower`, `rayengine`, `ray-editor` (a launcher for `bin/ray-editor-bin`) |
+| `ray-<tag>-amd64.deb` | Ubuntu 22.04 and later, Debian 12 and later: `sudo apt install ./ray-<tag>-amd64.deb` |
+| `ray-<tag>.x86_64.rpm` | RHEL, Rocky and Alma 9 and later, Fedora: `sudo dnf install ./ray-<tag>.x86_64.rpm` |
+| `ray-<tag>.flatpak` | Any Linux with Flatpak: `flatpak install ray-<tag>.flatpak` (the GNOME runtime comes from Flathub) |
 | `ray-<tag>-macos-arm64.tar.gz` | `raythrower`, `rayengine`, `ray-editor.app` (Apple silicon) |
-| `ray-<tag>-windows-x86_64.zip` | `raythrower.exe`, `rayengine.exe`, `ray-editor.exe`, and the MFC scene editor `Ray.exe` |
+| `ray-<tag>-windows-x86_64.zip` | `raythrower.exe`, `rayengine.exe`, `ray-editor.exe` |
 
-`SHA256SUMS.txt` (and a `.sha256` beside each archive) has their checksums: `sha256sum -c
+`SHA256SUMS.txt` (and a `.sha256` beside each file) has their checksums: `sha256sum -c
 SHA256SUMS.txt`. Try one with `raythrower scenes/scan_test.ray --png scan_test.png`.
 
-- **Linux:** built on Ubuntu (x86-64). `raythrower` and `rayengine` need only the C and C++
-  runtime; `ray-editor` needs GTK 3 and OpenGL (`sudo apt install libgtk-3-0 libgl1` on Debian and
-  Ubuntu; most desktops have them).
+- **Linux archive:** built on Ubuntu (x86-64). `raythrower` and `rayengine` need only the C and C++
+  runtime. `ray-editor` needs GTK 3 and OpenGL; it's a small script that checks for them (and for a
+  display) before it starts the editor, and if any are missing it names them and prints the command
+  to install them: `sudo apt install libgtk-3-0 libgl1 libglu1-mesa` (Debian, Ubuntu, Mint),
+  `sudo dnf install gtk3 mesa-libGL mesa-libGLU` (Fedora, RHEL 8 and later) or
+  `sudo yum install gtk3 mesa-libGL mesa-libGLU` (RHEL and CentOS 7). Most desktops have them.
+- **`.deb` and `.rpm`:** made with CPack (`cmake/RayPackaging.cmake`), and installed and tried in
+  clean containers (Ubuntu 22.04, Debian 12, Rocky Linux 9, Fedora) before each release. They
+  name GTK 3 and OpenGL as dependencies, so the package manager installs them. The editor appears
+  in the desktop's menu as *Ray Editor*.
+- **Flatpak:** `io.github.jnaujok.Ray`, on the GNOME 50 runtime, with access to the home folder
+  (for scenes and renders), the network (for `rayengine`) and the GPU. `flatpak run
+  io.github.jnaujok.Ray` starts the editor; `flatpak run --command=raythrower io.github.jnaujok.Ray
+  scene.ray --png out.png` renders. It isn't on Flathub.
 - **macOS:** built for Apple silicon (arm64), and not signed or notarized, so Gatekeeper stops the
   programs at first: clear the quarantine flag on the unpacked folder with
   `xattr -dr com.apple.quarantine ray-<tag>-macos-arm64` (or `xattr -d com.apple.quarantine` on
   each program), or right-click a program and choose Open.
 - **Windows:** x86-64. `raythrower` and `rayengine` are built with the static Visual C++ runtime
-  and need nothing installed; `ray-editor.exe` and `Ray.exe` (MFC in a DLL) need the
+  and need nothing installed; `ray-editor.exe` needs the
   [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)
-  (x64), which most Windows machines already have. The programs aren't signed, so SmartScreen may warn: choose "More info", then "Run anyway".
+  (x64), which most Windows machines already have. The programs aren't signed, so SmartScreen may
+  warn: choose "More info", then "Run anyway". (The 1997 MFC editor, `Ray.exe`, was in the
+  2026-alpha-0.21.1 archive, its last.)
 
-The archives are made by `.github/workflows/release.yml` when a `2026-alpha-*` tag is pushed; an
+Everything is made by `.github/workflows/release.yml` when a `2026-alpha-*` tag is pushed; an
 older tag can be built by hand from the Actions page (Release, Run workflow) or with
 `gh workflow run release.yml -f tag=<tag>`. The release notes are that tag's section of the
-changelog (`tools/changelog_section.py`).
+changelog (`tools/changelog_section.py`). To build the packages yourself, see
+[Packages](#packages) below.
 
 ## Building
 
@@ -434,21 +454,29 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON
 cmake --build build --target ray-editor --parallel
 ```
 
-To build the Windows MFC scene editor, use Visual Studio with the *C++ MFC* component, which
-includes the MBCS libraries the code needs:
-
-```sh
-cmake -S . -B build -DRAY_BUILD_GUI=ON
-cmake --build build --config Release --target Ray
-```
-
 | Option | Default | What it does |
 |--------|:-------:|--------------|
 | `RAY_BUILD_EDITOR` | `OFF` | Build `ray-editor`, the cross-platform scene editor (wxWidgets) |
 | `RAY_USE_SYSTEM_WXWIDGETS` | `ON` | Use an installed wxWidgets if CMake finds one, instead of downloading it |
-| `RAY_BUILD_GUI` | `OFF` | Build the MFC scene editor (MSVC only) |
 | `RAY_BUILD_TESTS` | `ON` | Build the regression tests |
 | `FETCHCONTENT_SOURCE_DIR_IASLIB` | | Use a local IASLib checkout instead of downloading it |
+| `RAY_PACKAGE_VERSION`, `RAY_PACKAGE_STAGE` | `0.0.0`, empty | The version the `.deb` and `.rpm` carry (`0.21.2` and `alpha` for 2026-alpha-0.21.2) |
+
+### Packages
+
+On Linux, `cmake --install` puts the programs in `bin/`, the sample scenes in `share/ray/scenes`,
+the docs in `share/doc/ray`, and (with the editor) a desktop entry, an icon and AppStream metadata
+under `share/`. CPack makes a `.deb` or an `.rpm` from that:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON -DCMAKE_INSTALL_PREFIX=/usr \
+      -DRAY_PACKAGE_VERSION=0.21.2 -DRAY_PACKAGE_STAGE=alpha
+cmake --build build --parallel
+cd build && cpack -G DEB      # or: cpack -G RPM (needs rpmbuild)
+```
+
+The Flatpak is built from [`packaging/flatpak/io.github.jnaujok.Ray.yml`](packaging/flatpak/io.github.jnaujok.Ray.yml)
+with `flatpak-builder` (the commands are at the top of that file).
 
 ## Usage
 
@@ -608,11 +636,6 @@ ray-traces the view over it, a quick pass first. *Edit* adds objects, lights and
 
 <img src="docs/images/editor.png" alt="ray-editor on Linux: the scene tree on the left, the textured teapot ray-traced in the view after Render, and the settings in the property grid on the right" width="720">
 
-**Windows scene editor:** run `Ray.exe`, open a scene from [`scenes/`](scenes) or build one with the *Add*
-menu, and choose *Render*. Right-click the scene's name in the tree to edit its settings, camera or
-environment as JSON, add any object or light as JSON, or import a model; right-click an object or
-light to edit it as JSON or delete it.
-
 ## Testing
 
 ```sh
@@ -715,7 +738,7 @@ a curve; they are what light it, since its lights lie in the triangle's own plan
 <tr><td align="center"><img src="docs/images/tests/fractal_test.png" alt="render_fractal" width="260"><br><code>render_fractal</code></td><td align="center"><img src="docs/images/tests/apollo_lenses_test.png" alt="render_apollo_lenses" width="160"><br><code>render_apollo_lenses</code></td><td align="center"><img src="docs/images/tests/film_test.png" alt="render_film" width="240"><br><code>render_film</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/reseau_test.png" alt="render_reseau" width="260"><br><code>render_reseau</code></td><td align="center"><img src="docs/images/tests/tranquility_test.png" alt="render_tranquility" width="192"><br><code>render_tranquility</code></td></tr>
 <tr><td align="center"><img src="docs/images/tests/chess_dof_test.png" alt="render_chess_dof" width="260"><br><code>render_chess_dof</code></td><td align="center"><img src="docs/images/tests/as11_40_5903_test.png" alt="render_as11_40_5903" width="192"><br><code>render_as11_40_5903</code></td><td align="center"><img src="docs/images/tests/blend_test.png" alt="render_blend" width="260"><br><code>render_blend</code></td></tr>
-<tr><td align="center"><img src="docs/images/tests/images_test.png" alt="render_images" width="260"><br><code>render_images</code></td></tr>
+<tr><td align="center"><img src="docs/images/tests/images_test.png" alt="render_images" width="260"><br><code>render_images</code></td><td align="center"><img src="docs/images/tests/lens_cutaway_test.png" alt="render_lens_cutaway" width="260"><br><code>render_lens_cutaway</code></td></tr>
 </table>
 
 **Samplers** (`--aa`): corner anti-aliasing on four scenes, and the `box`, `random`,
@@ -746,14 +769,12 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`raythrower/`](raythrower) | Command-line master |
 | [`rayengine/`](rayengine) | Networked tracing task |
 | [`editor/`](editor) | `ray-editor`, the cross-platform scene editor: `logic/` (no toolkit: the document, tessellation, the view's camera, the progressive render) and `gui/` (wxWidgets) |
-| [`src/`](src), [`include/`](include) | MFC scene editor |
-| [`res/`](res) | Resource scripts, icons, and bitmaps for the scene editor |
-| [`help/`](help) | WinHelp project for the scene editor |
 | [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images, `scenes/models/` model files, among them 3DBenchy (CC0), and `scenes/fonts/` fonts, Lato Bold (SIL Open Font License; see [NOTICE](NOTICE)) |
-| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files; `make_lens_cutaways.py`, which writes the lens cutaway scenes; `make_icon.py`, which draws the icon's PNG (see [`tools/README.md`](tools/README.md)) |
+| [`packaging/`](packaging) | The desktop entry, icon and AppStream metadata, the Linux archive's `ray-editor` launcher and Debian `copyright` (`linux/`), and the Flatpak manifest (`flatpak/`) |
 | [`tests/`](tests) | Regression tests and reference renders |
-| [`cmake/`](cmake) | The scene editors' builds: `RayEditor.cmake` (wxWidgets) and `RayGui.cmake` (MFC) |
-| [`docs/`](docs) | MFC AppWizard notes, README images, the changelog's before and after images, and the performance notes (`performance.md`) |
+| [`cmake/`](cmake) | The scene editor's build, `RayEditor.cmake` (wxWidgets) |
+| [`docs/`](docs) | README images, the changelog's before and after images, and the performance notes (`performance.md`) |
 | [`legacy/`](legacy) | Visual C++ 4, 5, and 6 project files, kept for history |
 
 ## Scene files
@@ -809,14 +830,16 @@ beam profiles, attenuation and projected light filters, texture maps for every m
 light setting, textures inside glass, tori, discs, quadrics, superquadrics and rounded boxes, 3D text
 from TrueType fonts, Bézier patches and B-spline and NURBS surfaces traced exactly, solids turned on a lathe, extrusions
 and sweeps along a path, implicit surfaces from formulas, metaballs and fractals, and JSON scenes
-so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering. Both
-editors reach every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
+so far, and a cross-platform scene editor with a shaded OpenGL view and progressive rendering, which
+reaches every feature through JSON editing. The Apollo cameras are in: the Hasselblad bodies,
 seven Zeiss lenses, Kodak film with grain and halation, the Réseau plate, and lunar regolith,
 and a recreation of AS11-40-5903. Models load from glTF (Draco-compressed too) and Blender
 `.blend` files as well as STL and OBJ. 2026-alpha-0.21 was a tuning release: frames split their last
 tiles, scene copies share the files they carry, and networked engines share one encoding of the
 scene (see [`docs/performance.md`](docs/performance.md)). 2026-alpha-0.21.1 reads JPEG and WebP images
-with Ray's own decoders and counts every ray a render casts, by kind.
+with Ray's own decoders and counts every ray a render casts, by kind. 2026-alpha-0.21.2 builds any of its lenses
+as glass with their ray fans, ships Linux `.deb`, `.rpm` and Flatpak packages, and retires the MFC
+editor.
 
 ## Changelog
 

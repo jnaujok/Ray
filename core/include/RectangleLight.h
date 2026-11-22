@@ -51,9 +51,6 @@ class CRectangleLight : public CLight
         virtual void    FilterAt( const CVector &oPoint, const CVector &oToLight, STexturePoint &oAt ) const;
 
     public:
-#ifdef RAY_GUI
-        virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __RECTANGLELIGHT_H__

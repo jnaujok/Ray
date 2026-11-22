@@ -6,11 +6,7 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "DirectionalLight.h"
 #include "Sampling.h"
@@ -18,11 +14,6 @@
 
 #include <math.h>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 #define MAXIMUM_LIGHT_SAMPLES   256
 
@@ -79,12 +70,6 @@ BOOL CDirectionalLight::SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoin
     return TRUE;
 }
 
-#ifdef RAY_GUI
-void CDirectionalLight::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddObject( this, 6, "Directional Light", hUnder );
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CDirectionalLight, "directional" );
 

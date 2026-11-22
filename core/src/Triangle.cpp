@@ -7,25 +7,12 @@
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-    #include "resource.h"
-//    #include "SpherePropertiesDlg.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Triangle.h"
 #include "Light.h"
 #include "SceneJson.h"
 
-#ifdef RAY_GUI
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
-#endif
 
 CTriangle::CTriangle( void )
 {
@@ -103,36 +90,6 @@ CTriangle::~CTriangle( void )
 }
 
 
-#ifdef RAY_GUI
-void CTriangle::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hTriangle;
-
-    hTriangle = pTree->AddObject( this, 24, "Triangle", hUnder );
-    CObjects::MatToTree( pTree, hTriangle );
-}
-
-void CTriangle::SetProperties( void )
-{
-/*    CTrianglePropertiesDlg    oProp( &m_oCenter, &m_nRadius );
-    int                     nCount;
-    CMaterial              *pMaterial;
-
-    oProp.m_oColor = m_oColor;
-    if ( ( oProp.DoModal() == IDOK ) && ( oProp.m_bColorChanged ) )
-    {
-        m_oColor = oProp.m_oColor;
-        nCount = 0;
-        while ( nCount < m_oMaterials.GetSize() )
-        {
-            pMaterial = m_oMaterials[ nCount ];
-            pMaterial->SetColor( m_oColor );
-            nCount++;
-        }
-    }
-*/
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CTriangle, "triangle" );
 

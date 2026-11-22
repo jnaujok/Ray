@@ -125,9 +125,6 @@ class CLight : public CObjects
         virtual BOOL    IsALight( void ) { return TRUE; }
             /// The kind of shadow ray (CRayCounts) cast toward the light.
         virtual int     ShadowRayKind( void ) const { return CRayCounts::SHADOW_POINT; }
-#ifdef RAY_GUI
-        virtual void    ToTree( CSceneTreeView *pTree, HTREEITEM hUnder ) = 0;
-#endif
 };
 
 #endif // __LIGHT_H__

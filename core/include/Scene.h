@@ -75,26 +75,14 @@ class CScene
         int                 BuildTreeNode( int nFirst, int nCount );
         static BOOL         RayHitsBox( const FLT anMin[ 3 ], const FLT anMax[ 3 ], const FLT anOrigin[ 3 ], const FLT anDirection[ 3 ],
                                         FLT nLimit );
-#ifdef RAY_GUI
-        HTREEITEM           m_hCamera;
-        HTREEITEM           m_hObjects;
-        HTREEITEM           m_hLights;
-        CSceneTreeView     *m_poSceneTree;
-#endif
 
     public:
                             CScene( void );
         virtual            ~CScene( void );
 
-#ifdef RAY_GUI
-        virtual void        ToTree( CSceneTreeView *oSceneTreeDlg );
-#endif
 
         virtual void        AddLight( CLight *pLight );
         virtual void        AddObject( CObjects *pObject );
-#ifdef RAY_GUI
-        virtual BOOL        TraceScene( CDC *pDC, CRect oRect, BOOL *pbStop, int nQuarter = 0 );
-#endif
 
             // TO DO: Replace TraceScene calls with multiple calls to TraceRay
             /// nKind is what the ray is, for the ray counts (CRayCounts):
@@ -164,11 +152,6 @@ class CScene
             /// Where an object or light is in its list, or -1.
         int                 IndexOfObject( CObjects *pObject );
         int                 IndexOfLight( CObjects *pLight );
-#ifdef RAY_GUI
-            /// Forgets the tree items, so the next ToTree builds them again
-            /// (after the tree has been emptied).
-        void                ForgetTreeItems( void ) { m_hObjects = m_hLights = m_hCamera = NULL; }
-#endif
         int                 GetLightCount( void ) const { return m_oLights.GetSize(); }
         int                 GetObjectCount( void ) const { return m_oObjects.GetSize(); }
         virtual CLight     *GetLight( int nIndex );

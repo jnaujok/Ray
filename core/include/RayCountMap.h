@@ -15,6 +15,7 @@
 #ifndef __RAYCOUNTMAP_H__
 #define __RAYCOUNTMAP_H__
 
+#include <cstddef>
 #include <vector>
 
 class CRayCountMap

@@ -2,9 +2,6 @@
 #define __PLANE_H__
 
 #include "Objects.h"
-#ifdef RAY_GUI
-#include "SceneTreeView.h"
-#endif
 
 class CPlane : public CObjects
 {
@@ -30,10 +27,6 @@ class CPlane : public CObjects
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect );
 
 
-#ifdef RAY_GUI
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-        virtual void        SetProperties( void );
-#endif
 };
 
 #endif // __PLANE_H__

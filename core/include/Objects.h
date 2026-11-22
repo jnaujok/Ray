@@ -21,9 +21,6 @@
 
 #include <memory>
 
-#ifdef RAY_GUI
-    #include "SceneTreeView.h"
-#endif
 
 class CBumpMap;
 class CLight;
@@ -68,11 +65,6 @@ class CObjects
             // Where textures are looked up, if not the scene's own space (a
             // mesh from a file, and its faces).
         std::shared_ptr<const STextureFrame> m_pTextureFrame;
-#ifdef RAY_GUI
-        HTREEITEM           m_hObjectItem;
-        HTREEITEM           m_hMaterialTree;
-        CSceneTreeView     *m_poTree;
-#endif
 
     public:
                             CObjects( void );
@@ -138,21 +130,6 @@ class CObjects
         CMaterialList      &GetMaterials( void ) { return m_oMaterials; }
         virtual CColor      Shade( CLight *pLight, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
         virtual CColor      Shade( CScene &oScene, CRay &oRay, CVector &oIntersect ) { CColor oTemp( 0, 0, 0 ); return oTemp; }
-#ifdef RAY_GUI
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder ) = 0;
-        virtual void        SetProperties( void ) { return; }
-        virtual void        SetMaterials( void );
-
-        BOOL                m_bSelected;
-        BOOL                m_bExpanded;
-    protected:
-        void                MatToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-
-    public:
-#ifdef _DEBUG
-        virtual void        Dump( CDumpContext& dc ) const;
-#endif
-#endif
             // The object's bump or normal map, if it has one ("bump" in
             // JSON, written and read by each object class through these).
         const std::shared_ptr<const CBumpMap> &GetBump( void ) const { return m_pBump; }

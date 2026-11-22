@@ -68,12 +68,6 @@ class CColor
         void        Set( FLT nRed, FLT nGreen, FLT nBlue, FLT nGamma = 1.0 );
 
 
-#ifdef RAY_GUI
-            // Casting operator for windows to change this object to a Windows Color
-            // reference automagically
-                    operator COLORREF();
-        CColor     &operator =( COLORREF crSource );
-#endif
 };
 
 #endif // __COLOR_H__

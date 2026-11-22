@@ -8,19 +8,10 @@
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Objects.h"
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 #define COLOR_VERSION   ((DWORD)1)
 
@@ -103,27 +94,3 @@ void CColor::Clip( void )
 }
 
 
-#ifdef RAY_GUI
-CColor::operator COLORREF( )
-{
-    int     nRed;
-    int     nGreen;
-    int     nBlue;
-
-    nRed = (int)(m_nRed * 255.0 );
-    nGreen = (int)(m_nGreen * 255.0 );
-    nBlue = (int)(m_nBlue * 255.0);
-
-    return RGB( nRed, nGreen, nBlue );
-}
-
-CColor &CColor::operator =( COLORREF crSource )
-{
-    m_nRed = (FLT)GetRValue( crSource ) / (FLT)255.0;
-    m_nGreen = (FLT)GetGValue( crSource ) / (FLT)255.0;
-    m_nBlue = (FLT)GetBValue( crSource ) / (FLT)255.0;
-
-    return *this;
-}
-
-#endif // RAY_GUI

@@ -225,9 +225,6 @@ class CMesh : public CObjects
         virtual void            SetBump( const std::shared_ptr<const CBumpMap> &pBump );
         virtual void            SetTextureFrame( const std::shared_ptr<const STextureFrame> &pFrame );
 
-#ifdef RAY_GUI
-        virtual void            ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 
     private:
                                 CMesh( const CMesh & );

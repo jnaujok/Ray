@@ -1,0 +1,44 @@
+# Ray as a Flatpak, built into a single-file bundle by the release workflow
+# (.github/workflows/release.yml). Not published on Flathub.
+#
+#   flatpak-builder --user --install-deps-from=flathub --repo=repo build packaging/flatpak/io.github.jnaujok.Ray.yml
+#   flatpak build-bundle repo ray.flatpak io.github.jnaujok.Ray --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
+#
+# ray-editor is the app; the command-line programs run with
+#   flatpak run --command=raythrower io.github.jnaujok.Ray scene.ray --png out.png
+app-id: io.github.jnaujok.Ray
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: ray-editor
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri           # OpenGL for the editor's view
+  - --share=network        # rayengine and raythrower --listen
+  - --filesystem=home      # scenes, models and renders in the home folder
+modules:
+  - name: ray
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DRAY_BUILD_EDITOR=ON
+      - -DRAY_BUILD_TESTS=OFF
+      - -DRAY_USE_SYSTEM_WXWIDGETS=OFF
+      - -DRAY_USE_CCACHE=OFF
+    build-options:
+      # CMake fetches IASLib and wxWidgets as it configures.
+      build-args:
+        - --share=network
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - build
+          - build-pkg
+          - build-editor
+          - build-asan
+          - .flatpak-builder

@@ -6,11 +6,7 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "SpotLight.h"
 #include "Sampling.h"
@@ -19,11 +15,6 @@
 #include <math.h>
 #include <algorithm>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 #define MAXIMUM_LIGHT_SAMPLES   256
 
@@ -108,12 +99,6 @@ BOOL CSpotLight::SampleAt( CVector &oFrom, FLT nU, FLT nV, CVector &oPoint )
     return TRUE;
 }
 
-#ifdef RAY_GUI
-void CSpotLight::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddObject( this, 6, "Spot Light", hUnder );
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CSpotLight, "spot" );
 

@@ -2,7 +2,8 @@
 
 `ray-editor` edits Ray scenes on Windows, Linux and macOS. It's built on
 [wxWidgets](https://www.wxwidgets.org/) 3.2 (native controls on each system: Win32, GTK 3,
-Cocoa) and sits beside the Windows-only MFC editor, `Ray.exe`, which is unchanged.
+Cocoa). It replaced the Windows-only MFC editor, `Ray.exe`, which was retired in 2026-alpha-0.21.2
+(its last version is the `mfc-editor-final` tag).
 
 <img src="../docs/images/editor.png" alt="ray-editor on Linux: the scene tree on the left, the textured teapot ray-traced in the view after Render, and the settings in the property grid on the right" width="720">
 
@@ -24,6 +25,19 @@ build/editor/ray-editor scenes/torture_test.ray     # macOS: build/editor/ray-ed
   command-line tools.
 - Without `RAY_BUILD_EDITOR`, the editor's toolkit-free logic still builds, and the
   `editor_logic` test checks it.
+
+## Ready-built
+
+The releases have it for Linux, macOS and Windows (see the README's Downloads section). On Linux:
+
+- **The archive:** `ray-editor` is a small launcher script ([`packaging/linux/ray-editor.sh`](../packaging/linux/ray-editor.sh))
+  for `bin/ray-editor-bin`. Before starting the editor it checks with `ldd` that GTK 3 and OpenGL
+  are installed, and if not it names the missing libraries and prints the commands to install them
+  (`apt` for Debian and Ubuntu, `dnf` for Fedora and RHEL 8 and later, `yum` for RHEL 7). Without
+  that check a missing library stops the program before it can say anything. It also says so when
+  there is no display (no `DISPLAY` or `WAYLAND_DISPLAY`). The `editor_launcher` test checks it.
+- **The `.deb`, `.rpm` and Flatpak** bring GTK and OpenGL with them, and add *Ray Editor* to the
+  desktop's menu (`io.github.jnaujok.Ray.desktop`).
 
 ## Using it
 
@@ -88,5 +102,4 @@ Mesa. The scene's coordinates are left-handed, as the tracer's camera takes them
 matrices match the tracer's camera exactly, so a render lines up with the view; `editor_logic`
 checks this against `CCamera::RayDirection`.
 
-The editor compiles the core without `RAY_GUI` (the MFC build's switch), so it needs none of the
-MFC code, and its logic files include no wxWidgets headers.
+The editor's logic files include no wxWidgets headers; only `gui/` does.

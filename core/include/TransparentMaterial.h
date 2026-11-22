@@ -58,11 +58,6 @@ class CTransparentMaterial : public CMaterial
         FLT                 IndexFor( int nChannel ) const { return IndexFor( nChannel, m_nIndexOfRefraction ); }
         FLT                 IndexFor( int nChannel, FLT nBase ) const;
         static BOOL         Refract( CVector oView, CVector oNormal, FLT nIndex, CVector &oTransmit );
-#ifdef RAY_GUI
-        virtual void        Properties( void );
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-        virtual void        ToList( CListCtrl &oList, int nIndex, FLT nInfluence );
-#endif
 };
 
 #endif

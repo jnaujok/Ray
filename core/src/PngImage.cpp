@@ -6,11 +6,7 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-#include "StdAfx.h"
-#else
 #include "Globals.h"
-#endif
 
 #include "PngImage.h"
 

@@ -21,9 +21,6 @@ class CCylinder : public CCone
                             CCylinder( void );
         virtual            ~CCylinder( void );
 
-#ifdef RAY_GUI
-        virtual void        ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __CYLINDER_H__

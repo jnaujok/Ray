@@ -42,6 +42,11 @@ else()
     set(wxBUILD_PRECOMP OFF CACHE STRING "Set-by-the-Ray-editor-build" FORCE)
     set(wxUSE_OPENGL ON CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
     set(wxUSE_PROPGRID ON CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
+    # No JPEG in wxWidgets: the editor only saves PNG (Ray's core reads JPEG textures itself),
+    # and a system libjpeg8 picked up on the build machine tied the .deb to Ubuntu (Debian has
+    # libjpeg62-turbo). wxWidgets 3.2.9's bundled zlib doesn't build with GCC 14, so PNG, zlib
+    # and regex stay the system's, which every distribution has.
+    set(wxUSE_LIBJPEG OFF CACHE STRING "Set-by-the-Ray-editor-build" FORCE)
     if(MSVC)
         # Match the rest of the build's runtime library.
         set(wxBUILD_USE_STATIC_RUNTIME OFF CACHE BOOL "Set-by-the-Ray-editor-build" FORCE)
@@ -86,4 +91,4 @@ if(APPLE)
     # The view's OpenGL 1.x calls are deprecated on macOS, but still there.
     target_compile_definitions(ray-editor PRIVATE GL_SILENCE_DEPRECATION)
 endif()
-install(TARGETS ray-editor RUNTIME DESTINATION bin BUNDLE DESTINATION .)
+install(TARGETS ray-editor RUNTIME DESTINATION bin COMPONENT ray BUNDLE DESTINATION . COMPONENT ray)

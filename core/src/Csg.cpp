@@ -7,11 +7,7 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Csg.h"
 #include "Material.h"
@@ -21,11 +17,6 @@
 #include <math.h>
 #include <memory>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 DYNAMIC_IMPLEMENTS( CCsg, "csg" );
 
@@ -386,15 +377,6 @@ CColor CCsg::Shade( CScene &oScene, CRay &oRay, CVector &oIntersect )
     return oColor;
 }
 
-#ifdef RAY_GUI
-void CCsg::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hCsg;
-
-    hCsg = pTree->AddObject( this, 8, "CSG", hUnder );
-    CObjects::MatToTree( pTree, hCsg );
-}
-#endif
 
 void CCsg::ToJson( IASLib::CObjectNode &oNode )
 {

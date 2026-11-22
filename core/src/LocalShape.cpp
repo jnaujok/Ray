@@ -7,22 +7,13 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "LocalShape.h"
 #include "SceneJson.h"
 
 #include <math.h>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 CLocalShape::CLocalShape( void ) :
     m_oCenter( 0.0, 0.0, 0.0 ),
@@ -45,15 +36,6 @@ CLocalShape::~CLocalShape( void )
 {
 }
 
-#ifdef RAY_GUI
-void CLocalShape::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hShape;
-
-    hShape = pTree->AddObject( this, 8, "Shape", hUnder );
-    CObjects::MatToTree( pTree, hShape );
-}
-#endif
 
 void CLocalShape::RotateXYZ( FLT anVector[ 3 ], FLT nX, FLT nY, FLT nZ )
 {

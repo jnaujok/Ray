@@ -1,17 +1,8 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "RaySettings.h"
 #include "SceneJson.h"
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 #define SETTINGS_VERSION    ((DWORD)1)
 CSettings::CSettings( int nWidth, int nHeight, int nColorDepth, LPCSTR strOutputFile )
@@ -53,27 +44,6 @@ CSettings::CSettings( int nWidth, int nHeight, int nColorDepth, LPCSTR strOutput
     m_nIndirectObjects = 8;
 }
 
-#ifdef RAY_GUI
-#include "resource.h"
-#include "SettingsDialog.h"
-
-void CSettings::Properties( void )
-{
-    CSettingsDialog     oDlg;
-
-    oDlg.m_nImageWidth = m_nImageWidth;
-    oDlg.m_nImageHeight = m_nImageHeight;
-    oDlg.m_strFileName = m_strImageFile;
-
-    if ( oDlg.DoModal() == IDOK )
-    {
-        m_nImageWidth = oDlg.m_nImageWidth;
-        m_nImageHeight = oDlg.m_nImageHeight;
-        m_strImageFile = oDlg.m_strFileName;
-    }
-}
-
-#endif
 
     // A WORD setting from minimum through 65535.
 static BOOL GetWord( const IASLib::CJsonNode &oNode, const char *strKey, WORD &nValue, int nMinimum )

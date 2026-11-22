@@ -8,11 +8,7 @@
 * Copyright (c) 1997, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Material.h"
 #include "Objects.h"
@@ -20,11 +16,6 @@
 
 #include <string.h>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 CDynMaterialList    *g_pMaterialList = NULL;
 
@@ -114,26 +105,6 @@ LPCSTR CDynMaterialList::JsonTypeOf( LPCSTR strClassType )
     return NULL;
 }
 
-#ifdef RAY_GUI
-void CDynMaterialList::LoadAddList( CListCtrl &oList )
-{
-    int             nIndex;
-    CDynMaterial   *pObject;
-
-    nIndex = 0;
-    pObject = m_pFirst;
-    while ( pObject )
-    {
-        if ( pObject != &g_oBaseMaterial )
-        {
-            oList.InsertItem( nIndex, pObject->GetAddName() );
-            oList.SetItemData( nIndex, (LPARAM)pObject->GetAddFunc() );
-            nIndex++;
-        }
-        pObject = pObject->GetNext();
-    }
-}
-#endif
 
 CColor CMaterial::ColorAt( const CColor &oColor, CVector &oPoint, CObjects *pObject )
 {

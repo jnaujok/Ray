@@ -86,6 +86,18 @@ Writes `scenes/chess_dof_test.ray` (the Najdorf Sicilian on a full board in dept
 position played out by python-chess: `pip install chess`), `scenes/as11_40_5903_test.ray` (the
 AS11-40-5903 recreation) and the indirect-light study scenes in `scenes/studies/`.
 
+## `make_lens_cutaways.py`
+
+Writes `scenes/cutaways/<prescription>.ray`, every built-in lens built as glass (`lensElements`) and
+cut away with its ray fans, and `scenes/lens_cutaway_test.ray`, the double Gauss small for the test
+suite. It reads the prescription tables from `core/src/Lens.cpp` and frames each scene from the
+lens's length and its paraxial back focal distance. Only the Python standard library is needed.
+
+## `make_icon.py`
+
+Draws `packaging/io.github.jnaujok.Ray.png`, the 256×256 PNG of Ray's icon, the same picture as
+`packaging/io.github.jnaujok.Ray.svg` (a lens bending three rays to a focus). Needs Pillow.
+
 ## `gltf_decompress.py`
 
 Writes a Draco-compressed `.glb` back out with plain accessors (`pip install DracoPy numpy`). Ray

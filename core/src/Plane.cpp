@@ -7,24 +7,12 @@
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-    #include "PlanePropertiesDlg.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Plane.h"
 #include "Light.h"
 #include "SceneJson.h"
 
-#ifdef RAY_GUI
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
-#endif
 
 #define PLANE_VERSION   ((DWORD)3)
 #define VERSION_2       ((DWORD)2)
@@ -67,37 +55,6 @@ CPlane::~CPlane( void )
 }
 
 
-#ifdef RAY_GUI
-
-void CPlane::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hPlane;
-
-    hPlane = pTree->AddObject( this, 10, "Plane", hUnder );
-    CObjects::MatToTree( pTree, hPlane );
-}
-
-void CPlane::SetProperties( void )
-{
-    CPlanePropertiesDlg     oProp( &m_oPosition, &m_oNormal );
-    int                     nCount;
-    CMaterial              *pMaterial;
-
-    oProp.m_oColor = m_oColor;
-    if ( ( oProp.DoModal() == IDOK ) && ( oProp.m_bColorChanged ) )
-    {
-        m_oColor = oProp.m_oColor;
-        nCount = 0;
-        while ( nCount < m_oMaterials.GetSize() )
-        {
-            pMaterial = m_oMaterials[ nCount ];
-            pMaterial->SetColor( m_oColor );
-            nCount++;
-        }
-    }
-}
-
-#endif
 
 DYNAMIC_IMPLEMENTS( CPlane, "plane" );
 

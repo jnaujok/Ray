@@ -55,9 +55,6 @@ class CExtrusion : public CMesh
             /// in strError, if the outlines can't be filled.
         BOOL                    Build( std::string &strError );
 
-#ifdef RAY_GUI
-        virtual void            ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __EXTRUSION_H__

@@ -1,8 +1,4 @@
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Vector.h"
 #include "Rays.h"
@@ -75,39 +71,6 @@ CColor CRegolithMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CColor 
     return oLt * ColorAt( m_oColor, oIntersect, pIntersect );
 }
 
-#ifdef RAY_GUI
-void CRegolithMaterial::Properties( void )
-{
-}
-
-void CRegolithMaterial::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    pTree->AddMaterial( this, 14, "Regolith Material", hUnder );
-}
-
-void CRegolithMaterial::ToList( CListCtrl &oList, int nIndex, FLT nInfluence )
-{
-    LVITEM      oItem;
-    CString     strTemp;
-
-    oItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
-    oItem.iItem = nIndex;
-    oItem.iSubItem = 0;
-    oItem.state = 0;
-    oItem.stateMask = 0;
-    oItem.pszText = "Regolith";
-    oItem.cchTextMax = 0;
-    oItem.iImage = 0;
-    oItem.lParam = (LPARAM)this;
-    oList.InsertItem( &oItem );
-
-    oItem.iSubItem = 1;
-    oItem.mask = LVIF_TEXT;
-    strTemp.Format( "%f", nInfluence );
-    oItem.pszText = (LPSTR)(LPCSTR)strTemp;
-    oList.SetItem( &oItem );
-}
-#endif
 
 void CRegolithMaterial::ToJson( IASLib::CObjectNode &oNode )
 {

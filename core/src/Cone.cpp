@@ -6,22 +6,13 @@
 * Copyright (c) 2026, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Cone.h"
 #include "SceneJson.h"
 
 #include <math.h>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 CCone::CCone( void ) :
     m_oBase( 0.0, 0.0, 0.0 ),
@@ -39,15 +30,6 @@ CCone::~CCone( void )
 {
 }
 
-#ifdef RAY_GUI
-void CCone::ToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    HTREEITEM   hCone;
-
-    hCone = pTree->AddObject( this, 8, "Cone", hUnder );
-    CObjects::MatToTree( pTree, hCone );
-}
-#endif
 
 DYNAMIC_IMPLEMENTS( CCone, "cone" );
 

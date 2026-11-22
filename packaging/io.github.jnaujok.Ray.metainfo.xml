@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.jnaujok.Ray</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>Ray</name>
+  <summary>A distributed ray tracer from 1997, rebuilt</summary>
+  <description>
+    <p>
+      Ray is a ray tracer written in 1996–1997 that splits rendering across a network of machines,
+      rebuilt in 2026. Its scene editor shows a scene in a shaded OpenGL view and ray-traces it in
+      place; raythrower renders from the command line with threads or with rayengine processes on
+      other machines.
+    </p>
+    <p>
+      It traces real camera lenses surface by surface, spectral dispersion, rough glass and metal,
+      area and spot lights, sky lighting, bounce light, haze, solid textures and a library of natural
+      materials, meshes from STL, OBJ, glTF and Blender files, and shapes from CSG to fractals.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.jnaujok.Ray.desktop</launchable>
+  <url type="homepage">https://github.com/jnaujok/Ray</url>
+  <url type="bugtracker">https://github.com/jnaujok/Ray/issues</url>
+  <developer id="io.github.jnaujok">
+    <name>Jeffrey R. Naujok</name>
+  </developer>
+  <provides>
+    <binary>ray-editor</binary>
+    <binary>raythrower</binary>
+    <binary>rayengine</binary>
+  </provides>
+  <categories>
+    <category>Graphics</category>
+    <category>3DGraphics</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.21.2~alpha" date="2026-11-22" type="development"/>
+  </releases>
+</component>

@@ -66,9 +66,6 @@ class CText : public CMesh
             /// Builds the mesh from the fields above.
         BOOL                    Build( std::string &strError );
 
-#ifdef RAY_GUI
-        virtual void            ToTree( CSceneTreeView *pTree, HTREEITEM hUnder );
-#endif
 };
 
 #endif // __TEXT_H__

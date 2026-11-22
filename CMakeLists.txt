@@ -9,7 +9,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-option(RAY_BUILD_GUI   "Build the Windows MFC scene editor (MSVC only)" OFF)
 option(RAY_BUILD_TESTS "Build the regression tests" ON)
 option(RAY_BUILD_EDITOR "Build the cross-platform wxWidgets scene editor (ray-editor)" OFF)
 option(RAY_USE_CCACHE  "Compile through ccache when it is installed" ON)
@@ -156,6 +155,7 @@ set(RAY_CORE_SOURCES
     core/src/Extruder.cpp
     core/src/Profile.cpp
     core/src/Lathe.cpp
+    core/src/LensElements.cpp
     core/src/Extrusion.cpp
     core/src/Sweep.cpp
     core/src/SrgbColorModel.cpp
@@ -177,7 +177,6 @@ add_library(ray_core OBJECT ${RAY_CORE_SOURCES})
 target_include_directories(ray_core PUBLIC core/include)
 target_link_libraries(ray_core PUBLIC IASLib::IASLib)
 if(MSVC)
-    # CMake adds /D_WINDOWS to every MSVC build; the core keys its GUI code on RAY_GUI instead.
     target_compile_definitions(ray_core PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX)
     target_compile_options(ray_core PRIVATE /W3)
 else()
@@ -193,23 +192,17 @@ target_link_libraries(raythrower PRIVATE ray_core)
 add_executable(rayengine rayengine/main.cpp)
 target_link_libraries(rayengine PRIVATE ray_core)
 
-install(TARGETS raythrower rayengine RUNTIME DESTINATION bin)
-
-# ---------------------------------------------------------------------------
-# Windows MFC scene editor
-# ---------------------------------------------------------------------------
-if(RAY_BUILD_GUI)
-    if(NOT MSVC)
-        message(FATAL_ERROR "RAY_BUILD_GUI needs MSVC with MFC")
-    endif()
-    include(cmake/RayGui.cmake)
-endif()
 
 # ---------------------------------------------------------------------------
 # Cross-platform scene editor (wxWidgets): its logic always, the program with
 # RAY_BUILD_EDITOR
 # ---------------------------------------------------------------------------
 add_subdirectory(editor)
+
+# ---------------------------------------------------------------------------
+# Installing and packaging (.deb and .rpm with CPack)
+# ---------------------------------------------------------------------------
+include(cmake/RayPackaging.cmake)
 
 # ---------------------------------------------------------------------------
 # Tests

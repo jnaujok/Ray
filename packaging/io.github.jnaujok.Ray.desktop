@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Ray Editor
+GenericName=Ray Tracer Scene Editor
+Comment=Build, edit and ray-trace scenes for the Ray distributed ray tracer
+Exec=ray-editor %f
+Icon=io.github.jnaujok.Ray
+Terminal=false
+Categories=Graphics;3DGraphics;
+Keywords=ray tracer;raytracing;3D;render;scene;
+StartupWMClass=ray-editor

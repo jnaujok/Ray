@@ -7,11 +7,7 @@
 * Copyright (c) 1996, Jeffrey R. Naujok                                  *
 *************************************************************************/
 
-#ifdef RAY_GUI
-    #include "StdAfx.h"
-#else
     #include "Globals.h"
-#endif
 
 #include "Scene.h"
 #include "Light.h"
@@ -24,11 +20,6 @@
 #include <algorithm>
 #include <vector>
 
-#if defined(RAY_GUI) && defined(_DEBUG)
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
 
 
 CDynObject *CDynObject::m_pFirst = NULL;
@@ -46,12 +37,6 @@ CObjects::CObjects( void )
 {
     m_bOwnsMaterials = TRUE;
     m_pShadeMaterials = NULL;
-#ifdef RAY_GUI
-    m_bExpanded = FALSE;
-    m_bSelected = FALSE;
-    m_hObjectItem = NULL;
-    m_hMaterialTree = NULL;
-#endif
 }
 
 CObjects::~CObjects( void )
@@ -69,46 +54,6 @@ CObjects::~CObjects( void )
     m_oMaterials.RemoveAll();
 }
 
-#ifdef RAY_GUI
-#include "resource.h"
-#include "MaterialsDlg.h"
-
-void CObjects::MatToTree( CSceneTreeView *pTree, HTREEITEM hUnder )
-{
-    CMaterial      *pMaterial;
-    int             nCount;
-
-    m_poTree = pTree;
-    m_hObjectItem = hUnder;
-
-    if ( m_hMaterialTree )
-        pTree->EmptyUnder( m_hMaterialTree );
-    else
-        m_hMaterialTree = pTree->AddObject( NULL, 14, "Materials", m_hObjectItem );
-
-    nCount = 0;
-    while ( nCount < m_oMaterials.GetSize() )
-    {
-        pMaterial = m_oMaterials[ nCount ];
-        pMaterial->ToTree( pTree, m_hMaterialTree );
-        nCount++;
-    }
-}
-
-void CObjects::SetMaterials( void )
-{
-    CMaterialsDlg   oDlg;
-
-    oDlg.m_oMaterials = m_oMaterials;
-
-    oDlg.DoModal();
-
-    m_oMaterials = oDlg.m_oMaterials;
-
-    MatToTree( m_poTree, m_hObjectItem );
-}
-
-#endif
 
 void CObjects::TextureAt( CVector &oPoint, STexturePoint &oAt )
 {
@@ -776,14 +721,6 @@ CDynObject::~CDynObject( void )
         pLast->m_pNext = m_pNext;
 }
 
-#ifdef RAY_GUI
-#ifdef _DEBUG
-void CObjects::Dump( CDumpContext& dc ) const
-{
-    dc << "CObjects[ No internal data ]";
-}
-#endif
-#endif
 
 int CDynObject::Compare( CDynObject *pCompare )
 {
@@ -851,23 +788,11 @@ LPCSTR CDynList::JsonTypeOf( LPCSTR strClassType )
 #endif
 
 #ifdef ASSERT_ME
-#ifdef RAY_GUI
-#include <windows.h>
-void ASSERT_ShowError( LPCSTR lpszAssertion, LPCSTR lpszFileName, int nLineNumber )
-{
-    char        Buffer[ 512 ];
-
-    wsprintf( Buffer, "Assertion Failed:\n%[%s]\nFile: %s\nLine: %d\n\nBreak into code?", lpszAssertion, lpszFileName, nLineNumber );
-    if ( ::MessageBox( NULL, Buffer, "ASSERT FAILURE", MB_YESNO | MB_ICONSTOP ) == IDYES )
-        DebugBreak();
-}
-#else
 #include <stdio.h>
 void ASSERT_ShowError( LPCSTR lpszAssertion, LPCSTR lpszFileName, int nLineNumber )
 {
     printf( "Assertion Failed:\n%[%s]\nFile: %s\nLine: %d\n\nBreak into code?", lpszAssertion, lpszFileName, nLineNumber );
     exit(-1);
 }
-#endif
 #endif
 
