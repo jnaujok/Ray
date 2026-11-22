@@ -1,0 +1,163 @@
+name: Release
+
+# Builds the programs for Linux, macOS and Windows and publishes them as a GitHub Release
+# (a prerelease: these are alphas). Pushing a 2026-alpha-* tag starts it; an older tag can be
+# built by hand: Actions > Release > Run workflow, or `gh workflow run release.yml -f tag=<tag>`.
+
+on:
+  push:
+    tags: ['2026-alpha-*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The tag to build and release (it must already exist)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-latest
+          - platform: macos-arm64
+            os: macos-latest
+          - platform: windows-x86_64
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install GTK and OpenGL
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libgl1-mesa-dev libglu1-mesa-dev
+
+      # The fetched wxWidgets build is the slow part; keep it between runs (separate from CI's
+      # cache, since the Windows build here uses the static C++ runtime).
+      - name: Cache wxWidgets
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_deps/wxwidgets-src
+            build/_deps/wxwidgets-build
+            build/_deps/wxwidgets-subbuild
+          key: release-wxwidgets-3.2.9-${{ runner.os }}-${{ hashFiles('cmake/RayEditor.cmake') }}
+
+      - name: Configure
+        shell: bash
+        run: |
+          ARGS=(-DCMAKE_BUILD_TYPE=Release -DRAY_BUILD_EDITOR=ON -DRAY_BUILD_TESTS=OFF -DRAY_USE_SYSTEM_WXWIDGETS=OFF)
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # The static C++ runtime, so the programs need no Visual C++ Redistributable.
+            ARGS+=(-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DwxBUILD_USE_STATIC_RUNTIME=ON)
+          fi
+          cmake -S . -B build "${ARGS[@]}"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      # The MFC scene editor uses MFC in a shared DLL, as CI builds it.
+      - name: Build the MFC scene editor
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S . -B build-gui -DRAY_BUILD_GUI=ON -DRAY_BUILD_TESTS=OFF
+          cmake --build build-gui --config Release --target Ray --parallel 4
+
+      - name: Package
+        shell: bash
+        run: |
+          NAME="ray-${TAG}-${{ matrix.platform }}"
+          mkdir -p "dist/$NAME"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            for program in raythrower rayengine ray-editor; do
+              cp "$(find build -type f -name "$program.exe" | head -1)" "dist/$NAME/"
+            done
+            cp "$(find build-gui -type f -name 'Ray.exe' | head -1)" "dist/$NAME/"
+          else
+            for program in raythrower rayengine; do
+              cp "$(find build -type f -name "$program" -perm -u+x | head -1)" "dist/$NAME/"
+            done
+            if [ "$RUNNER_OS" = "macOS" ]; then
+              cp -R "$(find build -name 'ray-editor.app' -type d | head -1)" "dist/$NAME/"
+            else
+              cp "$(find build -type f -name 'ray-editor' -perm -u+x | head -1)" "dist/$NAME/"
+            fi
+          fi
+          cp LICENSE NOTICE README.md CHANGELOG.md "dist/$NAME/"
+          cp -R scenes "dist/$NAME/"
+
+          # A quick render, to show the program runs where it was built.
+          RAYTHROWER="dist/$NAME/raythrower"
+          [ "$RUNNER_OS" = "Windows" ] && RAYTHROWER="$RAYTHROWER.exe"
+          "$RAYTHROWER" "dist/$NAME/scenes/scan_test.ray" -q --size 64x48 -o smoke.raw
+
+          cd dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ARCHIVE="$NAME.zip"
+            7z a -tzip -bd "$ARCHIVE" "$NAME" > /dev/null
+            sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+          else
+            ARCHIVE="$NAME.tar.gz"
+            tar -czf "$ARCHIVE" "$NAME"
+            if command -v sha256sum > /dev/null; then sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"; else shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"; fi
+          fi
+          rm -rf "$NAME"
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # The workflow's own commit, for its scripts; the notes come from the tag's CHANGELOG.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Release notes and checksums
+        run: |
+          git show "$TAG:CHANGELOG.md" > tag-changelog.md
+          python3 tools/changelog_section.py "$TAG" tag-changelog.md "$GITHUB_REPOSITORY" > notes.md
+          cat dist/*.sha256 > dist/SHA256SUMS.txt
+          ls -la dist
+          head -20 notes.md
+
+      - name: Create the release and upload the archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --prerelease --title "Ray $TAG" --notes-file notes.md
+          else
+            gh release edit "$TAG" --prerelease --title "Ray $TAG" --notes-file notes.md
+          fi
+          gh release upload "$TAG" --clobber dist/*.tar.gz dist/*.zip dist/*.sha256 dist/SHA256SUMS.txt
+          gh release view "$TAG"

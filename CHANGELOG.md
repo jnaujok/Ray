@@ -10,6 +10,22 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+### Added
+
+- **Downloadable programs.** `.github/workflows/release.yml` builds Release programs for Linux
+  (x86-64), macOS (arm64) and Windows (x86-64) when a `2026-alpha-*` tag is pushed, or by hand for
+  an older tag (`workflow_dispatch` with a `tag`), and publishes them as a GitHub prerelease named
+  `Ray <tag>`, its notes the tag's section of this changelog (`tools/changelog_section.py`, which
+  makes its links and images absolute). Each platform's archive (`ray-<tag>-linux-x86_64.tar.gz`,
+  `ray-<tag>-macos-arm64.tar.gz`, `ray-<tag>-windows-x86_64.zip`) holds `raythrower`, `rayengine`
+  and `ray-editor` (an app bundle on macOS; on Windows also the MFC `Ray.exe`), the sample scenes
+  with their models, fonts and textures, the README, this changelog, `LICENSE` and `NOTICE`, with a
+  SHA-256 checksum for each and `SHA256SUMS.txt` for all. The Windows programs use the static C++
+  runtime (`Ray.exe` still needs the Visual C++ Redistributable, for MFC). Each build renders a
+  small scene before it is packaged. The first release built this way is 2026-alpha-0.21.1, built
+  by hand after its tag, which was pushed before the workflow existed. The README's new Downloads
+  section has the platform notes (macOS quarantine, GTK 3 for the Linux editor, SmartScreen).
+
 ## [2026-alpha-0.21.1] - 2026-11-21
 
 JPEG and WebP, read by Ray's own decoders wherever PNG is, and every ray a render casts counted by

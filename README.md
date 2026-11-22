@@ -30,6 +30,7 @@
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Platforms](#platforms)
+- [Downloads](#downloads)
 - [Building](#building)
 - [Usage](#usage)
 - [Testing](#testing)
@@ -376,6 +377,40 @@ opens the connection with a hello carrying the protocol version (4).
 | `Ray.exe` scene editor (MFC) | | | ✅ MSVC with MFC |
 
 All of them are built by CI on every push.
+
+## Downloads
+
+Ready-built programs for each release are on the
+[Releases page](https://github.com/jnaujok/Ray/releases), as prereleases (these are alphas), from
+2026-alpha-0.21.1 on. Each archive holds the programs, the sample scenes (`scenes/`, with their
+models, fonts and textures, so they render as they are), `README.md`, `CHANGELOG.md`, `LICENSE`
+and `NOTICE`:
+
+| Archive | Programs |
+|---------|----------|
+| `ray-<tag>-linux-x86_64.tar.gz` | `raythrower`, `rayengine`, `ray-editor` |
+| `ray-<tag>-macos-arm64.tar.gz` | `raythrower`, `rayengine`, `ray-editor.app` (Apple silicon) |
+| `ray-<tag>-windows-x86_64.zip` | `raythrower.exe`, `rayengine.exe`, `ray-editor.exe`, and the MFC scene editor `Ray.exe` |
+
+`SHA256SUMS.txt` (and a `.sha256` beside each archive) has their checksums: `sha256sum -c
+SHA256SUMS.txt`. Try one with `raythrower scenes/scan_test.ray --png scan_test.png`.
+
+- **Linux:** built on Ubuntu (x86-64). `raythrower` and `rayengine` need only the C and C++
+  runtime; `ray-editor` needs GTK 3 and OpenGL (`sudo apt install libgtk-3-0 libgl1` on Debian and
+  Ubuntu; most desktops have them).
+- **macOS:** built for Apple silicon (arm64), and not signed or notarized, so Gatekeeper stops the
+  programs at first: clear the quarantine flag on the unpacked folder with
+  `xattr -dr com.apple.quarantine ray-<tag>-macos-arm64` (or `xattr -d com.apple.quarantine` on
+  each program), or right-click a program and choose Open.
+- **Windows:** x86-64, built with the static Visual C++ runtime, so `raythrower`, `rayengine` and
+  `ray-editor` need nothing installed. `Ray.exe` uses MFC in a DLL and needs the
+  [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)
+  (x64). The programs aren't signed, so SmartScreen may warn: choose "More info", then "Run anyway".
+
+The archives are made by `.github/workflows/release.yml` when a `2026-alpha-*` tag is pushed; an
+older tag can be built by hand from the Actions page (Release, Run workflow) or with
+`gh workflow run release.yml -f tag=<tag>`. The release notes are that tag's section of the
+changelog (`tools/changelog_section.py`).
 
 ## Building
 
