@@ -104,7 +104,7 @@ are black Pyromark paint, low aft faces beside the RCS quads crinkled silver foi
 faces the champagne 5056 anodized panels, the rest the gray 2024 skin, and forward, high faces of
 the window frames quartz; the secondary struts from the descent stage out to the legs are gold strut
 wrap (`kapton_gold`). It works normals out with a
-45° crease, scales the model by 1.4 to the real LM's size, shortens the primary struts' lower
+45° crease, scales the model by 1.4 to the real LM's leg span and its height by 0.948 more to the real proportions, shortens the primary struts' lower
 sections so everything above the footpads comes down 15 cm, stands it on y = 0, splits the
 anodized skin into flat panels (each bellied out by tilting its edge normals 5° away from its
 middle), packs them into a texture atlas (`lm5_eagle_panels.png`: each panel's color, varied a

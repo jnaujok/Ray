@@ -176,9 +176,9 @@ SUN_AZIMUTH = 90.2
     # (set by the LM's shadow), 1.03 m above the ground there, which is 0.31 m
     # below the LM's.
 LM_HEADING = 253.47
-LM_ROTATION = [0.954, 73.475, -2.238]
+LM_ROTATION = [0.954, 73.474, -2.238]
 CAMERA_POSITION = [11.153, 0.724, -5.2007]
-CAMERA_LOOK_AT = [2.0725, 1.2453, -1.0445]
+CAMERA_LOOK_AT = [2.0724, 1.2435, -1.0446]
 CAMERA_DISTANCE = 12.31
     # The Apollo surface exposure for Ektachrome SO-368 (ISO 64) down-sun: f/11 at
     # 1/250 s. With the regolith at a lunar albedo, the sun is calibrated to give

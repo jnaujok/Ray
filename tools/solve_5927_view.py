@@ -35,8 +35,8 @@ PHOTO = 1950.0
 PADS_PHOTO = {'near left': (290.0, 1312.0), 'near right': (1645.0, 1305.0),
               'far right': (1440.0, 1190.0), 'far left (ladder)': (625.0, 1135.0)}
 PAD_WEIGHT = {'near left': (1, 1), 'near right': (1, 1), 'far right': (1, 1), 'far left (ladder)': (1, 0.3)}
-PADS_MODEL = {'+x': (4.006, 0.03, 0.058), '-x': (-4.006, 0.03, 0.058), '+z': (-0.049, 0.03, 4.005),
-              '-z': (-0.05, 0.03, -4.005)}
+PADS_MODEL = {'+x': (4.006, 0.028, 0.058), '-x': (-4.006, 0.028, 0.058), '+z': (-0.049, 0.028, 4.005),
+              '-z': (-0.05, 0.028, -4.005)}
 FOCAL, FORMAT = 61.1, 53.0
     # The pads fix the LM's heading less the camera's azimuth, not the azimuth
     # itself (turning both together about the LM moves them only by the

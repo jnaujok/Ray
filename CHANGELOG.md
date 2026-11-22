@@ -16,7 +16,7 @@ Panoramas and terrain: an equirectangular camera renders the whole surroundings 
 ready to be an environment map; a new tool turns a digital terrain model into a mesh; and
 AS11-40-5927 now stands on the real ground of Tranquility Base from the LROC NAC terrain model,
 with its baked surroundings, its view solved from the footpads and the LM's shadow, and exposed as
-the crew exposed it. Every other render is byte for byte the same (only `render_as11_40_5927`'s
+the crew exposed it; the Eagle model gets the real LM's proportions. Every other render is byte for byte the same (only `render_as11_40_5927`'s
 reference changes, and `render_panorama` is new).
 
 ### Added
@@ -69,11 +69,13 @@ reference changes, and `render_panorama` is new).
   - *View:* the pads fix the LM's heading less the camera's azimuth but not the azimuth itself
     (turning both about the LM moves them only by the terrain's tilt); the LM's shadow fixes it.
     Rendering the rig turned 5° steps showed the shadow reaching past the left footpad as in the
-    frame at 115°. With that, the pads give the LM heading 253.47° (Ray rotation [0.954, 73.475,
+    frame at 115°. With that, the pads give the LM heading 253.47° (Ray rotation [0.954, 73.474,
     −2.238], tilted onto the slope), the camera 12.31 m out at azimuth 115, 1.03 m above its ground
     (0.72 m above the LM's), pitched up 3.0°; the pads land within 17.7 px rms of 1950 (near left
     (296, 1276) against (290, 1312), near right (1644, 1323) against (1645, 1305), far right (1451,
-    1197) against (1440, 1190), far left (607, 1168) against (625, 1135)). Left free, the eye would
+    1197) against (1440, 1190), far left (607, 1168) against (625, 1135)). As a check, the ascent
+    stage's top now comes about 80 px of 1950 higher in the frame than the photograph's (it was cut
+    off by the frame's edge before the LM got its real proportions, below). Left free, the eye would
     rise another 0.2 to 0.7 m: the 2 m DTM's decimeters near the LM are the limit.
   - *Exposure:* Ektachrome SO-368 (magazine 40/S, color, ALSJ) at the Apollo down-sun setting,
     f/11 at 1/250 s (the Data Camera body's own default), instead of f/8.6. With the regolith left
@@ -90,32 +92,43 @@ reference changes, and `render_panorama` is new).
   - *The bounce in the shadow* was not a bug: `regolith` gathers indirect light like `diffuse`
     (the new check). In 0.21.3 a point in the LM's shadow saw only black sky, the LM's dark
     underside and the sunlit ground at grazing angles; on the terrain, with the view moved, the
-    shadow measures 0.034 against the frame's 0.021 (it was 0.001).
+    shadow measures 0.029 against the frame's 0.021 (it was 0.001).
 
   Measured in linear light at 512×512 (`compare_5927.py`; ratios of luminance Y):
 
   | Region | NASA linear RGB | NASA Y | Ray linear RGB | Ray Y | Ray/NASA | b/r NASA, Ray |
   |---|---|---|---|---|---|---|
   | sunlit ground | (0.176, 0.164, 0.155) | 0.166 | (0.174, 0.163, 0.148) | 0.164 | 0.99 | 0.88, 0.85 |
-  | aft box face | (0.533, 0.590, 0.568) | 0.576 | (0.521, 0.536, 0.542) | 0.533 | 0.93 | 1.07, 1.04 |
-  | copper Kapton | (0.122, 0.052, 0.034) | 0.066 | (0.142, 0.061, 0.017) | 0.075 | 1.14 | 0.28, 0.12 |
-  | LM shadow | (0.025, 0.020, 0.015) | 0.021 | (0.034, 0.033, 0.033) | 0.034 | 1.63 | 0.60, 0.96 |
-  | engine bell | (0.476, 0.543, 0.551) | 0.529 | (0.417, 0.428, 0.445) | 0.427 | 0.81 | 1.16, 1.07 |
+  | aft box face | (0.533, 0.590, 0.568) | 0.576 | (0.570, 0.590, 0.597) | 0.586 | 1.02 | 1.07, 1.05 |
+  | copper Kapton | (0.122, 0.052, 0.034) | 0.066 | (0.138, 0.059, 0.017) | 0.073 | 1.10 | 0.28, 0.12 |
+  | LM shadow | (0.025, 0.020, 0.015) | 0.021 | (0.030, 0.029, 0.029) | 0.029 | 1.43 | 0.60, 0.96 |
+  | engine bell | (0.476, 0.543, 0.551) | 0.529 | (0.298, 0.304, 0.315) | 0.303 | 0.57 | 1.16, 1.06 |
 
   ![NASA photograph AS11-40-5927 beside Ray's recreation on the LROC terrain at 512×512](docs/images/changelog/as11-40-5927-terrain.png)
 
   Left, NASA's frame (Neil Armstrong; public domain); right, Ray at 512×512. Look at the horizon
   and the ground's lie, the LM's shadow reaching out past the left footpad, the gold secondary
   struts, the bright foil beside the RCS quads and the pale engine bell. Aldrin, the PSEP and the
-  flag are still left out, and NASA's model is still taller for its leg span than the real LM.
+  flag are still left out. The engine bell reads darker than the frame's (0.57): the shorter LM
+  puts its shaded lower rim in the measured box.
 
   ![render_as11_40_5927 before and after](docs/images/changelog/as11-40-5927-test.png)
 
   The test render (128×128) before and after: the view, the terrain and horizon, the struts and
   foil. `tests/reference/renders.tar.gz` and the README's expected-output images
   (`tools/render_previews.py`) are regenerated for it and for `panorama_test`.
-- `scenes/models/apollo/lm5_eagle.glb` and its prefab: the parts above (`make_lm5_eagle.py`
-  sorts the secondary struts into `kapton_gold` and the low aft faces into `silver_foil`).
+- **The Eagle has the real LM's proportions.** NASA's model, scaled by 1.4 to the leg span, was 4%
+  too tall for it: 9.00 m across the footpads and 7.02 m high, where the real LM spans 31 ft
+  (9.449 m) and stands 22 ft 11 in (6.985 m) with its gear extended, its descent stage 10 ft 7 in
+  and its ascent stage 12 ft 4 in (Grumman/NASA, Apollo News Reference). Both stages were off by
+  the same factor, so `make_lm5_eagle.py` scales the model's height by 0.948 (y only, the footpads'
+  spread kept; the 15 cm strut crush and the prefab's 4 cm pad sink as before): 6.65 m before the
+  crush, 6.50 m after. It also sorts the secondary struts into `kapton_gold` and the low aft faces
+  into `silver_foil` (above). The panel atlas is drawn again for the shorter panels.
+
+  ![The Eagle prefab before and after the height scale](docs/images/changelog/lm5-eagle-proportions.png)
+
+  The yellow line marks the same height in both: the ascent stage comes down about 35 cm.
 
 ## [2026-alpha-0.21.3] - 2026-11-22
 

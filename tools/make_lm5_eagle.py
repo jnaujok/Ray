@@ -72,6 +72,14 @@ except ImportError:
     sys.exit("needs DracoPy: pip install DracoPy numpy")
 
 SCALE = 1.4
+# NASA's model is 4% too tall for its leg span. The real LM stands 22 ft 11 in
+# (6.985 m) with its gear extended and spans 31 ft (9.449 m) across the
+# footpads, its descent stage 10 ft 7 in of that and its ascent stage 12 ft
+# 4 in (Grumman/NASA Apollo News Reference, LM-5 era); scaled by SCALE the model
+# spans 9.00 m and stands 7.02 m (descent 3.25, ascent 3.77), so both stages
+# come down by the same factor to the real height for that span, the footpads'
+# spread kept.
+Y_SCALE = 0.948
 CREASE_DEGREES = 45.0
 
 # Linear base colors for viewers that read glTF materials; Ray's prefab gives
@@ -178,8 +186,8 @@ def creased_normals(points, faces):
 # shortening smoothly between the pads' tops and CRUSH_TOP (meters, after
 # scaling). The engine bell, which reaches into that band, moves down whole.
 CRUSH = 0.15
-PAD_TOP = 0.24
-CRUSH_TOP = 1.25
+PAD_TOP = round(0.24 * Y_SCALE, 4)
+CRUSH_TOP = round(1.25 * Y_SCALE, 4)
 
 
 def crush_drop(y):
@@ -419,7 +427,7 @@ def main():
             used = np.unique(faces)
             remap = -np.ones(len(points), dtype=np.int64)
             remap[used] = np.arange(len(used)) + base
-            points_list.append((points[used] + shift) * SCALE)
+            points_list.append((points[used] + shift) * SCALE * np.array([1.0, Y_SCALE, 1.0]))
             faces_list.append(remap[faces])
             base += len(used)
         points = crush(np.concatenate(points_list), name)
