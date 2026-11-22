@@ -18,6 +18,7 @@
 #include <cmath>
 #include "Globals.h"
 #include "SceneJson.h"
+#include "Include.h"
 
 #include "Exceptions/Exception.h"
 #include "Files/File.h"
@@ -54,6 +55,7 @@
 #define JSON_VERSION    3
 
 CScene::CScene( void ) :
+    m_nOnlyObject( -1 ),
     m_bTreeBuilt( FALSE ),
     m_pLastOccluder( NULL )
 {
@@ -711,6 +713,42 @@ DWORD CScene::SaveJson( const char *strFileName )
     return 0;
 }
 
+int CScene::FindObject( const std::string &strName )
+{
+    for ( int nIndex = 0; nIndex < m_oObjects.GetSize(); nIndex++ )
+    {
+        if ( ! m_oObjects[ nIndex ]->GetName().empty() && m_oObjects[ nIndex ]->GetName() == strName )
+            return nIndex;
+    }
+
+    char  *pEnd = NULL;
+    long   nNumber = strtol( strName.c_str(), &pEnd, 10 );
+
+    if ( ! strName.empty() && pEnd && *pEnd == '\0' && nNumber >= 1 && nNumber <= m_oObjects.GetSize() )
+        return (int)nNumber - 1;
+    return -1;
+}
+
+DWORD CScene::SaveObject( int nIndex, const char *strFileName, BOOL bJson )
+{
+    if ( nIndex < 0 || nIndex >= m_oObjects.GetSize() )
+    {
+        m_strLoadError = "there is no such object";
+        return BAD_FILE;
+    }
+    if ( m_oObjects[ nIndex ]->IncludedBy() )
+    {
+        m_strLoadError = "that object came in with an include; save the include's file instead";
+        return BAD_FILE;
+    }
+    m_nOnlyObject = nIndex;
+
+    DWORD nResult = bJson ? SaveJson( strFileName ) : Save( strFileName );
+
+    m_nOnlyObject = -1;
+    return nResult;
+}
+
 std::string CScene::ToJson( BOOL bCompact )
 {
         // A compact copy goes to a task, which may not have the scene's
@@ -745,10 +783,18 @@ IASLib::CObjectNode *CScene::ToJsonTree( void )
         for ( int nIndex = 0; nIndex < nCount; nIndex++ )
         {
             CObjects               *pObject = ( nList == 0 ) ? m_oObjects[ nIndex ] : (CObjects *)m_oLights[ nIndex ];
+
+                // What an include brought in is saved as the include; with
+                // m_nOnlyObject set, only that object is (--save-object).
+            if ( nList == 0 && ( pObject->IncludedBy() || ( m_nOnlyObject >= 0 && nIndex != m_nOnlyObject ) ) )
+                continue;
+
             IASLib::CObjectNode    *pNode = apArrays[ nList ]->addObject();
             LPCSTR                  strType = g_pDynamicList->JsonTypeOf( pObject->ClassType() );
 
             pNode->put( "type", strType ? strType : pObject->ClassType() );
+            if ( ! pObject->GetName().empty() )
+                pNode->put( "name", pObject->GetName().c_str() );
             pObject->ToJson( *pNode );
         }
     }
@@ -772,23 +818,16 @@ static BOOL ReadObjects( const IASLib::CJsonNode &oRoot, const char *strKey, BOO
     for ( int nIndex = 0; nIndex < pArray->size(); nIndex++ )
     {
         RayJson::CWhere             oElement( "", nIndex );
-        const IASLib::CJsonNode    &oNode = *pArray->get( nIndex );
-        std::string                 strType;
+        CObjects                   *pObject = CObjects::ReadJson( *pArray->get( nIndex ), bLights );
 
-        if ( ! RayJson::GetString( oNode, "type", strType, TRUE ) )
+        if ( pObject == NULL )
             return FALSE;
-
-        CObjects *pObject = g_pDynamicList->Create( strType.c_str() );
-
-        if ( pObject == NULL || pObject->IsCamera() || ( pObject->IsALight() ? TRUE : FALSE ) != bLights )
-        {
-            delete pObject;
-            return RayJson::Fail( std::string( bLights ? "unknown light type \"" : "unknown object type \"" ) + strType + "\"" );
-        }
-
         apRead.push_back( pObject );
-        if ( ! pObject->FromJson( oNode ) )
-            return FALSE;
+
+        CInclude *pInclude = dynamic_cast<CInclude *>( pObject );
+
+        if ( pInclude )
+            pInclude->TakeObjects( apRead );
     }
     return TRUE;
 }

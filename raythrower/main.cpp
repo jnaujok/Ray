@@ -56,6 +56,9 @@ namespace
         std::string strColorModel;      // Empty: what the scene says.
         std::string strSave;
         std::string strSaveJson;
+        std::string strSaveObject;          // --save-object: which object
+        std::string strSaveObjectFile;
+        bool        bSaveObjectJson = false;
         int         nTasks = 0;
         int         nPort = RAY_WIRE_DEFAULT_PORT;
         int         nTimeout = 60;
@@ -110,6 +113,12 @@ namespace
         printf( "                              scene archive, with its textures inside, and exit\n" );
         printf( "  --save-json <file>          Save it as plain JSON, for editing by hand, with the\n" );
         printf( "                              files it uses written beside it, and exit\n" );
+        printf( "  --save-object <object> <file>\n" );
+        printf( "                              Save one object (by its \"name\", or its number from 1)\n" );
+        printf( "                              with its files as a scene archive, a prefab for an\n" );
+        printf( "                              \"include\", and exit\n" );
+        printf( "  --save-object-json <object> <file>\n" );
+        printf( "                              The same as plain JSON, its files written beside it\n" );
         printf( "  -q, --quiet                 Print only errors\n" );
         printf( "  --stats                     Print the rays cast, by kind, even with --quiet (they are\n" );
         printf( "                              printed anyway without it)\n" );
@@ -372,6 +381,18 @@ namespace
                 }
                 nCount++;
             }
+            else if ( strArg == "--save-object" || strArg == "--save-object-json" )
+            {
+                if ( strNext == NULL || nCount + 2 >= nArgs )
+                {
+                    fprintf( stderr, "%s needs an object and a file\n", strArg.c_str() );
+                    return false;
+                }
+                oOptions.strSaveObject = strNext;
+                oOptions.strSaveObjectFile = astrArgs[ nCount + 2 ];
+                oOptions.bSaveObjectJson = ( strArg == "--save-object-json" );
+                nCount += 2;
+            }
             else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--png" ||
                       strArg == "--hdr" || strArg == "--ray-count" || strArg == "--engine" || strArg == "--save" ||
                       strArg == "--save-json" || strArg == "--stats-json" )
@@ -602,6 +623,25 @@ int main( int argc, char **argv )
         oScene.GetSettings().SetImageHeight( oOptions.nHeight );
     }
 
+    if ( ! oOptions.strSaveObject.empty() )
+    {
+        int nObject = oScene.FindObject( oOptions.strSaveObject );
+
+        if ( nObject < 0 )
+        {
+            fprintf( stderr, "The scene has no object \"%s\" (give its \"name\" or its number from 1)\n", oOptions.strSaveObject.c_str() );
+            return 1;
+        }
+        if ( oScene.SaveObject( nObject, oOptions.strSaveObjectFile.c_str(), oOptions.bSaveObjectJson ? TRUE : FALSE ) != 0 )
+        {
+            fprintf( stderr, "Couldn't write %s: %s\n", oOptions.strSaveObjectFile.c_str(), oScene.GetLoadError() );
+            return 1;
+        }
+        if ( ! oOptions.bQuiet )
+            printf( "Object %d saved to %s\n", nObject + 1, oOptions.strSaveObjectFile.c_str() );
+        if ( oOptions.strSave.empty() && oOptions.strSaveJson.empty() )
+            return 0;
+    }
     if ( ! oOptions.strSave.empty() || ! oOptions.strSaveJson.empty() )
     {
         if ( ! oOptions.strSave.empty() )

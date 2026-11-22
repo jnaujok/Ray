@@ -1,0 +1,824 @@
+{
+  "format": "Ray scene",
+  "version": 3,
+  "settings": {
+    "imageWidth": 256,
+    "imageHeight": 256,
+    "imageFile": "eagle.out",
+    "colorDepth": 8,
+    "maximumDepth": 6,
+    "depthThreshold": 0.01,
+    "indirect": {
+      "method": "hemisphere",
+      "bounces": 1,
+      "samples": 16,
+      "distance": 6.0,
+      "strength": 1.0
+    }
+  },
+  "background": [
+    0,
+    0,
+    0
+  ],
+  "camera": {
+    "position": [
+      10.0,
+      2.0,
+      -12.0
+    ],
+    "lookAt": [
+      0.0,
+      2.6,
+      0.0
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "verticalAngle": 40.0,
+    "horizontalAngle": 40.0,
+    "aspectRatio": 1.0
+  },
+  "objects": [
+    {
+      "type": "mesh",
+      "name": "lm5_eagle",
+      "file": "lm5_eagle.glb",
+      "scale": 1.0,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "align": "none",
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "smooth": true,
+      "doubleSided": true,
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "materials": [
+        {
+          "type": "ambient",
+          "influence": 1.0,
+          "color": [
+            0.0096,
+            0.0102,
+            0.0108
+          ]
+        },
+        {
+          "type": "diffuse",
+          "influence": 0.97,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "diffuseCast": false,
+          "texture": {
+            "type": "noise",
+            "scale": 0.004,
+            "octaves": 3,
+            "seed": 5,
+            "stretch": [
+              60,
+              1,
+              1
+            ],
+            "colors": [
+              [
+                0.4218,
+                0.4478,
+                0.4748
+              ],
+              [
+                0.4793,
+                0.5089,
+                0.5395
+              ]
+            ]
+          }
+        },
+        {
+          "type": "metal",
+          "influence": 0.04,
+          "metal": "aluminum",
+          "roughness": 0.4,
+          "tint": [
+            0.4793,
+            0.5089,
+            0.5395
+          ]
+        },
+        {
+          "type": "specular",
+          "influence": 0.08,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "power": 0.35,
+          "indexOfRefraction": 1.5,
+          "materialHighlight": false
+        }
+      ],
+      "materialMap": {
+        "kapton_blanket": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.6,
+              "metal": "aluminum",
+              "roughness": 0.3,
+              "tint": [
+                0.4342,
+                0.0976,
+                0.0273
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.6,
+              "color": [
+                0.4342,
+                0.0976,
+                0.0273
+              ],
+              "power": 0.3,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.4,
+              "color": [
+                0.4342,
+                0.0976,
+                0.0273
+              ],
+              "diffuseCast": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "cells",
+              "mode": "edges",
+              "scale": 0.045,
+              "turbulence": 1.0,
+              "seed": 9
+            },
+            "depth": 0.006,
+            "step": 0.0015
+          }
+        },
+        "kapton_gold": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.65,
+              "metal": "aluminum",
+              "roughness": 0.25,
+              "tint": [
+                0.7379,
+                0.3763,
+                0.0423
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.65,
+              "color": [
+                0.7379,
+                0.3763,
+                0.0423
+              ],
+              "power": 0.25,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.35,
+              "color": [
+                0.7379,
+                0.3763,
+                0.0423
+              ],
+              "diffuseCast": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "cells",
+              "mode": "edges",
+              "scale": 0.02,
+              "turbulence": 0.9,
+              "seed": 7
+            },
+            "depth": 0.0025,
+            "step": 0.001
+          }
+        },
+        "silver_foil": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.7,
+              "metal": "aluminum",
+              "roughness": 0.25,
+              "tint": [
+                0.6584,
+                0.6867,
+                0.7157
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.7,
+              "color": [
+                0.6584,
+                0.6867,
+                0.7157
+              ],
+              "power": 0.25,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.3,
+              "color": [
+                0.6584,
+                0.6867,
+                0.7157
+              ],
+              "diffuseCast": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "cells",
+              "mode": "edges",
+              "scale": 0.02,
+              "turbulence": 0.9,
+              "seed": 7
+            },
+            "depth": 0.0025,
+            "step": 0.001
+          }
+        },
+        "al_olive": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.35,
+              "metal": "aluminum",
+              "roughness": 0.4,
+              "tint": [
+                0.2016,
+                0.1946,
+                0.1384
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.35,
+              "color": [
+                0.2016,
+                0.1946,
+                0.1384
+              ],
+              "power": 0.4,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.65,
+              "color": [
+                0.2016,
+                0.1946,
+                0.1384
+              ],
+              "diffuseCast": false
+            }
+          ]
+        },
+        "kapton_mesa": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.65,
+              "metal": "aluminum",
+              "roughness": 0.25,
+              "tint": [
+                0.7835,
+                0.3278,
+                0.0343
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.65,
+              "color": [
+                0.7835,
+                0.3278,
+                0.0343
+              ],
+              "power": 0.25,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.35,
+              "color": [
+                0.7835,
+                0.3278,
+                0.0343
+              ],
+              "diffuseCast": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "cells",
+              "mode": "edges",
+              "scale": 0.02,
+              "turbulence": 0.9,
+              "seed": 7
+            },
+            "depth": 0.0025,
+            "step": 0.001
+          }
+        },
+        "black_blanket": {
+          "materials": [
+            {
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.0002,
+                0.0002,
+                0.0003
+              ]
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.92,
+              "color": [
+                0.0116,
+                0.0123,
+                0.0137
+              ],
+              "diffuseCast": false
+            },
+            {
+              "type": "specular",
+              "influence": 0.06,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "power": 0.6,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "cells",
+              "mode": "edges",
+              "scale": 0.045,
+              "turbulence": 1.0,
+              "seed": 9
+            },
+            "depth": 0.006,
+            "step": 0.0015
+          }
+        },
+        "dps_bell": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.85,
+              "metal": "titanium",
+              "roughness": 0.45,
+              "tint": [
+                0.0423,
+                0.0467,
+                0.0545
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.85,
+              "color": [
+                0.0423,
+                0.0467,
+                0.0545
+              ],
+              "power": 0.45,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.15,
+              "color": [
+                0.0423,
+                0.0467,
+                0.0545
+              ],
+              "diffuseCast": false
+            }
+          ]
+        },
+        "porch_aluminum": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.8,
+              "metal": "aluminum",
+              "roughness": 0.5,
+              "tint": [
+                0.3916,
+                0.4179,
+                0.4452
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.8,
+              "color": [
+                0.3916,
+                0.4179,
+                0.4452
+              ],
+              "power": 0.5,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.2,
+              "color": [
+                0.3916,
+                0.4179,
+                0.4452
+              ],
+              "diffuseCast": false
+            }
+          ]
+        },
+        "inconel_dark": {
+          "materials": [
+            {
+              "type": "metal",
+              "influence": 0.65,
+              "metal": "iron",
+              "roughness": 0.55,
+              "tint": [
+                0.0194,
+                0.0212,
+                0.0232
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.65,
+              "color": [
+                0.0194,
+                0.0212,
+                0.0232
+              ],
+              "power": 0.55,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.35,
+              "color": [
+                0.0194,
+                0.0212,
+                0.0232
+              ],
+              "diffuseCast": false
+            }
+          ]
+        },
+        "white_paint": {
+          "materials": [
+            {
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.0152,
+                0.0155,
+                0.0158
+              ]
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.92,
+              "color": [
+                0.7605,
+                0.7758,
+                0.7913
+              ],
+              "diffuseCast": false
+            },
+            {
+              "type": "specular",
+              "influence": 0.06,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "power": 0.45,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            }
+          ]
+        },
+        "al2024_anodized": {
+          "materials": [
+            {
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.0096,
+                0.0102,
+                0.0108
+              ]
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.97,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "diffuseCast": false,
+              "texture": {
+                "type": "noise",
+                "scale": 0.004,
+                "octaves": 3,
+                "seed": 5,
+                "stretch": [
+                  60,
+                  1,
+                  1
+                ],
+                "colors": [
+                  [
+                    0.4218,
+                    0.4478,
+                    0.4748
+                  ],
+                  [
+                    0.4793,
+                    0.5089,
+                    0.5395
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "metal",
+              "influence": 0.04,
+              "metal": "aluminum",
+              "roughness": 0.4,
+              "tint": [
+                0.4793,
+                0.5089,
+                0.5395
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.08,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "power": 0.35,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "noise",
+              "scale": 0.6,
+              "octaves": 2,
+              "seed": 3
+            },
+            "depth": 0.004,
+            "step": 0.01
+          }
+        },
+        "al5056_anodized": {
+          "materials": [
+            {
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.0112,
+                0.0101,
+                0.0074
+              ]
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.97,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "diffuseCast": false,
+              "texture": {
+                "type": "noise",
+                "scale": 0.004,
+                "octaves": 3,
+                "seed": 5,
+                "stretch": [
+                  60,
+                  1,
+                  1
+                ],
+                "colors": [
+                  [
+                    0.4913,
+                    0.4426,
+                    0.3267
+                  ],
+                  [
+                    0.5583,
+                    0.5029,
+                    0.3712
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "metal",
+              "influence": 0.04,
+              "metal": "aluminum",
+              "roughness": 0.4,
+              "tint": [
+                0.5583,
+                0.5029,
+                0.3712
+              ]
+            },
+            {
+              "type": "specular",
+              "influence": 0.08,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "power": 0.35,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            }
+          ],
+          "bump": {
+            "mode": "height",
+            "texture": {
+              "type": "noise",
+              "scale": 0.6,
+              "octaves": 2,
+              "seed": 3
+            },
+            "depth": 0.004,
+            "step": 0.01
+          }
+        },
+        "pyromark_black": {
+          "materials": [
+            {
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.0002,
+                0.0002,
+                0.0002
+              ]
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.92,
+              "color": [
+                0.0091,
+                0.0097,
+                0.011
+              ],
+              "diffuseCast": false
+            },
+            {
+              "type": "specular",
+              "influence": 0.06,
+              "color": [
+                1,
+                1,
+                1
+              ],
+              "power": 0.7,
+              "indexOfRefraction": 1.5,
+              "materialHighlight": false
+            }
+          ]
+        },
+        "window_quartz": {
+          "materials": [
+            {
+              "type": "ambient",
+              "influence": 1.0,
+              "color": [
+                0.004,
+                0.004,
+                0.008
+              ]
+            },
+            {
+              "type": "diffuse",
+              "influence": 0.05,
+              "color": [
+                0.0033,
+                0.0065,
+                0.0103
+              ],
+              "diffuseCast": false
+            },
+            {
+              "type": "reflective",
+              "influence": 0.32,
+              "color": [
+                0.62,
+                0.55,
+                0.95
+              ],
+              "diffuseReflectivity": 0.0,
+              "filterReflection": true,
+              "roughness": 0.02
+            },
+            {
+              "type": "specular",
+              "influence": 0.45,
+              "color": [
+                0.8,
+                0.75,
+                1.0
+              ],
+              "power": 0.05,
+              "indexOfRefraction": 1.46,
+              "materialHighlight": false
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [
+        -0.9661,
+        -0.258145,
+        0.003372
+      ],
+      "color": [
+        2.2,
+        2.2,
+        2.15
+      ],
+      "angle": 0.53,
+      "samples": 2
+    }
+  ]
+}

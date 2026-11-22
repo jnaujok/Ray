@@ -37,6 +37,7 @@ CObjects::CObjects( void )
 {
     m_bOwnsMaterials = TRUE;
     m_pShadeMaterials = NULL;
+    m_pIncludedBy = NULL;
 }
 
 CObjects::~CObjects( void )
@@ -54,6 +55,58 @@ CObjects::~CObjects( void )
     m_oMaterials.RemoveAll();
 }
 
+
+CObjects *CObjects::ReadJson( const IASLib::CJsonNode &oNode, BOOL bLights, const std::function<BOOL ( CObjects * )> &fnBeforeRead )
+{
+    std::string strType;
+
+    if ( ! RayJson::GetString( oNode, "type", strType, TRUE ) )
+        return NULL;
+
+    CObjects *pObject = g_pDynamicList->Create( strType.c_str() );
+
+    if ( pObject == NULL || pObject->IsCamera() || ( pObject->IsALight() ? TRUE : FALSE ) != bLights )
+    {
+        delete pObject;
+        RayJson::Fail( std::string( bLights ? "unknown light type \"" : "unknown object type \"" ) + strType + "\"" );
+        return NULL;
+    }
+
+    if ( fnBeforeRead && ! fnBeforeRead( pObject ) )
+    {
+        delete pObject;
+        return NULL;
+    }
+
+    const IASLib::CJsonNode *pName = oNode.isObject() ? oNode.get( "name" ) : NULL;
+    BOOL                     bRead;
+
+    if ( pName )
+    {
+            // The name is the scene's, not the object's: it is read here and
+            // the rest goes to the object.
+        if ( ! pName->isTextual() )
+        {
+            delete pObject;
+            RayJson::Fail( "name must be text" );
+            return NULL;
+        }
+        pObject->m_strName = pName->textString();
+
+        std::unique_ptr<IASLib::CJsonNode> pCopy( oNode.clone() );
+
+        static_cast<IASLib::CObjectNode &>( *pCopy ).remove( "name" );
+        bRead = pObject->FromJson( *pCopy );
+    }
+    else
+        bRead = pObject->FromJson( oNode );
+    if ( ! bRead )
+    {
+        delete pObject;
+        return NULL;
+    }
+    return pObject;
+}
 
 void CObjects::TextureAt( CVector &oPoint, STexturePoint &oAt )
 {

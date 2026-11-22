@@ -95,6 +95,7 @@ set(RAY_CORE_SOURCES
     core/src/Maps.cpp
     core/src/MaterialList.cpp
     core/src/Matrix.cpp
+    core/src/Include.cpp
     core/src/Mesh.cpp
     core/src/ModelFile.cpp
     core/src/GltfFile.cpp

@@ -49,6 +49,7 @@ class CScene
             // The atmosphere the scene sits in, or NULL for clear air.
         std::shared_ptr<const CHaze>        m_pHaze;
         std::string         m_strLoadError;
+        int                 m_nOnlyObject;      // while saving one object: its number, else -1
 
             // A bounding volume hierarchy over the objects, built when a ray
             // first needs it, so a ray tests only the objects near its path.
@@ -134,6 +135,14 @@ class CScene
             /// Writes the scene as a plain JSON file, for editing by hand, and
             /// the files it uses beside it, under the names it gives them.
         DWORD               SaveJson( const char *strFileName );
+            /// Writes a scene holding only object nIndex (from 0) and its
+            /// files, with the scene's settings, camera and lights: a prefab
+            /// for an include. bJson writes plain JSON with the files beside
+            /// it, else an archive. Returns 0 or BAD_FILE (see GetLoadError).
+        DWORD               SaveObject( int nIndex, const char *strFileName, BOOL bJson );
+            /// The object named strName, or numbered strName (from 1, as the
+            /// editor's tree numbers them); -1 if there is none.
+        int                 FindObject( const std::string &strName );
 
             /// One part of the scene as JSON text, for editing by hand (the
             /// scene editor's "Edit as JSON"): "settings", "camera",
