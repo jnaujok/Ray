@@ -284,3 +284,14 @@ tools/obj_to_ray.py model.obj [--flip] [--smooth] [--double-sided] [--weld] \
 Only vertices and faces are read; polygons are split into triangles. `raythrower --save` tidies the
 layout of a scene the mesh has been pasted into. `scenes/teapot.ray` was made with
 `--smooth --double-sided --weld`.
+
+## `make_gallery_md.py`
+
+Writes `docs/gallery/README.md`, the release gallery as Markdown that GitHub renders, from the
+`TORTURE`, `RELEASES` and `PLANNED` lists in `docs/gallery/index.html`:
+
+```sh
+tools/make_gallery_md.py [docs/gallery/index.html] [docs/gallery/README.md]
+```
+
+Run it after adding a release to `index.html`.

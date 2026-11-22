@@ -60,6 +60,10 @@ The ray tracing itself is the 1997 code.
 <img src="docs/images/gallery.png" alt="Anti-aliased renders of six of the sample scenes, including the Utah teapot" width="720">
 </div>
 
+**[Release gallery](docs/gallery/README.md):** every release's pictures, from the 1997 code to
+today, with the torture test version by version ([interactive version](docs/gallery/index.html),
+with a slider comparing any two versions).
+
 ## Features
 
 - **Primitives:** spheres, planes, cylinders, cones, boxes, tori, discs and annuli, paraboloids,
@@ -800,11 +804,11 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`rayengine/`](rayengine) | Networked tracing task |
 | [`editor/`](editor) | `ray-editor`, the cross-platform scene editor: `logic/` (no toolkit: the document, tessellation, the view's camera, the progressive render) and `gui/` (wxWidgets) |
 | [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images, `scenes/models/` model files, among them 3DBenchy (CC0), `scenes/terrain/` the LROC terrain of Tranquility Base (public domain), and `scenes/fonts/` fonts, Lato Bold (SIL Open Font License; see [NOTICE](NOTICE)) |
-| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files; `make_lens_cutaways.py`, which writes the lens cutaway scenes; `make_lm5_eagle.py` and `make_eagle_scenes.py`, which make the LM-5 Eagle model, its prefab and the AS11-40-5927 scene; `solve_5927_view.py` and `compare_5927.py`, which solve that scene's view and measure it against the photograph; `geotiff_terrain.py` and `hdr_rle.py`, which make terrain meshes and pack baked panoramas; `make_icon.py`, which draws the icon's PNG (see [`tools/README.md`](tools/README.md)) |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files; `make_lens_cutaways.py`, which writes the lens cutaway scenes; `make_lm5_eagle.py` and `make_eagle_scenes.py`, which make the LM-5 Eagle model, its prefab and the AS11-40-5927 scene; `solve_5927_view.py` and `compare_5927.py`, which solve that scene's view and measure it against the photograph; `geotiff_terrain.py` and `hdr_rle.py`, which make terrain meshes and pack baked panoramas; `make_icon.py`, which draws the icon's PNG; `make_gallery_md.py`, which writes the release gallery's Markdown page (see [`tools/README.md`](tools/README.md)) |
 | [`packaging/`](packaging) | The desktop entry, icon and AppStream metadata, the Linux archive's `ray-editor` launcher and Debian `copyright` (`linux/`), and the Flatpak manifest (`flatpak/`) |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build, `RayEditor.cmake` (wxWidgets) |
-| [`docs/`](docs) | README images, the changelog's before and after images, and the performance notes (`performance.md`) |
+| [`docs/`](docs) | README images, the changelog's before and after images, the performance notes (`performance.md`), and the [release gallery](docs/gallery/README.md) |
 | [`legacy/`](legacy) | Visual C++ 4, 5, and 6 project files, kept for history |
 
 ## Scene files

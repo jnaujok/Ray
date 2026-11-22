@@ -10,6 +10,30 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.21.5] - 2026-11-22
+
+The release gallery joins the repository: every release's pictures, from the 1997 code to today.
+Documentation only; no code or render changes.
+
+### Added
+
+- **`docs/gallery/`**: the release gallery that was kept as a claude.ai page, now in the repository.
+  `README.md` renders on GitHub: the torture test version by version from 0.4 to 0.21, then a
+  section for every release, newest first, with its summary, its changelog images and links to
+  the code and changelog at its tag, a few experiments (the heat map of rays a pixel, the foil
+  lunar module, the Eagle materials), and the coming releases. `index.html` is the same gallery as
+  an interactive page, with a slider that compares any two versions of the torture test; open it
+  in a browser or through GitHub Pages. Images still on `main` are referenced where they are; the
+  47 the repository no longer has on `main` (each release's torture test, images replaced since,
+  and the experiments) are in `docs/gallery/images/` (9.6 MB).
+- **`tools/make_gallery_md.py`** writes `docs/gallery/README.md` from the data in `index.html`, so
+  the two stay the same.
+
+### Changed
+
+- `CLAUDE.md`: every release now updates `docs/gallery/` (and regenerates its Markdown page) as
+  well as the claude.ai copy. README.md links the gallery.
+
 ## [2026-alpha-0.21.4] - 2026-11-22
 
 Panoramas and terrain: an equirectangular camera renders the whole surroundings into one image,
@@ -2753,7 +2777,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.4...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.5...HEAD
+[2026-alpha-0.21.5]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.4...2026-alpha-0.21.5
 [2026-alpha-0.21.4]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.3...2026-alpha-0.21.4
 [2026-alpha-0.21.3]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.2...2026-alpha-0.21.3
 [2026-alpha-0.21.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.1...2026-alpha-0.21.2

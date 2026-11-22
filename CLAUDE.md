@@ -87,11 +87,14 @@ ctest --preset full             # every test
   test keeps the scene's own 5×5 stratified sampler at 160×120). Report its time in the changelog.
   The `render_torture` test is labelled `torture`, and CI leaves it out (`ctest -LE torture`):
   run it locally (the `full` preset does) before every merge.
-- **Every release updates the release gallery** (the claude.ai artifact
-  https://claude.ai/artifact/XScoVjKwNUscrc3fhGN35Z): add the release's full-size torture test to its
-  comparison slider and a section with the release's summary and changelog before and after images,
-  and move the release out of "Coming releases". Read the artifact back first and build on what's
-  there.
+- **Every release updates the release gallery** in `docs/gallery/`: add the release's full-size
+  torture test (as `docs/gallery/images/a<version>-torture.jpg`, since `docs/images/torture_test.png`
+  is replaced each release) to the `TORTURE` list in `docs/gallery/index.html`, a `RELEASES` entry
+  with the release's summary and changelog before and after images (point at `../images/...` for
+  files that stay on `main`; copy into `docs/gallery/images/` anything a later release will replace),
+  move the release out of `PLANNED`, then run `tools/make_gallery_md.py` to regenerate
+  `docs/gallery/README.md`. A copy is also published as the claude.ai artifact
+  https://claude.ai/artifact/XScoVjKwNUscrc3fhGN35Z.
 - If a change is meant to alter rendered output, regenerate `tests/reference/renders.tar.gz`,
   then run `tools/render_previews.py` to update the README's expected-output images
   (`docs/images/tests/`), and say so in the changelog. Otherwise a reference mismatch is a bug.
