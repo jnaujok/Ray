@@ -179,9 +179,24 @@ const TORTURE = [
   { v: "0.20",  src: "images/a0.20-torture.jpg",  note: "A dark lump of lunar regolith at the front right." },
   { v: "0.20.1", src: "images/a0.20.1-torture.jpg", note: "Stopped down to f/8 and refocused, so everything from the front row to the mirror is sharp; a true gold torus from the new metal material; rendered with the tuned adaptive sampler at under a third of the cost." },
   { v: "0.21",  src: "images/a0.21-torture.jpg",  note: "Smoother bounce light in shadow, from four times the rays where a point sits inside an object's bounds; frames finish 30% sooner on 16 threads." },
+  { v: "0.21.6", src: "images/a0.21.6-torture.jpg", note: "The lump of regolith at the front right is mottled by a combine of two noise layers, studded with pebbles and rough (Oren-Nayar)." },
 ];
 
 const RELEASES = [
+  { v: "2026-alpha-0.21.6", date: "2026-11-22",
+    summary: "Color for the Moon: the ground of Tranquility Base takes its albedo from the LROC NAC orthoimage of the site, the sunlight's shading divided out with the DTM (the orthoimage's sun fitted at 23\u00b0 in the west), the LM and its shadow painted over, mottled by noise at 2 m, 20 cm and 1.5 cm and roughened by pebbles, in Mare Tranquillitatis' warm gray. Ray gains a combine texture (multiply or add textures) and an optional Oren-Nayar term for regolith. AS11-40-5927 and its baked surroundings are rendered again on it, the sunlit ground still on the frame's brightness at f/11 and 1/250 s.",
+    shots: [
+      { src: "../images/changelog/as11-40-5927-albedo.png", wide: true, title: "AS11-40-5927 on the albedo",
+        cap: "NASA's frame beside Ray's. Sunlit ground within 1% of the frame's, the shadow down from 1.43 to 1.18 of it, Kapton within 3%; the ground now a little warmer than the scan." },
+      { src: "../images/changelog/as11-40-5927-albedo-before-after.png", wide: true, title: "Before and after",
+        cap: "Ray's AS11-40-5927 in 0.21.5 and 0.21.6: the even gray ground becomes mottled, pebbled near the camera and brighter in the blast zone round the LM." },
+      { src: "../images/changelog/lroc-albedo.png", wide: true, title: "From orthoimage to albedo",
+        cap: "The LROC orthoimage around the LM, with the shading divided out, and as the tinted texture." },
+      { src: "../images/changelog/panorama-albedo.png", wide: true, title: "The surroundings baked again",
+        cap: "The terrain to 2.4 km from the camera station before and after, tone mapped for show." },
+      { src: "../images/changelog/torture-regolith-mottled.png", wide: true, title: "The torture test's regolith",
+        cap: "The lump at the front right, three times full size: mottled by a combine of noise, pebbled and rough." },
+    ] },
   { v: "2026-alpha-0.21.1", date: "2026-11-21",
     summary: "JPEG and WebP decoders written from scratch (matching libjpeg-turbo and libwebp pixel for pixel on the test files), rays counted by kind and reported by raythrower, the chess set's own lacquer and marble textures, and the first downloadable builds for Linux, macOS and Windows.",
     shots: [

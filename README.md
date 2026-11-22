@@ -314,18 +314,22 @@ with a slider comparing any two versions).
   recreates NASA photograph AS11-40-5903, Aldrin with Armstrong and the lunar module in his gold
   visor, from NASA's own astronaut and lunar module models, and `as11_40_5927_test.ray` recreates
   AS11-40-5927, Eagle under the sun as it stood at 110:53:38 (14.96°
-  up, azimuth 90.2°), from the Eagle prefab, on the LROC NAC terrain of Tranquility Base with its
-  baked surroundings as the environment, the view solved from the four footpads and the LM's
+  up, azimuth 90.2°), from the Eagle prefab, on the LROC NAC terrain of Tranquility Base, colored
+  by the albedo of the LROC orthoimage with the sunlight's shading taken out and mottled down to
+  centimeters, with its baked surroundings as the environment, the view solved from the four footpads and the LM's
   shadow, exposed at f/11 and 1/250 s (left: NASA's frame, public domain; right: Ray at 512×512;
   Aldrin, the PSEP and the flag are left out):
 
-  <img src="docs/images/changelog/as11-40-5927-terrain.png" alt="NASA photograph AS11-40-5927 beside Ray's recreation on the LROC terrain: the lunar module Eagle from the east-southeast, its aft equipment box to the right, its shadow to the left, Réseau crosses" width="720">
+  <img src="docs/images/changelog/as11-40-5927-albedo.png" alt="NASA photograph AS11-40-5927 beside Ray's recreation on the LROC terrain with its albedo texture: the lunar module Eagle from the east-southeast, its aft equipment box to the right, its shadow to the left, mottled gray ground, Réseau crosses" width="720">
 - **Panoramas and terrain:** an `"equirectangular"` camera `projection` renders the whole
   surroundings in one image laid out as an `environment` reads it, so `--hdr` bakes environment
   maps from scenes. `tools/geotiff_terrain.py` crops a digital terrain model (PDS3 `.IMG` or
   GeoTIFF, such as the LROC NAC DTMs) around a point and tessellates it into a glTF mesh, with the
-  Moon's curvature and the lander's own bump flattened; `scenes/terrain/` holds Tranquility Base
-  out to 2.4 km and its baked surroundings.
+  Moon's curvature and the lander's own bump flattened; `tools/geotiff_albedo.py` makes the
+  ground's albedo texture from an orthoimage, the sunlight's shading divided out; `scenes/terrain/`
+  holds Tranquility Base out to 2.4 km, its albedo and its baked surroundings. A `combine` texture
+  multiplies or adds textures (mottling over an image, pebbles over undulation), and `regolith` can
+  blend in Oren-Nayar's rough diffuse term.
 - **Metals:** the `metal` material reflects by a conductor's exact Fresnel equations from its complex
   index n + ik in red, green and blue, so gold, copper, silver, aluminum, iron, chromium, titanium
   and platinum (presets, or your own n and k) shift color toward grazing as real metals do.
@@ -602,7 +606,7 @@ Seven rays in ten are shadow rays: every point shaded casts one at each of the s
 included, whether or not the light reaches it (a point outside the spot's cone still asks), which
 is where the next optimizations should look.
 
-<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, a lump of regolith, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
+<img src="docs/images/torture_test.png" alt="The torture test at 1024x768: a marble teapot among mirrors, glass, a flint prism, a drilled die, an orange 3DBenchy, a puzzle cube, a textured ring, a gold torus, a pebbled lump of regolith, textured shapes and a wood-framed mirror wall with RAY in red letters on top under an HDR sky in a light haze, through a real lens" width="720">
 
 **Bring in a model**: name an STL or OBJ file in a mesh, and place it (here a printable model,
 which stands on z, turned to stand on y, 2 units across, on the floor):
@@ -803,8 +807,8 @@ at its default exposure looks like `srgb` here: what it adds is the `--hdr` file
 | [`raythrower/`](raythrower) | Command-line master |
 | [`rayengine/`](rayengine) | Networked tracing task |
 | [`editor/`](editor) | `ray-editor`, the cross-platform scene editor: `logic/` (no toolkit: the document, tessellation, the view's camera, the progressive render) and `gui/` (wxWidgets) |
-| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images, `scenes/models/` model files, among them 3DBenchy (CC0), `scenes/terrain/` the LROC terrain of Tranquility Base (public domain), and `scenes/fonts/` fonts, Lato Bold (SIL Open Font License; see [NOTICE](NOTICE)) |
-| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files; `make_lens_cutaways.py`, which writes the lens cutaway scenes; `make_lm5_eagle.py` and `make_eagle_scenes.py`, which make the LM-5 Eagle model, its prefab and the AS11-40-5927 scene; `solve_5927_view.py` and `compare_5927.py`, which solve that scene's view and measure it against the photograph; `geotiff_terrain.py` and `hdr_rle.py`, which make terrain meshes and pack baked panoramas; `make_icon.py`, which draws the icon's PNG; `make_gallery_md.py`, which writes the release gallery's Markdown page (see [`tools/README.md`](tools/README.md)) |
+| [`scenes/`](scenes) | Sample `.ray` scenes: the 1997 test scenes, as JSON, and newer ones (the Utah teapot, lenses, textures, models); `scenes/textures/` holds texture images, `scenes/models/` model files, among them 3DBenchy (CC0), `scenes/terrain/` the LROC terrain of Tranquility Base and its albedo (public domain), and `scenes/fonts/` fonts, Lato Bold (SIL Open Font License; see [NOTICE](NOTICE)) |
+| [`tools/`](tools) | `obj_to_ray.py`, which turns OBJ models into meshes; `render_previews.py`, which makes the README's expected-output images; `check_image.py`, which checks PNG and HDR output; `make_textures.py`, which makes the brick textures and the sky; `make_models.py`, which makes the small model files; `make_lens_cutaways.py`, which writes the lens cutaway scenes; `make_lm5_eagle.py` and `make_eagle_scenes.py`, which make the LM-5 Eagle model, its prefab and the AS11-40-5927 scene; `solve_5927_view.py` and `compare_5927.py`, which solve that scene's view and measure it against the photograph; `geotiff_terrain.py`, `geotiff_albedo.py` and `hdr_rle.py`, which make terrain meshes and their albedo textures and pack baked panoramas; `make_icon.py`, which draws the icon's PNG; `make_gallery_md.py`, which writes the release gallery's Markdown page (see [`tools/README.md`](tools/README.md)) |
 | [`packaging/`](packaging) | The desktop entry, icon and AppStream metadata, the Linux archive's `ray-editor` launcher and Debian `copyright` (`linux/`), and the Flatpak manifest (`flatpak/`) |
 | [`tests/`](tests) | Regression tests and reference renders |
 | [`cmake/`](cmake) | The scene editor's build, `RayEditor.cmake` (wxWidgets) |
@@ -878,6 +882,8 @@ model dressed by a `materialMap`, `creaseAngle`, a model's own base color image 
 UVs, the LM-5 Eagle as Ray's own model, and a recreation of AS11-40-5927. 2026-alpha-0.21.4 adds
 an equirectangular panorama camera, terrain meshes from digital terrain models, and puts
 AS11-40-5927 on the real ground of Tranquility Base, its view solved and exposed as it was shot.
+2026-alpha-0.21.6 colors that ground with the albedo of the LROC orthoimage, its shading divided
+out and mottled down to centimeters, with a `combine` texture and an Oren-Nayar term for regolith.
 
 ## Changelog
 

@@ -189,16 +189,47 @@ CAMERA_DISTANCE = 12.31
 FILM_FSTOP = 11.0
 SUN_COLOR = [3.6, 3.6, 3.52]
 REGOLITH = [0.12, 0.115, 0.11]
+    # The terrain's mean albedo, in Mare Tranquillitatis' warm gray (linear
+    # 0.135 : 0.125 : 0.112), scaled so the sunlit ground in front of the LM keeps
+    # the photograph's brightness at f/11 and 1/250 s.
+REGOLITH_ALBEDO = [0.1107, 0.1024, 0.0918]
+    # Mottling multiplied over the albedo texture: (scale in meters, spread, seed).
+MOTTLING = [(2.0, 0.32, 21), (0.2, 0.27, 22), (0.015, 0.18, 23)]
+    # The regolith's Oren-Nayar roughness (radians) and its share, or None.
+OREN_NAYAR = (0.9, 0.35)
     # The baked surroundings: the terrain out to 2.4 km seen from the camera
     # station, 1.4 m up, without the LM (scenes/terrain/apollo11_bake.ray).
 BAKE_SIZE = (2048, 1024)
 
 
-def regolith_ground(glb):
+def regolith_ground(glb, albedo, detail=True):
+    """A terrain mesh in regolith, its color the LROC albedo texture (tools/geotiff_albedo.py)
+    mottled by noise at three scales, and its surface roughened by pebbles and grain."""
+    # The texture's mean is 0.5 (128 of 255): the combine's color doubles it back
+    # to the regolith's albedo and tints it.
+    color = [round(c / (128.0 / 255.0), 6) for c in REGOLITH_ALBEDO]
+    layers = [{"type": "image", "file": albedo, "srgb": False}]
+    for scale, spread, seed in (MOTTLING if detail else MOTTLING[:1]):
+        # Darker patches a little warmer (more mature), brighter ones a little cooler.
+        layers.append({"type": "noise", "scale": scale, "octaves": 2, "seed": seed,
+                       "colors": [[round(1.0 - spread * k, 4) for k in (0.97, 1.0, 1.03)],
+                                  [round(1.0 + spread * k, 4) for k in (0.97, 1.0, 1.03)]]})
+    texture = {"type": "combine", "mode": "multiply", "textures": layers, "color": color}
+    regolith = {"type": "regolith", "influence": 1.0, "texture": texture, "color": REGOLITH, "surge": 1.0, "width": 0.06}
+    if OREN_NAYAR:
+        regolith.update(orenNayar=OREN_NAYAR[0], orenNayarWeight=OREN_NAYAR[1])
+    height = {"type": "noise", "scale": 0.9, "octaves": 6, "seed": 11}
+    if detail:
+        # Pebbles 2 to 10 cm across (a dome over each cell of a Voronoi pattern)
+        # and fine grain, on top of the gentle undulation.
+        height = {"type": "combine", "mode": "add", "weights": [1.0, 0.25, 0.08],
+                  "textures": [height,
+                               {"type": "cells", "mode": "distance", "scale": 0.06, "turbulence": 0.3, "seed": 12,
+                                "colors": [[1, 1, 1], [0, 0, 0]]},
+                               {"type": "noise", "scale": 0.012, "octaves": 2, "seed": 13}]}
     return {"type": "mesh", "name": "ground", "file": glb, "smooth": True, "doubleSided": True, "color": [0.5, 0.5, 0.5],
-            "materials": [{"type": "regolith", "influence": 1.0, "color": REGOLITH, "surge": 1.0, "width": 0.06}],
-            "bump": {"mode": "height", "texture": {"type": "noise", "scale": 0.9, "octaves": 6, "seed": 11},
-                     "depth": 0.05, "step": 0.005}}
+            "materials": [regolith],
+            "bump": {"mode": "height", "texture": height, "depth": 0.05, "step": 0.004 if detail else 0.005}}
 
 
 def toward(azimuth, elevation=0.0):
@@ -254,7 +285,9 @@ def main():
                    "projection": "equirectangular", "sampler": {"type": "stratified", "grid": 2, "seed": 0},
                    "colorModel": "clip"}
     bake = base_scene(BAKE_SIZE[0], BAKE_SIZE[1], bake_camera,
-                      [regolith_ground("apollo11_inner.glb"), dict(regolith_ground("apollo11_outer.glb"), name="far ground")],
+                      [regolith_ground("apollo11_inner.glb", "apollo11_inner_albedo.png"),
+                       dict(regolith_ground("apollo11_outer.glb", "apollo11_outer_albedo.png", detail=False),
+                            name="far ground")],
                       [dict(sun, samples=1)])
     del bake["settings"]["indirect"]
     bake["settings"]["imageFile"] = "apollo11_surroundings.out"
@@ -283,7 +316,7 @@ def main():
         {"type": "cylinder", "base": r6(on_plane(lm_frame([3.6, 0.0, -0.4]))), "top": r6(on_plane(lm_frame([3.6, 0.9, -0.4]))),
          "radius": 0.012, "capped": True, "color": [0.5, 0.5, 0.5], "materials": anodized('#B8BDC2')},
     ]
-    objects = [regolith_ground("terrain/apollo11_inner.glb"), eagle] + props
+    objects = [regolith_ground("terrain/apollo11_inner.glb", "terrain/apollo11_inner_albedo.png"), eagle] + props
     scene = base_scene(128, 128, camera, objects, [sun])
     scene["environment"] = {"type": "image", "file": "terrain/apollo11_surroundings.hdr"}
     with open(os.path.join(SCENES, 'as11_40_5927_test.ray'), 'w') as f:

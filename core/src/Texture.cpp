@@ -10,6 +10,7 @@
 #include "FaceColorTexture.h"
 #include "CellsTexture.h"
 #include "CausticsTexture.h"
+#include "CombineTexture.h"
 #include "Presets.h"
 #include "SceneJson.h"
 
@@ -26,6 +27,7 @@ namespace
     CTexture *CreateFaceColors( void ) { return new CFaceColorTexture; }
     CTexture *CreateCells( void )   { return new CCellsTexture; }
     CTexture *CreateCaustics( void ) { return new CCausticsTexture; }
+    CTexture *CreateCombine( void ) { return new CCombineTexture; }
 
         // Every texture that can be named in a scene.
     const CTexture::SType s_aoTypes[] =
@@ -39,6 +41,7 @@ namespace
         { "faceColors", "the colors a colored model file gives its faces",    CreateFaceColors },
         { "cells",   "solid cellular noise: flecks, spots or cell edges",     CreateCells },
         { "caustics", "the web of light that waves focus under water",        CreateCaustics },
+        { "combine", "two or more textures multiplied or added together",     CreateCombine },
     };
 }
 

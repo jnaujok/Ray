@@ -67,6 +67,7 @@ set(RAY_CORE_SOURCES
     core/src/BoxSampler.cpp
     core/src/Camera.cpp
     core/src/CausticsTexture.cpp
+    core/src/CombineTexture.cpp
     core/src/CellsTexture.cpp
     core/src/CheckerTexture.cpp
     core/src/CenterSampler.cpp

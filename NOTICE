@@ -54,9 +54,16 @@ Reconnaissance Orbiter Camera's Narrow Angle Camera digital terrain model of
 the Apollo 11 landing site, NAC_DTM_APOLLO11 (product
 NAC_DTM_APOLLO11_E008N0234, 2 m posting; https://pds.lroc.im-ldi.com),
 courtesy NASA/GSFC/Arizona State University, in the public domain: cropped
-around Tranquility Base, its middle 6 m flattened, and tessellated.
+around Tranquility Base, its middle 9 m flattened, and tessellated.
+scenes/terrain/apollo11_inner_albedo.png and apollo11_outer_albedo.png were
+made by tools/geotiff_albedo.py from the orthoimages released with that model,
+NAC_DTM_APOLLO11_M150361817_50CM and NAC_DTM_APOLLO11_M150361817_2M (from LROC
+NAC frame M150361817), courtesy NASA/GSFC/Arizona State University, in the
+public domain: cropped, the sunlight's shading divided out with the model, the
+lunar module and its shadow painted over, and normalized.
 scenes/terrain/apollo11_surroundings.hdr is Ray's render of those meshes
-(scenes/terrain/apollo11_bake.ray). The source model itself is not included.
+(scenes/terrain/apollo11_bake.ray). The source model and orthoimages
+themselves are not included.
 NASA and ASU do not endorse this project.
 
 core/src/WebpImage.cpp contains the VP8 token, mode and quantizer tables of

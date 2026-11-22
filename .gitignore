@@ -33,3 +33,6 @@ nohup.out
 
 # Python bytecode
 __pycache__/
+
+# Scratch data for tools (downloaded rasters)
+.work/

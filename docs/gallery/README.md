@@ -30,8 +30,35 @@ Pages).
 | alpha 0.20 | <img src="images/a0.20-torture.jpg" width="320" alt="Torture test at 0.20"> | A dark lump of lunar regolith at the front right. |
 | alpha 0.20.1 | <img src="images/a0.20.1-torture.jpg" width="320" alt="Torture test at 0.20.1"> | Stopped down to f/8 and refocused, so everything from the front row to the mirror is sharp; a true gold torus from the new metal material; rendered with the tuned adaptive sampler at under a third of the cost. |
 | alpha 0.21 | <img src="images/a0.21-torture.jpg" width="320" alt="Torture test at 0.21"> | Smoother bounce light in shadow, from four times the rays where a point sits inside an object's bounds; frames finish 30% sooner on 16 threads. |
+| alpha 0.21.6 | <img src="images/a0.21.6-torture.jpg" width="320" alt="Torture test at 0.21.6"> | The lump of regolith at the front right is mottled by a combine of two noise layers, studded with pebbles and rough (Oren-Nayar). |
 
 ## Releases, newest first
+
+### alpha 0.21.6 (2026-11-22)
+
+[Code at this tag](https://github.com/jnaujok/Ray/tree/2026-alpha-0.21.6) · [Changelog](https://github.com/jnaujok/Ray/blob/2026-alpha-0.21.6/CHANGELOG.md)
+
+Color for the Moon: the ground of Tranquility Base takes its albedo from the LROC NAC orthoimage of the site, the sunlight's shading divided out with the DTM (the orthoimage's sun fitted at 23° in the west), the LM and its shadow painted over, mottled by noise at 2 m, 20 cm and 1.5 cm and roughened by pebbles, in Mare Tranquillitatis' warm gray. Ray gains a combine texture (multiply or add textures) and an optional Oren-Nayar term for regolith. AS11-40-5927 and its baked surroundings are rendered again on it, the sunlit ground still on the frame's brightness at f/11 and 1/250 s.
+
+<img src="../images/changelog/as11-40-5927-albedo.png" width="720" alt="AS11-40-5927 on the albedo">
+
+**AS11-40-5927 on the albedo.** NASA's frame beside Ray's. Sunlit ground within 1% of the frame's, the shadow down from 1.43 to 1.18 of it, Kapton within 3%; the ground now a little warmer than the scan.
+
+<img src="../images/changelog/as11-40-5927-albedo-before-after.png" width="720" alt="Before and after">
+
+**Before and after.** Ray's AS11-40-5927 in 0.21.5 and 0.21.6: the even gray ground becomes mottled, pebbled near the camera and brighter in the blast zone round the LM.
+
+<img src="../images/changelog/lroc-albedo.png" width="720" alt="From orthoimage to albedo">
+
+**From orthoimage to albedo.** The LROC orthoimage around the LM, with the shading divided out, and as the tinted texture.
+
+<img src="../images/changelog/panorama-albedo.png" width="720" alt="The surroundings baked again">
+
+**The surroundings baked again.** The terrain to 2.4 km from the camera station before and after, tone mapped for show.
+
+<img src="../images/changelog/torture-regolith-mottled.png" width="720" alt="The torture test's regolith">
+
+**The torture test's regolith.** The lump at the front right, three times full size: mottled by a combine of noise, pebbled and rough.
 
 ### alpha 0.21.1 (2026-11-21)
 
