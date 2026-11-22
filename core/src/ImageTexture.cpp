@@ -6,7 +6,9 @@
 
 #include "ImageTexture.h"
 #include "SceneJson.h"
+#include "JpegImage.h"
 #include "PngImage.h"
+#include "WebpImage.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -74,11 +76,18 @@ CImageTexture::CImageTexture( void ) :
 
 BOOL CImageTexture::ParseImage( const std::string &strData, const std::string &strPath, SImage &oImage, std::string &strError )
 {
-    if ( CPngImage::IsPng( strData ) )
+    if ( CPngImage::IsPng( strData ) || CJpegImage::IsJpeg( strData ) || CWebpImage::IsWebp( strData ) )
     {
         std::string strWhy;
+        BOOL        bRead;
 
-        if ( ! CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy ) )
+        if ( CPngImage::IsPng( strData ) )
+            bRead = CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+        else if ( CJpegImage::IsJpeg( strData ) )
+            bRead = CJpegImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+        else
+            bRead = CWebpImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+        if ( ! bRead )
         {
             strError = "\"" + strPath + "\" " + strWhy;
             return FALSE;

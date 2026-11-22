@@ -107,7 +107,9 @@ set(RAY_CORE_SOURCES
     core/src/ObjectsArray.cpp
     core/src/PixelAccumulator.cpp
     core/src/PixelSampler.cpp
+    core/src/JpegImage.cpp
     core/src/PngImage.cpp
+    core/src/WebpImage.cpp
     core/src/Presets.cpp
     core/src/Plane.cpp
     core/src/PtLight.cpp

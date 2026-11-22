@@ -45,6 +45,8 @@
 #include "ReinhardColorModel.h"
 #include "ImageTexture.h"
 #include "PngImage.h"
+#include "JpegImage.h"
+#include "WebpImage.h"
 #include "BumpMap.h"
 #include "Csg.h"
 #include "ModelFile.h"
@@ -6534,6 +6536,220 @@ static void PatchFileChecks( const char *strScenes )
     Check( oTeapot.PieceCount() > 32, "the teapot's patches are split into flat pieces" );
 }
 
+// --------------------------------------------------------------------------
+// JPEG and WebP: the fixtures tools/make_image_fixtures.py writes, each with
+// Pillow's decode beside it (libjpeg-turbo and libwebp).
+// --------------------------------------------------------------------------
+
+    // Decodes a JPEG or WebP with Ray's own decoder.
+static bool DecodeImageFile( const std::string &strData, int &nWidth, int &nHeight, std::vector<BYTE> &anPixels, std::string &strError,
+                             std::vector<BYTE> *pAlpha = NULL )
+{
+    if ( CJpegImage::IsJpeg( strData ) )
+        return CJpegImage::Decode( strData, nWidth, nHeight, anPixels, strError );
+    return CWebpImage::Decode( strData, nWidth, nHeight, anPixels, strError, pAlpha );
+}
+
+    // The largest difference of a fixture's decode from Pillow's, with the
+    // mean in dMean, or -1 if it doesn't decode or the sizes differ.
+static int CompareFixture( const std::string &strFolder, const char *strName, double &dMean, bool bAlpha = false )
+{
+    std::string       strData = ReadFile( strFolder + strName );
+    std::string       strBase = std::string( strName ).substr( 0, strlen( strName ) - ( strstr( strName, ".webp" ) ? 5 : 4 ) );
+    std::string       strRef = ReadFile( strFolder + strBase + ( bAlpha ? "_alpha.png" : "_ref.png" ) );
+    int               nWidth = 0, nHeight = 0, nRefWidth = 0, nRefHeight = 0;
+    std::vector<BYTE> anPixels, anRef, anAlpha;
+    std::string       strError;
+
+    dMean = 0.0;
+    if ( ! DecodeImageFile( strData, nWidth, nHeight, anPixels, strError, &anAlpha ) )
+    {
+        fprintf( stderr, "%s: %s\n", strName, strError.c_str() );
+        return -1;
+    }
+    if ( ! CPngImage::Decode( strRef, nRefWidth, nRefHeight, anRef, strError ) || nWidth != nRefWidth || nHeight != nRefHeight )
+    {
+        fprintf( stderr, "%s: %d x %d against the reference's %d x %d\n", strName, nWidth, nHeight, nRefWidth, nRefHeight );
+        return -1;
+    }
+
+    int    nWorst = 0;
+    double dSum = 0.0;
+    size_t nCount = 0;
+
+    for ( size_t n = 0; n < (size_t)nWidth * nHeight; n++ )
+        for ( int c = 0; c < ( bAlpha ? 1 : 3 ); c++ )
+        {
+                // The alpha reference is gray, so its PNG decodes to R = G = B.
+            int nMine = bAlpha ? anAlpha[ n ] : anPixels[ n * 3 + c ];
+            int nTheirs = anRef[ n * 3 + c ];
+            int nDiff = abs( nMine - nTheirs );
+
+            nWorst = (std::max)( nWorst, nDiff );
+            dSum += nDiff;
+            nCount++;
+        }
+    dMean = nCount ? dSum / (double)nCount : 0.0;
+    return nWorst;
+}
+
+static void ImageFormatChecks( const char *strScenes )
+{
+    std::string strFolder = std::string( strScenes ) + "/textures/formats/";
+
+        // JPEG: as libjpeg-turbo decodes it (the same integer DCT,
+        // upsampling and color conversion), within 1.
+    const char *astrJpegs[] = { "base444.jpg", "base422.jpg", "base420.jpg", "prog420.jpg", "prog444.jpg", "gray.jpg",
+                                "restart.jpg", "exif3.jpg", "exif6.jpg", "exif8.jpg" };
+
+    for ( const char *strName : astrJpegs )
+    {
+        double dMean = 0.0;
+        int    nWorst = CompareFixture( strFolder, strName, dMean );
+
+        if ( nWorst != 0 )
+            fprintf( stderr, "  %s: largest difference from libjpeg-turbo %d, mean %.4f\n", strName, nWorst, dMean );
+        Check( nWorst >= 0 && nWorst <= 1 && dMean < 0.05, ( std::string( "the JPEG " ) + strName + " decodes as libjpeg-turbo does, within 1" ).c_str() );
+    }
+
+        // WebP: lossless exactly; lossy as libwebp decodes it, within 1.
+    const char *astrLossless[] = { "lossless.webp", "lossless_fast.webp", "lossless_alpha.webp", "palette2.webp", "palette4.webp",
+                                   "palette12.webp", "palette100.webp" };
+
+    for ( const char *strName : astrLossless )
+    {
+        double dMean = 0.0;
+
+        Check( CompareFixture( strFolder, strName, dMean ) == 0, ( std::string( "the lossless WebP " ) + strName + " decodes exactly" ).c_str() );
+    }
+    {
+        double dMean = 0.0;
+
+        Check( CompareFixture( strFolder, "lossless_alpha.webp", dMean, true ) == 0, "lossless_alpha.webp's alpha decodes exactly" );
+    }
+
+    const char *astrLossy[] = { "lossy.webp", "lossy_small.webp", "lossy_alpha.webp", "lossy_alpha_lossy.webp", "lossy_simple.webp",
+                                "lossy_sharp.webp", "lossy_parts.webp", "lossy_low.webp" };
+
+    for ( const char *strName : astrLossy )
+    {
+        double dMean = 0.0;
+        int    nWorst = CompareFixture( strFolder, strName, dMean );
+
+        if ( nWorst != 0 )
+            fprintf( stderr, "  %s: largest difference from libwebp %d, mean %.4f\n", strName, nWorst, dMean );
+        Check( nWorst >= 0 && nWorst <= 1 && dMean < 0.05, ( std::string( "the lossy WebP " ) + strName + " decodes as libwebp does, within 1" ).c_str() );
+    }
+    for ( const char *strName : { "lossy_alpha.webp", "lossy_alpha_lossy.webp" } )
+    {
+        double dMean = 0.0;
+
+        Check( CompareFixture( strFolder, strName, dMean, true ) == 0, ( std::string( strName ) + "'s alpha decodes exactly" ).c_str() );
+    }
+
+        // What isn't read is reported, with a reason.
+    {
+        int               nWidth = 0, nHeight = 0;
+        std::vector<BYTE> anPixels;
+        std::string       strError;
+        std::string       strBase = ReadFile( strFolder + "base444.jpg" );
+        std::string       strData;
+        size_t            nFrame = strBase.find( "\xFF\xC0" );
+
+        Check( ! CJpegImage::Decode( ReadFile( strFolder + "cmyk.jpg" ), nWidth, nHeight, anPixels, strError ) &&
+               strError.find( "CMYK" ) != std::string::npos, "a CMYK JPEG is refused, saying so" );
+        Check( nFrame != std::string::npos, "base444.jpg has a baseline frame header" );
+        if ( nFrame != std::string::npos )
+        {
+            strData = strBase;
+            strData[ nFrame + 1 ] = (char)0xC9;
+            strError.clear();
+            Check( ! CJpegImage::Decode( strData, nWidth, nHeight, anPixels, strError ) && strError.find( "arithmetic" ) != std::string::npos,
+                   "an arithmetic-coded JPEG is refused, saying so" );
+            strData = strBase;
+            strData[ nFrame + 4 ] = 12;
+            strError.clear();
+            Check( ! CJpegImage::Decode( strData, nWidth, nHeight, anPixels, strError ) && strError.find( "12-bit" ) != std::string::npos,
+                   "a 12-bit JPEG is refused, saying so" );
+            strData = strBase;
+            strData[ nFrame + 1 ] = (char)0xC3;
+            strError.clear();
+            Check( ! CJpegImage::Decode( strData, nWidth, nHeight, anPixels, strError ) && strError.find( "lossless" ) != std::string::npos,
+                   "a lossless JPEG is refused, saying so" );
+        }
+
+            // An animated WebP: a VP8X chunk with the animation flag.
+        std::string strAnimated( "RIFF\x16\0\0\0WEBPVP8X\x0A\0\0\0\x02\0\0\0\0\0\0\0\0\0", 30 );
+
+        strError.clear();
+        Check( ! CWebpImage::Decode( strAnimated, nWidth, nHeight, anPixels, strError ) && strError.find( "animated" ) != std::string::npos,
+               "an animated WebP is refused, saying so" );
+    }
+
+        // Cut-off and damaged files fail cleanly (and, under the sanitizers,
+        // never read past their data).
+    {
+        const char *astrAll[] = { "base444.jpg", "base420.jpg", "prog420.jpg", "gray.jpg", "restart.jpg", "exif6.jpg", "lossless.webp",
+                                  "lossless_alpha.webp", "palette4.webp", "lossy.webp", "lossy_alpha.webp", "lossy_parts.webp" };
+        bool        bCutOff = true, bWhole = true;
+        uint32_t    nSeed = 12345;
+
+        for ( const char *strName : astrAll )
+        {
+            std::string strData = ReadFile( strFolder + strName );
+
+            for ( int nEighth = 1; nEighth < 8; nEighth++ )
+            {
+                int               nWidth = 0, nHeight = 0;
+                std::vector<BYTE> anPixels;
+                std::string       strError;
+
+                if ( DecodeImageFile( strData.substr( 0, strData.size() * nEighth / 8 ), nWidth, nHeight, anPixels, strError ) )
+                {
+                    fprintf( stderr, "  %s cut to %d/8 decoded\n", strName, nEighth );
+                    bCutOff = false;
+                }
+            }
+            for ( int nTrial = 0; nTrial < 40 && strData.size() > 32; nTrial++ )
+            {
+                std::string       strDamaged = strData;
+                int               nWidth = 0, nHeight = 0;
+                std::vector<BYTE> anPixels;
+                std::string       strError;
+
+                for ( int nFlip = 0; nFlip < 4; nFlip++ )
+                {
+                    nSeed = nSeed * 1103515245u + 12345u;
+
+                    size_t nAt = 16 + ( nSeed >> 8 ) % ( strDamaged.size() - 16 );
+
+                    nSeed = nSeed * 1103515245u + 12345u;
+                    strDamaged[ nAt ] = (char)( strDamaged[ nAt ] ^ ( 1 << ( ( nSeed >> 16 ) & 7 ) ) );
+                }
+                if ( DecodeImageFile( strDamaged, nWidth, nHeight, anPixels, strError ) && anPixels.size() != (size_t)nWidth * nHeight * 3 )
+                    bWhole = false;
+            }
+        }
+        Check( bCutOff, "a JPEG or WebP cut short is reported, not decoded" );
+        Check( bWhole, "a damaged JPEG or WebP decodes to whole pixels or is reported" );
+    }
+
+        // Image textures read JPEG and WebP by their contents, whatever their names.
+    {
+        CImageTexture::SImage oImage;
+        std::string           strError;
+        int                   nWidth = 0, nHeight = 0;
+        std::vector<BYTE>     anPixels;
+
+        Check( CImageTexture::ParseImage( ReadFile( strFolder + "lossless.webp" ), "image.png", oImage, strError ) &&
+               oImage.nWidth == 130 && oImage.nHeight == 97, "an image texture reads a WebP by its contents" );
+        Check( CJpegImage::Decode( ReadFile( strFolder + "exif6.jpg" ), nWidth, nHeight, anPixels, strError ) && nWidth == 45 && nHeight == 61,
+               "a JPEG with Exif orientation 6 comes out turned upright (45 x 61)" );
+        Check( CImageTexture::ParseImage( ReadFile( strFolder + "prog420.jpg" ), "image.webp", oImage, strError ) &&
+               oImage.nWidth == 130 && oImage.nHeight == 97, "an image texture reads a progressive JPEG" );
+    }
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -6552,6 +6768,7 @@ int main( int argc, char **argv )
         BlendChecks( argv[ 2 ] );
         TextChecks( argv[ 2 ] );
         PatchFileChecks( argv[ 2 ] );
+        ImageFormatChecks( argv[ 2 ] );
     }
     else if ( argc >= 3 )
         RoundTrip( argv[ 1 ], argv[ 2 ] );

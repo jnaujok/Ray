@@ -43,8 +43,9 @@
 *   (likewise). Each primitive's material's pbrMetallicRoughness         *
 *   baseColorFactor becomes its faces' color, times its                  *
 *   baseColorTexture at the middle of each face when that image is a     *
-*   PNG (sRGB, as glTF says); other images (JPEG, WebP) are skipped and  *
-*   counted in nSkippedImages, and the factor alone is used. Everything  *
+*   PNG, JPEG or WebP (sRGB, as glTF says; EXT_texture_webp's source is  *
+*   preferred); other images (KTX2) are skipped and counted in           *
+*   nSkippedImages, and the factor alone is used. Everything             *
 *   else about materials, cameras, lights, skins and animations is       *
 *   ignored. Draco- or meshopt-compressed models are refused. glTF is    *
 *   right-handed and Ray's scenes are left-handed, so z is negated and   *
@@ -74,7 +75,7 @@ namespace ModelFile
         std::vector<FLT>            anUVs;          // u and v a vertex, or empty
         std::vector<CColor>         aoFaceColors;   // one a face, or empty if the file has no colors
         std::vector<unsigned char>  abHasColor;     // whether each face has its color (with aoFaceColors)
-        int                         nSkippedImages = 0;     // glTF base color images that weren't PNG
+        int                         nSkippedImages = 0;     // glTF base color images Ray couldn't read
     };
 
         /// The other files a .gltf names (buffers and PNG images), by the

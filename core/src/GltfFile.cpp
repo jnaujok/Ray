@@ -16,7 +16,9 @@
 
 #include "DracoDecoder.h"
 #include "ModelFile.h"
+#include "JpegImage.h"
 #include "PngImage.h"
+#include "WebpImage.h"
 #include "SceneJson.h"
 #include "JSON/JsonNode.h"
 
@@ -549,9 +551,13 @@ namespace
             const IASLib::CJsonNode *pEntry = pTextures ? pTextures->get( (int)dTexture ) : NULL;
             double                   dSource = 0.0;
 
-                // The plain source; extensions' sources (WebP, KTX) are
-                // left out, since they need decoders Ray doesn't have.
-            if ( Number( pEntry, "source", dSource ) )
+                // EXT_texture_webp's source where there is one (Ray reads
+                // WebP), else the plain source; KTX2 (KHR_texture_basisu)
+                // isn't read, so its texture falls back to the plain source.
+            const IASLib::CJsonNode *pExtensions = pEntry ? pEntry->get( "extensions" ) : NULL;
+            const IASLib::CJsonNode *pWebp = pExtensions ? pExtensions->get( "EXT_texture_webp" ) : NULL;
+
+            if ( Number( pWebp, "source", dSource ) || Number( pEntry, "source", dSource ) )
                 nImage = (int)dSource;
             if ( Number( pTexture, "texCoord", dCoord ) )
                 nTexCoord = (int)dCoord;
@@ -602,15 +608,23 @@ namespace
                     m_strError = strSaved;
                 }
             }
-                // PNG only: a JPEG (or anything else) leaves the base color
-                // factor alone, and the model says so.
+                // PNG, JPEG or WebP; anything else (KTX2, or an image that
+                // won't decode) leaves the base color factor alone, and the
+                // model says so.
+            BOOL bRead = FALSE;
+
             if ( CPngImage::IsPng( strData ) )
+                bRead = CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+            else if ( CJpegImage::IsJpeg( strData ) )
+                bRead = CJpegImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+            else if ( CWebpImage::IsWebp( strData ) )
+                bRead = CWebpImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy );
+            if ( ! bRead )
             {
-                if ( ! CPngImage::Decode( strData, oImage.nWidth, oImage.nHeight, oImage.anPixels, strWhy ) )
-                    oImage.nWidth = oImage.nHeight = 0;
+                oImage.nWidth = oImage.nHeight = 0;
+                if ( ! strData.empty() || ( pUri && pUri->isTextual() ) )
+                    m_oModel.nSkippedImages++;
             }
-            else if ( ! strData.empty() || ( pUri && pUri->isTextual() ) )
-                m_oModel.nSkippedImages++;
         }
         return ( oImage.nWidth > 0 ) ? &oImage : NULL;
     }
