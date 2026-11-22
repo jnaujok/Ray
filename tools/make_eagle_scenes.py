@@ -8,12 +8,12 @@ by tools/make_lm5_eagle.py), with a materialMap giving each named part the
 materials the Apollo photographs call for. Any scene brings it in with
 {"type": "include", "file": "models/apollo/lm5_eagle.ray", ...}.
 
-scenes/eagle_test.ray recreates NASA photograph AS11-40-5927 (Apollo 11, GET
+scenes/as11_40_5927_test.ray recreates NASA photograph AS11-40-5927 (Apollo 11, GET
 110:53:38, 1969-07-21 04:25:38 UTC): Eagle from the east, its Scientific
 Equipment (SEQ) bay open, under a sun 14.96 degrees up at azimuth 90.2 (just
 south of east). Buzz Aldrin, who stands at the bay in the photograph, is left
 out. The LM is turned so its front (+Z, the hatch) faces azimuth 295, and the
-camera stands 12.8 m from it looking at azimuth 295, chest high, as matched
+camera stands 13 m from it looking at azimuth 295, 1.2 m up (chest high), as matched
 by eye to the photograph (no recovered camera station): the Hasselblad Data
 Camera, its 60 mm Biogon and Reseau plate, Ektachrome MS. Scene axes: x east,
 y up, z north.
@@ -82,7 +82,7 @@ QUARTZ = [{"type": "ambient", "influence": 1.0, "color": [0.004, 0.004, 0.008]},
            "materialHighlight": False}]
 
 MATERIAL_MAP = {
-    "kapton_blanket": {"materials": metal('#B0582E', 0.6, 0.3), "bump": BIG_CRINKLE},
+    "kapton_blanket": {"materials": metal('#8C3B1F', 0.65, 0.3), "bump": BIG_CRINKLE},
     "kapton_gold": {"materials": metal('#DFA53A', 0.65, 0.25), "bump": CRINKLE},
     "silver_foil": {"materials": metal('#D4D8DC', 0.7, 0.25), "bump": CRINKLE},
     "al_olive": {"materials": metal('#7C7A68', 0.35, 0.4)},
@@ -92,8 +92,8 @@ MATERIAL_MAP = {
     "porch_aluminum": {"materials": metal('#A8ADB2', 0.8, 0.5)},
     "inconel_dark": {"materials": metal('#26282A', 0.65, 0.55, 'iron')},
     "white_paint": {"materials": paint('#E2E4E6', 0.45)},
-    "al2024_anodized": {"materials": anodized('#B8BDC2'), "bump": OILCAN},
-    "al5056_anodized": {"materials": anodized('#C5BCA4'), "bump": OILCAN},
+    "al2024_anodized": {"materials": anodized('#8E8F86'), "bump": OILCAN},
+    "al5056_anodized": {"materials": anodized('#D2C7A8'), "bump": OILCAN},
     "pyromark_black": {"materials": paint('#18191B', 0.7)},
     "window_quartz": {"materials": QUARTZ},
 }
@@ -102,7 +102,7 @@ SUN_ELEVATION = 14.96
 SUN_AZIMUTH = 90.2
 LM_HEADING = 340.0          # the azimuth the LM's front faces, so its SEQ bay (quadrant 2) faces the camera
 CAMERA_HEADING = 295.0
-CAMERA_DISTANCE = 11.5
+CAMERA_DISTANCE = 13.0
 
 
 def toward(azimuth, elevation=0.0):
@@ -177,13 +177,13 @@ def main():
               "bump": {"mode": "height", "texture": {"type": "noise", "scale": 0.9, "octaves": 6, "seed": 11},
                        "depth": 0.05, "step": 0.005}}
     look = toward(CAMERA_HEADING)
-    camera = {"position": r6([-CAMERA_DISTANCE * look[0], 1.5, -CAMERA_DISTANCE * look[2]]), "lookAt": [0.0, 2.2, 0.0],
+    camera = {"position": r6([-CAMERA_DISTANCE * look[0], 1.2, -CAMERA_DISTANCE * look[2]]), "lookAt": [0.0, 2.05, 0.0],
               "up": [0, 1, 0], "body": "hasselblad-hdc",
               "sampler": {"type": "stratified", "grid": 2, "seed": 0},
               "lens": {"focusDistance": CAMERA_DISTANCE, "millimetersPerUnit": 1000.0}}
     eagle = {"type": "include", "file": "models/apollo/lm5_eagle.ray", "rotation": [0.0, round(LM_HEADING - 180.0, 6), 0.0]}
     rock = paint('#7E7B76', 0.8)
-    near = [-CAMERA_DISTANCE * look[0] * 0.62, 0.0, -CAMERA_DISTANCE * look[2] * 0.62]
+    near = [-CAMERA_DISTANCE * look[0] * 0.55, 0.0, -CAMERA_DISTANCE * look[2] * 0.55]
     props = [
             # A rock about 40 cm across in the middle foreground.
         {"type": "superquadric", "center": r6([near[0], 0.1, near[2]]), "radius": [0.24, 0.14, 0.2], "e1": 1.6, "e2": 1.4,
@@ -197,9 +197,9 @@ def main():
     ]
     objects = [ground, eagle] + seq_bay(LM_HEADING) + props
     scene = base_scene(128, 128, camera, objects, [sun])
-    with open(os.path.join(SCENES, 'eagle_test.ray'), 'w') as f:
+    with open(os.path.join(SCENES, 'as11_40_5927_test.ray'), 'w') as f:
         json.dump(scene, f, indent=2)
-    print("wrote lm5_eagle.ray and eagle_test.ray")
+    print("wrote lm5_eagle.ray and as11_40_5927_test.ray")
 
 
 if __name__ == '__main__':
