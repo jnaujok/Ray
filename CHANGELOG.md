@@ -80,10 +80,12 @@ Python tool, and Ray saves a model as a Ray scene with `--save-object`).
   color, a little different from its neighbors' and some clearly bluer, with its seam and a row of
   rivets around its edge, and `lm5_eagle_rivets.png` the rivets' heights for a bump map. `scenes/models/apollo/lm5_eagle.ray`, written by the new
   `tools/make_eagle_scenes.py`, is the prefab: one mesh whose `materialMap` dresses each part: the
-  anodized panels satin metal (0.38 diffuse from the atlas through their UVs, 0.35 metal tinted by
-  it, a soft highlight, the rivets as a bump); the copper Kapton blankets a tinted metal with large
+  anodized panels satin metal (diffuse from the atlas through their UVs, metal tinted by it, a soft
+  highlight, the rivets as a bump), the aft box's face brought to within 5% of the photograph's
+  brightness and tint as measured in linear light; the copper Kapton blankets a bright copper metal
+  (90%) with large
   faceted folds (cells about 27 cm across, 5 cm deep, sharp-edged, as big as Aldrin's head beside
-  them in the photograph); the bare aluminum struts and porch a dark, mostly diffuse metal; the RCS
+  them in the photograph); the bare aluminum struts and porch dark and metallic; the RCS
   quads polished 304 stainless steel (its own n and k, roughness 0.12, the sun's highlight); the
   plume deflectors below them gray, gently wrinkled and streaked from top to bottom.
 
@@ -96,7 +98,9 @@ Python tool, and Ray saves a model as a Ray scene with `--save-object`).
   0.508° an hour) at azimuth 90.2°, just south of east, a 0.53° disc. The Data Camera, its 60 mm
   Biogon, Réseau plate and Ektachrome MS; one bounce of `"hemisphere"` indirect light at 16 rays a
   point; 128×128 in the test suite (`render_as11_40_5927`, `roundtrip_as11_40_5927_test`,
-  `network_as11_40_5927`). The camera was placed by eye, 13 m out on azimuth 295 and 1.2 m up.
+  `network_as11_40_5927`). The camera was matched to the photograph by the footpads' spacing, the horizon's height and the
+  aft box seen square on: 12.4 m out on azimuth 295, 1.03 m up, pitched up about 3°, the LM's front
+  facing azimuth 244.
 
   ![NASA photograph AS11-40-5927 beside Ray's recreation at 512×512](docs/images/changelog/as11-40-5927.png)
 

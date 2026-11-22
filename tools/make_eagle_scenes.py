@@ -13,9 +13,9 @@ scenes/as11_40_5927_test.ray recreates NASA photograph AS11-40-5927 (Apollo 11, 
 equipment bay to the right and its Scientific Equipment (SEQ) bay closed, under
 a sun 14.96 degrees up at azimuth 90.2 (just south of east). Buzz Aldrin, who
 stands at the bay in the photograph, is left out. The LM is turned so its
-front (+Z, the hatch) faces azimuth 250 and sits 4 cm down (its footpads in the
-regolith), and the camera stands 13 m from it looking at azimuth 295, 1.2 m up (chest high), as matched
-by eye to the photograph (no recovered camera station): the Hasselblad Data
+front (+Z, the hatch) faces azimuth 244 and sits 4 cm down (its footpads in the
+regolith), and the camera stands 12.4 m from it looking at azimuth 295, 1.03 m up, matched to the
+photograph by the footpads' spacing, the horizon's height and the aft box seen square on (no recovered camera station): the Hasselblad Data
 Camera, its 60 mm Biogon and Reseau plate, Ektachrome MS. Scene axes: x east,
 y up, z north.
 """
@@ -55,13 +55,13 @@ def anodized(hexcolor):
 PANEL_IMAGE = {"type": "image", "file": "lm5_eagle_panels.png", "srgb": True}
 
 
-def panel(hexcolor):
+def panel(hexcolor, gain=1.0):
     """An anodized micrometeoroid-shield panel: satin metal, its color (each panel a little different,
     with its seam and rivets) from the model's panel atlas through its UVs."""
     c = lin(hexcolor)
     return [{"type": "ambient", "influence": 1.0, "color": scaled(c, 0.02)},
-            {"type": "diffuse", "influence": 0.38, "color": [1, 1, 1], "diffuseCast": False, "texture": PANEL_IMAGE},
-            {"type": "metal", "influence": 0.35, "metal": "aluminum", "roughness": 0.3, "tint": PANEL_IMAGE},
+            {"type": "diffuse", "influence": round(0.38 * gain, 4), "color": [1, 1, 1], "diffuseCast": False, "texture": PANEL_IMAGE},
+            {"type": "metal", "influence": round(0.35 * gain, 4), "metal": "aluminum", "roughness": 0.3, "tint": PANEL_IMAGE},
             {"type": "specular", "influence": 0.3, "color": c, "power": 0.15, "indexOfRefraction": 1.5,
              "materialHighlight": False}]
 
@@ -117,29 +117,29 @@ QUARTZ = [{"type": "ambient", "influence": 1.0, "color": [0.004, 0.004, 0.008]},
            "materialHighlight": False}]
 
 MATERIAL_MAP = {
-    "kapton_blanket": {"materials": metal('#7E3218', 0.8, 0.2), "bump": BIG_CRINKLE},
+    "kapton_blanket": {"materials": metal('#C2602C', 0.9, 0.15, 'copper'), "bump": BIG_CRINKLE},
     "kapton_gold": {"materials": metal('#DFA53A', 0.65, 0.25), "bump": CRINKLE},
     "silver_foil": {"materials": metal('#D4D8DC', 0.7, 0.25), "bump": CRINKLE},
     "al_olive": {"materials": panel('#7A7966'), "bump": RIVETS},
     "kapton_mesa": {"materials": metal('#E59B34', 0.65, 0.25), "bump": CRINKLE},
     "black_blanket": {"materials": paint('#1C1D1F', 0.6), "bump": BIG_CRINKLE},
     "dps_bell": {"materials": metal('#3A3D42', 0.85, 0.45, 'titanium')},
-    "porch_aluminum": {"materials": metal('#4E5255', 0.25, 0.55)},
+    "porch_aluminum": {"materials": metal('#34373A', 0.65, 0.3)},
     "rcs_stainless": {"materials": stainless()},
     "plume_deflector": {"materials": DEFLECTOR, "bump": WRINKLE},
     "inconel_dark": {"materials": metal('#26282A', 0.65, 0.55, 'iron')},
     "white_paint": {"materials": paint('#E2E4E6', 0.45)},
-    "al2024_anodized": {"materials": panel('#A3A6A6'), "bump": RIVETS},
-    "al5056_anodized": {"materials": panel('#CBBF9C'), "bump": RIVETS},
+    "al2024_anodized": {"materials": panel('#C2D4FF', 1.6), "bump": RIVETS},
+    "al5056_anodized": {"materials": panel('#F1F4F2', 1.6), "bump": RIVETS},
     "pyromark_black": {"materials": paint('#18191B', 0.7)},
     "window_quartz": {"materials": QUARTZ},
 }
 
 SUN_ELEVATION = 14.96
 SUN_AZIMUTH = 90.2
-LM_HEADING = 250.0          # the azimuth the LM's front faces: its aft equipment bay to the right, as in the photograph
+LM_HEADING = 244.0          # the azimuth the LM's front faces: its aft equipment bay to the right, as in the photograph
 CAMERA_HEADING = 295.0
-CAMERA_DISTANCE = 13.0
+CAMERA_DISTANCE = 12.4
 
 
 def toward(azimuth, elevation=0.0):
@@ -185,7 +185,7 @@ def main():
               "bump": {"mode": "height", "texture": {"type": "noise", "scale": 0.9, "octaves": 6, "seed": 11},
                        "depth": 0.05, "step": 0.005}}
     look = toward(CAMERA_HEADING)
-    camera = {"position": r6([-CAMERA_DISTANCE * look[0], 1.2, -CAMERA_DISTANCE * look[2]]), "lookAt": [0.0, 2.05, 0.0],
+    camera = {"position": r6([-CAMERA_DISTANCE * look[0], 1.03, -CAMERA_DISTANCE * look[2]]), "lookAt": [0.114, 1.67, 0.245],
               "up": [0, 1, 0], "body": "hasselblad-hdc",
               "sampler": {"type": "stratified", "grid": 2, "seed": 0},
               "lens": {"focusDistance": CAMERA_DISTANCE, "millimetersPerUnit": 1000.0}}

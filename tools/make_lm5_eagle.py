@@ -194,7 +194,7 @@ def crush(points, name):
 # texture atlas (lm5_eagle_panels.png: its color, a little different from its
 # neighbors', with a seam and rivets around its edge; lm5_eagle_rivets.png:
 # the rivets' heights, for a bump map), at TEXELS a meter.
-PANEL_PARTS = {'al2024_anodized': '#A3A6A6', 'al5056_anodized': '#CBBF9C', 'al_olive': '#7A7966'}
+PANEL_PARTS = {'al2024_anodized': '#C2D4FF', 'al5056_anodized': '#F1F4F2', 'al_olive': '#7A7966'}
 PANEL_DEGREES = 3.0
 PILLOW_DEGREES = 5.0
 MIN_PANEL_AREA = 0.03

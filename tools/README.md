@@ -114,7 +114,8 @@ indexed, uncompressed glb with their texture coordinates. The same files come ou
 Writes `scenes/models/apollo/lm5_eagle.ray`, the Eagle prefab (one mesh with a `materialMap`, and a
 camera and sun of its own), and `scenes/as11_40_5927_test.ray`, the AS11-40-5927 recreation that
 brings it in with an `include`: the sun as it stood at GET 110:53:38 (14.96° up at azimuth 90.2°),
-a rock half sunk in the ground, a bag and a pole, the LM 4 cm down (its footpads in the regolith), the camera placed by eye. Only the Python
+a rock half sunk in the ground, a bag and a pole, the LM 4 cm down (its footpads in the regolith), the camera matched to the photograph by the
+footpads' spacing, the horizon's height and the aft box seen square on. Only the Python
 standard library is needed.
 
 ## `make_icon.py`

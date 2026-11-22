@@ -137,34 +137,34 @@
           "materials": [
             {
               "type": "metal",
-              "influence": 0.8,
-              "metal": "aluminum",
-              "roughness": 0.2,
+              "influence": 0.9,
+              "metal": "copper",
+              "roughness": 0.15,
               "tint": [
-                0.2086,
-                0.0319,
-                0.0091
+                0.5395,
+                0.117,
+                0.0252
               ]
             },
             {
               "type": "specular",
-              "influence": 0.8,
+              "influence": 0.9,
               "color": [
-                0.2086,
-                0.0319,
-                0.0091
+                0.5395,
+                0.117,
+                0.0252
               ],
-              "power": 0.2,
+              "power": 0.15,
               "indexOfRefraction": 1.5,
               "materialHighlight": false
             },
             {
               "type": "diffuse",
-              "influence": 0.2,
+              "influence": 0.1,
               "color": [
-                0.2086,
-                0.0319,
-                0.0091
+                0.5395,
+                0.117,
+                0.0252
               ],
               "diffuseCast": false
             }
@@ -477,34 +477,34 @@
           "materials": [
             {
               "type": "metal",
-              "influence": 0.25,
+              "influence": 0.65,
               "metal": "aluminum",
-              "roughness": 0.55,
+              "roughness": 0.3,
               "tint": [
-                0.0762,
-                0.0844,
-                0.0908
+                0.0343,
+                0.0382,
+                0.0423
               ]
             },
             {
               "type": "specular",
-              "influence": 0.25,
+              "influence": 0.65,
               "color": [
-                0.0762,
-                0.0844,
-                0.0908
+                0.0343,
+                0.0382,
+                0.0423
               ],
-              "power": 0.55,
+              "power": 0.3,
               "indexOfRefraction": 1.5,
               "materialHighlight": false
             },
             {
               "type": "diffuse",
-              "influence": 0.75,
+              "influence": 0.35,
               "color": [
-                0.0762,
-                0.0844,
-                0.0908
+                0.0343,
+                0.0382,
+                0.0423
               ],
               "diffuseCast": false
             }
@@ -698,14 +698,14 @@
               "type": "ambient",
               "influence": 1.0,
               "color": [
-                0.0073,
-                0.0076,
-                0.0076
+                0.0108,
+                0.0132,
+                0.02
               ]
             },
             {
               "type": "diffuse",
-              "influence": 0.38,
+              "influence": 0.608,
               "color": [
                 1,
                 1,
@@ -720,7 +720,7 @@
             },
             {
               "type": "metal",
-              "influence": 0.35,
+              "influence": 0.56,
               "metal": "aluminum",
               "roughness": 0.3,
               "tint": {
@@ -733,9 +733,9 @@
               "type": "specular",
               "influence": 0.3,
               "color": [
-                0.3663,
-                0.3813,
-                0.3813
+                0.5395,
+                0.6584,
+                1.0
               ],
               "power": 0.15,
               "indexOfRefraction": 1.5,
@@ -758,14 +758,14 @@
               "type": "ambient",
               "influence": 1.0,
               "color": [
-                0.0119,
-                0.0104,
-                0.0067
+                0.0176,
+                0.0181,
+                0.0178
               ]
             },
             {
               "type": "diffuse",
-              "influence": 0.38,
+              "influence": 0.608,
               "color": [
                 1,
                 1,
@@ -780,7 +780,7 @@
             },
             {
               "type": "metal",
-              "influence": 0.35,
+              "influence": 0.56,
               "metal": "aluminum",
               "roughness": 0.3,
               "tint": {
@@ -793,9 +793,9 @@
               "type": "specular",
               "influence": 0.3,
               "color": [
-                0.5972,
-                0.521,
-                0.3325
+                0.8796,
+                0.9047,
+                0.8879
               ],
               "power": 0.15,
               "indexOfRefraction": 1.5,
