@@ -307,8 +307,11 @@ jobs:
       - name: Try it
         run: |
           flatpak install --user -y --noninteractive "dist/ray-${TAG}.flatpak"
-          flatpak run --command=raythrower io.github.jnaujok.Ray /app/share/ray/scenes/scan_test.ray -q --size 64x48 -o /tmp/smoke.raw
-          test -s /tmp/smoke.raw
+          # The sandbox's /tmp is its own; the home folder is shared.
+          flatpak run --command=raythrower io.github.jnaujok.Ray /app/share/ray/scenes/scan_test.ray -q --size 64x48 \
+                      -o "$HOME/flatpak-smoke.raw"
+          test -s "$HOME/flatpak-smoke.raw"
+          flatpak info io.github.jnaujok.Ray
       - uses: actions/upload-artifact@v4
         with:
           name: package-flatpak
