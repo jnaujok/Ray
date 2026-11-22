@@ -10,22 +10,103 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.21.2] - 2026-11-22
+
+Lenses as glass, and packages: every built-in lens can be built in a scene as glass, cut away to
+show its elements, with fans of rays traced through it to the film; Linux releases come as a
+`.deb`, an `.rpm` and a Flatpak bundle besides the archive, whose editor checks for GTK first; and
+the 1997 MFC scene editor is retired in favour of `ray-editor`. Every render that existed before is
+byte for byte the same.
+
 ### Added
 
+- **Lenses as glass, with their ray fans (`lensElements`).** A new object builds any built-in
+  prescription in the scene: each element (the glass between two surfaces) a csg of its two
+  surfaces (spheres; a flat surface a very large one) and a capped cylinder at its clear aperture,
+  in a pale blue glass with the element's own index and Abbe number (the Sellmeier glasses' worked
+  out at the d line); the aperture stop a thin dark ring opened to the f-number; an optional barrel.
+  `cutaway` (on by default) cuts off the lens's near half, so the cut faces show each element's
+  cross-section. The ray fans are traced through the actual prescription with the lens's own trace
+  (the new `CLens::TracePath`, which records the point at every surface; the lens's renders are
+  unchanged) from in front of the lens to the film plane, focused at infinity: the on-axis fan in
+  red, green and blue (the C, d and F lines, so the colors part near the focus) and one fan for each
+  other field angle, drawn as thin unlit tubes (sweeps) just off the cut face. It is one object
+  made of its generated parts: a scene file keeps only its settings (`prescription`, `fNumber`,
+  `scale` in scene units per mm, `position`, `rotation`, `cutaway`, `barrel`, `fans`, `rays`,
+  `fields`, `tubeRadius`, `lead`, `sensorWidth`; see `scenes/README.md`), and a ray that leaves a part
+  may meet that part again (the far side of an element) or any other. `ray-editor` draws the rays
+  and the glass's bounds.
+  - `scenes/cutaways/` has one scene for each of the nine built-in lenses, written by the new
+    `tools/make_lens_cutaways.py`, which reads the prescriptions from `core/src/Lens.cpp` and frames
+    each from its length and paraxial back focus; the README's lens section shows them together.
+    `scenes/lens_cutaway_test.ray` (the double Gauss, 320×180) is in the test suite
+    (`render_lens_cutaway`, `roundtrip_lens_cutaway_test`, `network_lens_cutaway`), and
+    `LensElementsChecks` in `format_test` checks the elements and parts the double Gauss and the
+    Planar 80 are built from, that each ray has a point at every surface and ends on the film,
+    that the on-axis rays meet the axis there within 0.15 mm, where rays meet the glass and pass the
+    cut-away half, the round trip, and the errors.
+
+  ![The nine built-in lenses built as glass, cut away, with their ray fans](docs/images/changelog/lens-cutaways.png)
+
+  The double Gauss's six elements and stop, the Biogons' deep front and rear groups (and the 60 mm's
+  Réseau plate against the film), the Planars, the UV-Sonnar's seven air-spaced crystals, and the
+  long telephotos, each with its on-axis fan coming to a focus and its off-axis fan (orange)
+  landing below the axis.
+- **`.deb` and `.rpm` packages** for Linux, made by CPack (`cmake/RayPackaging.cmake`): the programs
+  in `/usr/bin`, the sample scenes in `/usr/share/ray/scenes`, the docs (with a Debian `copyright`
+  and changelogs) in `/usr/share/doc/ray`, and a desktop entry, icon (new: a lens bending three rays
+  to a focus, `packaging/io.github.jnaujok.Ray.svg`, its PNG drawn by `tools/make_icon.py`) and
+  AppStream metadata, so *Ray Editor* appears in the desktop's menu. They name GTK 3 and OpenGL as
+  dependencies. Versions come from the tag: 2026-alpha-0.21.2 is `0.21.2~alpha-1` in the `.deb`
+  and `0.21.2-0.alpha` in the `.rpm`, both sorting before a final 0.21.2. Everything Ray installs
+  is in the `ray` component, so IASLib's and wxWidgets' own install rules stay out. The `.deb` is
+  built on Ubuntu 22.04 (for Ubuntu 22.04 and Debian 12 and later) and checked with lintian, the
+  `.rpm` on Rocky Linux 9 (for RHEL, Rocky and Alma 9 and later, and Fedora); before a release, each
+  is installed in clean Ubuntu 22.04, Debian 12, Rocky Linux 9 and Fedora containers, the package
+  manager pulling in its dependencies, and renders a scene.
+- **A Flatpak bundle**, `io.github.jnaujok.Ray` on the GNOME 50 runtime
+  (`packaging/flatpak/io.github.jnaujok.Ray.yml`), with access to the home folder, the network and
+  the GPU: `flatpak run io.github.jnaujok.Ray` starts the editor, and `flatpak run
+  --command=raythrower io.github.jnaujok.Ray` renders. It is attached to each release as
+  `ray-<tag>.flatpak`; it isn't on Flathub.
+- **A launcher for the editor in the Linux archive.** `ray-editor` is now a POSIX shell script
+  (`packaging/linux/ray-editor.sh`) for `bin/ray-editor-bin`: it runs `ldd` on the editor first and,
+  if GTK 3 or OpenGL libraries are missing, names them and prints the commands that install them on
+  Debian and Ubuntu (`apt`), Fedora and RHEL 8 and later (`dnf`), and RHEL 7 (`yum`), instead of the
+  loader's bare "error while loading shared libraries". With no display (neither `DISPLAY` nor
+  `WAYLAND_DISPLAY`) it says so too. The new `editor_launcher` test checks all three cases with a
+  program linked against a library that is then removed, and CI runs shellcheck on it.
 - **Downloadable programs.** `.github/workflows/release.yml` builds Release programs for Linux
   (x86-64), macOS (arm64) and Windows (x86-64) when a `2026-alpha-*` tag is pushed, or by hand for
   an older tag (`workflow_dispatch` with a `tag`), and publishes them as a GitHub prerelease named
   `Ray <tag>`, its notes the tag's section of this changelog (`tools/changelog_section.py`, which
   makes its links and images absolute). Each platform's archive (`ray-<tag>-linux-x86_64.tar.gz`,
   `ray-<tag>-macos-arm64.tar.gz`, `ray-<tag>-windows-x86_64.zip`) holds `raythrower`, `rayengine`
-  and `ray-editor` (an app bundle on macOS; on Windows also the MFC `Ray.exe`), the sample scenes
+  and `ray-editor` (an app bundle on macOS; on Windows, in 2026-alpha-0.21.1 only, also the MFC `Ray.exe`), the sample scenes
   with their models, fonts and textures, the README, this changelog, `LICENSE` and `NOTICE`, with a
   SHA-256 checksum for each and `SHA256SUMS.txt` for all. On Windows `raythrower` and `rayengine`
-  use the static C++ runtime; `ray-editor` (whose build keeps wxWidgets on the shared runtime) and
-  `Ray.exe` (MFC in a DLL) need the Visual C++ Redistributable. Each build renders a
+  use the static C++ runtime; `ray-editor` (whose build keeps wxWidgets on the shared runtime) needs
+  the Visual C++ Redistributable. Each build renders a
   small scene before it is packaged. The first release built this way is 2026-alpha-0.21.1, built
   by hand after its tag, which was pushed before the workflow existed. The README's new Downloads
   section has the platform notes (macOS quarantine, GTK 3 for the Linux editor, SmartScreen).
+
+### Removed
+
+- **The MFC scene editor (`Ray.exe`)**, the 1997 Windows editor, now that `ray-editor` does
+  everything it did on every platform. Its last version is the `mfc-editor-final` tag (the commit
+  before this release): `src/`, `include/`, `res/`, `help/` (its WinHelp project),
+  `docs/AppWizardReadMe.txt`, `cmake/RayGui.cmake`, the `RAY_BUILD_GUI` option, its CI job, and
+  `Ray.exe` in the Windows release archive are gone, and so is the `RAY_GUI` code in the core (the
+  scene tree and dialog hooks compiled into the scene classes, about 1,700 lines), which built only
+  for MFC. The core now includes no toolkit headers. `legacy/` is untouched.
+
+### Changed
+
+- **`lint_minmax`** now checks `core/`, `editor/`, `raythrower/`, `rayengine/` and `tests/` (the MFC
+  folders are gone), and found three unparenthesized `std::max` calls in `tests/editor_test.cpp`,
+  now fixed. The rule stays: IASLib's headers and the wxWidgets editor still bring Windows' `min`
+  and `max` macros into the Windows builds.
 
 ## [2026-alpha-0.21.1] - 2026-11-21
 
@@ -2410,7 +2491,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.1...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.2...HEAD
+[2026-alpha-0.21.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.1...2026-alpha-0.21.2
 [2026-alpha-0.21.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21...2026-alpha-0.21.1
 [2026-alpha-0.21]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.2...2026-alpha-0.21
 [2026-alpha-0.20.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.20.1...2026-alpha-0.20.2

@@ -837,7 +837,9 @@ and a recreation of AS11-40-5903. Models load from glTF (Draco-compressed too) a
 `.blend` files as well as STL and OBJ. 2026-alpha-0.21 was a tuning release: frames split their last
 tiles, scene copies share the files they carry, and networked engines share one encoding of the
 scene (see [`docs/performance.md`](docs/performance.md)). 2026-alpha-0.21.1 reads JPEG and WebP images
-with Ray's own decoders and counts every ray a render casts, by kind.
+with Ray's own decoders and counts every ray a render casts, by kind. 2026-alpha-0.21.2 builds any of its lenses
+as glass with their ray fans, ships Linux `.deb`, `.rpm` and Flatpak packages, and retires the MFC
+editor.
 
 ## Changelog
 
