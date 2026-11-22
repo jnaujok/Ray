@@ -87,19 +87,22 @@ reference changes, and `render_panorama` is new).
     (`kapton_gold`); the low aft faces beside the RCS quads, which had been near-black Pyromark,
     are crinkled silver foil: a rough mirror (roughness 0.35) with the sun's lobe, a 35% diffuse
     share, and facets of 6 cm cells, 2 cm deep; the engine bell is a light blue-gray, measured from
-    the frame; the anodized panels are brighter (gain 2.3) to keep the box face, and the copper
+    the frame; the anodized panels are held under a measured match (gain 1.5, see below), and the copper
     Kapton's untinted front reflects 12% and scatters a little.
   - *The bounce in the shadow* was not a bug: `regolith` gathers indirect light like `diffuse`
     (the new check). In 0.21.3 a point in the LM's shadow saw only black sky, the LM's dark
     underside and the sunlit ground at grazing angles; on the terrain, with the view moved, the
     shadow measures 0.029 against the frame's 0.021 (it was 0.001).
 
-  Measured in linear light at 512×512 (`compare_5927.py`; ratios of luminance Y):
+  Measured in linear light at 512×512 (`compare_5927.py`; ratios of luminance Y). NASA's print of
+  the frame looks hand-adjusted, its ascent stage held back (dodged) in printing or scanning, so
+  the box face is deliberately kept under its measured value: matched exactly, the ascent stage
+  read too bright against the rest.
 
   | Region | NASA linear RGB | NASA Y | Ray linear RGB | Ray Y | Ray/NASA | b/r NASA, Ray |
   |---|---|---|---|---|---|---|
-  | sunlit ground | (0.176, 0.164, 0.155) | 0.166 | (0.174, 0.163, 0.148) | 0.164 | 0.99 | 0.88, 0.85 |
-  | aft box face | (0.533, 0.590, 0.568) | 0.576 | (0.570, 0.590, 0.597) | 0.586 | 1.02 | 1.07, 1.05 |
+  | sunlit ground | (0.176, 0.164, 0.155) | 0.166 | (0.173, 0.163, 0.147) | 0.164 | 0.99 | 0.88, 0.85 |
+  | aft box face | (0.533, 0.590, 0.568) | 0.576 | (0.503, 0.528, 0.536) | 0.523 | 0.91 | 1.07, 1.06 |
   | copper Kapton | (0.122, 0.052, 0.034) | 0.066 | (0.138, 0.059, 0.017) | 0.073 | 1.10 | 0.28, 0.12 |
   | LM shadow | (0.025, 0.020, 0.015) | 0.021 | (0.030, 0.029, 0.029) | 0.029 | 1.43 | 0.60, 0.96 |
   | engine bell | (0.476, 0.543, 0.551) | 0.529 | (0.298, 0.304, 0.315) | 0.303 | 0.57 | 1.16, 1.06 |

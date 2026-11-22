@@ -161,8 +161,8 @@ MATERIAL_MAP = {
     "plume_deflector": {"materials": DEFLECTOR, "bump": WRINKLE},
     "inconel_dark": {"materials": metal('#26282A', 0.65, 0.55, 'iron')},
     "white_paint": {"materials": paint('#E2E4E6', 0.45)},
-    "al2024_anodized": {"materials": panel('#C2D4FF', 2.3), "bump": RIVETS},
-    "al5056_anodized": {"materials": panel('#F1F4F2', 2.3), "bump": RIVETS},
+    "al2024_anodized": {"materials": panel('#C2D4FF', 1.5), "bump": RIVETS},
+    "al5056_anodized": {"materials": panel('#F1F4F2', 1.5), "bump": RIVETS},
     "pyromark_black": {"materials": paint('#18191B', 0.7)},
     "window_quartz": {"materials": QUARTZ},
 }
