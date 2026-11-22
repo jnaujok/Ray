@@ -82,8 +82,9 @@ Python tool, and Ray saves a model as a Ray scene with `--save-object`).
   `tools/make_eagle_scenes.py`, is the prefab: one mesh whose `materialMap` dresses each part: the
   anodized panels satin metal (diffuse from the atlas through their UVs, metal tinted by it, a soft
   highlight, the rivets as a bump), the aft box's face brought to within 5% of the photograph's
-  brightness and tint as measured in linear light; the copper Kapton blankets a bright copper metal
-  (90%) with large
+  brightness and tint as measured in linear light; the copper Kapton blankets the film's own untinted
+  front surface (a dielectric of index 1.7, about 7% face on and more at grazing) over a copper
+  backing, with large
   faceted folds (cells about 27 cm across, 5 cm deep, sharp-edged, as big as Aldrin's head beside
   them in the photograph); the bare aluminum struts and porch dark and metallic; the RCS
   quads polished 304 stainless steel (its own n and k, roughness 0.12, the sun's highlight); the
@@ -96,11 +97,16 @@ Python tool, and Ray saves a model as a Ray scene with `--save-object`).
   footpads sunk into the regolith), its Scientific Equipment bay closed, a low rock about 70 cm
   across half sunk in the foreground, a white bag and a pole, on `regolith` under the sun as it stood then: 14.96° up (ALSJ's 14.0° at 109:00, rising
   0.508° an hour) at azimuth 90.2°, just south of east, a 0.53° disc. The Data Camera, its 60 mm
-  Biogon, Réseau plate and Ektachrome MS; one bounce of `"hemisphere"` indirect light at 16 rays a
-  point; 128×128 in the test suite (`render_as11_40_5927`, `roundtrip_as11_40_5927_test`,
+  Biogon, Réseau plate and Ektachrome MS exposed at f/8.6 and 1/250 s (the stop that gives the
+  sunlit ground the photograph's brightness); two bounces of `"hemisphere"` indirect light at 16 rays
+  a point, reaching 20 m; 128×128 in the test suite (`render_as11_40_5927`, `roundtrip_as11_40_5927_test`,
   `network_as11_40_5927`). The camera was matched to the photograph by the footpads' spacing, the horizon's height and the
   aft box seen square on: 12.4 m out on azimuth 295, 1.03 m up, pitched up about 3°, the LM's front
-  facing azimuth 244.
+  facing azimuth 244. Measured in linear light against the photograph, the sunlit ground (0.161
+  against 0.166), the aft box's face (0.584 against 0.576, the same tint) and the copper blankets
+  ((0.122, 0.054, 0.037) against (0.122, 0.052, 0.034)) match within 10%; the ground in the LM's
+  shadow is still almost black (0.001 against 0.017), since no bounce light reaches it: a point
+  there sees the black sky, the LM's dark underside, and the sunlit ground only at grazing angles.
 
   ![NASA photograph AS11-40-5927 beside Ray's recreation at 512×512](docs/images/changelog/as11-40-5927.png)
 

@@ -74,6 +74,19 @@ def stainless():
             {"type": "diffuse", "influence": 0.06, "color": lin('#8A8C8E'), "diffuseCast": False}]
 
 
+def kapton(hexcolor):
+    """Aluminized Kapton: the copper of the film over its aluminum backing, and the film's own front
+    surface (n about 1.7), which reflects about 7% face on, untinted, more at grazing angles."""
+    c = lin(hexcolor)
+    return [{"type": "metal", "influence": 0.4, "metal": "copper", "roughness": 0.15, "tint": c},
+            {"type": "specular", "influence": 0.4, "color": c, "power": 0.15, "indexOfRefraction": 1.5,
+             "materialHighlight": False},
+            {"type": "diffuse", "influence": 0.06, "color": c, "diffuseCast": False},
+            {"type": "reflective", "influence": 0.07, "color": [1, 1, 1], "diffuseReflectivity": 0.0, "roughness": 0.05},
+            {"type": "specular", "influence": 0.15, "color": [1, 1, 1], "power": 0.05, "indexOfRefraction": 1.7,
+             "materialHighlight": False}]
+
+
 def metal(hexcolor, metalness, roughness, preset='aluminum'):
     """A metal with the sun's highlight in its own tint (Ray's metal is a pure mirror)."""
     c = lin(hexcolor)
@@ -117,7 +130,7 @@ QUARTZ = [{"type": "ambient", "influence": 1.0, "color": [0.004, 0.004, 0.008]},
            "materialHighlight": False}]
 
 MATERIAL_MAP = {
-    "kapton_blanket": {"materials": metal('#C2602C', 0.9, 0.15, 'copper'), "bump": BIG_CRINKLE},
+    "kapton_blanket": {"materials": kapton('#D6865A'), "bump": BIG_CRINKLE},
     "kapton_gold": {"materials": metal('#DFA53A', 0.65, 0.25), "bump": CRINKLE},
     "silver_foil": {"materials": metal('#D4D8DC', 0.7, 0.25), "bump": CRINKLE},
     "al_olive": {"materials": panel('#7A7966'), "bump": RIVETS},
@@ -129,8 +142,8 @@ MATERIAL_MAP = {
     "plume_deflector": {"materials": DEFLECTOR, "bump": WRINKLE},
     "inconel_dark": {"materials": metal('#26282A', 0.65, 0.55, 'iron')},
     "white_paint": {"materials": paint('#E2E4E6', 0.45)},
-    "al2024_anodized": {"materials": panel('#C2D4FF', 1.6), "bump": RIVETS},
-    "al5056_anodized": {"materials": panel('#F1F4F2', 1.6), "bump": RIVETS},
+    "al2024_anodized": {"materials": panel('#C2D4FF', 1.1), "bump": RIVETS},
+    "al5056_anodized": {"materials": panel('#F1F4F2', 1.1), "bump": RIVETS},
     "pyromark_black": {"materials": paint('#18191B', 0.7)},
     "window_quartz": {"materials": QUARTZ},
 }
@@ -140,6 +153,8 @@ SUN_AZIMUTH = 90.2
 LM_HEADING = 244.0          # the azimuth the LM's front faces: its aft equipment bay to the right, as in the photograph
 CAMERA_HEADING = 295.0
 CAMERA_DISTANCE = 12.4
+    # Ektachrome MS at 1/250 s: the stop that gives the sunlit ground the photograph's brightness.
+FILM_FSTOP = 8.6
 
 
 def toward(azimuth, elevation=0.0):
@@ -155,7 +170,7 @@ def base_scene(width, height, camera, objects, lights):
     return {"format": "Ray scene", "version": 3,
             "settings": {"imageWidth": width, "imageHeight": height, "imageFile": "eagle.out", "colorDepth": 8,
                          "maximumDepth": 6, "depthThreshold": 0.01,
-                         "indirect": {"method": "hemisphere", "bounces": 1, "samples": 16, "distance": 6.0,
+                         "indirect": {"method": "hemisphere", "bounces": 2, "samples": 16, "distance": 20.0,
                                       "strength": 1.0}},
             "background": [0, 0, 0], "camera": camera, "objects": objects, "lights": lights}
 
@@ -188,6 +203,7 @@ def main():
     camera = {"position": r6([-CAMERA_DISTANCE * look[0], 1.03, -CAMERA_DISTANCE * look[2]]), "lookAt": [0.114, 1.67, 0.245],
               "up": [0, 1, 0], "body": "hasselblad-hdc",
               "sampler": {"type": "stratified", "grid": 2, "seed": 0},
+              "colorModel": {"type": "film", "stock": "ektachrome-ms", "shutter": 0.004, "fStop": FILM_FSTOP},
               "lens": {"focusDistance": CAMERA_DISTANCE, "millimetersPerUnit": 1000.0}}
     # 4 cm down: the footpads sank that far into the regolith.
     eagle = {"type": "include", "file": "models/apollo/lm5_eagle.ray", "rotation": [0.0, round(LM_HEADING - 180.0, 6), 0.0],

@@ -10,9 +10,9 @@
     "depthThreshold": 0.01,
     "indirect": {
       "method": "hemisphere",
-      "bounces": 1,
+      "bounces": 2,
       "samples": 16,
-      "distance": 6.0,
+      "distance": 20.0,
       "strength": 1.0
     }
   },
@@ -42,6 +42,12 @@
       "type": "stratified",
       "grid": 2,
       "seed": 0
+    },
+    "colorModel": {
+      "type": "film",
+      "stock": "ektachrome-ms",
+      "shutter": 0.004,
+      "fStop": 8.6
     },
     "lens": {
       "focusDistance": 12.4,
