@@ -22,9 +22,11 @@
 *   of the front element the lens lets through, in the plane x = 0 (the  *
 *   meridional plane). The on-axis fan is traced in red, green and blue  *
 *   (the C, d and F lines), so its colors part near the focus; each      *
-*   other fan in one color. Each ray is a thin tube (a sweep) with an    *
-*   ambient-only material, so it shows bright and unlit, set just in     *
-*   front of the cut face.                                               *
+*   other fan in one color. Each ray is a thin tube (a sweep) that       *
+*   glows with an ambient material at "fanOpacity" (default 0.5) of its  *
+*   color and lets the rest of the light through (a transparent          *
+*   material of index 1, which doesn't bend it), so the glass shows      *
+*   through the fans; set just in front of the cut face.                 *
 *                                                                        *
 *   The lens is built in its own frame, in mm: the axis along +z (light  *
 *   travels toward +z), the front vertex at z = 0, +y up. It is placed   *
@@ -62,6 +64,7 @@ class CLensElements : public CObjects
         int                     m_nRays;            // rays in each fan
         std::vector<FLT>        m_anFields;         // field fractions
         FLT                     m_nTubeRadius;      // mm
+        FLT                     m_nFanOpacity;      // how much of a ray tube glows (the rest lets light through)
         FLT                     m_nLead;            // mm of ray in front of the lens; 0: half the lens's length
         FLT                     m_nSensorWidth;     // mm, for the field's size; 0: 36 x 24 mm
 

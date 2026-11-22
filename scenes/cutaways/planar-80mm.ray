@@ -63,7 +63,8 @@
                 0.0,
                 0.7
             ],
-            "tubeRadius": 0.344904
+            "tubeRadius": 0.275923,
+            "fanOpacity": 0.5
         },
         {
             "type": "plane",
