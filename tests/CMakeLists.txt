@@ -580,8 +580,9 @@ ray_network_test(sampler_random4 ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCEN
 ray_network_test(sampler_adaptive ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray AA adaptive)
 
 # Models read straight from Blender .blend files, in both of Blender's mesh
-# layouts, Zstandard- and gzip-compressed.
-foreach(scene IN ITEMS blend)
+# layouts, Zstandard- and gzip-compressed; and textures from JPEG and WebP
+# files beside their PNG original.
+foreach(scene IN ITEMS blend images)
     add_test(NAME render_${scene}
              COMMAND ${CMAKE_COMMAND}
                      -DRAYTHROWER=$<TARGET_FILE:raythrower>
@@ -600,7 +601,7 @@ endforeach()
 foreach(scene IN ITEMS chromatic texture primitives solid_textures soft bump lights bounce bounce_hemisphere haze
                        materials projector underwater environment csg prism models benchy maps volume shapes text
                        patches nurbs lathe extrusion implicit blob fractal apollo_lenses film reseau tranquility
-                       chess_dof as11_40_5903 blend)
+                       chess_dof as11_40_5903 blend images)
     ray_network_test(${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray)
 endforeach()
 

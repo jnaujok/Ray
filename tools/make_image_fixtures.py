@@ -3,6 +3,9 @@
 
     make_image_fixtures.py [scenes/textures/formats]
 
+It also writes bricks.jpg and bricks.webp, ../bricks.png as JPEG and lossy
+WebP, which images_test.ray shows beside the PNG.
+
 Each image comes with a reference decode by Pillow (libjpeg-turbo and libwebp),
 saved as a PNG beside it (<name>_ref.png, RGB, and for images with alpha
 <name>_alpha.png, grayscale). format_test decodes the image with Ray's own
@@ -201,6 +204,11 @@ def main():
     webp('lossy_alpha.webp', rgba, quality=75, alpha_quality=100)
     webp('lossy_alpha_lossy.webp', rgba, quality=60, alpha_quality=40)
     libwebp_variants(big)
+
+    # The bricks as JPEG and lossy WebP, beside bricks.png in images_test.ray.
+    bricks = Image.open(os.path.join(OUT, '..', 'bricks.png')).convert('RGB')
+    bricks.save(os.path.join(OUT, 'bricks.jpg'), quality=85, subsampling=2)
+    bricks.save(os.path.join(OUT, 'bricks.webp'), quality=80, method=4)
 
 
 if __name__ == '__main__':

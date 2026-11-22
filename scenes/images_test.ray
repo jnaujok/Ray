@@ -1,0 +1,135 @@
+{
+    "format": "Ray scene",
+    "version": 3,
+    "settings": {
+        "imageWidth": 320,
+        "imageHeight": 160,
+        "imageFile": "images_test.out",
+        "colorDepth": 8,
+        "maximumDepth": 16,
+        "depthThreshold": 0.01
+    },
+    "background": [0.55, 0.65, 0.8],
+    "camera": {
+        "position": [0.0, 2.6, -8.5],
+        "lookAt": [0.0, 0.8, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "verticalAngle": 26.0,
+        "horizontalAngle": 50.0,
+        "aspectRatio": 2.0,
+        "sampler": "corners",
+        "colorModel": "srgb"
+    },
+    "objects": [
+        {
+            "type": "plane",
+            "position": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.1, 0.1, 0.1]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.8,
+                    "color": [0.7, 0.7, 0.68],
+                    "diffuseCast": false
+                }
+            ]
+        },
+        {
+            "type": "box",
+            "center": [-2.6, 0.9, 0.0],
+            "size": [1.6, 1.8, 1.6],
+            "rotation": [0.0, 30.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.12, 0.12, 0.12]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/bricks.png",
+                        "scale": [1.0, 1.0],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": true
+                    }
+                }
+            ]
+        },
+        {
+            "type": "box",
+            "center": [0.0, 0.9, 0.0],
+            "size": [1.6, 1.8, 1.6],
+            "rotation": [0.0, 30.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.12, 0.12, 0.12]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/formats/bricks.jpg",
+                        "scale": [1.0, 1.0],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": true
+                    }
+                }
+            ]
+        },
+        {
+            "type": "box",
+            "center": [2.6, 0.9, 0.0],
+            "size": [1.6, 1.8, 1.6],
+            "rotation": [0.0, 30.0, 0.0],
+            "color": [0.5, 0.5, 0.5],
+            "materials": [
+                {
+                    "type": "ambient",
+                    "influence": 1.0,
+                    "color": [0.12, 0.12, 0.12]
+                },
+                {
+                    "type": "diffuse",
+                    "influence": 0.9,
+                    "color": [1.0, 1.0, 1.0],
+                    "diffuseCast": false,
+                    "texture": {
+                        "type": "image",
+                        "file": "textures/formats/bricks.webp",
+                        "scale": [1.0, 1.0],
+                        "offset": [0.0, 0.0],
+                        "repeat": true,
+                        "srgb": true
+                    }
+                }
+            ]
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "position": [-5.0, 8.0, -7.0],
+            "color": [1.0, 1.0, 1.0]
+        }
+    ]
+}

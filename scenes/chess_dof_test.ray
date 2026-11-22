@@ -93,89 +93,23 @@
       ]
     },
     {
-      "type": "box",
-      "center": [
-        0.0,
-        -0.2,
-        0.0
-      ],
-      "size": [
-        9.2,
-        0.3,
-        9.2
-      ],
+      "type": "mesh",
+      "file": "models/chess/chess_set_1k.gltf",
+      "node": "board",
+      "scale": 17.277125086385624,
       "rotation": [
         0.0,
         0.0,
         0.0
       ],
-      "color": [
-        0.5,
-        0.5,
-        0.5
-      ],
-      "materials": [
-        {
-          "type": "ambient",
-          "influence": 1.0,
-          "color": [
-            0.02,
-            0.012,
-            0.008
-          ]
-        },
-        {
-          "type": "diffuse",
-          "influence": 0.8,
-          "color": [
-            0.3,
-            0.17,
-            0.08
-          ],
-          "diffuseCast": false
-        },
-        {
-          "type": "specular",
-          "influence": 0.3,
-          "color": [
-            1.0,
-            1.0,
-            1.0
-          ],
-          "power": 0.1,
-          "indexOfRefraction": 1.5,
-          "materialHighlight": false
-        },
-        {
-          "type": "reflective",
-          "influence": 0.05,
-          "color": [
-            1.0,
-            1.0,
-            1.0
-          ],
-          "diffuseReflectivity": 0.0,
-          "filterReflection": false
-        }
-      ]
-    },
-    {
-      "type": "box",
-      "center": [
+      "align": "none",
+      "translation": [
         0.0,
-        -0.025,
+        -0.3004938675542494,
         0.0
       ],
-      "size": [
-        8.0,
-        0.05,
-        8.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0
-      ],
+      "smooth": true,
+      "doubleSided": false,
       "color": [
         0.5,
         0.5,
@@ -193,29 +127,17 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.78,
+          "influence": 0.8,
           "color": [
-            1,
-            1,
-            1
+            1.0,
+            1.0,
+            1.0
           ],
           "diffuseCast": false,
           "texture": {
-            "type": "checker",
-            "colors": [
-              [
-                0.22,
-                0.12,
-                0.06
-              ],
-              [
-                0.8,
-                0.64,
-                0.42
-              ]
-            ],
-            "size": 1.0,
-            "solid": true
+            "type": "image",
+            "file": "models/chess/textures/chess_set_board_diff_1k.jpg",
+            "srgb": true
           }
         },
         {
@@ -278,13 +200,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -346,13 +273,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -414,13 +346,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -482,13 +419,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -550,13 +492,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -618,13 +565,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -686,13 +638,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -754,13 +711,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -822,13 +784,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -890,13 +857,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -958,13 +930,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1026,13 +1003,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1094,13 +1076,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1162,13 +1149,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1230,13 +1222,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1298,13 +1295,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1366,13 +1368,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1434,13 +1441,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1502,13 +1514,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1570,13 +1587,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1638,13 +1660,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1706,13 +1733,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1774,13 +1806,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1842,13 +1879,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1910,13 +1952,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -1978,13 +2025,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -2046,13 +2098,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -2114,13 +2171,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -2182,13 +2244,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.75,
+          "influence": 0.8,
           "color": [
-            0.88,
-            0.8,
-            0.66
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_white_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",
@@ -2250,13 +2317,18 @@
         },
         {
           "type": "diffuse",
-          "influence": 0.8,
+          "influence": 0.85,
           "color": [
-            0.07,
-            0.05,
-            0.035
+            1.0,
+            1.0,
+            1.0
           ],
-          "diffuseCast": false
+          "diffuseCast": false,
+          "texture": {
+            "type": "image",
+            "file": "models/chess/textures/chess_set_pieces_black_diff_1k.jpg",
+            "srgb": true
+          }
         },
         {
           "type": "specular",

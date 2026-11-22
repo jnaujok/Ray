@@ -771,8 +771,10 @@ namespace
             }
             else
                 m_aoNormals.push_back( CVector( 0.0, 1.0, 0.0 ) );
+                // glTF's v runs down from the image's top; Ray's runs up
+                // from its bottom (as OBJ's does), so it is turned over.
             m_anCoords.push_back( bHasCoords ? adCoords[ nPoint * 2 ] : 0.0 );
-            m_anCoords.push_back( bHasCoords ? adCoords[ nPoint * 2 + 1 ] : 0.0 );
+            m_anCoords.push_back( bHasCoords ? 1.0 - adCoords[ nPoint * 2 + 1 ] : 0.0 );
         }
         if ( ! bHasNormals )
             m_bNormals = FALSE;
