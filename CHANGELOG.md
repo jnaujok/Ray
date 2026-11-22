@@ -10,6 +10,129 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.21.4] - 2026-11-22
+
+Panoramas and terrain: an equirectangular camera renders the whole surroundings into one image,
+ready to be an environment map; a new tool turns a digital terrain model into a mesh; and
+AS11-40-5927 now stands on the real ground of Tranquility Base from the LROC NAC terrain model,
+with its baked surroundings, its view solved from the footpads and the LM's shadow, and exposed as
+the crew exposed it; the Eagle model gets the real LM's proportions. Every other render is byte for byte the same (only `render_as11_40_5927`'s
+reference changes, and `render_panorama` is new).
+
+### Added
+
+- **Equirectangular panoramas.** `"projection": "equirectangular"` on the camera traces the whole
+  sphere round its `position`, laid out exactly as an `environment` image is read: the top row
+  straight up, the bottom straight down, the level direction of `lookAt` in the middle and the
+  direction to its right a quarter of the way across. Render one with `--hdr` and it is an
+  environment map. It is a pinhole all the way round, so it refuses a `lens`, `body` or `reseau`;
+  perspective cameras are untouched (byte-identical renders). New `scenes/panorama_test.ray`
+  (128×64; `render_panorama`, `roundtrip_panorama_test`, `network_panorama`), and `format_test`
+  checks that every pixel's ray maps back to its own place in an environment map (to 1e-12), that a
+  tilted camera's middle is level, the save, and the refusals.
+
+  ![panorama_test.ray, and the baked surroundings of Tranquility Base](docs/images/changelog/panorama.png)
+
+  Top: red (+z) in the middle, green (+x) a quarter to the right, blue behind at both edges. Bottom:
+  the terrain to 2.4 km from the AS11-40-5927 camera station (tone mapped for show), the opposition
+  surge's bright spot opposite the sun.
+- **Terrain from digital terrain models** (`tools/geotiff_terrain.py`): reads PDS3 `.IMG` products
+  (such as the LROC NAC DTMs) and plain GeoTIFFs (float32 or int16, equirectangular or geographic,
+  with nodata), crops a disc or ring around a point into local meters (x east, y up, z north),
+  drops it by the Moon's curvature, flattens the middle where a lander shows as a bump (the plane
+  fitted to the ring outside it), and writes a glTF mesh with smooth normals and a float32 GeoTIFF
+  crop. `scenes/terrain/` holds Tranquility Base from `NAC_DTM_APOLLO11_E008N0234` (2 m posting,
+  NASA/GSFC/ASU, public domain): `apollo11_inner.glb` (out to 300 m at 2 m; 140,128 triangles),
+  `apollo11_outer.glb` (300 m to 2.4 km, past the 2.2 km horizon, at 16 m), the crop, and
+  `apollo11_bake.ray`, which bakes `apollo11_surroundings.hdr` (2048×1024, run-length encoded by
+  the new `tools/hdr_rle.py`) with the panorama camera from the camera station, 1.4 m up, without
+  the LM. `scenes/terrain/README.md` says how to make them again and rebake.
+
+  ![The inner and outer terrain meshes round the Eagle, looking west](docs/images/changelog/terrain.png)
+- **`tools/solve_5927_view.py`** solves the AS11-40-5927 view from the photograph's four footpads
+  on the terrain (the camera 1.03 m above its own ground, the LM tilted onto its plane), and
+  **`tools/compare_5927.py`** puts the photograph beside a render and measures both in linear
+  light.
+- `format_test` checks that `regolith` gathers bounced light (`RegolithBounceChecks`): in a
+  shadow beside a sunlit wall it is black without indirect light, lit with it, and more with two
+  bounces.
+
+### Changed
+
+- **AS11-40-5927 on the real ground, solved and exposed as shot** (`scenes/as11_40_5927_test.ray`,
+  `tools/make_eagle_scenes.py`):
+  - *Ground:* the terrain mesh instead of a flat plane, and the baked surroundings as the
+    `environment`, so the horizon and the far terrain show past 300 m and in the LM's metals. The
+    DTM puts the ground 3.2° downhill toward the east under the LM, and the camera station 0.31 m
+    below the LM's ground; the DTM's own lander bump reaches 7 m out, so the flattened middle is
+    9 m (a 6 m one left a ridge that hid the near footpads).
+  - *View:* the pads fix the LM's heading less the camera's azimuth but not the azimuth itself
+    (turning both about the LM moves them only by the terrain's tilt); the LM's shadow fixes it.
+    Rendering the rig turned 5° steps showed the shadow reaching past the left footpad as in the
+    frame at 115°. With that, the pads give the LM heading 253.47° (Ray rotation [0.954, 73.474,
+    −2.238], tilted onto the slope), the camera 12.31 m out at azimuth 115, 1.03 m above its ground
+    (0.72 m above the LM's), pitched up 3.0°; the pads land within 17.7 px rms of 1950 (near left
+    (296, 1276) against (290, 1312), near right (1644, 1323) against (1645, 1305), far right (1451,
+    1197) against (1440, 1190), far left (607, 1168) against (625, 1135)). As a check, the ascent
+    stage's top now comes about 80 px of 1950 higher in the frame than the photograph's (it was cut
+    off by the frame's edge before the LM got its real proportions, below). Left free, the eye would
+    rise another 0.2 to 0.7 m: the 2 m DTM's decimeters near the LM are the limit.
+  - *Exposure:* Ektachrome SO-368 (magazine 40/S, color, ALSJ) at the Apollo down-sun setting,
+    f/11 at 1/250 s (the Data Camera body's own default), instead of f/8.6. With the regolith left
+    at its lunar albedo (0.12), the sun is calibrated to the frame's sunlit ground: 3.6, 2.8 times
+    the 1.28 the Moon's sunlight is against sunny 16's 100 klx, so NASA's scan runs about 1.5 stops
+    brighter than the exposure alone (the film model's sunny-16 scale makes sun 3.6 at f/11 the
+    same as 2.2 at f/8.6, so 0.21.3's materials carried over).
+  - *Materials:* the secondary struts from the descent stage out to the legs are gold strut wrap
+    (`kapton_gold`); the low aft faces beside the RCS quads, which had been near-black Pyromark,
+    are crinkled silver foil: a rough mirror (roughness 0.35) with the sun's lobe, a 35% diffuse
+    share, and facets of 6 cm cells, 2 cm deep; the engine bell is a light blue-gray, measured from
+    the frame; the anodized panels are held under a measured match (gain 1.5, see below), and the copper
+    Kapton's untinted front reflects 12% and scatters a little.
+  - *The bounce in the shadow* was not a bug: `regolith` gathers indirect light like `diffuse`
+    (the new check). In 0.21.3 a point in the LM's shadow saw only black sky, the LM's dark
+    underside and the sunlit ground at grazing angles; on the terrain, with the view moved, the
+    shadow measures 0.029 against the frame's 0.021 (it was 0.001).
+
+  Measured in linear light at 512×512 (`compare_5927.py`; ratios of luminance Y). NASA's print of
+  the frame looks hand-adjusted, its ascent stage held back (dodged) in printing or scanning, so
+  the box face is deliberately kept under its measured value: matched exactly, the ascent stage
+  read too bright against the rest.
+
+  | Region | NASA linear RGB | NASA Y | Ray linear RGB | Ray Y | Ray/NASA | b/r NASA, Ray |
+  |---|---|---|---|---|---|---|
+  | sunlit ground | (0.176, 0.164, 0.155) | 0.166 | (0.173, 0.163, 0.147) | 0.164 | 0.99 | 0.88, 0.85 |
+  | aft box face | (0.533, 0.590, 0.568) | 0.576 | (0.503, 0.528, 0.536) | 0.523 | 0.91 | 1.07, 1.06 |
+  | copper Kapton | (0.122, 0.052, 0.034) | 0.066 | (0.138, 0.059, 0.017) | 0.073 | 1.10 | 0.28, 0.12 |
+  | LM shadow | (0.025, 0.020, 0.015) | 0.021 | (0.030, 0.029, 0.029) | 0.029 | 1.43 | 0.60, 0.96 |
+  | engine bell | (0.476, 0.543, 0.551) | 0.529 | (0.298, 0.304, 0.315) | 0.303 | 0.57 | 1.16, 1.06 |
+
+  ![NASA photograph AS11-40-5927 beside Ray's recreation on the LROC terrain at 512×512](docs/images/changelog/as11-40-5927-terrain.png)
+
+  Left, NASA's frame (Neil Armstrong; public domain); right, Ray at 512×512. Look at the horizon
+  and the ground's lie, the LM's shadow reaching out past the left footpad, the gold secondary
+  struts, the bright foil beside the RCS quads and the pale engine bell. Aldrin, the PSEP and the
+  flag are still left out. The engine bell reads darker than the frame's (0.57): the shorter LM
+  puts its shaded lower rim in the measured box.
+
+  ![render_as11_40_5927 before and after](docs/images/changelog/as11-40-5927-test.png)
+
+  The test render (128×128) before and after: the view, the terrain and horizon, the struts and
+  foil. `tests/reference/renders.tar.gz` and the README's expected-output images
+  (`tools/render_previews.py`) are regenerated for it and for `panorama_test`.
+- **The Eagle has the real LM's proportions.** NASA's model, scaled by 1.4 to the leg span, was 4%
+  too tall for it: 9.00 m across the footpads and 7.02 m high, where the real LM spans 31 ft
+  (9.449 m) and stands 22 ft 11 in (6.985 m) with its gear extended, its descent stage 10 ft 7 in
+  and its ascent stage 12 ft 4 in (Grumman/NASA, Apollo News Reference). Both stages were off by
+  the same factor, so `make_lm5_eagle.py` scales the model's height by 0.948 (y only, the footpads'
+  spread kept; the 15 cm strut crush and the prefab's 4 cm pad sink as before): 6.65 m before the
+  crush, 6.50 m after. It also sorts the secondary struts into `kapton_gold` and the low aft faces
+  into `silver_foil` (above). The panel atlas is drawn again for the shorter panels.
+
+  ![The Eagle prefab before and after the height scale](docs/images/changelog/lm5-eagle-proportions.png)
+
+  The yellow line marks the same height in both: the ascent stage comes down about 35 cm.
+
 ## [2026-alpha-0.21.3] - 2026-11-22
 
 Prefabs and the Eagle: any object can be saved as a scene of its own and brought into others with
@@ -2630,7 +2753,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.3...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.4...HEAD
+[2026-alpha-0.21.4]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.3...2026-alpha-0.21.4
 [2026-alpha-0.21.3]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.2...2026-alpha-0.21.3
 [2026-alpha-0.21.2]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.1...2026-alpha-0.21.2
 [2026-alpha-0.21.1]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21...2026-alpha-0.21.1

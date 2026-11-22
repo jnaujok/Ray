@@ -7141,6 +7141,100 @@ static void ModelPartChecks( const char *strScenes, const char *strDir )
     }
 }
 
+    // A regolith floor in the shadow of a slab, beside a white wall the sun
+    // lights (the sun 45 degrees up from +x), with the given "indirect"
+    // settings; the color of the shadowed floor at (-1, 0, 0).
+static CColor ShadowedRegolith( const char *strIndirect )
+{
+    std::string strText =
+        "{ \"format\": \"Ray scene\", \"version\": 3, \"background\": [0, 0, 0],\n"
+        "  \"settings\": { \"maximumDepth\": 8, \"depthThreshold\": 0.0001 ";
+
+    strText += strIndirect;
+    strText +=
+        " },\n"
+        "  \"camera\": { \"position\": [-1, 0.5, -3], \"lookAt\": [-1, 0, 0] },\n"
+        "  \"objects\": [ { \"type\": \"plane\", \"position\": [0, 0, 0], \"normal\": [0, 1, 0],\n"
+        "                   \"materials\": [ { \"type\": \"regolith\", \"color\": [0.12, 0.12, 0.12] } ] },\n"
+        "                 { \"type\": \"box\", \"center\": [0, 1, 0], \"size\": [2, 0.1, 2],\n"
+        "                   \"materials\": [ { \"type\": \"diffuse\", \"color\": [0, 0, 0] } ] },\n"
+        "                 { \"type\": \"box\", \"center\": [-3, 1, 0], \"size\": [0.2, 2, 4],\n"
+        "                   \"materials\": [ { \"type\": \"diffuse\", \"color\": [1, 1, 1] } ] } ],\n"
+        "  \"lights\": [ { \"type\": \"directional\", \"direction\": [-1, -1, 0], \"color\": [3, 3, 3] } ] }\n";
+
+    CScene oScene;
+
+    Check( oScene.FromJson( strText ) == 0, "the shadowed regolith scene loads" );
+    return TraceFrom( oScene, CVector( -1.0, 0.5, -3.0 ), CVector( 0.0, -0.5, 3.0 ) );
+}
+
+    // Regolith gathers bounced light like a diffuse surface: in a shadow,
+    // the sunlit wall and ground beside it light it.
+static void RegolithBounceChecks( void )
+{
+    CColor oOff = ShadowedRegolith( "" );
+    CColor oOne = ShadowedRegolith( ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 1, \"samples\": 64, \"distance\": 20 }" );
+    CColor oTwo = ShadowedRegolith( ", \"indirect\": { \"method\": \"hemisphere\", \"bounces\": 2, \"samples\": 64, \"distance\": 20 }" );
+
+    Check( oOff.GetR() == 0.0 && oOff.GetG() == 0.0, "regolith in a shadow is black without indirect light" );
+    Check( oOne.GetR() > 0.01 && oOne.GetG() > 0.01, "regolith in a shadow gathers the light bounced off what the sun lights" );
+    Check( oTwo.GetR() >= oOne.GetR(), "a second bounce adds to regolith's gathered light" );
+}
+
+static void PanoramaChecks( void )
+{
+    CScene  oScene;
+
+        // An equirectangular camera aims each pixel where an environment
+        // image keeps it: looking down +z with +y up, its image is laid out
+        // exactly as an environment's, so it can be read back as one.
+    Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 1], \"projection\": \"equirectangular\"" ) ) == 0,
+           "an equirectangular camera loads" );
+    CCamera    &oCamera = oScene.GetCamera();
+    CEnvironment oLayout;
+    double      dWorst = 0.0;
+
+    for ( int nRow = 0; nRow < 9; nRow++ )
+    {
+        for ( int nColumn = 0; nColumn < 17; nColumn++ )
+        {
+            FLT     nU = ( nColumn + 0.5 ) / 17.0;
+            FLT     nV = ( nRow + 0.5 ) / 9.0;
+            FLT     nGotU;
+            FLT     nGotV;
+            CVector oOrigin;
+            CVector oDirection;
+
+            oCamera.PrimaryRay( ( nU * 2.0 ) - 1.0, 1.0 - ( nV * 2.0 ), 2.0, nU * 17.0, nV * 9.0, oOrigin, oDirection );
+            oLayout.ImageCoords( oDirection.GetX(), oDirection.GetY(), oDirection.GetZ(), nGotU, nGotV );
+            dWorst = (std::max)( dWorst, (double)( ABS( nGotU - nU ) + ABS( nGotV - nV ) ) );
+        }
+    }
+    Check( dWorst < 1e-12, "every panorama pixel looks where an environment image keeps it" );
+    {
+            // Looking along +x (tilted down), the middle of the image looks
+            // level along +x and the left and right edges meet behind it.
+        CVector oOrigin, oMiddle, oLeft, oRight;
+
+        Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [10, -20, -10], \"projection\": \"equirectangular\"" ) ) == 0,
+               "a tilted equirectangular camera loads" );
+        oScene.GetCamera().PrimaryRay( 0.0, 0.0, 2.0, 0.5, 0.5, oOrigin, oMiddle );
+        oScene.GetCamera().PrimaryRay( -1.0, 0.0, 2.0, 0.0, 0.5, oOrigin, oLeft );
+        oScene.GetCamera().PrimaryRay( 1.0, 0.0, 2.0, 1.0, 0.5, oOrigin, oRight );
+        Check( ABS( oMiddle.GetX() - 1.0 ) < 1e-9 && ABS( oMiddle.GetY() ) < 1e-9 &&
+               ABS( oLeft.GetX() + 1.0 ) < 1e-9 && ABS( oRight.GetX() + 1.0 ) < 1e-9,
+               "the middle looks along the camera's level forward and the edges meet behind it (seam)" );
+    }
+    Check( oScene.FromJson( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 1], \"projection\": \"equirectangular\"" ) ) == 0 &&
+           oScene.ToJson().find( "\"projection\": \"equirectangular\"" ) != std::string::npos,
+           "a panorama saves its projection" );
+    Check( oScene.FromJson( s_strMinimal ) == 0 && oScene.ToJson().find( "projection" ) == std::string::npos,
+           "a perspective camera saves no projection" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"projection\": \"fisheye\"" ), BAD_FILE, "unknown projection" );
+    ExpectError( Minimal( "\"lookAt\": [0, 0, 0]", "\"lookAt\": [0, 0, 0], \"projection\": \"equirectangular\", \"body\": \"hasselblad-hdc\"" ),
+                 BAD_FILE, "can't have a lens" );
+}
+
 int main( int argc, char **argv )
 {
     if ( argc >= 4 && strcmp( argv[ 1 ], "--engines" ) == 0 )
@@ -7200,6 +7294,8 @@ int main( int argc, char **argv )
         ApolloChecks();
         ShowcaseChecks();
         LensElementsChecks();
+        PanoramaChecks();
+        RegolithBounceChecks();
     }
 
     if ( g_nFailures == 0 )

@@ -12,12 +12,15 @@ scenes/as11_40_5927_test.ray recreates NASA photograph AS11-40-5927 (Apollo 11, 
 110:53:38, 1969-07-21 04:25:38 UTC): Eagle from the east, its aft
 equipment bay to the right and its Scientific Equipment (SEQ) bay closed, under
 a sun 14.96 degrees up at azimuth 90.2 (just south of east). Buzz Aldrin, who
-stands at the bay in the photograph, is left out. The LM is turned so its
-front (+Z, the hatch) faces azimuth 244 and sits 4 cm down (its footpads in the
-regolith), and the camera stands 12.4 m from it looking at azimuth 295, 1.03 m up, matched to the
-photograph by the footpads' spacing, the horizon's height and the aft box seen square on (no recovered camera station): the Hasselblad Data
-Camera, its 60 mm Biogon and Reseau plate, Ektachrome MS. Scene axes: x east,
-y up, z north.
+stands at the bay in the photograph, is left out. The ground is the LROC NAC
+terrain of Tranquility Base (scenes/terrain/), with its baked surroundings as the
+environment. The LM's front (+Z, the hatch) faces azimuth 253.47, tilted onto the
+3.2 degree slope it stands on and 4 cm down (its footpads in the regolith); the
+camera stands 12.31 m out at azimuth 115, 1.03 m above its ground, as
+tools/solve_5927_view.py solves it from the footpads and the LM's shadow: the
+Hasselblad Data Camera, its 60 mm Biogon and Reseau plate, Ektachrome MS at f/11
+and 1/250 s. scenes/terrain/apollo11_bake.ray, the scene the surroundings are
+baked from, is written too. Scene axes: x east, y up, z north.
 """
 import json
 import math
@@ -76,13 +79,15 @@ def stainless():
 
 def kapton(hexcolor):
     """Aluminized Kapton: the copper of the film over its aluminum backing, and the film's own front
-    surface (n about 1.7), which reflects about 7% face on, untinted, more at grazing angles."""
+    surface (n about 1.7), which reflects about 7% face on (12% here, with the light the folds catch),
+    and scatters a little untinted from its matte areas, untinted, more at grazing angles."""
     c = lin(hexcolor)
     return [{"type": "metal", "influence": 0.4, "metal": "copper", "roughness": 0.15, "tint": c},
             {"type": "specular", "influence": 0.4, "color": c, "power": 0.15, "indexOfRefraction": 1.5,
              "materialHighlight": False},
-            {"type": "diffuse", "influence": 0.06, "color": c, "diffuseCast": False},
-            {"type": "reflective", "influence": 0.07, "color": [1, 1, 1], "diffuseReflectivity": 0.0, "roughness": 0.05},
+            {"type": "diffuse", "influence": 0.1, "color": c, "diffuseCast": False},
+            {"type": "diffuse", "influence": 0.015, "color": [1, 1, 1], "diffuseCast": False},
+            {"type": "reflective", "influence": 0.12, "color": [1, 1, 1], "diffuseReflectivity": 0.0, "roughness": 0.05},
             {"type": "specular", "influence": 0.15, "color": [1, 1, 1], "power": 0.05, "indexOfRefraction": 1.7,
              "materialHighlight": False}]
 
@@ -94,6 +99,15 @@ def metal(hexcolor, metalness, roughness, preset='aluminum'):
             {"type": "specular", "influence": metalness, "color": c, "power": max(roughness, 0.05),
              "indexOfRefraction": 1.5, "materialHighlight": False},
             {"type": "diffuse", "influence": round(max(1.0 - metalness, 0.05), 3), "color": c, "diffuseCast": False}]
+
+
+def foil(hexcolor):
+    """Crinkled aluminized foil: a rough mirror (roughness 0.35) with the sun's lobe and a modest diffuse share."""
+    c = lin(hexcolor)
+    return [{"type": "metal", "influence": 0.6, "metal": "aluminum", "roughness": 0.35, "tint": c},
+            {"type": "specular", "influence": 0.6, "color": c, "power": 0.35, "indexOfRefraction": 1.5,
+             "materialHighlight": False},
+            {"type": "diffuse", "influence": 0.35, "color": c, "diffuseCast": False}]
 
 
 def paint(hexcolor, roughness):
@@ -110,6 +124,11 @@ CRINKLE = {"mode": "height", "texture": {"type": "cells", "mode": "edges", "scal
     # AS11-40-5927 beside Aldrin), a few centimeters deep, with sharp facets
     # (the distance to the nearest cell point makes a facet that rises to a
     # ridge where two cells meet).
+    # The aluminized foil beside the RCS quads is crumpled hard: facets of a few
+    # centimeters to a decimeter, each catching the sun or not, so it sparkles
+    # nearly white in AS11-40-5927.
+FOIL_CRINKLE = {"mode": "height", "texture": {"type": "cells", "mode": "edges", "scale": 0.06, "turbulence": 0.8, "seed": 13},
+                "depth": 0.02, "step": 0.003}
 BIG_CRINKLE = {"mode": "height", "texture": {"type": "cells", "mode": "edges", "scale": 0.27, "turbulence": 0.3, "seed": 9},
                "depth": 0.05, "step": 0.006}
     # The plume deflectors: gray, gently wrinkled, streaked from top to bottom
@@ -132,29 +151,54 @@ QUARTZ = [{"type": "ambient", "influence": 1.0, "color": [0.004, 0.004, 0.008]},
 MATERIAL_MAP = {
     "kapton_blanket": {"materials": kapton('#D6865A'), "bump": BIG_CRINKLE},
     "kapton_gold": {"materials": metal('#DFA53A', 0.65, 0.25), "bump": CRINKLE},
-    "silver_foil": {"materials": metal('#D4D8DC', 0.7, 0.25), "bump": CRINKLE},
+    "silver_foil": {"materials": foil('#E8EBEE'), "bump": FOIL_CRINKLE},
     "al_olive": {"materials": panel('#7A7966'), "bump": RIVETS},
     "kapton_mesa": {"materials": metal('#E59B34', 0.65, 0.25), "bump": CRINKLE},
     "black_blanket": {"materials": paint('#1C1D1F', 0.6), "bump": BIG_CRINKLE},
-    "dps_bell": {"materials": metal('#3A3D42', 0.85, 0.45, 'titanium')},
+    "dps_bell": {"materials": metal('#ECF2FF', 0.2, 0.5, 'titanium')},
     "porch_aluminum": {"materials": metal('#34373A', 0.65, 0.3)},
     "rcs_stainless": {"materials": stainless()},
     "plume_deflector": {"materials": DEFLECTOR, "bump": WRINKLE},
     "inconel_dark": {"materials": metal('#26282A', 0.65, 0.55, 'iron')},
     "white_paint": {"materials": paint('#E2E4E6', 0.45)},
-    "al2024_anodized": {"materials": panel('#C2D4FF', 1.1), "bump": RIVETS},
-    "al5056_anodized": {"materials": panel('#F1F4F2', 1.1), "bump": RIVETS},
+    "al2024_anodized": {"materials": panel('#C2D4FF', 1.5), "bump": RIVETS},
+    "al5056_anodized": {"materials": panel('#F1F4F2', 1.5), "bump": RIVETS},
     "pyromark_black": {"materials": paint('#18191B', 0.7)},
     "window_quartz": {"materials": QUARTZ},
 }
 
 SUN_ELEVATION = 14.96
 SUN_AZIMUTH = 90.2
-LM_HEADING = 244.0          # the azimuth the LM's front faces: its aft equipment bay to the right, as in the photograph
-CAMERA_HEADING = 295.0
-CAMERA_DISTANCE = 12.4
-    # Ektachrome MS at 1/250 s: the stop that gives the sunlit ground the photograph's brightness.
-FILM_FSTOP = 8.6
+    # The view solved by tools/solve_5927_view.py from the four footpads in the
+    # photograph, on the LROC NAC terrain (scenes/terrain/): the LM's front faces
+    # azimuth 253.47, turned and tilted onto the 3.2 degree slope it stands on
+    # (Ray's x, y, z rotation), and the camera stands 12.31 m out at azimuth 115
+    # (set by the LM's shadow), 1.03 m above the ground there, which is 0.31 m
+    # below the LM's.
+LM_HEADING = 253.47
+LM_ROTATION = [0.954, 73.474, -2.238]
+CAMERA_POSITION = [11.153, 0.724, -5.2007]
+CAMERA_LOOK_AT = [2.0724, 1.2435, -1.0446]
+CAMERA_DISTANCE = 12.31
+    # The Apollo surface exposure for Ektachrome SO-368 (ISO 64) down-sun: f/11 at
+    # 1/250 s. With the regolith at a lunar albedo, the sun is calibrated to give
+    # the sunlit ground the scanned photograph's brightness at that exposure: 2.8
+    # times the 1.28 that the Moon's sunlight (about 128 klx against the 100 klx
+    # sunny 16 assumes) would be, so NASA's scan is about 1.5 stops brighter than
+    # the film's exposure alone would make it.
+FILM_FSTOP = 11.0
+SUN_COLOR = [3.6, 3.6, 3.52]
+REGOLITH = [0.12, 0.115, 0.11]
+    # The baked surroundings: the terrain out to 2.4 km seen from the camera
+    # station, 1.4 m up, without the LM (scenes/terrain/apollo11_bake.ray).
+BAKE_SIZE = (2048, 1024)
+
+
+def regolith_ground(glb):
+    return {"type": "mesh", "name": "ground", "file": glb, "smooth": True, "doubleSided": True, "color": [0.5, 0.5, 0.5],
+            "materials": [{"type": "regolith", "influence": 1.0, "color": REGOLITH, "surge": 1.0, "width": 0.06}],
+            "bump": {"mode": "height", "texture": {"type": "noise", "scale": 0.9, "octaves": 6, "seed": 11},
+                     "depth": 0.05, "step": 0.005}}
 
 
 def toward(azimuth, elevation=0.0):
@@ -183,6 +227,15 @@ def lm_frame(point, heading=LM_HEADING):
     return [x * math.cos(t) + z * math.sin(t), y, -x * math.sin(t) + z * math.cos(t)]
 
 
+    # The plane the LM stands on (the terrain mesh is this plane within 9 m of it):
+    # its rise per meter east and north, fitted by solve_5927_view.py.
+GROUND_SLOPE = (-0.055085, -0.004744)
+
+
+def on_plane(point):
+    return [point[0], point[1] + GROUND_SLOPE[0] * point[0] + GROUND_SLOPE[1] * point[2], point[2]]
+
+
 def main():
     prefab_mesh = {"type": "mesh", "name": "lm5_eagle", "file": "lm5_eagle.glb", "scale": 1.0, "rotation": [0, 0, 0],
                    "align": "none", "translation": [0, 0, 0], "smooth": True, "doubleSided": True,
@@ -195,37 +248,47 @@ def main():
     with open(os.path.join(SCENES, 'models', 'apollo', 'lm5_eagle.ray'), 'w') as f:
         json.dump(prefab, f, indent=2)
 
-    ground = {"type": "plane", "position": [0, 0, 0], "normal": [0, 1, 0], "color": [0.5, 0.5, 0.5],
-              "materials": [{"type": "regolith", "influence": 1.0, "color": [0.12, 0.115, 0.11], "surge": 1.0, "width": 0.06}],
-              "bump": {"mode": "height", "texture": {"type": "noise", "scale": 0.9, "octaves": 6, "seed": 11},
-                       "depth": 0.05, "step": 0.005}}
-    look = toward(CAMERA_HEADING)
-    camera = {"position": r6([-CAMERA_DISTANCE * look[0], 1.03, -CAMERA_DISTANCE * look[2]]), "lookAt": [0.114, 1.67, 0.245],
+    sun = dict(sun, color=SUN_COLOR)
+    station = [CAMERA_POSITION[0], round(CAMERA_POSITION[1] - 1.03 + 1.4, 6), CAMERA_POSITION[2]]
+    bake_camera = {"position": station, "lookAt": [station[0], station[1], station[2] + 1.0], "up": [0, 1, 0],
+                   "projection": "equirectangular", "sampler": {"type": "stratified", "grid": 2, "seed": 0},
+                   "colorModel": "clip"}
+    bake = base_scene(BAKE_SIZE[0], BAKE_SIZE[1], bake_camera,
+                      [regolith_ground("apollo11_inner.glb"), dict(regolith_ground("apollo11_outer.glb"), name="far ground")],
+                      [dict(sun, samples=1)])
+    del bake["settings"]["indirect"]
+    bake["settings"]["imageFile"] = "apollo11_surroundings.out"
+    with open(os.path.join(SCENES, 'terrain', 'apollo11_bake.ray'), 'w') as f:
+        json.dump(bake, f, indent=2)
+
+    camera = {"position": CAMERA_POSITION, "lookAt": CAMERA_LOOK_AT,
               "up": [0, 1, 0], "body": "hasselblad-hdc",
               "sampler": {"type": "stratified", "grid": 2, "seed": 0},
               "colorModel": {"type": "film", "stock": "ektachrome-ms", "shutter": 0.004, "fStop": FILM_FSTOP},
               "lens": {"focusDistance": CAMERA_DISTANCE, "millimetersPerUnit": 1000.0}}
     # 4 cm down: the footpads sank that far into the regolith.
-    eagle = {"type": "include", "file": "models/apollo/lm5_eagle.ray", "rotation": [0.0, round(LM_HEADING - 180.0, 6), 0.0],
+    eagle = {"type": "include", "file": "models/apollo/lm5_eagle.ray", "rotation": LM_ROTATION,
              "position": [0.0, -0.04, 0.0]}
     rock = paint('#7E7B76', 0.8)
-    near = [-CAMERA_DISTANCE * look[0] * 0.55, 0.0, -CAMERA_DISTANCE * look[2] * 0.55]
+    near = on_plane([CAMERA_POSITION[0] * 0.55, 0.0, CAMERA_POSITION[2] * 0.55])
     props = [
             # A rock about 70 cm across and low in the middle foreground, half sunk in the ground.
-        {"type": "superquadric", "center": r6([near[0], 0.0, near[2]]), "radius": [0.36, 0.12, 0.28], "e1": 1.6, "e2": 1.4,
+        {"type": "superquadric", "center": r6(near), "radius": [0.36, 0.12, 0.28], "e1": 1.6, "e2": 1.4,
          "rotation": [0, 30, 0], "color": [0.5, 0.5, 0.5], "materials": rock,
          "bump": {"mode": "height", "texture": {"type": "noise", "scale": 0.08, "octaves": 4, "seed": 2}, "depth": 0.03, "step": 0.004}},
-            # The white bag near the left footpad, and a pole at the left.
-        {"type": "cylinder", "base": r6(lm_frame([2.6, 0.0, -1.7], LM_HEADING)), "top": r6(lm_frame([2.6, 0.32, -1.7], LM_HEADING)),
+            # The white bag near the left footpad, and a pole at the left, on the
+            # plane the LM stands on.
+        {"type": "cylinder", "base": r6(on_plane(lm_frame([2.6, 0.0, -1.7]))), "top": r6(on_plane(lm_frame([2.6, 0.32, -1.7]))),
          "radius": 0.13, "capped": True, "color": [0.5, 0.5, 0.5], "materials": paint('#E8E8E6', 0.5)},
-        {"type": "cylinder", "base": r6(lm_frame([3.6, 0.0, -0.4], LM_HEADING)), "top": r6(lm_frame([3.6, 0.9, -0.4], LM_HEADING)),
+        {"type": "cylinder", "base": r6(on_plane(lm_frame([3.6, 0.0, -0.4]))), "top": r6(on_plane(lm_frame([3.6, 0.9, -0.4]))),
          "radius": 0.012, "capped": True, "color": [0.5, 0.5, 0.5], "materials": anodized('#B8BDC2')},
     ]
-    objects = [ground, eagle] + props
+    objects = [regolith_ground("terrain/apollo11_inner.glb"), eagle] + props
     scene = base_scene(128, 128, camera, objects, [sun])
+    scene["environment"] = {"type": "image", "file": "terrain/apollo11_surroundings.hdr"}
     with open(os.path.join(SCENES, 'as11_40_5927_test.ray'), 'w') as f:
         json.dump(scene, f, indent=2)
-    print("wrote lm5_eagle.ray and as11_40_5927_test.ray")
+    print("wrote lm5_eagle.ray, terrain/apollo11_bake.ray and as11_40_5927_test.ray")
 
 
 if __name__ == '__main__':

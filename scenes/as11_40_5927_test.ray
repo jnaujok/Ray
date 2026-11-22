@@ -23,14 +23,14 @@
   ],
   "camera": {
     "position": [
-      11.238217,
-      1.03,
-      -5.240466
+      11.153,
+      0.724,
+      -5.2007
     ],
     "lookAt": [
-      0.114,
-      1.67,
-      0.245
+      2.0724,
+      1.2435,
+      -1.0446
     ],
     "up": [
       0,
@@ -47,26 +47,20 @@
       "type": "film",
       "stock": "ektachrome-ms",
       "shutter": 0.004,
-      "fStop": 8.6
+      "fStop": 11.0
     },
     "lens": {
-      "focusDistance": 12.4,
+      "focusDistance": 12.31,
       "millimetersPerUnit": 1000.0
     }
   },
   "objects": [
     {
-      "type": "plane",
-      "position": [
-        0,
-        0,
-        0
-      ],
-      "normal": [
-        0,
-        1,
-        0
-      ],
+      "type": "mesh",
+      "name": "ground",
+      "file": "terrain/apollo11_inner.glb",
+      "smooth": true,
+      "doubleSided": true,
       "color": [
         0.5,
         0.5,
@@ -101,9 +95,9 @@
       "type": "include",
       "file": "models/apollo/lm5_eagle.ray",
       "rotation": [
-        0.0,
-        64.0,
-        0.0
+        0.954,
+        73.474,
+        -2.238
       ],
       "position": [
         0.0,
@@ -114,9 +108,9 @@
     {
       "type": "superquadric",
       "center": [
-        6.181019,
-        0.0,
-        -2.882257
+        6.13415,
+        -0.32433,
+        -2.860385
       ],
       "radius": [
         0.36,
@@ -183,14 +177,14 @@
     {
       "type": "cylinder",
       "base": [
-        -0.388185,
-        0.0,
-        -3.082095
+        -0.889995,
+        0.063145,
+        -2.976224
       ],
       "top": [
-        -0.388185,
-        0.32,
-        -3.082095
+        -0.889995,
+        0.383145,
+        -2.976224
       ],
       "radius": 0.13,
       "capped": true,
@@ -236,14 +230,14 @@
     {
       "type": "cylinder",
       "base": [
-        1.218619,
-        0.0,
-        -3.411007
+        0.640794,
+        -0.018386,
+        -3.565022
       ],
       "top": [
-        1.218619,
-        0.9,
-        -3.411007
+        0.640794,
+        0.881614,
+        -3.565022
       ],
       "radius": 0.012,
       "capped": true,
@@ -330,12 +324,16 @@
         0.003372
       ],
       "color": [
-        2.2,
-        2.2,
-        2.15
+        3.6,
+        3.6,
+        3.52
       ],
       "angle": 0.53,
       "samples": 2
     }
-  ]
+  ],
+  "environment": {
+    "type": "image",
+    "file": "terrain/apollo11_surroundings.hdr"
+  }
 }

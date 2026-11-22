@@ -50,6 +50,7 @@ CCamera::CCamera( const CCamera &oSource )
     m_nAspectRatio = oSource.m_nAspectRatio;
     m_nClamp = oSource.m_nClamp;
     m_bSpectral = oSource.m_bSpectral;
+    m_bPanorama = oSource.m_bPanorama;
     m_oReseau = oSource.m_oReseau;
     m_pSampler.reset( oSource.m_pSampler ? oSource.m_pSampler->Clone() : NULL );
     m_pColorModel.reset( oSource.m_pColorModel ? oSource.m_pColorModel->Clone() : NULL );
@@ -67,6 +68,7 @@ CCamera &CCamera::operator =( const CCamera &oSource )
     m_nAspectRatio = oSource.m_nAspectRatio;
     m_nClamp = oSource.m_nClamp;
     m_bSpectral = oSource.m_bSpectral;
+    m_bPanorama = oSource.m_bPanorama;
     m_oReseau = oSource.m_oReseau;
     if ( this != &oSource )
     {
@@ -133,6 +135,37 @@ BOOL CCamera::PrimaryRay( FLT nScreenX, FLT nScreenY, FLT nAspect, FLT nImageX, 
 {
     if ( pnWeight )
         *pnWeight = 1.0;
+    if ( m_bPanorama )
+    {
+            // Longitude across the image (the look-at direction in the
+            // middle, right a quarter of the way round to the right), from
+            // straight up at the top to straight down at the bottom: an
+            // environment image's layout in the camera's own frame.
+        FLT     nLongitude = nScreenX * PI;
+        FLT     nPolar = ( ( 1.0 - nScreenY ) * 0.5 ) * PI;
+        FLT     nAcross = (FLT)sin( (double)nPolar );
+        CVector oUp( m_oUp );
+        CVector oForward( m_oForward );
+
+        oUp.Normalize();
+        CVector oAlongUp( oUp * oUp.Dot( oForward ) );
+
+        oForward = oForward - oAlongUp;
+        if ( oForward.Magnitude() < 1e-9 )
+            oForward = m_oTop;
+        oForward.Normalize();
+
+        CVector oRight( oUp.Cross( oForward ) );
+        CVector oA( oRight * ( (FLT)sin( (double)nLongitude ) * nAcross ) );
+        CVector oB( oUp * (FLT)cos( (double)nPolar ) );
+        CVector oC( oForward * ( (FLT)cos( (double)nLongitude ) * nAcross ) );
+
+        oOrigin = m_oPosition;
+        oDirection = oA + oB;
+        oDirection = oDirection + oC;
+        oDirection.Normalize();
+        return TRUE;
+    }
     if ( ! m_pLens || m_bAimOnly )
     {
         oOrigin = m_oPosition;
@@ -357,6 +390,8 @@ void CCamera::ToJson( IASLib::CObjectNode &oNode )
         RayJson::PutNumber( oNode, "clamp", m_nClamp );
     if ( m_bSpectral )
         oNode.put( "dispersion", "spectral" );
+    if ( m_bPanorama )
+        oNode.put( "projection", "equirectangular" );
     if ( m_pLens )
         m_pLens->ToJson( *oNode.putObject( "lens" ) );
     if ( m_oReseau.bOn )
@@ -375,13 +410,15 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
     static const char *const astrFields[] = { "position", "lookAt", "up", "verticalAngle",
                                               "horizontalAngle", "aspectRatio",
                                               "sampler", "colorModel", "clamp", "dispersion", "lens",
-                                              "body", "reseau", NULL };
+                                              "body", "reseau", "projection", NULL };
     CPixelSampler  *pSampler;
     CColorModel    *pColorModel;
     FLT             nClamp = 0.0;
     std::string     strDispersion = "rgb";
+    std::string     strProjection = "perspective";
 
     if ( ! RayJson::OnlyFields( oNode, astrFields ) ||
+         ! RayJson::GetString( oNode, "projection", strProjection, FALSE ) ||
          ! RayJson::GetNumber( oNode, "clamp", nClamp, FALSE ) ||
          ! RayJson::GetString( oNode, "dispersion", strDispersion, FALSE ) ||
          ! RayJson::GetVector( oNode, "position", m_oPosition, TRUE ) ||
@@ -404,6 +441,13 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
         return RayJson::Fail( "unknown dispersion \"" + strDispersion + "\" (rgb or spectral)" );
     }
     m_bSpectral = ( strDispersion == "spectral" ) ? TRUE : FALSE;
+    if ( strProjection != "perspective" && strProjection != "equirectangular" )
+    {
+        RayJson::CWhere oWhere( "projection" );
+
+        return RayJson::Fail( "unknown projection \"" + strProjection + "\" (perspective or equirectangular)" );
+    }
+    m_bPanorama = ( strProjection == "equirectangular" ) ? TRUE : FALSE;
 
     if ( ! GetModel( oNode, "sampler", pSampler, "sampler" ) )
         return FALSE;
@@ -496,6 +540,12 @@ BOOL CCamera::FromJson( const IASLib::CJsonNode &oNode )
         return RayJson::Fail( "a Reseau plate needs a lens (its crosses are placed in mm on the film)" );
     }
 
+    if ( m_bPanorama && ( m_pLens || m_oReseau.bOn ) )
+    {
+        RayJson::CWhere oWhere( "projection" );
+
+        return RayJson::Fail( "an equirectangular panorama is a pinhole all the way round: it can't have a lens, a body or a Reseau plate" );
+    }
     CalcRotate();
     if ( ! m_strLensError.empty() )
     {

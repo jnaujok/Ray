@@ -10,14 +10,17 @@ uncompressed glTF 2.0 binary whose primitives are named for what they are, so
 a scene can give each part its own materials with a mesh's "materialMap":
 
     kapton_blanket    the descent stage's quadrant blankets: copper-red Kapton
-    kapton_gold       the footpads and the lower primary struts: bright gold foil
-    silver_foil       the upper primary struts: silver aluminized foil
+    kapton_gold       the footpads, the lower primary struts and the secondary
+                      struts from the descent stage out to the legs: bright gold foil
+    silver_foil       the upper primary struts and the low aft faces of the
+                      ascent stage beside the RCS quads: crinkled silver
+                      aluminized foil
     kapton_mesa       the MESA bay panel
     black_blanket     the descent stage's black rim bands and the blanket
                       between the stages
     dps_bell          the descent engine bell
     porch_aluminum    the porch, ladder and secondary struts
-    inconel_dark      the black trusses and RCS housings
+    inconel_dark      the black trusses, downlock tubes and RCS housings
     white_paint       the dishes and other white-painted fittings
     al2024_anodized   the ascent stage's silver panels: the front face around
                       the windows and hatch, and the tops
@@ -25,8 +28,8 @@ a scene can give each part its own materials with a mesh's "materialMap":
                       equipment bay
     al_olive          the faceted tank fairing on the +x side: darker
                       olive-gray metal, as AS11-40-5927 shows it
-    pyromark_black    the ascent stage's black panels: the other tank fairing,
-                      the lower forward panels and the low aft panels
+    pyromark_black    the ascent stage's black panels: the other tank fairing
+                      and the lower forward panels
     window_quartz     the windows
     rcs_stainless     the RCS thruster quads (polished 304 stainless steel)
     plume_deflector   the RCS plume deflectors below the quads
@@ -69,6 +72,14 @@ except ImportError:
     sys.exit("needs DracoPy: pip install DracoPy numpy")
 
 SCALE = 1.4
+# NASA's model is 4% too tall for its leg span. The real LM stands 22 ft 11 in
+# (6.985 m) with its gear extended and spans 31 ft (9.449 m) across the
+# footpads, its descent stage 10 ft 7 in of that and its ascent stage 12 ft
+# 4 in (Grumman/NASA Apollo News Reference, LM-5 era); scaled by SCALE the model
+# spans 9.00 m and stands 7.02 m (descent 3.25, ascent 3.77), so both stages
+# come down by the same factor to the real height for that span, the footpads'
+# spread kept.
+Y_SCALE = 0.948
 CREASE_DEGREES = 45.0
 
 # Linear base colors for viewers that read glTF materials; Ray's prefab gives
@@ -99,6 +110,9 @@ for _node in ('10', '11', 'p9', 'pP'):
     BY_NODE[('blinn6SG.001', 'group75 ' + _node)] = 'plume_deflector'    # the panels under the RCS quads
 for _node in ('group31 10', 'group31 11', 'group31 12', 'group31 13', 'group31 14', 'group31 g9'):
     BY_NODE[('initialShadingGr.001', _node)] = 'black_blanket'
+    # The secondary struts, from the descent stage's corners out to the primary struts (1.1 to 2.7 m
+    # up, 2.1 to 2.9 m out): black in NASA's model, wrapped in bright gold Kapton in AS11-40-5927.
+    BY_NODE[('blinn6SG.001', _node)] = 'kapton_gold'
 
 
 def face_part(material, node, normal, center):
@@ -117,7 +131,9 @@ def face_part(material, node, normal, center):
         if abs(normal[0]) > 0.6 or normal[2] < -0.5:
             return 'al5056_anodized'
         if normal[2] > 0.5 and center[1] < 2.95:
-            return 'pyromark_black'
+            # The aft faces low on the ascent stage, beside the RCS quads: crinkled silver
+            # aluminized foil in AS11-40-5927, not black paint.
+            return 'silver_foil'
         return 'al2024_anodized'
     if node == 'polySurfac' and material == 'blinn3SG.001':
         if normal[2] > 0.4 and center[1] > 3.4:
@@ -170,8 +186,8 @@ def creased_normals(points, faces):
 # shortening smoothly between the pads' tops and CRUSH_TOP (meters, after
 # scaling). The engine bell, which reaches into that band, moves down whole.
 CRUSH = 0.15
-PAD_TOP = 0.24
-CRUSH_TOP = 1.25
+PAD_TOP = round(0.24 * Y_SCALE, 4)
+CRUSH_TOP = round(1.25 * Y_SCALE, 4)
 
 
 def crush_drop(y):
@@ -411,7 +427,7 @@ def main():
             used = np.unique(faces)
             remap = -np.ones(len(points), dtype=np.int64)
             remap[used] = np.arange(len(used)) + base
-            points_list.append((points[used] + shift) * SCALE)
+            points_list.append((points[used] + shift) * SCALE * np.array([1.0, Y_SCALE, 1.0]))
             faces_list.append(remap[faces])
             base += len(used)
         points = crush(np.concatenate(points_list), name)
