@@ -10,6 +10,127 @@ Every change that alters rendered output shows its before and after images here.
 
 ## [Unreleased]
 
+## [2026-alpha-0.21.6] - 2026-11-22
+
+The ground of Tranquility Base gets its color: an albedo texture made from the LROC orthoimage of
+the site, the sunlight's shading divided out, mottled down to centimeters and roughened with
+pebbles; AS11-40-5927 and its baked surroundings are rendered again on it. Ray gains a `combine`
+texture and an optional Oren-Nayar term for `regolith`. Every other render is byte for byte the
+same but the torture test, whose lump of regolith shows both off (`render_as11_40_5927` and
+`render_torture` references change).
+
+### Added
+
+- **`combine` texture** (`core/src/CombineTexture.cpp`): two or more textures of any kind made one,
+  `"mode": "multiply"` (the default: channel by channel, so noise can mottle an image) or `"add"`
+  (each times its entry in `weights`, as for layering bump heights), the result times `color`
+  (default white), which scales a 0 to 1 texture to the albedo wanted. Combines nest, and presets
+  inside stay presets when saved. `format_test` checks the product, the weighted sum, the color, a
+  product of real patterns at 200 points, round trips and the refusals.
+- **Oren-Nayar for `regolith`**: `"orenNayar"` (roughness in radians, 0 to 1.5; default 0, off)
+  blends Oren and Nayar's qualitative rough diffuse term, scaled to 1 lit and seen straight on as
+  the Lommel-Seeliger term is, into the material by `"orenNayarWeight"` (default 0.65). It darkens
+  the soil lit and seen from the side and brightens it toward the light. Off, the material takes
+  exactly its old path (every regolith render without it is byte-identical) and saves no new
+  fields. `format_test` checks it against the formula, its share, backscatter, Lambert away from the
+  light, the round trip and the refusals.
+- **`tools/geotiff_albedo.py`** makes an albedo texture for a terrain mesh from an orthoimage
+  (PDS3 or GeoTIFF; it reads only the rows it needs, so a partial download of a 944 MB product
+  works) and the DTM under it: it samples both on the texture's grid, divides out the
+  Lommel-Seeliger shading of the DTM under the orthoimage's sun (`--sun`, or `--fit-sun` to find
+  it), fills in pixels on slopes turned away from that sun, divides by a broad Gaussian blur
+  (`--highpass`), paints over a lander and its shadow (`--mask-lander`), takes out seams between
+  image strips (`--destripe`) and fades to the mean where the image has no data. It writes 8-bit
+  linear gray with mean 128. Needs numpy and Pillow (the blur is an FFT; no SciPy).
+- **`geotiff_terrain.py --uv-extent METERS`** writes texture coordinates mapping the square ±METERS
+  about the center onto an image, north at the top. Positions, normals and triangles are
+  unchanged: without it the meshes come out byte for byte as before.
+- **The albedo of Tranquility Base** (`scenes/terrain/apollo11_inner_albedo.png`, 1024×1024 over
+  ±300 m, 59 cm a pixel, from the 50 cm orthoimage `NAC_DTM_APOLLO11_M150361817_50CM`; and
+  `apollo11_outer_albedo.png`, 2048×2048 over ±2.4 km, 2.3 m a pixel, from the 2 m one, which
+  covers 73% of that square; 2.2 MB together; NASA/GSFC/ASU, public domain, see `NOTICE`). The
+  orthoimage's sun had to be found: fitting the DTM's shading to the image's detail puts it 23° up
+  in the west (azimuth 270, correlation 0.56; the east, which the frame's sub-solar azimuth seemed
+  to say, correlates at −0.52). The shading divided out at that sun (pixels under 0.3 of flat
+  ground's, 0.1% of them, filled in), then an 80 m blur (300 m outside), leaves the bright blast
+  zone round the LM, ejecta halos and dark patches, within ±25% of the mean (1st to 99th
+  percentile). The LM and its 17 m shadow are painted over (the scene has its own LM), and the
+  outer texture is destriped of a seam 1.15 km west. The meshes now carry texture coordinates.
+
+  ![The LROC orthoimage around the LM, de-shaded, and as the tinted texture](docs/images/changelog/lroc-albedo.png)
+
+  The inner ±300 m: left the orthoimage (sun from the left), middle with the shading divided out
+  (both stretched for show), right the texture tinted as the scene uses it (×2.7 for show). Look
+  at the craters: their sunlit and shadowed walls become even rims, and what is left is albedo,
+  the bright halo around the LM in the middle and the crater ejecta.
+
+### Changed
+
+- **AS11-40-5927 and the surroundings on the albedo** (`tools/make_eagle_scenes.py`,
+  `scenes/as11_40_5927_test.ray`, `scenes/terrain/apollo11_bake.ray`,
+  `apollo11_surroundings.hdr`). The terrain's regolith `texture` is a `combine` multiplying the
+  albedo image by noise at 2 m, 20 cm and 1.5 cm (each about ±7%, ±6% and ±4%; darker patches a
+  little warmer, brighter ones cooler) and by a color that makes the mean an albedo in Mare
+  Tranquillitatis' warm gray (linear 0.135 : 0.125 : 0.112). The inner ground's bump adds pebbles,
+  domes over Voronoi cells 2 to 10 cm across, and fine grain to the undulation; the regolith takes
+  35% Oren-Nayar at 0.9 rad. The far ground leaves out the finer layers. The exposure is untouched
+  (f/11, 1/250 s, sun 3.6): the albedo's normalization was set so the sunlit ground measures as
+  the frame does. The ground in front of the LM is in the blast zone, about 15% brighter than the
+  site's mean, so the mean albedo comes out at 0.103 (0.111, 0.102, 0.092) and the ground there at
+  about 0.12. The surroundings were baked again with it (12 s, 3.8 MB).
+
+  Measured in linear light at 512×512 (`compare_5927.py`, ratios of luminance Y):
+
+  | Region | NASA Y | 0.21.5 Y | 0.21.6 linear RGB | 0.21.6 Y | 0.21.6/NASA | b/r NASA, 0.21.6 |
+  |---|---|---|---|---|---|---|
+  | sunlit ground | 0.166 | 0.164 | (0.184, 0.166, 0.139) | 0.168 | 1.01 | 0.88, 0.75 |
+  | aft box face | 0.576 | 0.523 | (0.501, 0.526, 0.533) | 0.521 | 0.91 | 1.07, 1.06 |
+  | copper Kapton | 0.066 | 0.073 | (0.131, 0.055, 0.015) | 0.068 | 1.03 | 0.28, 0.11 |
+  | LM shadow | 0.021 | 0.029 | (0.025, 0.024, 0.023) | 0.024 | 1.18 | 0.60, 0.92 |
+  | engine bell | 0.529 | 0.303 | (0.291, 0.297, 0.308) | 0.297 | 0.56 | 1.16, 1.06 |
+
+  The sunlit ground stays on the frame's 0.166 (1%). The shadow comes down from 1.43 to 1.18 of
+  the frame's, the darker surroundings bouncing less light into it; the Kapton moves from 1.10 to
+  1.03 for the same reason. The ground is now warmer than NASA's print (blue over red 0.75 against
+  0.88): the Mare Tranquillitatis tint through Ektachrome comes out browner than the scan.
+
+  ![NASA photograph AS11-40-5927 beside Ray's recreation on the albedo texture at 512×512](docs/images/changelog/as11-40-5927-albedo.png)
+
+  Left, NASA's frame (Neil Armstrong; public domain); right, Ray at 512×512. Look at the ground:
+  patches and streaks instead of an even gray, and grain and pebbles in the foreground.
+
+  ![AS11-40-5927 at 512×512 in 0.21.5 and 0.21.6](docs/images/changelog/as11-40-5927-albedo-before-after.png)
+
+  Ray before and after at 512×512: the same LM, exposure and ground brightness in front of it; the
+  ground mottled, rough near the camera, brighter in the blast zone round the LM.
+
+  ![render_as11_40_5927 before and after](docs/images/changelog/as11-40-5927-albedo-test.png)
+
+  The test render (128×128).
+
+  ![The baked surroundings of Tranquility Base before and after](docs/images/changelog/panorama-albedo.png)
+
+  The baked surroundings, the band from just above the horizon to 30° below it (tone mapped for
+  show): the far ground now has the site's dark and bright patches and craters, where it was an
+  even gray with the opposition surge's bright spot; the surge is still there, fainter.
+- **The torture test's lump of regolith** is mottled by a `combine` of two noise layers, studded
+  with pebbles (a `combine` adding `cells` to its bump) and rough (`orenNayar` 0.9, half and half).
+  The reference render, README preview and full-size image are regenerated.
+  The full-size image took 24,296 CPU seconds (32 minutes on the shared machine; 0.21 took
+  24,137).
+
+  ![The torture test's lump of regolith before and after, at three times full size](docs/images/changelog/torture-regolith-mottled.png)
+
+  The lump at the front right, three times full size. The change is subtle, the lump being dark
+  and lit mostly from behind: look for the blotchier, less even surface and the slightly darker
+  sides turned away from the lights.
+- `scenes/terrain/README.md` gives the commands for the albedo textures, explains the de-shading,
+  and corrects the meshes' flattened middle to the 9 m they were made with (it said 6 m);
+  `NOTICE` credits the orthoimages; `scenes/README.md` documents `combine` and the Oren-Nayar
+  fields; `tools/README.md` documents `geotiff_albedo.py` and `--uv-extent`. `tests/reference/renders.tar.gz`
+  and the README's expected-output images (`tools/render_previews.py`) are regenerated for
+  `as11_40_5927_test` and `torture_test`.
+
 ## [2026-alpha-0.21.5] - 2026-11-22
 
 The release gallery joins the repository: every release's pictures, from the 1997 code to today.
@@ -2777,7 +2898,8 @@ The ray tracing code itself is unchanged.
 Original development of the distributed ray tracer: the MFC scene editor, the PVM ray engine, and
 the ray thrower, built with Visual C++ 4–6 on Windows and with `make` on Unix.
 
-[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.5...HEAD
+[Unreleased]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.6...HEAD
+[2026-alpha-0.21.6]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.5...2026-alpha-0.21.6
 [2026-alpha-0.21.5]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.4...2026-alpha-0.21.5
 [2026-alpha-0.21.4]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.3...2026-alpha-0.21.4
 [2026-alpha-0.21.3]: https://github.com/jnaujok/Ray/compare/2026-alpha-0.21.2...2026-alpha-0.21.3

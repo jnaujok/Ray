@@ -3,7 +3,7 @@
 
     geotiff_terrain.py INPUT --center LAT LON --radius METERS --out MESH.glb
                        [--inner METERS] [--step N] [--curvature] [--crop OUT.tif]
-                       [--sample LAT LON ...]
+                       [--sample LAT LON ...] [--uv-extent METERS]
 
 INPUT is a 32-bit float elevation model: a GeoTIFF (uncompressed, strips or
 tiles, float32 or int16, one band) or a PDS3 image with an attached label (the
@@ -21,7 +21,10 @@ outer ring can surround a fine inner patch) becomes a vertex, taking every
 triangles. With --curvature, points drop by d^2 / 2R for their distance d, as
 the Moon's surface curves away (at 1.4 m eye height the horizon is about
 2.2 km off). The output is a binary glTF (.glb) with positions, smooth
-normals and indices, which Ray loads as a mesh.
+normals and indices, which Ray loads as a mesh. --uv-extent METERS adds
+texture coordinates that map the square from -METERS to +METERS east and
+north of the center onto an image, north at the top, as the albedo textures
+tools/geotiff_albedo.py writes.
 
 --crop writes the cropped heights as a small float32 GeoTIFF in the same
 local frame (meters east and north of the center), so a crop can be kept in
@@ -265,16 +268,17 @@ def tessellate(east, north, heights, radius, inner, curvature):
     return positions.astype(np.float32), normals.astype(np.float32), tris.astype(np.uint32)
 
 
-def write_glb(path, positions, normals, tris, name):
+def write_glb(path, positions, normals, tris, name, uv_extent=0.0):
     bin_pos, bin_nrm, bin_idx = positions.tobytes(), normals.tobytes(), tris.reshape(-1).tobytes()
     pad = lambda b: b + b'\0' * ((4 - len(b) % 4) % 4)
     buffer = pad(bin_pos) + pad(bin_nrm) + pad(bin_idx)
     o_nrm = len(pad(bin_pos))
     o_idx = o_nrm + len(pad(bin_nrm))
+    attributes = {"POSITION": 0, "NORMAL": 1}
     doc = {
         "asset": {"version": "2.0", "generator": "Ray tools/geotiff_terrain.py"},
         "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"name": name, "mesh": 0}],
-        "meshes": [{"name": name, "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 2, "material": 0}]}],
+        "meshes": [{"name": name, "primitives": [{"attributes": attributes, "indices": 2, "material": 0}]}],
         "materials": [{"name": "regolith", "pbrMetallicRoughness": {"baseColorFactor": [0.12, 0.115, 0.11, 1.0]}}],
         "buffers": [{"byteLength": len(buffer)}],
         "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(bin_pos), "target": 34962},
@@ -285,6 +289,18 @@ def write_glb(path, positions, normals, tris, name):
                       {"bufferView": 1, "componentType": 5126, "count": len(normals), "type": "VEC3"},
                       {"bufferView": 2, "componentType": 5125, "count": int(tris.size), "type": "SCALAR"}],
     }
+    if uv_extent > 0:
+        # u runs west to east and v north to south (glTF's v = 0 is an
+        # image's top row) across the square +-uv_extent about the center,
+        # so an image of that square, north up, lands on the ground 1:1.
+        uv = np.stack([(positions[:, 0] + uv_extent) / (2.0 * uv_extent),
+                       (uv_extent - positions[:, 2]) / (2.0 * uv_extent)], axis=1).astype(np.float32)
+        bin_uv = uv.tobytes()
+        doc["bufferViews"].append({"buffer": 0, "byteOffset": len(buffer), "byteLength": len(bin_uv), "target": 34962})
+        doc["accessors"].append({"bufferView": 3, "componentType": 5126, "count": len(uv), "type": "VEC2"})
+        attributes["TEXCOORD_0"] = 3
+        buffer += pad(bin_uv)
+        doc["buffers"][0]["byteLength"] = len(buffer)
     js = json.dumps(doc, separators=(',', ':')).encode()
     js += b' ' * ((4 - len(js) % 4) % 4)
     with open(path, 'wb') as f:
@@ -348,6 +364,8 @@ def main(argv=None):
     ap.add_argument('--fill-center', type=float, default=0.0, metavar='METERS',
                     help='replace the heights within this distance of the center by a plane fitted around it')
     ap.add_argument('--name', default='terrain')
+    ap.add_argument('--uv-extent', type=float, default=0.0, metavar='METERS',
+                    help='write texture coordinates mapping the square +-METERS about the center onto an image')
     args = ap.parse_args(argv)
 
     grid = read_any(args.input)
@@ -382,7 +400,7 @@ def main(argv=None):
         print('wrote %s' % args.crop)
     if args.out:
         positions, normals, tris = tessellate(east, north, heights, args.radius, args.inner, args.curvature)
-        write_glb(args.out, positions, normals, tris, args.name)
+        write_glb(args.out, positions, normals, tris, args.name, args.uv_extent)
         print('wrote %s: %d vertices, %d triangles' % (args.out, len(positions), len(tris)))
 
 

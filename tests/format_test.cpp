@@ -18,6 +18,7 @@
 #include "Lens.h"
 #include "FilmColorModel.h"
 #include "RegolithMaterial.h"
+#include "CombineTexture.h"
 #include "SrgbColorModel.h"
 #include "Camera.h"
 #include "AdaptiveSampler.h"
@@ -540,6 +541,103 @@ static void SolidTextureChecks( void )
     ExpectError( WithTexture( "{ \"type\": \"noise\", \"colors\": [ [1, 1, 1] ] }" ), BAD_FILE, "two or more colors" );
     ExpectError( WithTexture( "{ \"type\": \"noise\", \"size\": 1 }" ), BAD_FILE, "size" );
 }
+
+    // A noise texture whose two colors are the same is that color everywhere.
+#define FLAT_TEXTURE( r, g, b ) "{ \"type\": \"noise\", \"colors\": [ [" r ", " g ", " b "], [" r ", " g ", " b "] ] }"
+
+static void CombineTextureChecks( void )
+{
+    STexturePoint oAt;
+
+    oAt.oPoint = CVector( 0.3, 1.7, -2.2 );
+    oAt.nU = oAt.nV = 0.0;
+    oAt.bHasUV = FALSE;
+    oAt.bHasColor = FALSE;
+
+        // Multiplied, then tinted by the color.
+    std::unique_ptr<IASLib::CJsonNode> pNode( RayJson::Parse(
+        "{ \"type\": \"combine\", \"textures\": [ " FLAT_TEXTURE( "0.5", "0.5", "0.5" ) ", " FLAT_TEXTURE( "0.2", "0.4", "0.8" ) " ], "
+        "\"color\": [2, 1, 0.5] }" ) );
+    CCombineTexture oTimes;
+
+    Check( pNode && oTimes.FromJson( *pNode ) && oTimes.GetCount() == 2, "a combine texture reads" );
+
+    CColor oColor = oTimes.ColorAt( oAt );
+
+    Check( ABS( oColor.GetR() - 0.2 ) < 1e-12 && ABS( oColor.GetG() - 0.2 ) < 1e-12 && ABS( oColor.GetB() - 0.2 ) < 1e-12,
+           "combine multiplies its textures and its color" );
+
+        // Added with weights.
+    pNode.reset( RayJson::Parse(
+        "{ \"type\": \"combine\", \"mode\": \"add\", \"weights\": [1, 0.5, 2], \"textures\": [ " FLAT_TEXTURE( "0.5", "0.5", "0.5" ) ", "
+        FLAT_TEXTURE( "0.2", "0.4", "0.8" ) ", " FLAT_TEXTURE( "0.1", "0", "0" ) " ] }" ) );
+    CCombineTexture oPlus;
+
+    Check( pNode && oPlus.FromJson( *pNode ) && oPlus.GetCount() == 3, "an adding combine texture reads" );
+    oColor = oPlus.ColorAt( oAt );
+    Check( ABS( oColor.GetR() - 0.8 ) < 1e-12 && ABS( oColor.GetG() - 0.7 ) < 1e-12 && ABS( oColor.GetB() - 0.9 ) < 1e-12,
+           "combine adds its textures by their weights" );
+
+        // A multiplied pair of real patterns is their product at every point.
+    pNode.reset( RayJson::Parse( "{ \"type\": \"combine\", \"textures\": [ { \"type\": \"noise\", \"seed\": 3 }, "
+                                 "{ \"type\": \"cells\", \"scale\": 0.3 } ] }" ) );
+    std::unique_ptr<IASLib::CJsonNode> pNoise( RayJson::Parse( "{ \"type\": \"noise\", \"seed\": 3 }" ) );
+    std::unique_ptr<IASLib::CJsonNode> pCells( RayJson::Parse( "{ \"type\": \"cells\", \"scale\": 0.3 }" ) );
+    CCombineTexture oPair;
+    CNoiseTexture   oNoise;
+    CCellsTexture   oCells;
+    bool            bProduct = true;
+
+    Check( pNode && pNoise && pCells && oPair.FromJson( *pNode ) && oNoise.FromJson( *pNoise ) && oCells.FromJson( *pCells ),
+           "a combine of noise and cells reads" );
+    for ( int nIndex = 0; nIndex < 200; nIndex++ )
+    {
+        oAt.oPoint = CVector( nIndex * 0.137, nIndex * -0.071, nIndex * 0.029 );
+
+        CColor oBoth = oPair.ColorAt( oAt ), oA = oNoise.ColorAt( oAt ), oB = oCells.ColorAt( oAt );
+
+        if ( ABS( oBoth.GetR() - oA.GetR() * oB.GetR() ) > 1e-12 || ABS( oBoth.GetB() - oA.GetB() * oB.GetB() ) > 1e-12 )
+            bProduct = false;
+    }
+    Check( bProduct, "a multiplying combine is its textures' product everywhere" );
+
+        // Round trips: defaults left out, weights and color kept, presets and
+        // nesting kept.
+    const char *astrKinds[] =
+    {
+        "{ \"type\": \"combine\", \"textures\": [ { \"type\": \"noise\", \"seed\": 2 }, { \"preset\": \"caustics\" } ] }",
+        "{ \"type\": \"combine\", \"mode\": \"add\", \"weights\": [1, 0.25], \"color\": [0.2, 0.19, 0.17], "
+        "\"textures\": [ { \"type\": \"noise\" }, { \"type\": \"combine\", \"textures\": [ { \"type\": \"cells\" }, "
+        "{ \"type\": \"noise\", \"scale\": 0.1 } ] } ] }",
+    };
+    for ( size_t nIndex = 0; nIndex < sizeof( astrKinds ) / sizeof( astrKinds[ 0 ] ); nIndex++ )
+    {
+        CScene oScene, oAgain;
+        Check( oScene.FromJson( WithTexture( astrKinds[ nIndex ] ) ) == 0, "a combine texture loads" );
+        std::string strSaved = oScene.ToJson();
+        Check( oAgain.FromJson( strSaved ) == 0 && oAgain.ToJson() == strSaved, "a combine texture reads back as it was saved" );
+        if ( nIndex == 0 )
+            Check( strSaved.find( "\"weights\"" ) == std::string::npos && strSaved.find( "\"preset\": \"caustics\"" ) != std::string::npos,
+                   "a multiplying combine saves no weights, and a preset stays a preset" );
+        else
+            Check( strSaved.find( "\"weights\": [1.0, 0.25]" ) != std::string::npos && strSaved.find( "\"mode\": \"add\"" ) != std::string::npos,
+                   "an adding combine saves its mode and weights" );
+    }
+
+    ExpectError( WithTexture( "{ \"type\": \"combine\", \"textures\": [ { \"type\": \"noise\" } ] }" ), BAD_FILE,
+                 "textures must be an array of two or more textures" );
+    ExpectError( WithTexture( "{ \"type\": \"combine\", \"mode\": \"divide\", \"textures\": [ { \"type\": \"noise\" }, { \"type\": \"noise\" } ] }" ),
+                 BAD_FILE, "mode must be \"multiply\" or \"add\"" );
+    ExpectError( WithTexture( "{ \"type\": \"combine\", \"weights\": [1, 2], \"textures\": [ { \"type\": \"noise\" }, { \"type\": \"noise\" } ] }" ),
+                 BAD_FILE, "weights are for \"mode\": \"add\"" );
+    ExpectError( WithTexture( "{ \"type\": \"combine\", \"mode\": \"add\", \"weights\": [1], \"textures\": [ { \"type\": \"noise\" }, { \"type\": \"noise\" } ] }" ),
+                 BAD_FILE, "one number a texture" );
+    ExpectError( WithTexture( "{ \"type\": \"combine\", \"textures\": [ { \"type\": \"noise\" }, { \"type\": \"plaid\" } ] }" ),
+                 BAD_FILE, "textures[1]" );
+    ExpectError( WithTexture( "{ \"type\": \"combine\", \"size\": 2, \"textures\": [ { \"type\": \"noise\" }, { \"type\": \"noise\" } ] }" ),
+                 BAD_FILE, "size" );
+}
+#undef FLAT_TEXTURE
 
 static void TextureChecks( const char *strScenes )
 {
@@ -6089,6 +6187,50 @@ static void ApolloChecks( void )
         CRegolithMaterial oBad;
         Check( pNode && ! oBad.FromJson( *pNode ), "a zero surge width is refused" );
 
+            // The Oren-Nayar blend: off unless asked for, and then the
+            // Lommel-Seeliger term mixed with Oren-Nayar's, which is 1 lit and
+            // seen straight on and brightens toward the light (backscatter).
+        Check( oSoil.Factor( 0.4, 0.7, 0.9, 1.0 ) == oSoil.Factor( 0.4, 0.7, 0.9 ), "without orenNayar, regolith is as it was" );
+
+        IASLib::CObjectNode oPlain;
+
+        oSoil.ToJson( oPlain );
+        Check( oPlain.get( "orenNayar" ) == NULL && oPlain.get( "orenNayarWeight" ) == NULL, "regolith saves no Oren-Nayar fields when off" );
+
+        pNode.reset( RayJson::Parse( "{ \"type\": \"regolith\", \"surge\": 0, \"orenNayar\": 0.9, \"orenNayarWeight\": 1 }" ) );
+        CRegolithMaterial oRough;
+
+        Check( pNode && oRough.FromJson( *pNode ), "a regolith with Oren-Nayar reads" );
+        Check( ABS( oRough.Factor( 1.0, 1.0, 0.0, 1.0 ) - 1.0 ) < 1e-12, "Oren-Nayar regolith seen along the light is its color" );
+
+        double dS2 = 0.81, dA = 1.0 - 0.5 * dS2 / ( dS2 + 0.33 ), dB = 0.45 * dS2 / ( dS2 + 0.09 );
+        double dI = acos( 0.5 ), dR = acos( 0.8 );
+        double dExpected = 0.5 * ( dA + dB * 0.6 * sin( dI ) * tan( dR ) ) / dA;
+
+        Check( ABS( oRough.Factor( 0.5, 0.8, 0.3, 0.6 ) - dExpected ) < 1e-9, "Oren-Nayar's qualitative model, scaled to 1 at normal incidence" );
+        Check( oRough.Factor( 0.5, 0.8, 0.3, 1.0 ) > oRough.Factor( 0.5, 0.8, 0.3, -1.0 ), "Oren-Nayar is brighter toward the light" );
+        Check( ABS( oRough.Factor( 0.5, 0.8, 0.3, -1.0 ) - 0.5 ) < 1e-12, "Oren-Nayar away from the light is Lambert's" );
+
+        pNode.reset( RayJson::Parse( "{ \"type\": \"regolith\", \"surge\": 0, \"orenNayar\": 0.9, \"orenNayarWeight\": 0.25 }" ) );
+        CRegolithMaterial oMix;
+
+        Check( pNode && oMix.FromJson( *pNode ), "a blended regolith reads" );
+        double dLommel = 2.0 * 0.5 / ( 0.5 + 0.8 );
+        Check( ABS( oMix.Factor( 0.5, 0.8, 0.3, 0.6 ) - ( 0.75 * dLommel + 0.25 * dExpected ) ) < 1e-9, "orenNayarWeight blends the two" );
+
+        IASLib::CObjectNode oSaved;
+        oMix.ToJson( oSaved );
+        CRegolithMaterial oBack;
+        Check( oBack.FromJson( oSaved ) && oBack.Factor( 0.5, 0.8, 0.3, 0.6 ) == oMix.Factor( 0.5, 0.8, 0.3, 0.6 ),
+               "a blended regolith reads back as it was saved" );
+
+        pNode.reset( RayJson::Parse( "{ \"type\": \"regolith\", \"orenNayar\": 2 }" ) );
+        CRegolithMaterial oTooRough;
+        Check( pNode && ! oTooRough.FromJson( *pNode ), "an Oren-Nayar roughness over 1.5 radians is refused" );
+        pNode.reset( RayJson::Parse( "{ \"type\": \"regolith\", \"orenNayar\": 0.5, \"orenNayarWeight\": 1.5 }" ) );
+        CRegolithMaterial oTooMuch;
+        Check( pNode && ! oTooMuch.FromJson( *pNode ), "an Oren-Nayar weight over 1 is refused" );
+
     }
 }
 
@@ -7296,6 +7438,7 @@ int main( int argc, char **argv )
         LensElementsChecks();
         PanoramaChecks();
         RegolithBounceChecks();
+        CombineTextureChecks();
     }
 
     if ( g_nFailures == 0 )

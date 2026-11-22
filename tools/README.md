@@ -147,8 +147,27 @@ stops where the model has no data. `--curvature` drops the ground by d²/2R for 
 curvature; `--fill-center` replaces the middle (where a lander shows as a bump) by the plane fitted
 to the ground from that radius to twice it, and puts y = 0 on that plane under the center.
 `--crop` writes the heights as a float32 GeoTIFF in the same local meters (which it reads back),
-and `--sample LAT LON` and `--sample-local EAST NORTH` print the ground's height at points. Needs
-numpy.
+and `--sample LAT LON` and `--sample-local EAST NORTH` print the ground's height at points.
+`--uv-extent METERS` adds texture coordinates that map the square ±METERS about the center onto an
+image, north at the top (the albedo textures below). Needs numpy.
+
+## `geotiff_albedo.py`
+
+Makes an albedo texture for a terrain mesh from an orthoimage of the same place:
+`geotiff_albedo.py <ortho> --dtm <model> --center LAT LON --extent METERS --size PIXELS
+(--sun AZIMUTH ELEVATION | --fit-sun) [--highpass METERS] [--mask-lander METERS] [--destripe]
+--out albedo.png [--report strip.png]`. It samples the orthoimage (PDS3 8- or 16-bit or float, or
+GeoTIFF; only the rows it needs are read, so a partial download works) and the model on a square
+grid ±`--extent` about the center, north up, which is what `geotiff_terrain.py --uv-extent` maps.
+It divides out the sunlight's shading: the model's Lommel-Seeliger shading under the
+orthoimage's sun (`--fit-sun` finds the sun whose shading best matches the image's detail), with
+pixels on slopes that face away from it filled in from around them; then, with `--highpass`, a
+Gaussian blur of that many meters, leaving the albedo's mottling. `--mask-lander` paints over a
+lander and its shadow within that radius of the center; `--destripe` takes out north-south seams
+between image strips; where the orthoimage has no data the texture fades to the mean. The output
+is 8-bit linear gray, the albedo over its mean, halved (mean 128): a scene multiplies it back to
+an albedo with a `combine` texture's `color`. `--report` writes the crop, the de-shaded image and
+the texture side by side. Needs numpy and Pillow.
 
 ## `hdr_rle.py`
 
