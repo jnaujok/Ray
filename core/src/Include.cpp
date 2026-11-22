@@ -119,12 +119,15 @@ void CInclude::ToJson( IASLib::CObjectNode &oNode )
     std::unique_ptr<IASLib::CObjectNode> pScratch;
     IASLib::CArrayNode                  *pObjects;
 
+    std::unique_ptr<RayJson::CArchiveFolder> pFolder;
+
     if ( RayJson::EmbeddingData() )
         pObjects = oNode.putArray( "objects" );
     else
     {
         pScratch.reset( new IASLib::CObjectNode );
         pObjects = pScratch->putArray( "objects" );
+        pFolder.reset( new RayJson::CArchiveFolder( RayJson::CArchiveFolder::FolderOf( m_strFile ) ) );
     }
     for ( CObjects *pObject : m_apIncluded )
     {
@@ -233,6 +236,10 @@ BOOL CInclude::FromJson( const IASLib::CJsonNode &oNode )
 
     std::unique_ptr<IASLib::CJsonNode> pRoot( RayJson::Parse( strJson ) );
     BOOL                               bRead;
+        // In an archive, its files sit in its folder; in an archive of its
+        // own, at the top of that.
+    RayJson::CArchiveFolder            oFolder( pSource ? std::string() : RayJson::CArchiveFolder::FolderOf( m_strFile ),
+                                                pSource ? TRUE : FALSE );
 
     if ( ! pRoot )
         bRead = FALSE;

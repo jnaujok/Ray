@@ -7092,6 +7092,32 @@ static void ModelPartChecks( const char *strScenes, const char *strDir )
 
         Check( oTask.FromJson( strTask ) == 0 && oTask.GetObjectCount() == 2, "a task's copy carries the included objects inline" );
         Check( strTask.find( "\"objects\":[{\"type\":\"mesh\"" ) != std::string::npos, "a task's copy holds the mesh itself" );
+
+            // An included scene in a folder of its own: its files go in an
+            // archive under that folder, so extracting the archive puts them
+            // beside it, where it looks for them.
+        std::filesystem::create_directories( std::string( strDir ) + "/parts" );
+        Check( oScene.SaveObject( 1, ( std::string( strDir ) + "/parts/cube.ray" ).c_str(), TRUE ) == 0, "a prefab saves in a folder" );
+
+        std::string strNested = std::string( strDir ) + "/use_nested.ray";
+
+        pFile = fopen( strNested.c_str(), "wb" );
+        fputs( "{\"format\": \"Ray scene\", \"version\": 3, \"camera\": {\"position\": [0, 2, -10], \"lookAt\": [0, 0, 0]},"
+               " \"objects\": [{\"type\": \"include\", \"file\": \"parts/cube.ray\"}], \"lights\": []}", pFile );
+        fclose( pFile );
+
+        CScene      oNested, oArchived, oExtracted;
+        std::string strArchive = std::string( strDir ) + "/use_nested_archive.ray";
+        std::string strOut = std::string( strDir ) + "/extracted/use.ray";
+
+        std::filesystem::create_directories( std::string( strDir ) + "/extracted" );
+        Check( oNested.Load( strNested.c_str() ) == 0 && oNested.Save( strArchive.c_str() ) == 0, "a scene with an include in a folder saves as an archive" );
+        Check( oArchived.Load( strArchive.c_str() ) == 0 && oArchived.GetObjectCount() == 2, "the archive reads back" );
+        Check( oArchived.SaveJson( strOut.c_str() ) == 0, "and extracts" );
+        Check( std::filesystem::exists( std::string( strDir ) + "/extracted/parts/cube.ray" ) &&
+               std::filesystem::exists( std::string( strDir ) + "/extracted/parts/models/color_cube.stl" ),
+               "an included scene's files are extracted beside it" );
+        Check( oExtracted.Load( strOut.c_str() ) == 0 && oExtracted.GetObjectCount() == 2, "the extracted scene reads" );
     }
 
         // The LM-5 Eagle: NASA's model, its parts named.
