@@ -556,6 +556,24 @@ foreach(scene IN LISTS RAY_AA_NETWORK_SCENES)
     ray_network_test(aa_${scene} ${PROJECT_SOURCE_DIR}/scenes/${scene}.ray AA corners)
 endforeach()
 
+# The rays a render casts, by kind (raythrower --stats-json), must be the same
+# with 4 threads, 2 threads and 3 networked engines. Between them the scenes
+# cast every kind: area, spot, sun and sky shadow rays, bounce rays,
+# reflections and refractions.
+foreach(scene IN ITEMS soft lights environment bounce)
+    math(EXPR port "${ray_network_port} + 1")
+    set(ray_network_port ${port})
+    add_test(NAME ray_counts_${scene}
+             COMMAND ${CMAKE_COMMAND}
+                     -DRAYTHROWER=$<TARGET_FILE:raythrower>
+                     -DSCENE=${PROJECT_SOURCE_DIR}/scenes/${scene}_test.ray
+                     -DOUTPUT=${RENDER_DIR}
+                     -DSIZE=48x36
+                     -DPORT=${port}
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/RayCountTest.cmake)
+    set_tests_properties(ray_counts_${scene} PROPERTIES PROCESSORS 4 TIMEOUT 300)
+endforeach()
+
 # The random sampler's points must not depend on which task traces a ray, and
 # the adaptive sampler decides on rays from colors; engines must decide the same.
 ray_network_test(sampler_random4 ${PROJECT_SOURCE_DIR}/scenes/${RAY_SAMPLER_SCENE}.ray AA random:samples=4)

@@ -99,12 +99,10 @@ class CSocketTaskMaster::CConnection : public IASLib::CThread
                         oEvent.nKind = CTaskMaster::SEvent::EVENT_REQUEST;
                     else if ( nTag == MESSAGE_PIXELS )
                     {
-                        uint64_t nRays = 0;
 
                         oEvent.nKind = CTaskMaster::SEvent::EVENT_PIXELS;
-                        if ( ! RayWire::DecodePixels( strPayload, oEvent.nTrace, oEvent.oTile, nRays, oEvent.anColors ) )
+                        if ( ! RayWire::DecodePixels( strPayload, oEvent.nTrace, oEvent.oTile, oEvent.oCounts, oEvent.anColors ) )
                             break;      // A damaged stream can't be followed.
-                        oEvent.nRays = (long long)nRays;
                     }
                     else
                         continue;

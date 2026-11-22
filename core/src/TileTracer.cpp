@@ -27,13 +27,14 @@ CTileTracer::CTileTracer( void ) :
     m_oTile.nLeft = m_oTile.nTop = m_oTile.nWidth = m_oTile.nHeight = 0;
 }
 
-long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<double> &anColors )
+long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<double> &anColors, CRayCounts *pCounts )
 {
     CCamera        &oCamera = oScene.GetCamera();
     CPixelSampler  &oSampler = oCamera.GetSampler();
     int             nChannels = oCamera.GetChannels();
     CRay            oRay;
     long long       nRays = 0;
+    CRayCounts      oBefore( oScene.GetRayCounts() );
 
     m_oTile = oTile;
     m_pColors = &anColors;
@@ -56,7 +57,7 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
 
         if ( nChannels == 1 )
         {
-            oScene.TraceRay( oRay, oColor, NULL );
+            oScene.TraceRay( oRay, oColor, NULL, CRayCounts::CAMERA );
             if ( oRay.GetWeight() != 1.0 )
                 oColor = oColor * oRay.GetWeight();
             nRays++;
@@ -82,7 +83,7 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
 
                 oChannelRay.CreateRayAt( oScene, oRay.GetImageX(), oRay.GetImageY(), oRay.GetPixelX(), oRay.GetPixelY(), 1.0, nChannel );
                 oChannelRay.CopySampleIndex( oRay );
-                oScene.TraceRay( oChannelRay, oSeen, NULL );
+                oScene.TraceRay( oChannelRay, oSeen, NULL, CRayCounts::CAMERA );
                 anSum[ 0 ] += oSeen.GetR() * anWeight[ 0 ] * oChannelRay.GetWeight();
                 anSum[ 1 ] += oSeen.GetG() * anWeight[ 1 ] * oChannelRay.GetWeight();
                 anSum[ 2 ] += oSeen.GetB() * anWeight[ 2 ] * oChannelRay.GetWeight();
@@ -103,7 +104,7 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
                 CColor  oSeen;
 
                 oChannelRay.CreateRayAt( oScene, oRay.GetImageX(), oRay.GetImageY(), oRay.GetPixelX(), oRay.GetPixelY(), 1.0, nChannel );
-                oScene.TraceRay( oChannelRay, oSeen, NULL );
+                oScene.TraceRay( oChannelRay, oSeen, NULL, CRayCounts::CAMERA );
                 anChannel[ nChannel - 1 ] = ( ( nChannel == 1 ) ? oSeen.GetR() : ( nChannel == 2 ) ? oSeen.GetG() : oSeen.GetB() ) *
                                             oChannelRay.GetWeight();
                 nRays++;
@@ -116,6 +117,8 @@ long long CTileTracer::Trace( CScene &oScene, const STile &oTile, std::vector<do
     }
     oSampler.End();
     m_pColors = NULL;
+    if ( pCounts )
+        *pCounts = oScene.GetRayCounts().Since( oBefore );
     return nRays;
 }
 

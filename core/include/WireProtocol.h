@@ -20,8 +20,9 @@
 *       MESSAGE_TILE    master: a tile to trace: the trace number, then  *
 *                       left, top, width and height, 32-bit each         *
 *       MESSAGE_PIXELS  engine: the traced tile: the same five numbers,  *
-*                       the primary rays traced (64-bit), then red,      *
-*                       green, blue for each pixel, row by row, as       *
+*                       the rays the tile cast, one 64-bit count for     *
+*                       each kind in CRayCounts (camera first), then     *
+*                       red, green, blue for each pixel, row by row, as  *
 *                       IEEE-754 doubles. A request follows.             *
 *       MESSAGE_STOP    master: the engine stops (no payload)            *
 *                                                                        *
@@ -37,6 +38,7 @@
 #ifndef __WIREPROTOCOL_H__
 #define __WIREPROTOCOL_H__
 
+#include "RayCounts.h"
 #include "Globals.h"
 #include "MsgTag.h"
 #include "Streams/Stream.h"
@@ -47,7 +49,7 @@
 #include <string>
 
 #define RAY_WIRE_MAGIC          ((uint32_t)0x52415931)     // "RAY1"
-#define RAY_WIRE_VERSION        ((uint32_t)5)     // 2: JSON scene; 3: SJSON scene, binary batches; 4: tiles; 5: a scene starts a fresh stream
+#define RAY_WIRE_VERSION        ((uint32_t)6)     // 2: JSON scene; 3: SJSON scene, binary batches; 4: tiles; 5: a scene starts a fresh stream; 6: ray counts by kind
 #define RAY_WIRE_DEFAULT_PORT   7997
 #define RAY_WIRE_MAX_PAYLOAD    ((uint32_t)( 256u * 1024u * 1024u ))
 
@@ -79,9 +81,9 @@ namespace RayWire
     bool        DecodeHello( const std::string &strPayload );
     std::string EncodeTile( uint32_t nTrace, const STile &oTile );
     bool        DecodeTile( const std::string &strPayload, uint32_t &nTrace, STile &oTile );
-    std::string EncodePixels( uint32_t nTrace, const STile &oTile, uint64_t nRays, const std::vector<double> &anColors );
+    std::string EncodePixels( uint32_t nTrace, const STile &oTile, const CRayCounts &oCounts, const std::vector<double> &anColors );
         /// False if the payload isn't a whole tile of pixels.
-    bool        DecodePixels( const std::string &strPayload, uint32_t &nTrace, STile &oTile, uint64_t &nRays,
+    bool        DecodePixels( const std::string &strPayload, uint32_t &nTrace, STile &oTile, CRayCounts &oCounts,
                               std::vector<double> &anColors );
         /// A tile or pixels message as indented JSON, for reading; empty if
         /// the payload isn't a valid one.

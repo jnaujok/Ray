@@ -52,6 +52,7 @@ namespace
 
         // A tile's header: the trace number, left, top, width, height.
     const size_t s_nTileBytes = 5 * 4;
+    const size_t s_nCountBytes = (size_t)CRayCounts::KINDS * 8;
         // The most pixels a tile may have.
     const uint64_t s_nMaxTilePixels = 4096u * 4096u;
 
@@ -197,32 +198,37 @@ namespace RayWire
         return ( strPayload.size() == s_nTileBytes ) && GetTile( strPayload, nTrace, oTile );
     }
 
-    std::string EncodePixels( uint32_t nTrace, const STile &oTile, uint64_t nRays, const std::vector<double> &anColors )
+    std::string EncodePixels( uint32_t nTrace, const STile &oTile, const CRayCounts &oCounts, const std::vector<double> &anColors )
     {
         std::string strPayload;
 
-        strPayload.reserve( s_nTileBytes + 8 + ( anColors.size() * 8 ) );
+        strPayload.reserve( s_nTileBytes + s_nCountBytes + ( anColors.size() * 8 ) );
         PutTile( strPayload, nTrace, oTile );
-        PutUInt32( strPayload, (uint32_t)( nRays >> 32 ) );
-        PutUInt32( strPayload, (uint32_t)( nRays & 0xFFFFFFFFu ) );
+        for ( int nKind = 0; nKind < CRayCounts::KINDS; nKind++ )
+        {
+            PutUInt32( strPayload, (uint32_t)( oCounts.anCounts[ nKind ] >> 32 ) );
+            PutUInt32( strPayload, (uint32_t)( oCounts.anCounts[ nKind ] & 0xFFFFFFFFu ) );
+        }
         for ( size_t nIndex = 0; nIndex < anColors.size(); nIndex++ )
             PutDouble( strPayload, anColors[ nIndex ] );
         return strPayload;
     }
 
-    bool DecodePixels( const std::string &strPayload, uint32_t &nTrace, STile &oTile, uint64_t &nRays, std::vector<double> &anColors )
+    bool DecodePixels( const std::string &strPayload, uint32_t &nTrace, STile &oTile, CRayCounts &oCounts, std::vector<double> &anColors )
     {
         if ( ! GetTile( strPayload, nTrace, oTile ) )
             return false;
 
         size_t nValues = (size_t)oTile.nWidth * (size_t)oTile.nHeight * 3;
 
-        if ( strPayload.size() != s_nTileBytes + 8 + ( nValues * 8 ) )
+        if ( strPayload.size() != s_nTileBytes + s_nCountBytes + ( nValues * 8 ) )
             return false;
-        nRays = ( (uint64_t)GetUInt32( strPayload, s_nTileBytes ) << 32 ) | GetUInt32( strPayload, s_nTileBytes + 4 );
+        for ( int nKind = 0; nKind < CRayCounts::KINDS; nKind++ )
+            oCounts.anCounts[ nKind ] = ( (uint64_t)GetUInt32( strPayload, s_nTileBytes + nKind * 8 ) << 32 ) |
+                                        GetUInt32( strPayload, s_nTileBytes + nKind * 8 + 4 );
         anColors.resize( nValues );
         for ( size_t nIndex = 0; nIndex < nValues; nIndex++ )
-            anColors[ nIndex ] = GetDouble( strPayload, s_nTileBytes + 8 + ( nIndex * 8 ) );
+            anColors[ nIndex ] = GetDouble( strPayload, s_nTileBytes + s_nCountBytes + ( nIndex * 8 ) );
         return true;
     }
 
@@ -239,12 +245,17 @@ namespace RayWire
         }
         else if ( nTag == MESSAGE_PIXELS )
         {
-            uint64_t            nRays;
+            CRayCounts          oCounts;
             std::vector<double> anColors;
 
-            if ( ! DecodePixels( strPayload, nTrace, oTile, nRays, anColors ) )
+            if ( ! DecodePixels( strPayload, nTrace, oTile, oCounts, anColors ) )
                 return "";
-            oDocument.put( "rays", (double)nRays );
+            oDocument.put( "rays", (double)oCounts.anCounts[ CRayCounts::CAMERA ] );
+
+            IASLib::CObjectNode *pCounts = oDocument.putObject( "rayCounts" );
+
+            for ( int nKind = 0; nKind < CRayCounts::KINDS; nKind++ )
+                pCounts->put( CRayCounts::Name( nKind ), (double)oCounts.anCounts[ nKind ] );
 
             IASLib::CArrayNode *pPixels = oDocument.putArray( "pixels" );
 

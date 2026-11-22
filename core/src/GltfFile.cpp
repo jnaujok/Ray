@@ -551,13 +551,14 @@ namespace
             const IASLib::CJsonNode *pEntry = pTextures ? pTextures->get( (int)dTexture ) : NULL;
             double                   dSource = 0.0;
 
-                // EXT_texture_webp's source where there is one (Ray reads
-                // WebP), else the plain source; KTX2 (KHR_texture_basisu)
-                // isn't read, so its texture falls back to the plain source.
+                // The plain source (PNG or JPEG) where there is one, since
+                // it is usually the lossless original; else EXT_texture_webp's
+                // source, for files that ship only WebP. KTX2
+                // (KHR_texture_basisu) isn't read.
             const IASLib::CJsonNode *pExtensions = pEntry ? pEntry->get( "extensions" ) : NULL;
             const IASLib::CJsonNode *pWebp = pExtensions ? pExtensions->get( "EXT_texture_webp" ) : NULL;
 
-            if ( Number( pWebp, "source", dSource ) || Number( pEntry, "source", dSource ) )
+            if ( Number( pEntry, "source", dSource ) || Number( pWebp, "source", dSource ) )
                 nImage = (int)dSource;
             if ( Number( pTexture, "texCoord", dCoord ) )
                 nTexCoord = (int)dCoord;

@@ -17,6 +17,7 @@
 #define __TILETRACER_H__
 
 #include "PixelWriter.h"
+#include "RayCounts.h"
 
 #include <vector>
 
@@ -42,8 +43,9 @@ class CTileTracer : public CPixelWriter
 
             /// Traces oTile of the scene. anColors gets its pixels row by
             /// row from the top left, red, green and blue. Returns the number
-            /// of primary rays traced.
-        long long               Trace( CScene &oScene, const STile &oTile, std::vector<double> &anColors );
+            /// of primary rays traced; *pCounts, if given, gets every ray
+            /// the tile cast, by kind.
+        long long               Trace( CScene &oScene, const STile &oTile, std::vector<double> &anColors, CRayCounts *pCounts = NULL );
 
             /// Where the sampler puts the tile's pixels.
         virtual BOOL            PutPixel( int nX, int nY, const CColor &oColor );

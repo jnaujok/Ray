@@ -18,6 +18,7 @@
 #ifndef __TASKMASTER_H__
 #define __TASKMASTER_H__
 
+#include "RayCounts.h"
 #include "Globals.h"
 #include "TileTracer.h"
 #include "WorkQueue.h"
@@ -52,7 +53,7 @@ class CTaskMaster
             int                 nTask = -1;
             uint32_t            nTrace = 0;
             STile               oTile;
-            long long           nRays = 0;
+            CRayCounts          oCounts;            // every ray the tile cast, by kind
             std::vector<double> anColors;
         };
 
@@ -62,7 +63,8 @@ class CTaskMaster
         std::atomic<bool>       m_bTracing;
         std::atomic<bool>       m_bStop;
         std::atomic<int>        m_nStatus;          // fraction of the image traced, 0 to 10000
-        long long               m_nRaysTraced;
+        long long               m_nRaysTraced;      // camera rays
+        CRayCounts              m_oRayCounts;       // every ray, by kind
         uint32_t                m_nTrace;           // which trace this is, from 1
         std::string             m_strLastError;
         TWorkQueue<SEvent>      m_oEvents;
@@ -102,6 +104,10 @@ class CTaskMaster
         int                     GetTileSize( void ) const { return m_nTileSize; }
             /// The number of rays cast from the camera by the last trace.
         long long               GetRaysTraced( void ) const { return m_nRaysTraced; }
+            /// Every ray the last trace cast, by kind, from the tiles that
+            /// made the image (a tile traced again after a task was lost
+            /// counts once).
+        const CRayCounts       &GetRayCounts( void ) const { return m_oRayCounts; }
         const char             *GetLastError( void ) const { return m_strLastError.c_str(); }
 
         virtual int             Status( void ) { return m_nStatus; }

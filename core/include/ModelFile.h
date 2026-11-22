@@ -43,8 +43,8 @@
 *   (likewise). Each primitive's material's pbrMetallicRoughness         *
 *   baseColorFactor becomes its faces' color, times its                  *
 *   baseColorTexture at the middle of each face when that image is a     *
-*   PNG, JPEG or WebP (sRGB, as glTF says; EXT_texture_webp's source is  *
-*   preferred); other images (KTX2) are skipped and counted in           *
+*   PNG, JPEG or WebP (sRGB, as glTF says; the plain source, else         *
+*   EXT_texture_webp's); other images (KTX2) are skipped and counted in  *
 *   nSkippedImages, and the factor alone is used. Everything             *
 *   else about materials, cameras, lights, skins and animations is       *
 *   ignored. Draco- or meshopt-compressed models are refused. glTF is    *

@@ -105,8 +105,11 @@ static void WireChecks( void )
     STile               oTile = { 64, 96, 7, 5 };
     STile               oRead;
     uint32_t            nTrace = 0;
-    uint64_t            nRays = 0;
+    CRayCounts          oCounts, oReadCounts;
     std::vector<double> anColors, anRead;
+
+    for ( int nKind = 0; nKind < CRayCounts::KINDS; nKind++ )
+        oCounts.anCounts[ nKind ] = 0x123456789ull * (uint64_t)( nKind + 1 );
 
     Check( RayWire::DecodeHello( RayWire::EncodeHello() ), "the hello reads back" );
 
@@ -115,9 +118,9 @@ static void WireChecks( void )
 
     for ( int nIndex = 0; nIndex < 7 * 5 * 3; nIndex++ )
         anColors.push_back( adValues[ nIndex % nValues ] + nIndex * 1e-9 );
-    Check( RayWire::DecodePixels( RayWire::EncodePixels( 43, oTile, 0x123456789ull, anColors ), nTrace, oRead, nRays, anRead ) &&
-           nTrace == 43 && nRays == 0x123456789ull && oRead.nWidth == 7 && anRead.size() == anColors.size(),
-           "a tile's pixels decode" );
+    Check( RayWire::DecodePixels( RayWire::EncodePixels( 43, oTile, oCounts, anColors ), nTrace, oRead, oReadCounts, anRead ) &&
+           nTrace == 43 && oReadCounts == oCounts && oRead.nWidth == 7 && anRead.size() == anColors.size(),
+           "a tile's pixels and its ray counts by kind decode" );
 
     bool bExact = anRead.size() == anColors.size();
 
@@ -125,13 +128,14 @@ static void WireChecks( void )
         bExact = ( memcmp( &anRead[ nIndex ], &anColors[ nIndex ], sizeof( double ) ) == 0 );
     Check( bExact, "every pixel arrives exactly, bit for bit" );
 
-    std::string strReadable = RayWire::ToReadable( MESSAGE_PIXELS, RayWire::EncodePixels( 43, oTile, 9, anColors ) );
-    Check( strReadable.find( "\"pixels\"" ) != std::string::npos && strReadable.find( "\"left\": 64" ) != std::string::npos,
+    std::string strReadable = RayWire::ToReadable( MESSAGE_PIXELS, RayWire::EncodePixels( 43, oTile, oCounts, anColors ) );
+    Check( strReadable.find( "\"pixels\"" ) != std::string::npos && strReadable.find( "\"left\": 64" ) != std::string::npos &&
+           strReadable.find( "\"shadowArea\"" ) != std::string::npos,
            "a pixels message can be read as JSON" );
 
-    std::string strShort = RayWire::EncodePixels( 43, oTile, 9, anColors );
+    std::string strShort = RayWire::EncodePixels( 43, oTile, oCounts, anColors );
     strShort.resize( strShort.size() - 8 );
-    Check( ! RayWire::DecodePixels( strShort, nTrace, oRead, nRays, anRead ), "a short pixels message is refused" );
+    Check( ! RayWire::DecodePixels( strShort, nTrace, oRead, oReadCounts, anRead ), "a short pixels message is refused" );
     STile oEmpty = { 0, 0, 0, 5 };
     Check( ! RayWire::DecodeTile( RayWire::EncodeTile( 1, oEmpty ), nTrace, oRead ), "an empty tile is refused" );
 }
@@ -1167,9 +1171,9 @@ static void HdrChecks( void )
 class CQuitter : public CSocketTaskSlave
 {
     public:
-        virtual BOOL PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors )
+        virtual BOOL PixelsToMaster( uint32_t nTrace, const STile &oTile, const CRayCounts &oCounts, const std::vector<double> &anColors )
         {
-            (void)nTrace; (void)oTile; (void)nRays; (void)anColors;
+            (void)nTrace; (void)oTile; (void)oCounts; (void)anColors;
             delete m_pStream;       // drops the connection
             m_pStream = NULL;
             return FALSE;

@@ -289,7 +289,7 @@ CColor CTransparentMaterial::GetColor( CScene &oScene, CRay &oViewIncident, CVec
         // (past the critical angle) keeps the ray where it was.
     oTransmitted.SetInside( ( bLeaving != bPasses ) ? pIntersect : NULL );
 
-    oScene.TraceRay( oTransmitted, oTransparent, NULL );
+    oScene.TraceRay( oTransmitted, oTransparent, NULL, CRayCounts::REFRACTION );
 
     oTransparent = oTransparent * ColorAt( m_oColor, oIntersect, pIntersect );
 

@@ -35,11 +35,12 @@ BOOL CTaskSlave::RunEngine( void )
                 if ( ! pScene )
                     return FALSE;       // a tile before any scene
 
-                long long nRays = oTracer.Trace( *pScene, oTile, anColors );
+                CRayCounts oCounts;
+                long long  nRays = oTracer.Trace( *pScene, oTile, anColors, &oCounts );
 
                 m_nTilesTraced++;
                 m_nRaysTraced += nRays;
-                if ( ! PixelsToMaster( nTrace, oTile, nRays, anColors ) || ! RequestWork() )
+                if ( ! PixelsToMaster( nTrace, oTile, oCounts, anColors ) || ! RequestWork() )
                     return FALSE;
                 break;
             }

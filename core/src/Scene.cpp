@@ -602,7 +602,7 @@ int CScene::BuildTreeNode( int nFirst, int nCount )
 }
 
 
-BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny )
+BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny, int nKind )
 {
     int     nCount;
         // Object pointer
@@ -625,6 +625,7 @@ BOOL CScene::TraceRay( CRay &oRay, CColor &oResult, CObjects *pDeny )
         oResult = oPixel;
         return TRUE;
     }
+    m_oRayCounts.Count( nKind );
 
     (void)nCount;
     (void)pObject;

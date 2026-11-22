@@ -188,6 +188,7 @@ CColor CObjects::BaseShade( CScene &oScene, CRay &oRay, CVector &oIntersect, CVe
 
         oToLight = pLight->ToLight( oIntersect );
         oLightRay.CreateRay( oToLight, oIntersect, 1.0, -1, -1 );
+        oScene.CountRay( pLight->ShadowRayKind() );
         if ( ! oScene.Intersect( oLightRay, this ) )
         {
             nMaterial = 0;
@@ -287,6 +288,7 @@ void CObjects::AreaLightShade( CScene &oScene, CRay &oRay, CVector &oIntersect, 
         CVector oToLight( oPoint - oIntersect );
 
         oLightRay.CreateRay( oToLight, oIntersect, 1.0, -1, -1 );
+        oScene.CountRay( pLight->ShadowRayKind() );
         if ( oScene.Intersect( oLightRay, this ) )
             continue;
 
@@ -360,6 +362,7 @@ void CObjects::EnvironmentShade( CScene &oScene, CRay &oRay, CVector &oIntersect
         CRay    oSkyRay;
 
         oSkyRay.CreateRay( oToSky, oIntersect, 1.0, -1, -1 );
+        oScene.CountRay( CRayCounts::SHADOW_SKY );
         if ( ! oScene.Intersect( oSkyRay, this ) )
             nOpen++;
     }
@@ -402,6 +405,8 @@ BOOL CObjects::GatherAlong( CScene &oScene, CRay &oRay, CVector &oFrom, CVector 
     oGather.Increment();
     if ( oGather.GetDepth() > oSettings.GetMaximumDepth() )
         return FALSE;
+
+    oScene.CountRay( CRayCounts::INDIRECT );
 
     CObjects   *pHit = oScene.ClosestHit( oGather, oHit, this );
 

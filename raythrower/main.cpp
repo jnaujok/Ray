@@ -17,6 +17,7 @@
 #include "WireProtocol.h"
 #include "PixelSampler.h"
 #include "RayCountMap.h"
+#include "RayCounts.h"
 #include "ColorModel.h"
 #include "SceneJson.h"
 
@@ -49,6 +50,7 @@ namespace
         std::string strPng;
         std::string strHdr;
         std::string strRayCount;        // --ray-count: a heat map of rays per pixel
+        std::string strStatsJson;       // --stats-json: the ray counts as JSON
         std::string strEngine;
         std::string strSampler;         // Empty: what the scene says.
         std::string strColorModel;      // Empty: what the scene says.
@@ -63,6 +65,7 @@ namespace
         bool        bListen = false;
         bool        bSpawn = false;
         bool        bQuiet = false;
+        bool        bStats = false;     // --stats: the ray counts even when quiet
     };
 
     void ShowUsage( void )
@@ -108,12 +111,56 @@ namespace
         printf( "  --save-json <file>          Save it as plain JSON, for editing by hand, with the\n" );
         printf( "                              files it uses written beside it, and exit\n" );
         printf( "  -q, --quiet                 Print only errors\n" );
+        printf( "  --stats                     Print the rays cast, by kind, even with --quiet (they are\n" );
+        printf( "                              printed anyway without it)\n" );
+        printf( "  --stats-json <file>         Also write the rays cast, by kind, as JSON\n" );
         printf( "  -h, --help                  Show this help\n" );
     }
 
         // A sampler or color model from "name" or "name:key=value,...", the
         // settings as the scene file would give them. NULL, with a message in
         // strError, if the name or a setting is not right.
+        // The rays cast, by kind: a table on standard output.
+    void PrintRayCounts( const CRayCounts &oCounts, long nPixels, double dSeconds, int nTasks )
+    {
+        uint64_t nTotal = oCounts.Total();
+
+        printf( "Rays cast, by kind:\n" );
+        printf( "  %-12s %16s %8s %12s\n", "kind", "rays", "share", "per pixel" );
+        for ( int nKind = 0; nKind < CRayCounts::KINDS; nKind++ )
+        {
+            uint64_t n = oCounts.anCounts[ nKind ];
+
+            printf( "  %-12s %16llu %7.2f%% %12.2f\n", CRayCounts::Name( nKind ), (unsigned long long)n,
+                    nTotal ? 100.0 * (double)n / (double)nTotal : 0.0, nPixels ? (double)n / (double)nPixels : 0.0 );
+        }
+        printf( "  %-12s %16llu %7.2f%% %12.2f\n", "total", (unsigned long long)nTotal, nTotal ? 100.0 : 0.0,
+                nPixels ? (double)nTotal / (double)nPixels : 0.0 );
+        if ( dSeconds > 0.0 && nTasks > 0 )
+            printf( "  %.0f rays a second; %.0f a second per task (%d tasks)\n", (double)nTotal / dSeconds,
+                    (double)nTotal / dSeconds / (double)nTasks, nTasks );
+    }
+
+        // The same, as JSON.
+    bool WriteRayCounts( const std::string &strFile, const CRayCounts &oCounts, long nPixels, double dSeconds, int nTasks )
+    {
+        FILE *pFile = fopen( strFile.c_str(), "w" );
+
+        if ( pFile == NULL )
+            return false;
+
+        uint64_t nTotal = oCounts.Total();
+
+        fprintf( pFile, "{\n  \"pixels\": %ld,\n  \"seconds\": %.3f,\n  \"tasks\": %d,\n  \"rays\": {\n", nPixels, dSeconds, nTasks );
+        for ( int nKind = 0; nKind < CRayCounts::KINDS; nKind++ )
+            fprintf( pFile, "    \"%s\": %llu,\n", CRayCounts::Name( nKind ), (unsigned long long)oCounts.anCounts[ nKind ] );
+        fprintf( pFile, "    \"total\": %llu\n  },\n", (unsigned long long)nTotal );
+        fprintf( pFile, "  \"raysPerPixel\": %.4f,\n", nPixels ? (double)nTotal / (double)nPixels : 0.0 );
+        fprintf( pFile, "  \"raysPerSecond\": %.1f,\n", dSeconds > 0.0 ? (double)nTotal / dSeconds : 0.0 );
+        fprintf( pFile, "  \"raysPerSecondPerTask\": %.1f\n}\n", ( dSeconds > 0.0 && nTasks > 0 ) ? (double)nTotal / dSeconds / nTasks : 0.0 );
+        return fclose( pFile ) == 0;
+    }
+
         // The rays per pixel CRayCountMap recorded, as a PNG heat map
         // (a log scale from the fewest to the most), and a summary.
     bool WriteRayCount( const std::string &strFile, bool bQuiet )
@@ -261,6 +308,8 @@ namespace
                 return false;
             else if ( strArg == "-q" || strArg == "--quiet" )
                 oOptions.bQuiet = true;
+            else if ( strArg == "--stats" )
+                oOptions.bStats = true;
             else if ( strArg == "--spawn" )
                 oOptions.bSpawn = true;
             else if ( strArg == "--aa" || strArg == "--antialias" )
@@ -325,7 +374,7 @@ namespace
             }
             else if ( strArg == "-o" || strArg == "--output" || strArg == "--ppm" || strArg == "--png" ||
                       strArg == "--hdr" || strArg == "--ray-count" || strArg == "--engine" || strArg == "--save" ||
-                      strArg == "--save-json" )
+                      strArg == "--save-json" || strArg == "--stats-json" )
             {
                 if ( strNext == NULL )
                 {
@@ -336,6 +385,7 @@ namespace
                                          ( strArg == "--png" ) ? oOptions.strPng :
                                          ( strArg == "--hdr" ) ? oOptions.strHdr :
                                          ( strArg == "--ray-count" ) ? oOptions.strRayCount :
+                                         ( strArg == "--stats-json" ) ? oOptions.strStatsJson :
                                          ( strArg == "--save" ) ? oOptions.strSave :
                                          ( strArg == "--save-json" ) ? oOptions.strSaveJson :
                                          ( strArg == "--engine" ) ? oOptions.strEngine : oOptions.strOutput;
@@ -663,7 +713,9 @@ int main( int argc, char **argv )
     }
     auto tEnd = std::chrono::steady_clock::now();
 
-    long long nRays = pMaster->GetRaysTraced();
+    long long   nRays = pMaster->GetRaysTraced();
+    CRayCounts  oCounts = pMaster->GetRayCounts();
+    int         nTaskCount = pMaster->GetTaskCount();
     std::string strError = pMaster->GetLastError();
 
     pMaster->EndTasks();
@@ -702,16 +754,23 @@ int main( int argc, char **argv )
     if ( bHdrFailed )
         return 1;
 
+    double  dSeconds = std::chrono::duration<double>( tEnd - tStart ).count();
+    long    nPixels = (long)oSettings.GetImageHeight() * (long)oSettings.GetImageWidth();
+
     if ( ! oOptions.bQuiet )
     {
-        double  dSeconds = std::chrono::duration<double>( tEnd - tStart ).count();
-        long    nPixels = (long)oSettings.GetImageHeight() * (long)oSettings.GetImageWidth();
-
         printf( "Total Pixels Traced: %ld\n", nPixels );
         printf( "Rays Traced: %lld (%.2f per pixel)\n", nRays, nPixels ? (double)nRays / (double)nPixels : 0.0 );
         printf( "Time to trace: %.2f seconds\n", dSeconds );
         if ( dSeconds > 0.0 )
             printf( "Pixels per Second: %.0f\n", (double)nPixels / dSeconds );
+    }
+    if ( ! oOptions.bQuiet || oOptions.bStats )
+        PrintRayCounts( oCounts, nPixels, dSeconds, nTaskCount );
+    if ( ! oOptions.strStatsJson.empty() && ! WriteRayCounts( oOptions.strStatsJson, oCounts, nPixels, dSeconds, nTaskCount ) )
+    {
+        fprintf( stderr, "Couldn't write %s\n", oOptions.strStatsJson.c_str() );
+        return 1;
     }
 
     return 0;

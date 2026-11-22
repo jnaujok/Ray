@@ -44,7 +44,7 @@ class CTaskSlave
             /// Asks the master for a tile.
         virtual BOOL        RequestWork( void ) = 0;
             /// Sends a traced tile's pixels.
-        virtual BOOL        PixelsToMaster( uint32_t nTrace, const STile &oTile, long long nRays, const std::vector<double> &anColors ) = 0;
+        virtual BOOL        PixelsToMaster( uint32_t nTrace, const STile &oTile, const CRayCounts &oCounts, const std::vector<double> &anColors ) = 0;
 
         long long           GetTilesTraced( void ) const { return m_nTilesTraced; }
         long long           GetRaysTraced( void ) const { return m_nRaysTraced; }

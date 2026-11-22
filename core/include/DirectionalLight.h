@@ -30,6 +30,7 @@ class CDirectionalLight : public CLight
         int             m_nSamples;
 
     public:
+        virtual int     ShadowRayKind( void ) const { return CRayCounts::SHADOW_SUN; }
                         DYNAMIC_OBJECTS( CDirectionalLight );
 
                         CDirectionalLight( void );
