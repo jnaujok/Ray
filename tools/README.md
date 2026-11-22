@@ -99,6 +99,12 @@ one in each of Blender's mesh layouts, and their gzip and Zstandard copies) for 
 `blend_test.ray`: a header, blocks and a structure catalog the way Blender writes them, the same
 every time. Zstandard needs `pip install zstandard`.
 
+## `changelog_section.py`
+
+Prints one release's section of `CHANGELOG.md` (`changelog_section.py <tag> [CHANGELOG.md]
+[owner/repo]`), with links and images made absolute to the files at that tag, for the GitHub
+Release's notes; `.github/workflows/release.yml` uses it.
+
 ## `make_image_fixtures.py`
 
 Writes the JPEG and WebP test images in `scenes/textures/formats/` for `format_test`, each with
